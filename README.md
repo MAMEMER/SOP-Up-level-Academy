@@ -14,3 +14,28 @@ Private company SOP website for employees, department leaders, and admins.
 - Employee: reads published SOPs.
 - Leader: drafts SOPs for their department and submits for approval.
 - Admin: approves, publishes, and manages users.
+
+## Deployment
+
+Deploy the app to Vercel.
+
+Required environment variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+Recommended domain:
+
+- `sop.company.com`
+
+After adding the domain in Vercel, configure DNS at the domain registrar using the A record or CNAME record shown in the Vercel project domain settings.
+
+## Preview
+
+Static preview file:
+
+- `preview.html`
+
+Local preview URL when the static server is running:
+
+- `http://localhost:8000/preview.html`
