@@ -14,6 +14,11 @@ input {
   font: inherit;
 }
 
+textarea,
+select {
+  font: inherit;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -80,6 +85,41 @@ a {
   background: white;
   border-bottom: 1px solid #d8dee4;
   padding: 16px;
+}
+
+.sop-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.sop-editor label,
+.step-card {
+  display: grid;
+  gap: 8px;
+}
+
+.sop-editor input,
+.sop-editor textarea {
+  border: 1px solid #cbd5df;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.list-panel,
+.sop-list {
+  display: grid;
+  gap: 12px;
+}
+
+.user-list {
+  display: grid;
+  gap: 12px;
+}
+
+.user-list > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr 120px 90px;
+  gap: 12px;
 }
 
 .app-shell {
