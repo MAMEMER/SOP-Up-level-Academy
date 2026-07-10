@@ -337,7 +337,58 @@ function CloseStoreTaskDetails({
   details: Record<string, string>;
   updateDetail: (key: string, value: string) => void;
 }) {
-  if (index === 4) {
+  if (index === 0) {
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-head">
+          <strong>สรุปออเดอร์ก่อนกลับบ้าน</strong>
+          <small>ใส่จำนวนออเดอร์และแจ้งงานส่งของพรุ่งนี้ในกลุ่มแอดมิน</small>
+        </div>
+        <label className="workflow-note-field compact">
+          <span>จำนวนออเดอร์</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={details[detailKey(workDate, "closing-order-count")] || ""}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("closing-order-count", event.target.value)}
+            placeholder="เช่น 8"
+          />
+        </label>
+        <label className="detail-check">
+          <input
+            type="checkbox"
+            checked={details[detailKey(workDate, "closing-admin-next-day-shipping")] === "แจ้งแล้ว"}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("closing-admin-next-day-shipping", event.target.checked ? "แจ้งแล้ว" : "")}
+          />
+          <span>แจ้งในกลุ่มแอดมินเพื่อส่งของในวันพรุ่งนี้</span>
+        </label>
+        <label className="detail-upload">
+          <span>อัปโหลดรูปสรุปออเดอร์</span>
+          <input type="file" accept="image/*" disabled={!canEdit} />
+        </label>
+      </div>
+    );
+  }
+
+  if (index === 1) {
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-head">
+          <strong>เก็บอุปกรณ์ ทำความสะอาดพื้นที่เล่น</strong>
+          <small>แนบรูปหลักฐานหลังเก็บพื้นที่และอุปกรณ์เรียบร้อย</small>
+        </div>
+        <label className="detail-upload">
+          <span>อัปโหลดรูปหลักฐานทำความสะอาด</span>
+          <input type="file" accept="image/*" disabled={!canEdit} />
+        </label>
+      </div>
+    );
+  }
+
+  if (index === 2) {
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
@@ -359,6 +410,26 @@ function CloseStoreTaskDetails({
         <label className="detail-upload">
           <span>อัปโหลดรูปเงินสดปิดร้าน</span>
           <input type="file" accept="image/*" disabled={!canEdit} />
+        </label>
+      </div>
+    );
+  }
+
+  if (index === 3) {
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-head">
+          <strong>แจ้งสรุปประจำวันในกลุ่มแอดมิน</strong>
+          <small>ส่งยอดรวม ปัญหา และงานที่ต้องติดตามในกลุ่มแอดมิน</small>
+        </div>
+        <label className="detail-check">
+          <input
+            type="checkbox"
+            checked={details[detailKey(workDate, "closing-admin-daily-summary")] === "แจ้งแล้ว"}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("closing-admin-daily-summary", event.target.checked ? "แจ้งแล้ว" : "")}
+          />
+          <span>แจ้งสรุปประจำวันในกลุ่มแอดมิน</span>
         </label>
       </div>
     );
@@ -866,9 +937,7 @@ export function WorkflowChecklist({
               </div>
               <p className="phase-window">
                 เวลาที่กำหนด {schedule.startLabel}-{schedule.endLabel}
-                {!unlocked ? " · ต้องทำขั้นก่อนหน้าให้เสร็จก่อน" : ""}
                 {isExpired && !flexible && !isAdmin && !adminUnlocked ? " · เลยเวลาแล้ว ไม่สามารถกลับไปทำได้" : ""}
-                {isExpired && !flexible && isAdmin ? " · admin แก้ไขได้" : ""}
                 {adminUnlocked ? " · admin ปลดล็อคให้แก้ไข" : ""}
                 {!withinWorkHours ? " · นอกเวลาทำงาน 09:00-23:00" : ""}
               </p>
@@ -881,7 +950,7 @@ export function WorkflowChecklist({
                     phase.id === "open-store" ||
                     phase.id === "stock-work" ||
                     (phase.id === "daytime-work" && (index === 0 || index === 1)) ||
-                    (phase.id === "close-store" && index === 4);
+                    (phase.id === "close-store" && index <= 3);
                   return (
                     <div key={key} className={hasDetail ? "tick-group has-detail" : "tick-group"}>
                       <label

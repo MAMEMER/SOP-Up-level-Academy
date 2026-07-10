@@ -38,7 +38,16 @@ describe("card store workflow content", () => {
       "แจ้งเลข tracking กับลูกค้า"
     ]);
     assert.equal(daytime?.checklist.includes("ไม่มีออเดอร์"), false);
-    assert.equal(closing?.checklist.includes("ปิดยอดร้านและบันทึกเงินสด"), true);
+    assert.deepEqual(closing?.checklist, [
+      "สรุปออเดอร์ก่อนกลับบ้าน",
+      "เก็บอุปกรณ์ ทำความสะอาดพื้นที่เล่น",
+      "ปิดยอดร้านและบันทึกเงินสด",
+      "แจ้งสรุปประจำวันในกลุ่มแอดมิน",
+      "ปิดระบบขาย / ปิดไฟ / ปิดแอร์",
+      "ล็อกประตูและยืนยันปิดร้าน"
+    ]);
+    assert.equal(closing?.checklist.includes("ล็อกตู้สินค้าและตรวจสินค้าแพง"), false);
+    assert.equal(closing?.checklist.includes("สรุปรายการต้องเติม"), false);
   });
 
   it("links every task phase to its matching manual section", () => {

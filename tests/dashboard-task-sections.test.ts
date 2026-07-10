@@ -61,4 +61,16 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("จัดส่งสินค้าพร้อมเพิ่ม record เลข track"), true);
     assert.equal(source.includes("shipping-tracking-number"), true);
   });
+
+  it("removes close-store phase helper text and adds closing proof fields", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("ต้องทำขั้นก่อนหน้าให้เสร็จก่อน"), false);
+    assert.equal(source.includes("admin แก้ไขได้"), false);
+    assert.equal(source.includes("closing-order-count"), true);
+    assert.equal(source.includes("แจ้งในกลุ่มแอดมินเพื่อส่งของในวันพรุ่งนี้"), true);
+    assert.equal(source.includes("อัปโหลดรูปสรุปออเดอร์"), true);
+    assert.equal(source.includes("อัปโหลดรูปหลักฐานทำความสะอาด"), true);
+    assert.equal(source.includes("แจ้งสรุปประจำวันในกลุ่มแอดมิน"), true);
+  });
 });
