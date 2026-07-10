@@ -38,6 +38,7 @@ function completedCountForPhase(phase: WorkflowPhase, checkedMap: Record<string,
 const workflowNoteStorageKey = "up-level-workflow-notes";
 const workflowDetailStorageKey = "up-level-workflow-details";
 const stockRoomSheetUrl = "https://docs.google.com/spreadsheets/d/1hZcCPfbjEsKTVnLxSrb75HnPdv8ZcGQyvaB5BEa5Vyk/edit?gid=0#gid=0";
+const supplyNeedsUrl = "https://uplevel.storehubhq.com/stocks/supplyNeeds/v2/web";
 
 function noteKey(workDate: string, phaseId: string) {
   return `${workDate}:${phaseId}`;
@@ -370,8 +371,11 @@ function StockTaskDetails({
       <div className="detail-panel">
         <div className="detail-panel-head">
           <strong>แจ้งเตือนสินค้าใกล้หมด</strong>
-          <small>ตรวจจากหน้าแจ้งเตือนใน StoreHub</small>
+          <small>สรุปรายวันจาก StoreHub Supply Needs เฉพาะชื่อสินค้าและจำนวนที่เหลือ</small>
         </div>
+        <a href={supplyNeedsUrl} target="_blank" rel="noreferrer" className="detail-action-link">
+          เปิด StoreHub Supply Needs
+        </a>
         <label className="detail-check">
           <input
             type="checkbox"
@@ -380,6 +384,15 @@ function StockTaskDetails({
             onChange={(event) => updateDetail("stock-low-none", event.target.checked ? "ไม่มี" : "")}
           />
           <span>ไม่มี</span>
+        </label>
+        <label className="workflow-note-field compact">
+          <span>สรุปรายวัน: ชื่อสินค้า | จำนวนที่เหลือ</span>
+          <textarea
+            value={details[detailKey(workDate, "supply-needs-summary")] || ""}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("supply-needs-summary", event.target.value)}
+            placeholder="ชื่อสินค้า | จำนวนที่เหลือ"
+          />
         </label>
       </div>
     );
@@ -780,7 +793,6 @@ export function WorkflowChecklist({
               <p className="phase-window">
                 เวลาที่กำหนด {schedule.startLabel}-{schedule.endLabel}
                 {!unlocked ? " · ต้องทำขั้นก่อนหน้าให้เสร็จก่อน" : ""}
-                {isExpired && flexible ? " · เลยเวลาแล้ว ถ้าส่งงานจะขึ้นสีส้ม" : ""}
                 {isExpired && !flexible && !isAdmin && !adminUnlocked ? " · เลยเวลาแล้ว ไม่สามารถกลับไปทำได้" : ""}
                 {isExpired && !flexible && isAdmin ? " · admin แก้ไขได้" : ""}
                 {adminUnlocked ? " · admin ปลดล็อคให้แก้ไข" : ""}

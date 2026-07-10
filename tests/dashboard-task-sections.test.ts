@@ -26,4 +26,19 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("https://docs.google.com/spreadsheets/d/1hZcCPfbjEsKTVnLxSrb75HnPdv8ZcGQyvaB5BEa5Vyk/edit?gid=0#gid=0"), true);
     assert.equal(source.includes("เปิด Google Sheet ห้อง Stock"), true);
   });
+
+  it("summarizes low stock daily from StoreHub Supply Needs with only name and remaining quantity", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("supplyNeedsUrl"), true);
+    assert.equal(source.includes("https://uplevel.storehubhq.com/stocks/supplyNeeds/v2/web"), true);
+    assert.equal(source.includes("สรุปรายวันจาก StoreHub Supply Needs"), true);
+    assert.equal(source.includes("ชื่อสินค้า | จำนวนที่เหลือ"), true);
+  });
+
+  it("does not explain orange late-submit behavior in the checklist window text", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("เลยเวลาแล้ว ถ้าส่งงานจะขึ้นสีส้ม"), false);
+  });
 });

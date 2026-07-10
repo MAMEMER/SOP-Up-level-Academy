@@ -28,7 +28,7 @@ describe("card store workflow content", () => {
     assert.deepEqual(stock?.checklist, [
       "ดึงข้อมูลการนับจาก StoreHub Stock Take และ approve เมื่อสถานะ Completed",
       "นับจำนวนจริงหน้าร้านและห้อง Stock",
-      "ระบุสินค้าใกล้หมดจาก StoreHub ในหน้าแจ้งเตือน",
+      "สรุปรายวันสินค้าใกล้หมดจาก StoreHub Supply Needs เฉพาะชื่อและจำนวนที่เหลือ",
       "แคปหน้าจอตรวจสินค้าเสร็จสิ้น",
       "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
     ]);

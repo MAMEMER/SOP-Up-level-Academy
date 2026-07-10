@@ -97,6 +97,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
           "เปิด StoreHub Stock Take และเลือก session น้ำ/ขนมล่าสุด",
           "นับจำนวนจริงหน้าร้านและพื้นที่เก็บสำรอง",
           "ตรวจสถานะ Stock Take ให้เป็น Completed ก่อนส่งงาน",
+          "สรุปรายวันสินค้าใกล้หมดจาก StoreHub Supply Needs เฉพาะชื่อสินค้าและจำนวนที่เหลือ",
           "แคปหน้าจอ StoreHub Stock Take หลังทำรายการเสร็จ",
           "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
         ]
@@ -145,7 +146,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
     checklist: [
       "ดึงข้อมูลการนับจาก StoreHub Stock Take และ approve เมื่อสถานะ Completed",
       "นับจำนวนจริงหน้าร้านและห้อง Stock",
-      "ระบุสินค้าใกล้หมดจาก StoreHub ในหน้าแจ้งเตือน",
+      "สรุปรายวันสินค้าใกล้หมดจาก StoreHub Supply Needs เฉพาะชื่อและจำนวนที่เหลือ",
       "แคปหน้าจอตรวจสินค้าเสร็จสิ้น",
       "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
     ]

@@ -3303,6 +3303,21 @@ a {
   text-underline-offset: 3px;
 }
 
+.detail-action-link {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 36px;
+  align-items: center;
+  border: 1px solid rgba(29, 78, 216, 0.22);
+  border-radius: 8px;
+  background: rgba(239, 246, 255, 0.78);
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 7px 10px;
+  text-decoration: none;
+}
+
 .detail-upload {
   border: 1px dashed rgba(46, 125, 79, 0.28);
   border-radius: 8px;
