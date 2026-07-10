@@ -51,5 +51,14 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("IG"), true);
     assert.equal(source.includes("Line group"), true);
     assert.equal(source.includes("Shopee"), true);
+    assert.equal(source.includes("ไม่มีออเดอร์"), true);
+  });
+
+  it("records tracking on the shipping packing step", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("แพ็คสินค้าตามขั้นตอน"), true);
+    assert.equal(source.includes("จัดส่งสินค้าพร้อมเพิ่ม record เลข track"), true);
+    assert.equal(source.includes("shipping-tracking-number"), true);
   });
 });

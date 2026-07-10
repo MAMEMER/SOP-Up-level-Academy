@@ -33,14 +33,11 @@ describe("card store workflow content", () => {
       "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
     ]);
     assert.deepEqual(daytime?.checklist, [
-      "สรุปออเดอร์สินค้าที่ต้องจัดส่ง",
-      "ตรวจรายการสินค้าและสภาพก่อนแพ็ค",
-      "แพ็คสินค้า",
-      "นำส่งสินค้า",
-      "ลงเลข tracking ให้เรียบร้อย",
-      "แจ้งเลข tracking กับลูกค้า",
-      "ไม่มีออเดอร์"
+      "ตรวจสอบเช็คสินค้าที่ต้องจัดส่ง",
+      "แพ็คสินค้าตามขั้นตอน",
+      "แจ้งเลข tracking กับลูกค้า"
     ]);
+    assert.equal(daytime?.checklist.includes("ไม่มีออเดอร์"), false);
     assert.equal(closing?.checklist.includes("ปิดยอดร้านและบันทึกเงินสด"), true);
   });
 

@@ -263,34 +263,65 @@ function ShippingTaskDetails({
   details: Record<string, string>;
   updateDetail: (key: string, value: string) => void;
 }) {
-  if (index !== 0) return null;
+  if (index === 0) {
+    const channels = ["Facebook", "IG", "Line group", "Shopee", "ไม่มีออเดอร์"] as const;
 
-  const channels = ["Facebook", "IG", "Line group", "Shopee"] as const;
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-head">
+          <strong>ช่องทางออเดอร์</strong>
+          <small>ตรวจสอบเช็คสินค้าที่ต้องจัดส่งจากช่องทางที่มีงานวันนี้</small>
+        </div>
+        <div className="detail-grid">
+          {channels.map((channel) => {
+            const key = `shipping-channel-${channel.toLowerCase().replaceAll(" ", "-")}`;
+            return (
+              <label key={channel} className="detail-check">
+                <input
+                  type="checkbox"
+                  checked={details[detailKey(workDate, key)] === "มี"}
+                  disabled={!canEdit}
+                  onChange={(event) => updateDetail(key, event.target.checked ? "มี" : "")}
+                />
+                <span>{channel}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
-  return (
-    <div className="detail-panel">
-      <div className="detail-panel-head">
-        <strong>ช่องทางออเดอร์</strong>
-        <small>สรุปออเดอร์สินค้าที่ต้องจัดส่งจากช่องทางที่มีงานวันนี้</small>
+  if (index === 1) {
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-head">
+          <strong>แพ็คและจัดส่ง</strong>
+          <small>แพ็คสินค้าตามขั้นตอน แล้วเพิ่ม record เลข track เมื่อจัดส่งแล้ว</small>
+        </div>
+        <label className="detail-check">
+          <input
+            type="checkbox"
+            checked={details[detailKey(workDate, "shipping-dispatched-with-tracking-record")] === "เรียบร้อย"}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("shipping-dispatched-with-tracking-record", event.target.checked ? "เรียบร้อย" : "")}
+          />
+          <span>จัดส่งสินค้าพร้อมเพิ่ม record เลข track</span>
+        </label>
+        <label className="workflow-note-field compact">
+          <span>เลข track</span>
+          <textarea
+            value={details[detailKey(workDate, "shipping-tracking-number")] || ""}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("shipping-tracking-number", event.target.value)}
+            placeholder="กรอกเลข tracking หลังจัดส่ง"
+          />
+        </label>
       </div>
-      <div className="detail-grid">
-        {channels.map((channel) => {
-          const key = `shipping-channel-${channel.toLowerCase().replaceAll(" ", "-")}`;
-          return (
-            <label key={channel} className="detail-check">
-              <input
-                type="checkbox"
-                checked={details[detailKey(workDate, key)] === "มี"}
-                disabled={!canEdit}
-                onChange={(event) => updateDetail(key, event.target.checked ? "มี" : "")}
-              />
-              <span>{channel}</span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
 
 function CloseStoreTaskDetails({
@@ -849,7 +880,7 @@ export function WorkflowChecklist({
                   const hasDetail =
                     phase.id === "open-store" ||
                     phase.id === "stock-work" ||
-                    (phase.id === "daytime-work" && index === 0) ||
+                    (phase.id === "daytime-work" && (index === 0 || index === 1)) ||
                     (phase.id === "close-store" && index === 4);
                   return (
                     <div key={key} className={hasDetail ? "tick-group has-detail" : "tick-group"}>
