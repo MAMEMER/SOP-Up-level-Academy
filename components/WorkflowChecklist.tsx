@@ -37,6 +37,7 @@ function completedCountForPhase(phase: WorkflowPhase, checkedMap: Record<string,
 
 const workflowNoteStorageKey = "up-level-workflow-notes";
 const workflowDetailStorageKey = "up-level-workflow-details";
+const stockRoomSheetUrl = "https://docs.google.com/spreadsheets/d/1hZcCPfbjEsKTVnLxSrb75HnPdv8ZcGQyvaB5BEa5Vyk/edit?gid=0#gid=0";
 
 function noteKey(workDate: string, phaseId: string) {
   return `${workDate}:${phaseId}`;
@@ -352,7 +353,12 @@ function StockTaskDetails({
           </label>
           <label className="detail-check">
             <input type="checkbox" disabled={!canEdit} />
-            <span>ห้อง Stock</span>
+            <span>
+              ห้อง Stock
+              <a href={stockRoomSheetUrl} target="_blank" rel="noreferrer" className="detail-inline-link">
+                เปิด Google Sheet ห้อง Stock
+              </a>
+            </span>
           </label>
         </div>
       </div>

@@ -3290,6 +3290,19 @@ a {
   accent-color: #15803d;
 }
 
+.detail-check span {
+  display: grid;
+  gap: 3px;
+}
+
+.detail-inline-link {
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .detail-upload {
   border: 1px dashed rgba(46, 125, 79, 0.28);
   border-radius: 8px;
