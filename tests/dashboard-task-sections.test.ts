@@ -41,4 +41,15 @@ describe("dashboard task sections UI", () => {
 
     assert.equal(source.includes("เลยเวลาแล้ว ถ้าส่งงานจะขึ้นสีส้ม"), false);
   });
+
+  it("shows shipping order summary channels on the first shipping checklist item", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("ShippingTaskDetails"), true);
+    assert.equal(source.includes("ช่องทางออเดอร์"), true);
+    assert.equal(source.includes("Facebook"), true);
+    assert.equal(source.includes("IG"), true);
+    assert.equal(source.includes("Line group"), true);
+    assert.equal(source.includes("Shopee"), true);
+  });
 });

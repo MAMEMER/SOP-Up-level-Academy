@@ -250,6 +250,49 @@ function OpenStoreTaskDetails({
   return null;
 }
 
+function ShippingTaskDetails({
+  index,
+  canEdit,
+  workDate,
+  details,
+  updateDetail
+}: {
+  index: number;
+  canEdit: boolean;
+  workDate: string;
+  details: Record<string, string>;
+  updateDetail: (key: string, value: string) => void;
+}) {
+  if (index !== 0) return null;
+
+  const channels = ["Facebook", "IG", "Line group", "Shopee"] as const;
+
+  return (
+    <div className="detail-panel">
+      <div className="detail-panel-head">
+        <strong>ช่องทางออเดอร์</strong>
+        <small>สรุปออเดอร์สินค้าที่ต้องจัดส่งจากช่องทางที่มีงานวันนี้</small>
+      </div>
+      <div className="detail-grid">
+        {channels.map((channel) => {
+          const key = `shipping-channel-${channel.toLowerCase().replaceAll(" ", "-")}`;
+          return (
+            <label key={channel} className="detail-check">
+              <input
+                type="checkbox"
+                checked={details[detailKey(workDate, key)] === "มี"}
+                disabled={!canEdit}
+                onChange={(event) => updateDetail(key, event.target.checked ? "มี" : "")}
+              />
+              <span>{channel}</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CloseStoreTaskDetails({
   index,
   canEdit,
@@ -806,6 +849,7 @@ export function WorkflowChecklist({
                   const hasDetail =
                     phase.id === "open-store" ||
                     phase.id === "stock-work" ||
+                    (phase.id === "daytime-work" && index === 0) ||
                     (phase.id === "close-store" && index === 4);
                   return (
                     <div key={key} className={hasDetail ? "tick-group has-detail" : "tick-group"}>
@@ -841,6 +885,15 @@ export function WorkflowChecklist({
                               updateDetail={updateDetail}
                               note={notes[noteKey(workDate, phase.id)] || ""}
                               updateNote={(value) => updateNote(phase.id, value)}
+                            />
+                          ) : null}
+                          {phase.id === "daytime-work" ? (
+                            <ShippingTaskDetails
+                              index={index}
+                              canEdit={canEdit}
+                              workDate={workDate}
+                              details={details}
+                              updateDetail={updateDetail}
                             />
                           ) : null}
                           {phase.id === "close-store" ? (
