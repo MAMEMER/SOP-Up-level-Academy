@@ -14,7 +14,7 @@ import {
   customerServiceRecordsToEvents,
   readPerformanceDailyStore
 } from "./performance-service-records.ts";
-import { readPerformanceSourceFiles } from "./performance-source-files.ts";
+import { monthlyPerformanceSourceFolder, readPerformanceSourceFiles } from "./performance-source-files.ts";
 import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "./storehub-stocktake-export.ts";
 import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "./storehub-timesheet-export.ts";
 
@@ -63,7 +63,7 @@ export const performanceReviewPeriods: PerformanceReviewPeriod[] = [
 
 export const performanceSourceStatuses: PerformanceSourceStatus[] = [
   { key: "schedule", label: "Google Sheet ตารางกะ", status: "import-ready", detail: "อิงโครงสร้างจริงจาก Sheet ตารางการทำงาน Uplevel (บางแค)" },
-  { key: "attendance", label: "StoreHub clock-in", status: "import-ready", detail: "อ่านจาก StoreHub Timesheets CSV export ถ้ามีไฟล์ใน Downloads" },
+  { key: "attendance", label: "StoreHub clock-in", status: "import-ready", detail: "อ่านไฟล์ Timesheets CSV ล่าสุดจากโฟลเดอร์ข้อมูล performance รายเดือน" },
   { key: "stock", label: "StoreHub stock count", status: "import-ready", detail: "อ่านจาก StoreHub Stock Take CSV export และช่อง Difference" },
   { key: "checklist", label: "Checklist", status: "import-ready", detail: "อิงจาก Google Sheet uplevel_daily_checklist tab Form Responses 1" }
 ];
@@ -80,17 +80,17 @@ export const performanceSourceDetails: PerformanceSourceDetail[] = [
   {
     key: "attendance",
     title: "StoreHub clock-in",
-    sourcePath: "/Users/home/Downloads/Timesheets_06-10-2026_07-09-2026.csv",
+    sourcePath: monthlyPerformanceSourceFolder,
     sourceType: "storehub-csv",
-    currentRange: "StoreHub Timesheets export 2026-06-10 ถึง 2026-07-09",
+    currentRange: "ไฟล์ Timesheets_*.csv ล่าสุดตามเวลาที่ลงไฟล์",
     whatToCheck: ["ชื่อพนักงาน", "Time In แรกของวัน", "เทียบกับเวลาเข้ากะใน Google Sheet", "late/missing clock-in deductions"]
   },
   {
     key: "stock",
     title: "StoreHub stock count",
-    sourcePath: "/Users/home/Downloads/Stock_Take_07-09-2026 (1).csv",
+    sourcePath: monthlyPerformanceSourceFolder,
     sourceType: "storehub-csv",
-    currentRange: "StoreHub Stock Take export ถึง 2026-07-09",
+    currentRange: "ไฟล์ Stock_Take_*.csv ล่าสุดตามเวลาที่ลงไฟล์",
     whatToCheck: ["Start Time", "Completed Time", "Status", "Started By / Completed By", "Expected Qty", "Counted Qty", "Difference"]
   },
   {

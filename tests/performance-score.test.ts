@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
   calculateAssignedWorkScore,
@@ -31,6 +33,7 @@ import {
 } from "../lib/performance-service-records.ts";
 import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "../lib/storehub-stocktake-export.ts";
 import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "../lib/storehub-timesheet-export.ts";
+import { resolveMonthlyPerformanceSourceFiles } from "../lib/performance-source-files.ts";
 
 const schedule = {
   employeeName: "ICE",
@@ -479,9 +482,9 @@ describe("performance score engine", () => {
     assert.ok(boom);
     assert.ok(leo);
     assert.equal(rows.length, 3);
-    assert.equal(ice.totalScore, 42);
+    assert.equal(ice.totalScore, 44);
     assert.equal(ice.incentive.percent, 0);
-    assert.equal(ice.categories.attendance.score, 8);
+    assert.equal(ice.categories.attendance.score, 10);
     assert.equal(ice.categories.stock.score, 14);
     assert.equal(ice.categories.stock.deductions[0].reason, "stock_difference");
     assert.equal(ice.categories.checklist.score, 0);
@@ -489,7 +492,7 @@ describe("performance score engine", () => {
     assert.equal(ice.categories.attendance.deductions[0].detail, "ICE late 58 minutes on 2026-07-01");
     assert.equal(ice.categories.assignedWork.score, 0);
     assert.equal(ice.categories.customerService.score, 20);
-    assert.equal(boom.totalScore, 82);
+    assert.equal(boom.totalScore, 88);
     assert.equal(boom.categories.customerService.score, 20);
     assert.equal(boom.categories.assignedWork.score, 20);
     assert.equal(leo.categories.checklist.score, 0);
@@ -543,12 +546,38 @@ describe("performance score engine", () => {
     });
 
     assert.equal(getPerformanceSourceDetail("schedule")?.sourcePath.includes("docs.google.com/spreadsheets"), true);
-    assert.equal(getPerformanceSourceDetail("attendance")?.sourcePath.includes("Timesheets_06-10-2026_07-09-2026.csv"), true);
-    assert.equal(getPerformanceSourceDetail("stock")?.sourcePath.includes("Stock_Take_07-09-2026"), true);
+    assert.equal(getPerformanceSourceDetail("attendance")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
+    assert.equal(getPerformanceSourceDetail("stock")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
     assert.equal(getPerformanceSourceDetail("checklist")?.sourcePath.includes("1Ona5H3hBsJywLtRC8FLqyjj7MJTdhwGjhTW3G1X8Fe8"), true);
     assert.equal(performanceSourceStatuses.find((source) => source.key === "checklist")?.status, "import-ready");
     assert.equal(performanceSourceStatuses.some((source) => source.key === "service" || source.key === "assigned"), false);
     assert.equal(performanceSourceStatuses.map((source) => String(source.status)).includes("mock"), false);
+  });
+
+  it("resolves monthly performance CSV files from the Man power folder by latest modified file", () => {
+    const folder = mkdtempSync(join(tmpdir(), "performance-source-files-"));
+    try {
+      const oldTimesheet = join(folder, "Timesheets_07-01-2026_07-15-2026.csv");
+      const latestTimesheet = join(folder, "Timesheets_07-01-2026_07-31-2026.csv");
+      const oldStock = join(folder, "Stock_Take_07-09-2026.csv");
+      const latestStock = join(folder, "Stock_Take_07-10-2026 (1).csv");
+      writeFileSync(oldTimesheet, "old timesheet", "utf8");
+      writeFileSync(latestTimesheet, "latest timesheet", "utf8");
+      writeFileSync(oldStock, "old stock", "utf8");
+      writeFileSync(latestStock, "latest stock", "utf8");
+      writeFileSync(join(folder, "notes.txt"), "ignore", "utf8");
+      utimesSync(oldTimesheet, new Date("2026-07-01T00:00:00Z"), new Date("2026-07-01T00:00:00Z"));
+      utimesSync(latestTimesheet, new Date("2026-07-02T00:00:00Z"), new Date("2026-07-02T00:00:00Z"));
+      utimesSync(oldStock, new Date("2026-07-01T00:00:00Z"), new Date("2026-07-01T00:00:00Z"));
+      utimesSync(latestStock, new Date("2026-07-03T00:00:00Z"), new Date("2026-07-03T00:00:00Z"));
+
+      const files = resolveMonthlyPerformanceSourceFiles(folder);
+
+      assert.equal(files.attendanceCsvPath, latestTimesheet);
+      assert.equal(files.stockCsvPath, latestStock);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 
   it("renders performance source cards as drilldown links", () => {
