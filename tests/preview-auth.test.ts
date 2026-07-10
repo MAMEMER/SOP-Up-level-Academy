@@ -59,9 +59,10 @@ describe("preview auth", () => {
     assert.match(loginSource, /router\.push\("\/checklist"\)/);
   });
 
-  it("routes the root page to checklist for public access", () => {
+  it("keeps the root page as the dashboard for public access", () => {
     const rootSource = readFileSync("app/(dashboard)/page.tsx", "utf8");
 
-    assert.match(rootSource, /redirect\("\/checklist"\)/);
+    assert.equal(rootSource.includes('href="/checklist"'), true);
+    assert.equal(rootSource.includes('redirect("/checklist")'), false);
   });
 });
