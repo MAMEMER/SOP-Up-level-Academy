@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SOP Library",
+  title: "SOP_UPLEVEL",
   description: "Public UPMAN operations manual and checklist"
 };
 

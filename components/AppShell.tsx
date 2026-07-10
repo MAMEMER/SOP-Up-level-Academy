@@ -35,7 +35,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
             <strong>LEVEL</strong>
           </div>
           <div>
-            <strong>Uplevel Manual</strong>
+            <strong>SOP_UPLEVEL</strong>
             <small>Checklist dashboard</small>
           </div>
         </div>
