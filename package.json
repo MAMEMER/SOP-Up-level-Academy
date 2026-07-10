@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=./node_modules/@next/swc-wasm-nodejs next dev --webpack",
     "build": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=./node_modules/@next/swc-wasm-nodejs next build --webpack",
+    "build:sites": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "next start",
     "lint": "tsc -p tsconfig.lint.json --noEmit --incremental false",
     "test": "node --test --experimental-strip-types tests/*.test.ts"
@@ -18,10 +19,16 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.37.1",
     "@next/swc-wasm-nodejs": "^16.2.9",
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^6.0.3"
+    "@vitejs/plugin-rsc": "^0.5.26",
+    "react-server-dom-webpack": "^19.2.7",
+    "typescript": "^6.0.3",
+    "vinext": "^0.0.50",
+    "vite": "^8.0.13",
+    "wrangler": "^4.92.0"
   }
 }
