@@ -63,11 +63,12 @@ describe("preview auth", () => {
     assert.equal(serverSource.includes('user: { id: "preview-admin" }'), false);
   });
 
-  it("routes preview login directly to checklist", () => {
+  it("routes preview login to the dashboard", () => {
     const loginSource = readFileSync("app/(auth)/login/page.tsx", "utf8");
 
     assert.equal(loginSource.includes("previewLoginEmailCookieName"), true);
-    assert.match(loginSource, /router\.push\("\/checklist"\)/);
+    assert.match(loginSource, /router\.push\("\/"\)/);
+    assert.doesNotMatch(loginSource, /router\.push\("\/checklist"\)/);
   });
 
   it("keeps the root page as the dashboard for public access", () => {
@@ -75,5 +76,15 @@ describe("preview auth", () => {
 
     assert.equal(rootSource.includes('href="/checklist"'), true);
     assert.equal(rootSource.includes('redirect("/checklist")'), false);
+  });
+
+  it("shows product arrangement images on the dashboard", () => {
+    const rootSource = readFileSync("app/(dashboard)/page.tsx", "utf8");
+
+    assert.equal(rootSource.includes("product-arrangement-grid"), true);
+    assert.equal(rootSource.includes("น้ำ / ขนม"), true);
+    assert.equal(rootSource.includes("ตู้ขายอุปกรณ์"), true);
+    assert.equal(rootSource.includes("/training/snack-shelf-opening.jpg"), true);
+    assert.equal(rootSource.includes("/training/equipment-cabinet.jpg"), true);
   });
 });

@@ -24,7 +24,7 @@ export default function LoginPage() {
     setSent(true);
     if (isPreviewMode()) {
       document.cookie = `${previewLoginEmailCookieName}=${encodeURIComponent(email.trim())}; path=/; max-age=2592000; SameSite=Lax`;
-      router.push("/checklist");
+      router.push("/");
     }
   }
 
@@ -44,7 +44,7 @@ export default function LoginPage() {
           <div className="auth-panel-head">
             <p>Secure sign in</p>
             <h2>เข้าสู่ระบบทีม</h2>
-            <span>ใช้ magic link ผ่านอีเมลบริษัทเพื่อเข้า checklist ประจำวัน</span>
+            <span>ใช้ magic link ผ่านอีเมลบริษัทเพื่อเข้า dashboard ประจำวัน</span>
           </div>
           <label className="auth-field">
             <span>Company email</span>
@@ -54,7 +54,7 @@ export default function LoginPage() {
               placeholder="name@uplevelacademy.com"
             />
           </label>
-          <button onClick={signIn}>ส่งลิงก์เข้า Checklist</button>
+          <button onClick={signIn}>ส่งลิงก์เข้า Dashboard</button>
           {sent ? <p className="auth-success">ส่งลิงก์เข้าสู่ระบบแล้ว กรุณาเช็กอีเมล</p> : null}
         </div>
       </section>

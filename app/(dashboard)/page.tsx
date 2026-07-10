@@ -4,6 +4,21 @@ import { DashboardTaskSections } from "../../components/DashboardTaskSections.ts
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
 
+const productArrangementCards = [
+  {
+    title: "น้ำ / ขนม",
+    description: "จัดเรียงน้ำและขนมให้เห็นจำนวนชัด เติมช่องว่าง และถ่ายรูปก่อนเริ่มนับ Stock",
+    image: "/training/snack-shelf-opening.jpg",
+    alt: "ตัวอย่างการจัดเรียงน้ำและขนมบนชั้นหน้าร้าน"
+  },
+  {
+    title: "ตู้ขายอุปกรณ์",
+    description: "จัดตู้ขายอุปกรณ์ให้หยิบง่าย ป้ายตรงหมวด และเห็นสินค้าสำคัญครบก่อนเปิดขาย",
+    image: "/training/equipment-cabinet.jpg",
+    alt: "ตัวอย่างตู้ขายอุปกรณ์และชั้นสินค้า"
+  }
+] as const;
+
 export default async function HomePage() {
   const user = await requireUser();
 
@@ -22,6 +37,26 @@ export default async function HomePage() {
       </section>
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} />
+      <section className="product-arrangement-section">
+        <div className="section-heading-row">
+          <div>
+            <p className="eyebrow">Product arrangement</p>
+            <h3>รูปมาตรฐานการจัดเรียงสินค้า</h3>
+          </div>
+          <Link href="/training" className="text-link">ดูคู่มือรูปหลักฐาน</Link>
+        </div>
+        <div className="product-arrangement-grid">
+          {productArrangementCards.map((card) => (
+            <figure key={card.title} className="product-arrangement-card">
+              <img src={card.image} alt={card.alt} />
+              <figcaption>
+                <strong>{card.title}</strong>
+                <span>{card.description}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
       <DashboardTaskSections phases={cardStoreWorkflow} />
     </main>
   );

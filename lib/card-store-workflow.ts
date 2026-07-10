@@ -88,16 +88,16 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
     timeLabel: "ระหว่างเปิดบริการ",
     category: "stock",
     icon: "ST",
-    goal: "ตรวจนับ Stock น้ำและขนมทุกเช้าให้ตรงของจริงและ StoreHub พร้อมสรุปรายการที่ต้องสั่งเพิ่ม",
-    caution: "ต้องนับจำนวนจริงก่อนบันทึกใน StoreHub และต้องมีหลักฐานรูปหรือแคปหน้าจอ complete ทุกครั้ง",
+    goal: "ดึงผลการนับ Stock น้ำและขนมจาก StoreHub Stock Take ให้ตรงของจริง พร้อมสรุปรายการที่ต้องสั่งเพิ่ม",
+    caution: "ข้อแรกจะ approve ได้เมื่อสถานะใน StoreHub Stock Take เป็น Completed และต้องมีหลักฐานรูปหรือแคปหน้าจอทุกครั้ง",
     sections: [
       {
         title: "Daily Stock น้ำ / ขนม",
         tasks: [
-          "นับ Stock น้ำและขนมทุกเช้า",
+          "เปิด StoreHub Stock Take และเลือก session น้ำ/ขนมล่าสุด",
           "นับจำนวนจริงหน้าร้านและพื้นที่เก็บสำรอง",
-          "ระบุจำนวนของที่ใกล้หมดในระบบ StoreHub",
-          "แคปหน้าจอ StoreHub หลังทำรายการ complete",
+          "ตรวจสถานะ Stock Take ให้เป็น Completed ก่อนส่งงาน",
+          "แคปหน้าจอ StoreHub Stock Take หลังทำรายการเสร็จ",
           "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
         ]
       },
@@ -143,7 +143,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
       }
     ],
     checklist: [
-      "นับ Stock น้ำและขนมผ่านระบบ StoreHub",
+      "ดึงข้อมูลการนับจาก StoreHub Stock Take และ approve เมื่อสถานะ Completed",
       "นับจำนวนจริงหน้าร้านและห้อง Stock",
       "ระบุสินค้าใกล้หมดจาก StoreHub ในหน้าแจ้งเตือน",
       "แคปหน้าจอตรวจสินค้าเสร็จสิ้น",

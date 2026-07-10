@@ -19,12 +19,14 @@ describe("card store workflow content", () => {
       "นับ Stock / Stocktake",
       "ตรวจผลต่างและรายงาน"
     ]);
-    assert.equal(stock?.checklist.some((item) => item.includes("น้ำและขนม")), true);
+    assert.equal(stock?.checklist.some((item) => item.includes("Stock Take")), true);
+    assert.equal(stock?.checklist.some((item) => item.includes("Completed")), true);
+    assert.equal(stock?.checklist.some((item) => item.includes("น้ำ/ขนม")), true);
     assert.equal(stock?.checklist.some((item) => item.includes("StoreHub")), true);
     assert.equal(stock?.checklist.some((item) => item.includes("เสร็จสิ้น")), true);
     assert.deepEqual(daytime?.sections.map((section) => section.title), ["งานแพ็คและส่งของ"]);
     assert.deepEqual(stock?.checklist, [
-      "นับ Stock น้ำและขนมผ่านระบบ StoreHub",
+      "ดึงข้อมูลการนับจาก StoreHub Stock Take และ approve เมื่อสถานะ Completed",
       "นับจำนวนจริงหน้าร้านและห้อง Stock",
       "ระบุสินค้าใกล้หมดจาก StoreHub ในหน้าแจ้งเตือน",
       "แคปหน้าจอตรวจสินค้าเสร็จสิ้น",

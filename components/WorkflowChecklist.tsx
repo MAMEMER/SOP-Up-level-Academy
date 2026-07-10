@@ -309,12 +309,31 @@ function StockTaskDetails({
   updateNote: (value: string) => void;
 }) {
   if (index === 0) {
+    const stocktakeStatus = details[detailKey(workDate, "stocktake-status")];
+
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
-          <strong>StoreHub Stock Count</strong>
-          <small>นับผ่านระบบ StoreHub ให้ตรงหมวดน้ำและขนม</small>
+          <strong>StoreHub Stock Take</strong>
+          <small>ดึงข้อมูลจาก session ล่าสุด และ approve เฉพาะสถานะ Completed</small>
         </div>
+        <div className="segmented-check">
+          {["In Progress", "Completed", "Cancelled"].map((status) => (
+            <label key={status}>
+              <input
+                type="radio"
+                name="stocktake-status"
+                checked={stocktakeStatus === status}
+                disabled={!canEdit}
+                onChange={() => updateDetail("stocktake-status", status)}
+              />
+              <span>{status}</span>
+            </label>
+          ))}
+        </div>
+        <p className="detail-hint">
+          {stocktakeStatus === "Completed" ? "พร้อม approve ตามสถานะ StoreHub Stock Take" : "รอ StoreHub Stock Take เป็น Completed ก่อนส่งงาน"}
+        </p>
       </div>
     );
   }
@@ -691,6 +710,11 @@ export function WorkflowChecklist({
     );
   }
 
+  function missingStockTakeApproval(phase: WorkflowPhase) {
+    if (phase.id !== "stock-work") return false;
+    return details[detailKey(workDate, "stocktake-status")] !== "Completed";
+  }
+
   return (
     <section className="workflow-panel">
       {trialMode ? (
@@ -730,7 +754,8 @@ export function WorkflowChecklist({
           const flexible = isFlexibleWorkflowPhase(phase.id);
           const canEdit = withinWorkHours && canEditWorkflowRecord(record, { adminOverride: isAdmin }) && unlocked && (isAdmin || flexible || !isExpired);
           const missingStockReorderList = stockReorderListMissing(phase);
-          const canSubmit = canEdit && done === phase.checklist.length && !missingStockReorderList;
+          const missingStockTakeStatus = missingStockTakeApproval(phase);
+          const canSubmit = canEdit && done === phase.checklist.length && !missingStockReorderList && !missingStockTakeStatus;
           const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now) && !adminUnlocked && !trialMode;
           const schedule = phaseScheduleForWorkDate(phase.id, workDate);
           return (
@@ -817,6 +842,9 @@ export function WorkflowChecklist({
               </div>
               {missingStockReorderList ? (
                 <p className="phase-warning">กรอกรายการและจำนวนที่ต้องสั่งเพิ่มก่อนส่งงาน</p>
+              ) : null}
+              {missingStockTakeStatus ? (
+                <p className="phase-warning">StoreHub Stock Take ต้องเป็น Completed ก่อนส่งงาน Stock</p>
               ) : null}
               <div className="workflow-record-actions">
                 <button type="button" className="soft-button" onClick={() => recordPhase(phase, "saved")} disabled={!canEdit}>

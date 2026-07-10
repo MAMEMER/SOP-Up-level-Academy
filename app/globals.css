@@ -1727,6 +1727,71 @@ a {
   grid-template-columns: repeat(3, minmax(132px, 1fr));
 }
 
+.product-arrangement-section {
+  display: grid;
+  gap: 16px;
+  margin: 18px 0 22px;
+}
+
+.section-heading-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+}
+
+.section-heading-row h3 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.product-arrangement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.product-arrangement-card {
+  display: grid;
+  grid-template-rows: minmax(240px, 34vw) auto;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(46, 125, 79, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 8px 24px rgba(23, 53, 38, 0.06);
+}
+
+.product-arrangement-card img {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  object-fit: cover;
+}
+
+.product-arrangement-card figcaption {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+
+.product-arrangement-card strong {
+  color: #173526;
+  font-size: 20px;
+}
+
+.product-arrangement-card span {
+  color: #4e6f5c;
+  line-height: 1.55;
+}
+
+.detail-hint {
+  margin: 10px 0 0;
+  color: #4e6f5c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .checklist-status {
   min-height: 172px;
   color: #173526;
@@ -3474,9 +3539,15 @@ a {
   .detail-grid,
   .segmented-check,
   .daily-phase-grid,
+  .product-arrangement-grid,
   .review-grid,
   .monthly-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .section-heading-row {
+    align-items: start;
+    flex-direction: column;
   }
 
   .auth-page {
