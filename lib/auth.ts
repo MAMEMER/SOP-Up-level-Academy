@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Role } from "./permissions.ts";
+import { isPreviewMode } from "./preview-data.ts";
 import { createClient } from "./supabase/server.ts";
 
 export type CurrentUser = {
@@ -26,6 +27,16 @@ export async function requireUser(): Promise<CurrentUser> {
 
   if (error || !profile || !profile.active) {
     redirect("/login");
+  }
+
+  if (!isPreviewMode()) {
+    const today = new Date().toISOString().slice(0, 10);
+    await supabase
+      .from("employee_login_events")
+      .upsert(
+        { user_id: profile.id, work_date: today, last_seen_at: new Date().toISOString() },
+        { onConflict: "user_id,work_date" }
+      );
   }
 
   return {

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Card Shop SOP Preview</title>
+    <style>
+      :root {
+        --bg: #eef2f5;
+        --panel: #ffffff;
+        --line: #d9e0e7;
+        --ink: #18212b;
+        --muted: #66727f;
+        --brand: #1f6feb;
+        --brand-2: #f4b63f;
+        --ok: #1f7a45;
+        --warn: #966200;
+        --bad: #b42318;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+      }
+      .shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 260px 1fr;
+      }
+      .sidebar {
+        background: #17202a;
+        color: #fff;
+        padding: 24px 18px;
+      }
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 28px;
+      }
+      .brand-mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: var(--brand-2);
+        color: #17202a;
+        font-weight: 700;
+      }
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+      .nav a {
+        color: #dce3ea;
+        text-decoration: none;
+        padding: 11px 12px;
+        border-radius: 8px;
+      }
+      .nav a.active, .nav a:hover { background: #243241; }
+      .main {
+        padding: 28px;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 18px;
+      }
+      .top h1 { margin: 0 0 6px; font-size: 28px; }
+      .top p { margin: 0; color: var(--muted); }
+      .chip {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        white-space: nowrap;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 18px;
+      }
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+      .row {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: #fbfcfd;
+      }
+      .row strong { display: block; margin-bottom: 4px; }
+      .row small { color: var(--muted); }
+      .status {
+        float: right;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .published { background: #e8f7ef; color: var(--ok); }
+      .pending { background: #fff4dc; color: var(--warn); }
+      .revision { background: #ffecec; color: var(--bad); }
+      .section {
+        margin-top: 18px;
+      }
+      .section h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+      .flow {
+        display: grid;
+        gap: 8px;
+      }
+      .flow div {
+        border-left: 4px solid var(--brand);
+        background: #f8fbff;
+        padding: 10px 12px;
+        border-radius: 8px;
+      }
+      @media (max-width: 900px) {
+        .shell, .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">C</div>
+          <div>
+            <strong>Card Shop SOP</strong>
+            <small>Internal Playbook</small>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="active" href="#">ภาพรวม</a>
+          <a href="#">หน้าร้าน</a>
+          <a href="#">Stock</a>
+          <a href="#">อีเวนต์</a>
+          <a href="#">ความปลอดภัย</a>
+        </nav>
+      </aside>
+      <section class="main">
+        <header class="top">
+          <div>
+            <h1>ชุด SOP ร้านการ์ด</h1>
+            <p>ทำงานให้เหมือนกันทุกวัน ตั้งแต่เปิดร้านจนปิดร้าน พร้อม stock, ราคา, event, และความปลอดภัย</p>
+          </div>
+          <div class="chip">Preview mode</div>
+        </header>
+
+        <section class="grid">
+          <div class="panel">
+            <h2>Core SOP</h2>
+            <div class="list">
+              <div class="row"><span class="status published">Published</span><strong>เปิดร้าน / ปิดร้าน</strong><small>เช็กความปลอดภัย เงินสด และความพร้อมหน้าร้าน</small></div>
+              <div class="row"><span class="status published">Published</span><strong>รับสินค้าใหม่เข้า stock ผ่าน Storehub</strong><small>รับเข้า ตรวจ SKU และเก็บเข้าที่</small></div>
+              <div class="row"><span class="status published">Published</span><strong>ตรวจและจัดเรียงซอง / กล่อง / ซิงเกิล</strong><small>แยกประเภท จัดกล่อง stock และหน้าตู้</small></div>
+              <div class="row"><span class="status published">Published</span><strong>ตั้งราคาและอัปเดตราคา</strong><small>ใช้ลิงก์อ้างอิงและอัปเดต Storehub</small></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Operations</h2>
+            <div class="list">
+              <div class="row"><span class="status pending">Pending</span><strong>แพ็กสินค้าออนไลน์</strong><small>ตรวจสินค้า ป้องกันเสียหาย และบันทึกเลขพัสดุ</small></div>
+              <div class="row"><span class="status pending">Pending</span><strong>จัดอีเวนต์ / ลีก / ทัวร์นาเมนต์</strong><small>ลงทะเบียน จับคู่ บันทึกผล และจ่ายรางวัล</small></div>
+              <div class="row"><span class="status revision">Needs Revision</span><strong>รับเรื่องร้องเรียน / เคลม / คืนสินค้า</strong><small>เก็บหลักฐานและตัดสินตามนโยบาย</small></div>
+              <div class="row"><span class="status published">Published</span><strong>ควบคุมความปลอดภัยของการ์ดมูลค่าสูง</strong><small>เก็บแยก จำกัดการเข้าถึง และตรวจนับสม่ำเสมอ</small></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <h2>ลำดับใช้งานจริง</h2>
+          <div class="flow">
+            <div>1. เปิดร้านและเตรียมหน้าร้าน</div>
+            <div>2. รับสินค้าเข้า stock ผ่าน Storehub</div>
+            <div>3. แยกและจัดเรียงสินค้า</div>
+            <div>4. ตั้งราคาและอัปเดตราคา</div>
+            <div>5. แพ็กออเดอร์ออนไลน์</div>
+            <div>6. จัด event หรือ tournament</div>
+            <div>7. รับเคสร้องเรียน / เคลม / คืนสินค้า</div>
+            <div>8. ปิดร้านและเก็บการ์ดมูลค่าสูง</div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

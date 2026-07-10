@@ -3,6 +3,13 @@ import { SopList } from "../../../components/SopList.tsx";
 import { requireUser } from "../../../lib/auth.ts";
 import { createClient } from "../../../lib/supabase/server.ts";
 
+type SopRow = {
+  id: string;
+  title: string;
+  status: "draft" | "pending_approval" | "published" | "needs_revision";
+  departments: Array<{ display_name: string }> | null;
+};
+
 export default async function ApprovalsPage() {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
@@ -13,7 +20,7 @@ export default async function ApprovalsPage() {
     .select("id,title,status,departments(display_name)")
     .eq("status", "pending_approval");
 
-  const items = (data ? data : []).map((sop) => ({
+  const items = (data ? data : []).map((sop: SopRow) => ({
     id: sop.id,
     title: sop.title,
     status: sop.status,

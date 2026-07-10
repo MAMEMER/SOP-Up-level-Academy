@@ -1,0 +1,25 @@
+{
+  "serviceRecords": [
+    {
+      "id": "service-2026-06-25-ICE-2026-07-09T00-00-00-000Z",
+      "workDate": "2026-06-25",
+      "employeeName": "ICE",
+      "bucket": "feedback",
+      "severity": "fixed_immediately",
+      "count": 1,
+      "note": "ลูกค้าคอมเพลนเรื่องการใช้คำหยาบ",
+      "recordedAt": "2026-07-09T00:00:00.000Z"
+    }
+  ],
+  "assignedWorkRecords": [
+    {
+      "id": "assigned-2026-07-09-ICE-2026-07-09T00-00-00-000Z",
+      "workDate": "2026-07-09",
+      "employeeName": "ICE",
+      "title": "จัด stock Lorcana (มอบหมายเดือน 6 / กำหนด 1 week / ยังไม่เสร็จ)",
+      "status": "not_finished",
+      "note": "บันทึกจากผู้ใช้: งานที่ให้ไปตั้งแต่เดือน 6 ยังไม่เสร็จจนถึงปัจจุบัน",
+      "recordedAt": "2026-07-09T00:00:00.000Z"
+    }
+  ]
+}

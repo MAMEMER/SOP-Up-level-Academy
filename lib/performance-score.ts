@@ -1,0 +1,411 @@
+export type DataSource = "google-sheet" | "storehub" | "manual" | "mock" | "import" | "live";
+
+export type DeductionRecord = {
+  category: "attendance" | "stock" | "checklist" | "customer_service" | "assigned_work";
+  points: number;
+  reason: string;
+  detail: string;
+  source: DataSource;
+};
+
+export type ScoreResult = {
+  score: number;
+  maxScore: number;
+  deductions: DeductionRecord[];
+  flags: string[];
+  warnings: string[];
+};
+
+export type ShiftSchedule = {
+  employeeName: string;
+  workDate: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  shiftLabel: string;
+  source: DataSource;
+};
+
+export type ClockEvent = {
+  employeeName: string;
+  workDate: string;
+  clockIn: string;
+  clockOut?: string;
+  source: DataSource;
+};
+
+export type AttendanceInput = {
+  schedules: ShiftSchedule[];
+  clockEvents: ClockEvent[];
+  leaveRecords?: LeaveRecord[];
+};
+
+export type LeaveType = "sick" | "personal";
+
+export type LeaveRecord = {
+  employeeName: string;
+  workDate: string;
+  type: LeaveType;
+  source: DataSource;
+};
+
+export type LeaveSummary = {
+  sickUsed: number;
+  sickAllowance: number;
+  sickRemaining: number;
+  personalUsed: number;
+  personalAllowance: number;
+  personalRemaining: number;
+  records: LeaveRecord[];
+};
+
+export type StockCountRecord = {
+  employeeName: string;
+  owner: string;
+  category: string;
+  countType: "weekly" | "monthly";
+  dueDate: string;
+  startedAt?: string;
+  submittedAt?: string;
+  expectedQuantity: number;
+  actualQuantity: number;
+  discrepancyStatus: "matched" | "resolved" | "real_loss" | "fraud_review" | "not_counted";
+  resolvedWithin24Hours?: boolean;
+  realLossOccurrence?: number;
+  source: DataSource;
+};
+
+export type ChecklistEvent = {
+  type: "missing_day" | "missing_important" | "backfilled" | "false_record";
+  count: number;
+  source: DataSource;
+  dates?: string[];
+};
+
+export type ServiceEvent = {
+  bucket: "feedback" | "event_response";
+  severity: "fixed_immediately" | "repeated" | "severe";
+  count: number;
+  source: DataSource;
+};
+
+export type AssignedWork = {
+  title: string;
+  status: "early_quality" | "on_time" | "needs_revision" | "late_one_day" | "not_finished";
+  source: DataSource;
+};
+
+export type IncentiveTier = {
+  label: string;
+  percent: 0 | 20 | 50 | 80 | 100;
+  requiresCoaching: boolean;
+};
+
+export type EmployeePerformanceInput = {
+  employeeName: string;
+  attendance: AttendanceInput;
+  annualLeave?: {
+    schedules: ShiftSchedule[];
+    records: LeaveRecord[];
+  };
+  stockCounts: StockCountRecord[];
+  checklistEvents: ChecklistEvent[];
+  serviceEvents: ServiceEvent[];
+  assignedWorks: AssignedWork[];
+};
+
+export type EmployeePerformanceScore = {
+  employeeName: string;
+  totalScore: number;
+  incentive: IncentiveTier;
+  categories: {
+    attendance: ScoreResult;
+    stock: ScoreResult;
+    checklist: ScoreResult;
+    customerService: ScoreResult;
+    assignedWork: ScoreResult;
+  };
+  deductions: DeductionRecord[];
+  flags: string[];
+  warnings: string[];
+  leaveSummary: LeaveSummary;
+};
+
+function clampScore(score: number, maxScore: number) {
+  return Math.min(maxScore, Math.max(0, Math.round(score * 100) / 100));
+}
+
+function dateKey(employeeName: string, workDate: string) {
+  return `${employeeName.trim().toLowerCase()}:${workDate}`;
+}
+
+function minutesLate(scheduledStart: string, clockIn: string) {
+  return Math.max(0, Math.floor((Date.parse(clockIn) - Date.parse(scheduledStart)) / 60_000));
+}
+
+export function summarizeLeave(records: LeaveRecord[]): LeaveSummary {
+  const sickUsed = records.filter((record) => record.type === "sick").length;
+  const personalUsed = records.filter((record) => record.type === "personal").length;
+  return {
+    sickUsed,
+    sickAllowance: 30,
+    sickRemaining: Math.max(0, 30 - sickUsed),
+    personalUsed,
+    personalAllowance: 3,
+    personalRemaining: Math.max(0, 3 - personalUsed),
+    records
+  };
+}
+
+function scheduledLeaveRecords(records: LeaveRecord[], schedules: ShiftSchedule[]) {
+  const scheduledWorkDays = new Set(schedules.map((schedule) => dateKey(schedule.employeeName, schedule.workDate)));
+  return records.filter((record) => scheduledWorkDays.has(dateKey(record.employeeName, record.workDate)));
+}
+
+export function calculateAttendanceScore(input: AttendanceInput): ScoreResult {
+  const deductions: DeductionRecord[] = [];
+  const warnings: string[] = [];
+  const clocks = new Map(input.clockEvents.map((event) => [dateKey(event.employeeName, event.workDate), event]));
+  const schedules = new Set(input.schedules.map((schedule) => dateKey(schedule.employeeName, schedule.workDate)));
+  const approvedLeave = new Set((input.leaveRecords || []).map((record) => dateKey(record.employeeName, record.workDate)));
+
+  input.schedules.forEach((schedule) => {
+    if (approvedLeave.has(dateKey(schedule.employeeName, schedule.workDate))) return;
+
+    const clock = clocks.get(dateKey(schedule.employeeName, schedule.workDate));
+    if (!clock) {
+      deductions.push({
+        category: "attendance",
+        points: 2,
+        reason: "late_over_30_minutes_or_missing_clock_in",
+        detail: `${schedule.employeeName} missing clock-in or late over 30 minutes on ${schedule.workDate}`,
+        source: schedule.source
+      });
+      return;
+    }
+
+    const lateMinutes = minutesLate(schedule.scheduledStart, clock.clockIn);
+    if (lateMinutes > 10) {
+      deductions.push({
+        category: "attendance",
+        points: 2,
+        reason: "late_over_10_minutes",
+        detail: `${schedule.employeeName} late ${lateMinutes} minutes on ${schedule.workDate}`,
+        source: clock.source
+      });
+    } else if (lateMinutes > 0) {
+      deductions.push({
+        category: "attendance",
+        points: 1,
+        reason: "late_within_10_minutes",
+        detail: `${schedule.employeeName} late ${lateMinutes} minutes on ${schedule.workDate}`,
+        source: clock.source
+      });
+    }
+  });
+
+  input.clockEvents.forEach((clock) => {
+    if (approvedLeave.has(dateKey(clock.employeeName, clock.workDate))) return;
+
+    if (!schedules.has(dateKey(clock.employeeName, clock.workDate))) {
+      warnings.push(`Unmatched StoreHub clock-in for ${clock.employeeName} on ${clock.workDate}`);
+    }
+  });
+
+  const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
+  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [], warnings };
+}
+
+export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
+  const deductions: DeductionRecord[] = [];
+  const flags: string[] = [];
+
+  records.forEach((record) => {
+    if (record.discrepancyStatus === "not_counted") {
+      deductions.push({
+        category: "stock",
+        points: 10,
+        reason: "stock_not_counted",
+        detail: `${record.employeeName} did not count ${record.category} on ${record.dueDate}`,
+        source: record.source
+      });
+      return;
+    }
+
+    if (record.discrepancyStatus === "resolved" && record.resolvedWithin24Hours) return;
+
+    if (record.discrepancyStatus === "real_loss") {
+      deductions.push({
+        category: "stock",
+        points: 2,
+        reason: "stock_difference",
+        detail: `${record.category} has StoreHub Difference`,
+        source: record.source
+      });
+    }
+
+    if (record.discrepancyStatus === "fraud_review") flags.push("management_review_required");
+  });
+
+  const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
+  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+}
+
+export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
+  const deductions: DeductionRecord[] = [];
+  const flags: string[] = [];
+
+  events.forEach((event) => {
+    const pointsByType = { missing_day: 10, missing_important: 2, backfilled: 1, false_record: 10 } satisfies Record<ChecklistEvent["type"], number>;
+    const dateDetail = event.dates?.length ? ` (${event.dates.join(", ")})` : "";
+    const detailByType = {
+      missing_day: `มีกะและ clock-in แต่ไม่มีข้อมูล Google Form checklist x ${event.count} วัน${dateDetail}`,
+      missing_important: `missing_important x ${event.count}`,
+      backfilled: `backfilled x ${event.count}`,
+      false_record: `false_record x ${event.count}`
+    } satisfies Record<ChecklistEvent["type"], string>;
+    deductions.push({
+      category: "checklist",
+      points: pointsByType[event.type] * event.count,
+      reason: event.type,
+      detail: detailByType[event.type],
+      source: event.source
+    });
+    if (event.type === "false_record") flags.push("coaching_required");
+  });
+
+  const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
+  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+}
+
+export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResult {
+  const deductions: DeductionRecord[] = [];
+  const flags: string[] = [];
+  const bucketScores = { feedback: 10, event_response: 10 };
+
+  events.forEach((event) => {
+    let targetScore = bucketScores[event.bucket];
+    if (event.severity === "severe") {
+      targetScore = 0;
+      flags.push("coaching_required");
+    } else if (event.severity === "repeated") {
+      targetScore = Math.min(targetScore, 5);
+      flags.push("coaching_required");
+    } else {
+      targetScore = Math.max(0, targetScore - event.count * 2);
+    }
+
+    const deductionPoints = bucketScores[event.bucket] - targetScore;
+    if (deductionPoints > 0) {
+      deductions.push({
+        category: "customer_service",
+        points: deductionPoints,
+        reason: `${event.bucket}_${event.severity}`,
+        detail: `${event.bucket} ${event.severity} x ${event.count}`,
+        source: event.source
+      });
+    }
+    bucketScores[event.bucket] = targetScore;
+  });
+
+  return {
+    score: clampScore(bucketScores.feedback + bucketScores.event_response, 20),
+    maxScore: 20,
+    deductions,
+    flags: [...new Set(flags)],
+    warnings: []
+  };
+}
+
+function assignedWorkItemScore(status: AssignedWork["status"]) {
+  if (status === "early_quality") return 20;
+  if (status === "on_time") return 18;
+  if (status === "needs_revision") return 15;
+  if (status === "late_one_day") return 12;
+  return 0;
+}
+
+export function calculateAssignedWorkScore(works: AssignedWork[]): ScoreResult {
+  if (works.length === 0) return { score: 20, maxScore: 20, deductions: [], flags: [], warnings: [] };
+
+  const flags: string[] = [];
+  const itemScores = works.map((work) => {
+    const score = assignedWorkItemScore(work.status);
+    if (work.status === "not_finished") flags.push("coaching_required");
+    return { work, score };
+  });
+  const score = clampScore(itemScores.reduce((sum, item) => sum + item.score, 0) / itemScores.length, 20);
+  const deductions = itemScores
+    .filter((item) => item.score < 20)
+    .map<DeductionRecord>((item) => ({
+      category: "assigned_work",
+      points: 20 - item.score,
+      reason: item.work.status,
+      detail: item.work.title,
+      source: item.work.source
+    }));
+
+  return { score, maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+}
+
+export function getIncentiveTier(totalScore: number): IncentiveTier {
+  if (totalScore >= 90) return { label: "90-100", percent: 100, requiresCoaching: false };
+  if (totalScore >= 80) return { label: "80-89", percent: 80, requiresCoaching: false };
+  if (totalScore >= 70) return { label: "70-79", percent: 50, requiresCoaching: false };
+  if (totalScore >= 60) return { label: "60-69", percent: 20, requiresCoaching: false };
+  return { label: "ต่ำกว่า 60", percent: 0, requiresCoaching: true };
+}
+
+export function calculateEmployeePerformanceScore(input: EmployeePerformanceInput): EmployeePerformanceScore {
+  const annualLeave = input.annualLeave || {
+    schedules: input.attendance.schedules,
+    records: input.attendance.leaveRecords || []
+  };
+  const leaveRecords = scheduledLeaveRecords(annualLeave.records, annualLeave.schedules);
+  const categories = {
+    attendance: calculateAttendanceScore(input.attendance),
+    stock: calculateStockScore(input.stockCounts),
+    checklist: calculateChecklistScore(input.checklistEvents),
+    customerService: calculateCustomerServiceScore(input.serviceEvents),
+    assignedWork: calculateAssignedWorkScore(input.assignedWorks)
+  };
+  const totalScore = clampScore(
+    categories.attendance.score +
+      categories.stock.score +
+      categories.checklist.score +
+      categories.customerService.score +
+      categories.assignedWork.score,
+    100
+  );
+  const incentive = getIncentiveTier(totalScore);
+  const flags = [
+    ...categories.attendance.flags,
+    ...categories.stock.flags,
+    ...categories.checklist.flags,
+    ...categories.customerService.flags,
+    ...categories.assignedWork.flags,
+    ...(incentive.requiresCoaching ? ["coaching_required"] : [])
+  ];
+
+  return {
+    employeeName: input.employeeName,
+    totalScore,
+    incentive,
+    categories,
+    deductions: [
+      ...categories.attendance.deductions,
+      ...categories.stock.deductions,
+      ...categories.checklist.deductions,
+      ...categories.customerService.deductions,
+      ...categories.assignedWork.deductions
+    ],
+    flags: [...new Set(flags)],
+    warnings: [
+      ...categories.attendance.warnings,
+      ...categories.stock.warnings,
+      ...categories.checklist.warnings,
+      ...categories.customerService.warnings,
+      ...categories.assignedWork.warnings
+    ],
+    leaveSummary: summarizeLeave(leaveRecords)
+  };
+}

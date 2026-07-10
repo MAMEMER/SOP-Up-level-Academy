@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SOP Library",
-  description: "Private company SOP library"
+  description: "Public UPMAN operations manual and checklist"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

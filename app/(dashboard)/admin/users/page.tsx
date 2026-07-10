@@ -2,6 +2,15 @@ import { redirect } from "next/navigation";
 import { requireUser } from "../../../../lib/auth.ts";
 import { createClient } from "../../../../lib/supabase/server.ts";
 
+type ProfileRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  departments: Array<{ display_name: string }> | null;
+};
+
 export default async function AdminUsersPage() {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
@@ -16,7 +25,7 @@ export default async function AdminUsersPage() {
     <main className="page">
       <h1>ผู้ใช้</h1>
       <div className="panel user-list">
-        {(data ? data : []).map((profile) => (
+        {(data ? data : []).map((profile: ProfileRow) => (
           <div key={profile.id}>
             <span>{profile.name}</span>
             <span>{profile.email}</span>

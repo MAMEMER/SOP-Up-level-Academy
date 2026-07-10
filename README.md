@@ -1,13 +1,15 @@
 # SOP Website
 
-Private company SOP website for employees, department leaders, and admins.
+Public UPMAN operations manual and checklist website for store work, training, review, and admin monitoring.
 
 ## Local Setup
 
 1. Install dependencies with `npm install`.
 2. Copy `.env.local.example` to `.env.local`.
-3. Fill Supabase URL and anon key.
+3. Fill Supabase URL and anon key only when the site should use a real private database.
 4. Run `npm run dev`.
+
+By default the web app runs in public preview mode. Visitors can open the dashboard, checklist, manual, and public performance score without signing in.
 
 ## Roles
 
@@ -19,10 +21,18 @@ Private company SOP website for employees, department leaders, and admins.
 
 Deploy the app to Vercel.
 
-Required environment variables:
+Optional environment variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_ACCESS`: leave unset or set `public` for a public site. Set `private` to require Supabase login.
+
+Optional StoreHub stock integration:
+
+- `STOREHUB_STOCK_URL`: server-side JSON endpoint or integration proxy that returns StoreHub product/inventory rows.
+- `STOREHUB_API_TOKEN`: bearer token used by the server route when calling `STOREHUB_STOCK_URL`.
+
+Admin Owner Summary reads `/api/storehub/stock`. If StoreHub env vars are missing or the endpoint fails, the dashboard falls back to mock stock data.
 
 Recommended domain:
 
