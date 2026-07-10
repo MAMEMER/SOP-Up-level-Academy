@@ -610,6 +610,16 @@ describe("performance score engine", () => {
     assert.equal(source.includes("บันทึกเหตุการณ์"), true);
   });
 
+  it("keeps daily complaint saving from hanging when server storage fails", () => {
+    const source = readFileSync(new URL("../components/PerformanceScoreView.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("withInputStatus"), true);
+    assert.equal(source.includes("service-saved"), true);
+    assert.equal(source.includes("service-error"), true);
+    assert.equal(source.includes("try {\n    saveCustomerServiceRecord"), true);
+    assert.equal(source.includes("catch"), true);
+  });
+
   it("parses StoreHub stock take CSV export into stock count records", () => {
     const csv = [
       '"Start Time","Completed Time","Description","Store","Supplier","Status","Started By","Completed By"',

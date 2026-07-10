@@ -19,7 +19,7 @@ import {
 import { readPerformanceSourceFiles, savePerformanceSourceFilePath } from "../lib/performance-source-files.ts";
 
 type PageProps = {
-  searchParams?: Promise<{ period?: string; startDate?: string; endDate?: string; source?: string }>;
+  searchParams?: Promise<{ period?: string; startDate?: string; endDate?: string; source?: string; inputStatus?: string }>;
 };
 
 type PerformanceScoreViewProps = PageProps & {
@@ -72,6 +72,11 @@ function safeRedirectTo(value: FormDataEntryValue | null) {
   return path.startsWith("/admin/performance-score") || path.startsWith("/performance-score") ? path : "/admin/performance-score";
 }
 
+function withInputStatus(path: string, status: "service-saved" | "service-error") {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}inputStatus=${status}`;
+}
+
 function stringValue(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
@@ -103,17 +108,22 @@ function sourceCsvPath(sourceKey: string, sourceFiles: ReturnType<typeof readPer
 async function saveComplaintServiceAction(formData: FormData) {
   "use server";
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
-  saveCustomerServiceRecord({
-    workDate: stringValue(formData, "serviceDate"),
-    employeeName: stringValue(formData, "employeeName"),
-    bucket: serviceBucket(stringValue(formData, "bucket")),
-    severity: serviceSeverity(stringValue(formData, "severity")),
-    count: Number(stringValue(formData, "serviceCount") || "1"),
-    note: stringValue(formData, "serviceNote")
-  });
+  let inputStatus: "service-saved" | "service-error" = "service-saved";
+  try {
+    saveCustomerServiceRecord({
+      workDate: stringValue(formData, "serviceDate"),
+      employeeName: stringValue(formData, "employeeName"),
+      bucket: serviceBucket(stringValue(formData, "bucket")),
+      severity: serviceSeverity(stringValue(formData, "severity")),
+      count: Number(stringValue(formData, "serviceCount") || "1"),
+      note: stringValue(formData, "serviceNote")
+    });
+  } catch {
+    inputStatus = "service-error";
+  }
   revalidatePath("/admin/performance-score");
   revalidatePath("/performance-score");
-  redirect(redirectTo);
+  redirect(withInputStatus(redirectTo, inputStatus));
 }
 
 async function saveAssignedWorkAction(formData: FormData) {
@@ -153,6 +163,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const summary = getPerformanceSummary(rows);
   const activeSourceDetail = getPerformanceSourceDetail(params.source || "");
   const redirectTo = `${basePath}?startDate=${activePeriod.startDate}&endDate=${activePeriod.endDate}${params.source ? `&source=${params.source}` : ""}`;
+  const inputStatus = params.inputStatus;
   const entryDate = activePeriod.endDate;
   const dailyStore = readPerformanceDailyStore();
   const sourceFiles = readPerformanceSourceFiles();
@@ -257,6 +268,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             <p className="eyebrow">Complaint / service input</p>
             <h3>บันทึกปัญหาบริการรายวัน</h3>
           </div>
+          {inputStatus === "service-saved" ? <p className="input-status success">บันทึกหัวข้อปัญหารายวันแล้ว</p> : null}
+          {inputStatus === "service-error" ? <p className="input-status warning">บันทึกไม่สำเร็จ แต่หน้าไม่ค้างแล้ว กรุณาตรวจสิทธิ์ storage ของ production</p> : null}
           <form action={saveComplaintServiceAction} className="performance-input-form">
             <input type="hidden" name="redirectTo" value={redirectTo} />
             <label>
