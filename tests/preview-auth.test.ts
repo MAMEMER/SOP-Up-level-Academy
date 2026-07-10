@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { isPreviewMode, previewProfiles, previewUser } from "../lib/preview-data.ts";
+import { isPreviewMode, previewProfileForEmail, previewProfiles, previewUser } from "../lib/preview-data.ts";
 
 describe("preview auth", () => {
   it("keeps the web app public by default even when Supabase env vars exist", () => {
@@ -46,16 +46,27 @@ describe("preview auth", () => {
     assert.equal(profile?.active, true);
   });
 
+  it("selects the preview profile that matches the login email", () => {
+    const profile = previewProfileForEmail("namenrw@gmail.com");
+
+    assert.equal(profile?.name, "Namen RW");
+    assert.equal(profile?.email, "namenrw@gmail.com");
+    assert.equal(previewProfileForEmail(" NAMENRW@GMAIL.COM ")?.id, profile?.id);
+    assert.equal(previewProfileForEmail("staff@example.com")?.name, "staff@example.com");
+    assert.equal(previewProfileForEmail("staff@example.com")?.email, "staff@example.com");
+  });
+
   it("uses the preview user id for the mock server auth user", () => {
     const serverSource = readFileSync("lib/supabase/server.ts", "utf8");
 
-    assert.equal(serverSource.includes("user: { id: previewUser.id }"), true);
+    assert.equal(serverSource.includes("previewProfileForEmail"), true);
     assert.equal(serverSource.includes('user: { id: "preview-admin" }'), false);
   });
 
   it("routes preview login directly to checklist", () => {
     const loginSource = readFileSync("app/(auth)/login/page.tsx", "utf8");
 
+    assert.equal(loginSource.includes("previewLoginEmailCookieName"), true);
     assert.match(loginSource, /router\.push\("\/checklist"\)/);
   });
 

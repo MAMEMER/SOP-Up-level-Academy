@@ -90,6 +90,8 @@ export const previewUser: PreviewUser = {
   departmentId: "admin"
 };
 
+export const previewLoginEmailCookieName = "sop_uplevel_preview_email";
+
 export const previewDepartments: PreviewDepartment[] = [
   { id: "front-store", name: "front-store", display_name: "หน้าร้าน" },
   { id: "stock", name: "stock", display_name: "Stock" },
@@ -126,6 +128,22 @@ export const previewProfiles: PreviewProfile[] = [
     departments: [{ display_name: "แอดมิน" }]
   }
 ];
+
+export function previewProfileForEmail(email: string | null | undefined) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const existingProfile = previewProfiles.find((profile) => profile.email.toLowerCase() === normalizedEmail && profile.active);
+  if (existingProfile) return existingProfile;
+  if (!normalizedEmail) return previewProfiles.find((profile) => profile.id === previewUser.id);
+  return {
+    id: `preview-email-${normalizedEmail.replace(/[^a-z0-9]+/g, "-")}`,
+    name: normalizedEmail,
+    email: normalizedEmail,
+    role: "admin" as const,
+    department_id: "admin",
+    active: true,
+    departments: [{ display_name: "แอดมิน" }]
+  };
+}
 
 export const previewSops: PreviewSop[] = [
   {

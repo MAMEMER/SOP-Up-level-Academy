@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { isPreviewMode } from "../../../lib/preview-data.ts";
+import { isPreviewMode, previewLoginEmailCookieName } from "../../../lib/preview-data.ts";
 import { createClient } from "../../../lib/supabase/browser.ts";
 
 export default function LoginPage() {
@@ -22,7 +22,10 @@ export default function LoginPage() {
     });
 
     setSent(true);
-    if (isPreviewMode()) router.push("/checklist");
+    if (isPreviewMode()) {
+      document.cookie = `${previewLoginEmailCookieName}=${encodeURIComponent(email.trim())}; path=/; max-age=2592000; SameSite=Lax`;
+      router.push("/checklist");
+    }
   }
 
   return (

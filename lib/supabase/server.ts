@@ -2,7 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import {
   isPreviewMode,
+  previewLoginEmailCookieName,
   previewDepartments,
+  previewProfileForEmail,
   previewProfiles,
   previewUser,
   previewSops,
@@ -11,7 +13,7 @@ import {
   previewTaskRuns,
 } from "../preview-data.ts";
 
-function makePreviewQuery(table: string) {
+function makePreviewQuery(table: string, sessionProfile?: (typeof previewProfiles)[number]) {
   const filters: Array<{ kind: "eq" | "in"; column: string; value: unknown }> = [];
   let sortColumn: string | null = null;
   let sortAscending = true;
@@ -19,7 +21,11 @@ function makePreviewQuery(table: string) {
 
   function rowsForTable() {
     if (table === "departments") return previewDepartments.map((department) => ({ ...department }));
-    if (table === "profiles") return previewProfiles.map((profile) => ({ ...profile }));
+    if (table === "profiles") {
+      const profiles = previewProfiles.map((profile) => ({ ...profile }));
+      if (sessionProfile && !profiles.some((profile) => profile.id === sessionProfile.id)) profiles.push({ ...sessionProfile });
+      return profiles;
+    }
     if (table === "sops") return previewSops.map((sop) => ({ ...sop }));
     if (table === "task_assignments") return previewTaskAssignments.map((assignment) => ({ ...assignment }));
     if (table === "task_runs") return previewTaskRuns.map((run) => ({ ...run }));
@@ -108,10 +114,12 @@ function makePreviewQuery(table: string) {
 
 export async function createClient() {
   if (isPreviewMode()) {
+    const previewCookieStore = await cookies();
+    const previewProfile = previewProfileForEmail(previewCookieStore.get(previewLoginEmailCookieName)?.value);
     return {
       auth: {
         async getUser() {
-          return { data: { user: { id: previewUser.id } }, error: null };
+          return { data: { user: { id: previewProfile?.id || previewUser.id } }, error: null };
         },
         async signInWithOtp() {
           return { data: null, error: null };
@@ -124,7 +132,7 @@ export async function createClient() {
         }
       },
       from(table: string) {
-        return makePreviewQuery(table);
+        return makePreviewQuery(table, previewProfile);
       }
     };
   }
