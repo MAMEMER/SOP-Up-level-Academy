@@ -74,8 +74,8 @@ export const performanceSourceDetails: PerformanceSourceDetail[] = [
     title: "Google Sheet ตารางกะ",
     sourcePath: "https://docs.google.com/spreadsheets/d/1C9iMNfU8PYGoAaUN68M39ihJSOW4ZcYinzYDHBgyDWw/edit",
     sourceType: "google-sheet",
-    currentRange: "JUN26. และ JUL26 แถวชื่อพนักงาน + แถวหมายเหตุ",
-    whatToCheck: ["เวลาเข้ากะรายวัน", "OFF", "ลาป่วย/ลากิจในแถวหมายเหตุ", "ยอดวันลาทั้งปีนับเฉพาะวันที่มีกะ"]
+    currentRange: "JUN26. และ JUL26 แถวชื่อพนักงาน + แถวแก้ไข/หมายเหตุ",
+    whatToCheck: ["เวลาเข้ากะรายวัน", "OFF", "บรรทัดแก้ไขใช้เป็นข้อมูลล่าสุด", "ลาป่วย/ลากิจในแถวหมายเหตุ", "ยอดวันลาทั้งปีนับเฉพาะวันที่มีกะ"]
   },
   {
     key: "attendance",
@@ -123,10 +123,11 @@ export function getPerformanceSourceDetail(sourceKey: string) {
   return performanceSourceDetails.find((source) => source.key === sourceKey);
 }
 
-type SheetScheduleRow = {
+export type SheetScheduleRow = {
   employeeName: string;
   month: "2026-06" | "2026-07";
   shifts: Record<number, string>;
+  editShifts?: Record<number, string>;
 };
 
 export function leaveTypeFromScheduleValue(value: string): LeaveType | undefined {
@@ -134,6 +135,30 @@ export function leaveTypeFromScheduleValue(value: string): LeaveType | undefined
   if (normalized.includes("ลาป่วย") || normalized === "ป่วย" || normalized === "sick") return "sick";
   if (normalized.includes("ลากิจ") || normalized === "personal") return "personal";
   return undefined;
+}
+
+export function applyScheduleEditRows(rows: SheetScheduleRow[]): SheetScheduleRow[] {
+  return rows.map((row) => {
+    const editEntries = Object.entries(row.editShifts || {}).filter(([, value]) => value.trim().length > 0);
+    if (editEntries.length === 0) return row;
+    return {
+      ...row,
+      shifts: {
+        ...row.shifts,
+        ...Object.fromEntries(editEntries)
+      }
+    };
+  });
+}
+
+function normalizeShiftStart(value: string) {
+  const normalized = value.trim();
+  const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!match) return undefined;
+  const hour = Number(match[1]);
+  const minute = Number(match[2] || "0");
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return undefined;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 const sheetScheduleRows: SheetScheduleRow[] = [
@@ -203,12 +228,14 @@ const sheetScheduleRows: SheetScheduleRow[] = [
   {
     employeeName: "ICE",
     month: "2026-07",
-    shifts: { 1: "13:00", 2: "13:00", 3: "11:00", 4: "OFF", 5: "OFF", 6: "13:00", 7: "11:00", 8: "13:00", 9: "13:30" }
+    shifts: { 1: "13:00", 2: "13:00", 3: "11:00", 4: "OFF", 5: "OFF", 6: "13:00", 7: "11:00", 8: "13:00", 9: "13:30" },
+    editShifts: { 7: "f", 9: "f" }
   },
   {
     employeeName: "Boom",
     month: "2026-07",
-    shifts: { 1: "OFF", 2: "11:00", 3: "11:00", 4: "09:00", 5: "09:00", 6: "13:00", 7: "OFF", 8: "OFF", 9: "11:00" }
+    shifts: { 1: "OFF", 2: "11:00", 3: "11:00", 4: "09:00", 5: "09:00", 6: "13:00", 7: "OFF", 8: "OFF", 9: "11:00" },
+    editShifts: { 3: "ลาป่วย", 4: "ลาป่วย", 5: "ลาป่วย", 6: "ลาป่วย", 8: "11" }
   },
   {
     employeeName: "Leo",
@@ -222,25 +249,28 @@ function addHours(isoDateTime: string, hours: number) {
 }
 
 function buildSchedules(rows: SheetScheduleRow[]): ShiftSchedule[] {
-  return rows.flatMap((row) =>
+  return applyScheduleEditRows(rows).flatMap((row) =>
     Object.entries(row.shifts)
       .filter(([, shift]) => shift !== "OFF" && !leaveTypeFromScheduleValue(shift))
-      .map(([day, shift]) => {
+      .flatMap(([day, shift]) => {
+        const normalizedShiftStart = normalizeShiftStart(shift);
+        if (!normalizedShiftStart) return [];
         const workDate = `${row.month}-${day.padStart(2, "0")}`;
-        const scheduledStart = `${workDate}T${shift}:00+07:00`;
-        return {
+        const scheduledStart = `${workDate}T${normalizedShiftStart}:00+07:00`;
+        return [{
           employeeName: row.employeeName,
           workDate,
           scheduledStart,
           scheduledEnd: addHours(scheduledStart, 9),
-          shiftLabel: `${row.month.toUpperCase()} sheet ${shift}`,
+          shiftLabel: `${row.month.toUpperCase()} sheet ${normalizedShiftStart}`,
           source: "google-sheet" as const
-        };
+        }];
       })
   );
 }
 
 const schedules = buildSchedules(sheetScheduleRows);
+const leaveEligibleSchedules = buildSchedules(sheetScheduleRows.map((row) => ({ ...row, editShifts: undefined })));
 
 type SheetLeaveRow = {
   employeeName: string;
@@ -254,11 +284,6 @@ const sheetLeaveRows: SheetLeaveRow[] = [
     month: "2026-06",
     leaves: { 24: "sick", 25: "sick", 26: "sick", 27: "sick", 28: "sick", 29: "sick", 30: "sick" }
   },
-  {
-    employeeName: "Boom",
-    month: "2026-07",
-    leaves: { 2: "sick", 3: "sick", 4: "sick", 5: "sick" }
-  }
 ];
 
 function buildLeaveRecords(rows: SheetLeaveRow[]): LeaveRecord[] {
@@ -270,7 +295,7 @@ function buildLeaveRecords(rows: SheetLeaveRow[]): LeaveRecord[] {
       source: "google-sheet" as const
     }))
   );
-  const scheduleLeaveRecords = sheetScheduleRows.flatMap((row) =>
+  const scheduleLeaveRecords = applyScheduleEditRows(sheetScheduleRows).flatMap((row) =>
     Object.entries(row.shifts).flatMap(([day, shift]) => {
       const type = leaveTypeFromScheduleValue(shift);
       if (!type) return [];
@@ -414,7 +439,7 @@ export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod)
         leaveRecords: leaveRecords.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
       },
       annualLeave: {
-        schedules: employeeSchedules.filter((item) => inYear(item.workDate, year)),
+        schedules: leaveEligibleSchedules.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year)),
         records: leaveRecords.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year))
       },
       stockCounts: [...employeePeriodStockCounts, ...missingStockCounts],

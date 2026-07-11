@@ -14,6 +14,7 @@ import {
   summarizeLeave
 } from "../lib/performance-score.ts";
 import {
+  applyScheduleEditRows,
   getPerformanceScoreRows,
   getPerformanceScoreRowsForRange,
   getPerformanceSourceDetail,
@@ -134,6 +135,19 @@ describe("performance score engine", () => {
     assert.equal(leaveTypeFromScheduleValue("ลาป่วย"), "sick");
     assert.equal(leaveTypeFromScheduleValue("ลากิจ"), "personal");
     assert.equal(leaveTypeFromScheduleValue("09:00"), undefined);
+  });
+
+  it("treats schedule edit rows as the latest onsite schedule data", () => {
+    const [row] = applyScheduleEditRows([
+      {
+        employeeName: "Boom",
+        month: "2026-07",
+        shifts: { 2: "11:00", 3: "11:00", 4: "09:00", 6: "13:00", 8: "OFF" },
+        editShifts: { 3: "ลาป่วย", 4: "ลาป่วย", 6: "ลาป่วย", 8: "11" }
+      }
+    ]);
+
+    assert.deepEqual(row.shifts, { 2: "11:00", 3: "ลาป่วย", 4: "ลาป่วย", 6: "ลาป่วย", 8: "11" });
   });
 
   it("does not reduce attendance below 0", () => {
@@ -482,9 +496,9 @@ describe("performance score engine", () => {
     assert.ok(boom);
     assert.ok(leo);
     assert.equal(rows.length, 3);
-    assert.equal(ice.totalScore, 44);
+    assert.equal(ice.totalScore, 46);
     assert.equal(ice.incentive.percent, 0);
-    assert.equal(ice.categories.attendance.score, 10);
+    assert.equal(ice.categories.attendance.score, 12);
     assert.equal(ice.categories.stock.score, 14);
     assert.equal(ice.categories.stock.deductions[0].reason, "stock_difference");
     assert.equal(ice.categories.checklist.score, 0);
@@ -492,7 +506,7 @@ describe("performance score engine", () => {
     assert.equal(ice.categories.attendance.deductions[0].detail, "ICE late 58 minutes on 2026-07-01");
     assert.equal(ice.categories.assignedWork.score, 0);
     assert.equal(ice.categories.customerService.score, 20);
-    assert.equal(boom.totalScore, 88);
+    assert.equal(boom.totalScore, 74);
     assert.equal(boom.categories.customerService.score, 20);
     assert.equal(boom.categories.assignedWork.score, 20);
     assert.equal(leo.categories.checklist.score, 0);
@@ -527,7 +541,7 @@ describe("performance score engine", () => {
     assert.equal(julyBoom.leaveSummary.sickUsed, 9);
     assert.deepEqual(
       julyBoom.leaveSummary.records.map((record) => record.workDate),
-      ["2026-06-25", "2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-07-02", "2026-07-03", "2026-07-04", "2026-07-05"]
+      ["2026-06-25", "2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06"]
     );
 
     const previousRows = getPerformanceScoreRows("previous-half-month");
@@ -546,6 +560,7 @@ describe("performance score engine", () => {
     });
 
     assert.equal(getPerformanceSourceDetail("schedule")?.sourcePath.includes("docs.google.com/spreadsheets"), true);
+    assert.equal(getPerformanceSourceDetail("schedule")?.whatToCheck.includes("บรรทัดแก้ไขใช้เป็นข้อมูลล่าสุด"), true);
     assert.equal(getPerformanceSourceDetail("attendance")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
     assert.equal(getPerformanceSourceDetail("stock")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
     assert.equal(getPerformanceSourceDetail("checklist")?.sourcePath.includes("1Ona5H3hBsJywLtRC8FLqyjj7MJTdhwGjhTW3G1X8Fe8"), true);
