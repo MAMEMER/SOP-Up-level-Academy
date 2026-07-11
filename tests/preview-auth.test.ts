@@ -56,6 +56,30 @@ describe("preview auth", () => {
     assert.equal(previewProfileForEmail("staff@example.com")?.email, "staff@example.com");
   });
 
+  it("maps named staff emails to employee preview profiles", () => {
+    assert.deepEqual(
+      ["boomboom08755@gmail.com", "phooreephat.k@gmail.com", "nuslove2560@gmail.com"].map((email) => {
+        const profile = previewProfileForEmail(email);
+        return [profile?.email, profile?.name, profile?.role, profile?.department_id];
+      }),
+      [
+        ["boomboom08755@gmail.com", "บูม", "employee", "front-store"],
+        ["phooreephat.k@gmail.com", "ไอซ์", "employee", "front-store"],
+        ["nuslove2560@gmail.com", "ลีโอ", "employee", "front-store"]
+      ]
+    );
+  });
+
+  it("limits employee staff navigation to Dashboard, Checklist, and คู่มือ", () => {
+    const appShellSource = readFileSync("components/AppShell.tsx", "utf8");
+
+    assert.equal(appShellSource.includes("staffLinks"), true);
+    assert.equal(appShellSource.includes('{ href: "/", label: "Dashboard" }'), true);
+    assert.equal(appShellSource.includes('{ href: "/checklist", label: "Checklist" }'), true);
+    assert.equal(appShellSource.includes('{ href: "/training", label: "คู่มือ" }'), true);
+    assert.equal(appShellSource.includes('user.role === "employee" ? staffLinks'), true);
+  });
+
   it("uses the preview user id for the mock server auth user", () => {
     const serverSource = readFileSync("lib/supabase/server.ts", "utf8");
 

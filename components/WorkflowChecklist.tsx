@@ -201,26 +201,44 @@ function OpenStoreTaskDetails({
       <div className="detail-panel">
         <div className="detail-panel-head">
           <strong>แชตค้าง</strong>
-          <small>ตอบข้อความหลังปิดกะเมื่อวานให้จบก่อน 12:00</small>
+          <small>ตอบแชทลูกค้าที่ค้างให้จบก่อน 12.00</small>
         </div>
         <label className="detail-check">
           <input type="checkbox" disabled={!canEdit} />
-          <span>ตอบครบก่อน 12:00</span>
+          <span>ตอบแชทลูกค้าครบก่อน 12.00</span>
         </label>
       </div>
     );
   }
 
   if (index === 5) {
+    const refillGroups = ["น้ำ,ขนม", "ชั้นแขวน อุปกรณ์", "การ์ด Booster box"] as const;
+
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
           <strong>สินค้าเหลือน้อย</strong>
           <small>เติมบนชั้นให้พร้อมขาย</small>
         </div>
-        <label className="detail-check">
-          <input type="checkbox" disabled={!canEdit} />
-          <span>เติมแล้ว</span>
+        <div className="detail-grid">
+          {refillGroups.map((group) => {
+            const key = `open-shelf-refill-${group.toLowerCase().replaceAll(" ", "-").replaceAll(",", "-")}`;
+            return (
+              <label key={group} className="detail-check">
+                <input
+                  type="checkbox"
+                  checked={details[detailKey(workDate, key)] === "เติมแล้ว"}
+                  disabled={!canEdit}
+                  onChange={(event) => updateDetail(key, event.target.checked ? "เติมแล้ว" : "")}
+                />
+                <span>{group}</span>
+              </label>
+            );
+          })}
+        </div>
+        <label className="detail-upload">
+          <span>อัปโหลดรูปหลังเติมสินค้า</span>
+          <input name="stock-shelf-refill-photo" type="file" accept="image/*" disabled={!canEdit} />
         </label>
       </div>
     );
@@ -296,6 +314,29 @@ function ShippingTaskDetails({
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
+          <strong>จำนวนออเดอร์ทั้งหมดที่ต้องส่ง</strong>
+          <small>ใส่จำนวนรวมก่อนเริ่มแพ็คสินค้า</small>
+        </div>
+        <label className="workflow-note-field compact">
+          <span>จำนวนออเดอร์ทั้งหมดที่ต้องส่ง</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={details[detailKey(workDate, "shipping-total-order-count")] || ""}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("shipping-total-order-count", event.target.value)}
+            placeholder="เช่น 12"
+          />
+        </label>
+      </div>
+    );
+  }
+
+  if (index === 2) {
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-head">
           <strong>แพ็คและจัดส่ง</strong>
           <small>แพ็คสินค้าตามขั้นตอน แล้วเพิ่ม record เลข track เมื่อจัดส่งแล้ว</small>
         </div>
@@ -341,11 +382,11 @@ function CloseStoreTaskDetails({
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
-          <strong>สรุปออเดอร์ก่อนกลับบ้าน</strong>
-          <small>ใส่จำนวนออเดอร์และแจ้งงานส่งของพรุ่งนี้ในกลุ่มแอดมิน</small>
+          <strong>แพ็คออเดอร์ที่ค้าง</strong>
+          <small>ใส่จำนวนออเดอร์ที่ค้างและแจ้งงานส่งของพรุ่งนี้ในกลุ่มแอดมิน</small>
         </div>
         <label className="workflow-note-field compact">
-          <span>จำนวนออเดอร์</span>
+          <span>จำนวนออเดอร์ที่ค้าง</span>
           <input
             type="number"
             inputMode="numeric"
@@ -366,7 +407,7 @@ function CloseStoreTaskDetails({
           <span>แจ้งในกลุ่มแอดมินเพื่อส่งของในวันพรุ่งนี้</span>
         </label>
         <label className="detail-upload">
-          <span>อัปโหลดรูปสรุปออเดอร์</span>
+          <span>อัปโหลดรูปแพ็คออเดอร์ที่ค้าง</span>
           <input type="file" accept="image/*" disabled={!canEdit} />
         </label>
       </div>
@@ -544,14 +585,32 @@ function StockTaskDetails({
   }
 
   if (index === 3) {
+    const refillGroups = ["น้ำ,ขนม", "ชั้นแขวน อุปกรณ์", "การ์ด Booster box"] as const;
+
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
-          <strong>หลักฐานหลังตรวจเสร็จ</strong>
-          <small>อัปโหลดรูปหรือแคปหน้าจอหลังทำรายการเสร็จสิ้น</small>
+          <strong>เติมสินค้าบนชั้น</strong>
+          <small>เลือกพื้นที่ที่เติมและอัปโหลดรูปหลังเติมเสร็จ</small>
+        </div>
+        <div className="detail-grid">
+          {refillGroups.map((group) => {
+            const key = `stock-shelf-refill-${group.toLowerCase().replaceAll(" ", "-").replaceAll(",", "-")}`;
+            return (
+              <label key={group} className="detail-check">
+                <input
+                  type="checkbox"
+                  checked={details[detailKey(workDate, key)] === "เติมแล้ว"}
+                  disabled={!canEdit}
+                  onChange={(event) => updateDetail(key, event.target.checked ? "เติมแล้ว" : "")}
+                />
+                <span>{group}</span>
+              </label>
+            );
+          })}
         </div>
         <label className="detail-upload">
-          <span>อัปโหลดภาพ</span>
+          <span>อัปโหลดรูปหลังเติมสินค้า</span>
           <input type="file" accept="image/*" disabled={!canEdit} />
         </label>
       </div>
@@ -898,10 +957,6 @@ export function WorkflowChecklist({
           <span>ความคืบหน้าทั้งวัน</span>
           <strong>{progress}%</strong>
         </div>
-        <div className="board-stat compact">
-          <span>Done</span>
-          <strong>{completed}/{total}</strong>
-        </div>
       </div>
       <div className="runner-progress" aria-label={`ความคืบหน้า ${progress}%`}>
         <span style={{ width: `${progress}%` }} />
@@ -949,7 +1004,7 @@ export function WorkflowChecklist({
                   const hasDetail =
                     phase.id === "open-store" ||
                     phase.id === "stock-work" ||
-                    (phase.id === "daytime-work" && (index === 0 || index === 1)) ||
+                    (phase.id === "daytime-work" && index <= 2) ||
                     (phase.id === "close-store" && index <= 3);
                   return (
                     <div key={key} className={hasDetail ? "tick-group has-detail" : "tick-group"}>

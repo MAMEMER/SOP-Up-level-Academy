@@ -126,6 +126,33 @@ export const previewProfiles: PreviewProfile[] = [
     department_id: "admin",
     active: true,
     departments: [{ display_name: "แอดมิน" }]
+  },
+  {
+    id: "staff-boom",
+    name: "บูม",
+    email: "boomboom08755@gmail.com",
+    role: "employee",
+    department_id: "front-store",
+    active: true,
+    departments: [{ display_name: "หน้าร้าน" }]
+  },
+  {
+    id: "staff-ice",
+    name: "ไอซ์",
+    email: "phooreephat.k@gmail.com",
+    role: "employee",
+    department_id: "front-store",
+    active: true,
+    departments: [{ display_name: "หน้าร้าน" }]
+  },
+  {
+    id: "staff-leo",
+    name: "ลีโอ",
+    email: "nuslove2560@gmail.com",
+    role: "employee",
+    department_id: "front-store",
+    active: true,
+    departments: [{ display_name: "หน้าร้าน" }]
   }
 ];
 

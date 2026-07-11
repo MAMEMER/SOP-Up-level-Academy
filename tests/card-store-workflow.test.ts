@@ -23,23 +23,24 @@ describe("card store workflow content", () => {
     assert.equal(stock?.checklist.some((item) => item.includes("Completed")), true);
     assert.equal(stock?.checklist.some((item) => item.includes("น้ำ/ขนม")), true);
     assert.equal(stock?.checklist.some((item) => item.includes("StoreHub")), true);
-    assert.equal(stock?.checklist.some((item) => item.includes("เสร็จสิ้น")), true);
+    assert.equal(stock?.checklist.some((item) => item.includes("เติมสินค้าบนชั้น")), true);
     assert.deepEqual(daytime?.sections.map((section) => section.title), ["งานแพ็คและส่งของ"]);
     assert.deepEqual(stock?.checklist, [
       "ดึงข้อมูลการนับจาก StoreHub Stock Take และ approve เมื่อสถานะ Completed",
       "นับจำนวนจริงหน้าร้านและห้อง Stock",
       "สรุปรายวันสินค้าใกล้หมดจาก StoreHub Supply Needs เฉพาะชื่อและจำนวนที่เหลือ",
-      "แคปหน้าจอตรวจสินค้าเสร็จสิ้น",
+      "เติมสินค้าบนชั้น",
       "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
     ]);
     assert.deepEqual(daytime?.checklist, [
       "ตรวจสอบเช็คสินค้าที่ต้องจัดส่ง",
+      "จำนวนออเดอร์ทั้งหมดที่ต้องส่ง",
       "แพ็คสินค้าตามขั้นตอน",
       "แจ้งเลข tracking กับลูกค้า"
     ]);
     assert.equal(daytime?.checklist.includes("ไม่มีออเดอร์"), false);
     assert.deepEqual(closing?.checklist, [
-      "สรุปออเดอร์ก่อนกลับบ้าน",
+      "แพ็คออเดอร์ที่ค้าง",
       "เก็บอุปกรณ์ ทำความสะอาดพื้นที่เล่น",
       "ปิดยอดร้านและบันทึกเงินสด",
       "แจ้งสรุปประจำวันในกลุ่มแอดมิน",
@@ -48,6 +49,8 @@ describe("card store workflow content", () => {
     ]);
     assert.equal(closing?.checklist.includes("ล็อกตู้สินค้าและตรวจสินค้าแพง"), false);
     assert.equal(closing?.checklist.includes("สรุปรายการต้องเติม"), false);
+    assert.equal(closing?.checklist.includes("สรุปออเดอร์ก่อนกลับบ้าน"), false);
+    assert.equal(cardStoreWorkflow[0].checklist.includes("ตอบแชทลูกค้า ค้างก่อน 12.00"), true);
   });
 
   it("links every task phase to its matching manual section", () => {

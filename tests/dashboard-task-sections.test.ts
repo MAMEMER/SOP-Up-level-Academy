@@ -62,6 +62,30 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("shipping-tracking-number"), true);
   });
 
+  it("removes the checklist Done status box but keeps progress visible", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("<span>Done</span>"), false);
+    assert.equal(source.includes("ความคืบหน้าทั้งวัน"), true);
+    assert.equal(source.includes("runner-progress"), true);
+  });
+
+  it("captures shelf refill evidence and product groups", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("stock-shelf-refill-photo"), true);
+    assert.equal(source.includes("น้ำ,ขนม"), true);
+    assert.equal(source.includes("ชั้นแขวน อุปกรณ์"), true);
+    assert.equal(source.includes("การ์ด Booster box"), true);
+  });
+
+  it("captures total shipping order count before packing", () => {
+    const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("shipping-total-order-count"), true);
+    assert.equal(source.includes("จำนวนออเดอร์ทั้งหมดที่ต้องส่ง"), true);
+  });
+
   it("removes close-store phase helper text and adds closing proof fields", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 
@@ -69,7 +93,7 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("admin แก้ไขได้"), false);
     assert.equal(source.includes("closing-order-count"), true);
     assert.equal(source.includes("แจ้งในกลุ่มแอดมินเพื่อส่งของในวันพรุ่งนี้"), true);
-    assert.equal(source.includes("อัปโหลดรูปสรุปออเดอร์"), true);
+    assert.equal(source.includes("อัปโหลดรูปแพ็คออเดอร์ที่ค้าง"), true);
     assert.equal(source.includes("อัปโหลดรูปหลักฐานทำความสะอาด"), true);
     assert.equal(source.includes("แจ้งสรุปประจำวันในกลุ่มแอดมิน"), true);
   });

@@ -10,6 +10,12 @@ const mainLinks = [
   { href: "/training", label: "คู่มือ" }
 ];
 
+const staffLinks = [
+  { href: "/", label: "Dashboard" },
+  { href: "/checklist", label: "Checklist" },
+  { href: "/training", label: "คู่มือ" }
+];
+
 const adminLinks = [
   { href: "/admin/ops", label: "Owner Summary" },
   { href: "/admin/performance-score", label: "Performance Score" },
@@ -18,6 +24,8 @@ const adminLinks = [
 ];
 
 export function AppShell({ user, children }: { user: CurrentUser; children: React.ReactNode }) {
+  const visibleMainLinks = user.role === "employee" ? staffLinks : mainLinks;
+
   async function logOut() {
     "use server";
 
@@ -42,7 +50,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
         <section>
           <p className="sidebar-label">Main</p>
           <nav className="nav-list">
-            {mainLinks.map((item) => (
+            {visibleMainLinks.map((item) => (
               <Link key={item.href} href={item.href}>
                 {item.label}
               </Link>
