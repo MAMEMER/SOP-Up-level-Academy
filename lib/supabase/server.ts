@@ -115,10 +115,13 @@ function makePreviewQuery(table: string, sessionProfile?: (typeof previewProfile
 export async function createClient() {
   if (isPreviewMode()) {
     const previewCookieStore = await cookies();
-    const previewProfile = previewProfileForEmail(previewCookieStore.get(previewLoginEmailCookieName)?.value);
+    const previewLoginEmail = previewCookieStore.get(previewLoginEmailCookieName)?.value;
+    const previewProfile = previewProfileForEmail(previewLoginEmail);
+    const previewLoginAllowed = !previewLoginEmail || Boolean(previewProfile);
     return {
       auth: {
         async getUser() {
+          if (!previewLoginAllowed) return { data: { user: null }, error: null };
           return { data: { user: { id: previewProfile?.id || previewUser.id } }, error: null };
         },
         async signInWithOtp() {

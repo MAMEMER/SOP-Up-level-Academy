@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { isPreviewMode, previewProfileForEmail, previewProfiles, previewUser } from "../lib/preview-data.ts";
+import { allowedPreviewLoginEmails, isPreviewMode, previewProfileForEmail, previewProfiles, previewUser } from "../lib/preview-data.ts";
 
 describe("preview auth", () => {
   it("keeps the web app public by default even when Supabase env vars exist", () => {
@@ -52,8 +52,18 @@ describe("preview auth", () => {
     assert.equal(profile?.name, "Namen RW");
     assert.equal(profile?.email, "namenrw@gmail.com");
     assert.equal(previewProfileForEmail(" NAMENRW@GMAIL.COM ")?.id, profile?.id);
-    assert.equal(previewProfileForEmail("staff@example.com")?.name, "staff@example.com");
-    assert.equal(previewProfileForEmail("staff@example.com")?.email, "staff@example.com");
+    assert.equal(previewProfileForEmail("staff@example.com"), undefined);
+  });
+
+  it("allows only the approved admin and staff login emails", () => {
+    assert.deepEqual(allowedPreviewLoginEmails, [
+      "namenrw@gmail.com",
+      "champ.championest@gmail.com",
+      "boomboom08755@gmail.com",
+      "phooreephat.k@gmail.com",
+      "nuslove2560@gmail.com"
+    ]);
+    assert.equal(previewProfileForEmail("random@example.com"), undefined);
   });
 
   it("maps named staff emails to employee preview profiles", () => {
@@ -85,6 +95,8 @@ describe("preview auth", () => {
 
     assert.equal(serverSource.includes("previewProfileForEmail"), true);
     assert.equal(serverSource.includes('user: { id: "preview-admin" }'), false);
+    assert.equal(serverSource.includes("previewLoginAllowed"), true);
+    assert.equal(serverSource.includes("user: null"), true);
   });
 
   it("routes preview login to the dashboard", () => {
