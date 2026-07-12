@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 
-const manualMedia: Record<string, { src: string; alt: string; evidence: string[]; photoGuide?: string[] }> = {
+const manualMedia: Record<string, {
+  src: string;
+  alt: string;
+  evidence: string[];
+  photoGuide?: string[];
+  proofExamples?: Array<{ src: string; alt: string; caption: string }>;
+}> = {
   "open-store": {
     src: "/training/snack-shelf-opening.jpg",
     alt: "ตัวอย่างชั้นวางขนมเปิดร้านที่ต้องถ่ายเป็นหลักฐาน",
@@ -15,6 +21,13 @@ const manualMedia: Record<string, { src: string; alt: string; evidence: string[]
       "ถ่ายให้เห็นชั้นวางขนมและน้ำทั้งชั้น",
       "จัดสินค้าให้เรียบร้อยก่อนถ่าย เช่น ขนมไม่ล้ม กล่องไม่บังสินค้า และชั้นไม่รก",
       "ถ่ายให้เห็นว่าพื้นที่พร้อมขายก่อนเปิดร้าน"
+    ],
+    proofExamples: [
+      {
+        src: "/training/open-store-line-proof.jpg",
+        alt: "ตัวอย่างการส่งงานเปิดร้านในกลุ่ม LINE Admin",
+        caption: "ตัวอย่างการส่งงานเปิดร้านในกลุ่ม LINE Admin · กดดูรูปตัวอย่างเต็ม"
+      }
     ]
   },
   "stock-work": {
@@ -41,7 +54,14 @@ const manualMedia: Record<string, { src: string; alt: string; evidence: string[]
   "close-store": {
     src: "/training/closing-sales.jpg",
     alt: "ตัวอย่างการตรวจสอบยอดขายก่อนปิดร้าน",
-    evidence: ["ยอดขายรวมและแยกช่องทาง", "รูปเงินสดปิดร้าน", "รายงานส่งต่อหัวหน้า"]
+    evidence: ["ยอดขายรวมและแยกช่องทาง", "รูปเงินสดปิดร้าน", "ส่งหลักฐานยืนยันในกลุ่ม LINE Admin"],
+    proofExamples: [
+      {
+        src: "/training/line-admin-proof.jpg",
+        alt: "ตัวอย่างข้อความและรูปหลักฐานที่ส่งในกลุ่ม LINE Admin",
+        caption: "ตัวอย่างข้อความและรูปหลักฐานที่ส่งในกลุ่ม LINE Admin · กดดูรูปตัวอย่างเต็ม"
+      }
+    ]
   }
 };
 
@@ -77,6 +97,15 @@ export default function TrainingPage() {
                 </a>
                 <figcaption>{media.alt} · กดดูรูปตัวอย่างเต็ม</figcaption>
               </figure>
+
+              {media.proofExamples?.map((example) => (
+                <figure key={example.src} className="wi-figure">
+                  <a className="wi-image-link" href={example.src} target="_blank" rel="noreferrer">
+                    <img src={example.src} alt={example.alt} />
+                  </a>
+                  <figcaption>{example.caption}</figcaption>
+                </figure>
+              ))}
 
               <div className="wi-content">
                 <section className="wi-summary-grid">

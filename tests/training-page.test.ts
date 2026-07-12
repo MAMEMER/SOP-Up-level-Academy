@@ -29,10 +29,25 @@ describe("training manual page", () => {
     assert.equal(source.includes("ถ่ายให้เห็นชั้นวางขนมและน้ำ"), true);
   });
 
+  it("shows a LINE Admin proof example for opening work", () => {
+    const source = readFileSync(new URL("../app/(dashboard)/training/page.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("/training/open-store-line-proof.jpg"), true);
+    assert.equal(source.includes("ตัวอย่างการส่งงานเปิดร้านในกลุ่ม LINE Admin"), true);
+  });
+
   it("lets staff open each WI sample image from the manual", () => {
     const source = readFileSync(new URL("../app/(dashboard)/training/page.tsx", import.meta.url), "utf8");
 
     assert.equal(source.includes('<a className="wi-image-link" href={media.src}'), true);
     assert.equal(source.includes("กดดูรูปตัวอย่างเต็ม"), true);
+  });
+
+  it("shows a LINE Admin proof example for closing evidence", () => {
+    const source = readFileSync(new URL("../app/(dashboard)/training/page.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("/training/line-admin-proof.jpg"), true);
+    assert.equal(source.includes("ส่งหลักฐานยืนยันในกลุ่ม LINE Admin"), true);
+    assert.equal(source.includes("ตัวอย่างข้อความและรูปหลักฐานที่ส่งในกลุ่ม LINE Admin"), true);
   });
 });
