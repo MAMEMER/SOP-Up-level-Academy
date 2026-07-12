@@ -120,6 +120,7 @@ describe("preview auth", () => {
     assert.equal(rootSource.includes("product-arrangement-grid"), false);
     assert.equal(rootSource.includes("/training/snack-shelf-opening.jpg"), false);
     assert.equal(rootSource.includes("/training/equipment-cabinet.jpg"), false);
+    assert.equal(rootSource.includes("มาตรฐานรูป"), false);
   });
 
   it("uses only neutral box colors on the dashboard", () => {

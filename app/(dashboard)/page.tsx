@@ -6,7 +6,7 @@ import { requireUser } from "../../lib/auth.ts";
 
 const dashboardCategories = [
   { href: "/checklist", title: "Checklist", detail: "งานวันนี้" },
-  { href: "/training", title: "คู่มือ", detail: "มาตรฐานรูป" },
+  { href: "/training", title: "คู่มือ", detail: "ขั้นตอนงาน" },
   { href: "/checklist#stock-work", title: "Stock", detail: "นับและเติม" },
   { href: "/checklist#daytime-work", title: "Shipping", detail: "ออเดอร์จัดส่ง" },
   { href: "/checklist#close-store", title: "Close", detail: "ปิดร้าน" }
