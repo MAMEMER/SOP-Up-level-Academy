@@ -38,10 +38,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="up-logo" aria-hidden="true">
-            <span>UP</span>
-            <strong>LEVEL</strong>
-          </div>
+          <img className="brand-logo-image" src="/up-level-academy-logo.png" alt="UP LEVEL Academy" />
           <div>
             <strong>SOP_UPLEVEL</strong>
             <small>Checklist dashboard</small>

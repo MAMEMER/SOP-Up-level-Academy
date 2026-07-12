@@ -111,4 +111,25 @@ describe("preview auth", () => {
     assert.equal(rootSource.includes("/training/snack-shelf-opening.jpg"), true);
     assert.equal(rootSource.includes("/training/equipment-cabinet.jpg"), true);
   });
+
+  it("uses the UP LEVEL logo as the site brand and browser icon", () => {
+    const appShellSource = readFileSync("components/AppShell.tsx", "utf8");
+    const layoutSource = readFileSync("app/layout.tsx", "utf8");
+
+    assert.equal(appShellSource.includes("/up-level-academy-logo.png"), true);
+    assert.equal(appShellSource.includes("brand-logo-image"), true);
+    assert.equal(layoutSource.includes('icon: "/up-level-academy-logo.png"'), true);
+    assert.equal(layoutSource.includes('apple: "/up-level-academy-logo.png"'), true);
+  });
+
+  it("applies an Apple Store inspired dashboard structure", () => {
+    const rootSource = readFileSync("app/(dashboard)/page.tsx", "utf8");
+    const styles = readFileSync("app/globals.css", "utf8");
+
+    assert.equal(rootSource.includes("apple-store-hero"), true);
+    assert.equal(rootSource.includes("apple-category-strip"), true);
+    assert.equal(rootSource.includes("apple-dashboard-card"), true);
+    assert.equal(styles.includes(".apple-store-hero"), true);
+    assert.equal(styles.includes("font-family: -apple-system"), true);
+  });
 });
