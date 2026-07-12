@@ -114,14 +114,34 @@ describe("preview auth", () => {
     assert.equal(rootSource.includes('redirect("/checklist")'), false);
   });
 
-  it("shows product arrangement images on the dashboard", () => {
+  it("does not show product arrangement example images on the dashboard", () => {
     const rootSource = readFileSync("app/(dashboard)/page.tsx", "utf8");
 
-    assert.equal(rootSource.includes("product-arrangement-grid"), true);
-    assert.equal(rootSource.includes("น้ำ / ขนม"), true);
-    assert.equal(rootSource.includes("ตู้ขายอุปกรณ์"), true);
-    assert.equal(rootSource.includes("/training/snack-shelf-opening.jpg"), true);
-    assert.equal(rootSource.includes("/training/equipment-cabinet.jpg"), true);
+    assert.equal(rootSource.includes("product-arrangement-grid"), false);
+    assert.equal(rootSource.includes("/training/snack-shelf-opening.jpg"), false);
+    assert.equal(rootSource.includes("/training/equipment-cabinet.jpg"), false);
+  });
+
+  it("uses only neutral box colors on the dashboard", () => {
+    const styles = readFileSync("app/globals.css", "utf8");
+    const checklistStatusStyles = styles.slice(styles.indexOf(".checklist-status"), styles.indexOf(".section-title"));
+    const dashboardTaskStyles = styles.slice(styles.indexOf(".task-sections"), styles.indexOf(".workflow-timeline"));
+    const workflowStatusStyles = styles.slice(styles.indexOf(".workflow-status-white"), styles.indexOf(".workflow-tile p"));
+
+    for (const section of [checklistStatusStyles, dashboardTaskStyles, workflowStatusStyles]) {
+      assert.equal(section.includes("background: #f0fdf4"), false);
+      assert.equal(section.includes("background: #ecfeff"), false);
+      assert.equal(section.includes("background: #fffbeb"), false);
+      assert.equal(section.includes("background: #f5f3ff"), false);
+      assert.equal(section.includes("background: #dcfce7"), false);
+      assert.equal(section.includes("background: #ffedd5"), false);
+      assert.equal(section.includes("background: #fee2e2"), false);
+      assert.equal(section.includes("background: #ede9fe"), false);
+      assert.equal(section.includes("border-left-color: #15803d"), false);
+      assert.equal(section.includes("border-left-color: #ea580c"), false);
+      assert.equal(section.includes("border-left-color: #b42318"), false);
+      assert.equal(section.includes("border-left-color: #7c3aed"), false);
+    }
   });
 
   it("uses the UP LEVEL logo as the site brand and browser icon", () => {
@@ -140,7 +160,6 @@ describe("preview auth", () => {
 
     assert.equal(rootSource.includes("apple-store-hero"), true);
     assert.equal(rootSource.includes("apple-category-strip"), true);
-    assert.equal(rootSource.includes("apple-dashboard-card"), true);
     assert.equal(styles.includes(".apple-store-hero"), true);
     assert.equal(styles.includes("font-family: -apple-system"), true);
   });
