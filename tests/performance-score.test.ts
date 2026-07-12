@@ -609,6 +609,18 @@ describe("performance score engine", () => {
     assert.equal(source.includes("Source detail"), true);
   });
 
+  it("renders quick period shortcuts on the performance score date picker", () => {
+    const source = readFileSync(new URL("../components/PerformanceScoreView.tsx", import.meta.url), "utf8");
+    const styles = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+
+    assert.equal(source.includes("performance-period-shortcuts"), true);
+    assert.equal(source.includes("วันนี้"), true);
+    assert.equal(source.includes("7 วันล่าสุด"), true);
+    assert.equal(source.includes("เดือนนี้"), true);
+    assert.equal(source.includes("quickPeriodHref"), true);
+    assert.equal(styles.includes(".performance-period-shortcuts"), true);
+  });
+
   it("renders an inline complaint and service form on the performance page", () => {
     const source = readFileSync(new URL("../components/PerformanceScoreView.tsx", import.meta.url), "utf8");
 

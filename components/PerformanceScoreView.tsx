@@ -67,6 +67,40 @@ function sourceHref(sourceKey: string, period: PerformanceReviewPeriod, basePath
   return `${basePath}?startDate=${period.startDate}&endDate=${period.endDate}&source=${sourceKey}`;
 }
 
+function bangkokDateValue(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value || "2026";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+  return `${year}-${month}-${day}`;
+}
+
+function shiftBangkokDate(dateValue: string, days: number) {
+  const date = new Date(`${dateValue}T12:00:00+07:00`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function quickPeriodHref(basePath: string, startDate: string, endDate: string, source?: string) {
+  const params = new URLSearchParams({ startDate, endDate });
+  if (source) params.set("source", source);
+  return `${basePath}?${params.toString()}`;
+}
+
+function quickPeriodLinks(basePath: string, source?: string) {
+  const today = bangkokDateValue();
+  return [
+    { label: "วันนี้", href: quickPeriodHref(basePath, today, today, source) },
+    { label: "7 วันล่าสุด", href: quickPeriodHref(basePath, shiftBangkokDate(today, -6), today, source) },
+    { label: "เดือนนี้", href: quickPeriodHref(basePath, `${today.slice(0, 8)}01`, today, source) }
+  ];
+}
+
 function safeRedirectTo(value: FormDataEntryValue | null) {
   const path = String(value || "/admin/performance-score");
   return path.startsWith("/admin/performance-score") || path.startsWith("/performance-score") ? path : "/admin/performance-score";
@@ -167,6 +201,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const entryDate = activePeriod.endDate;
   const dailyStore = readPerformanceDailyStore();
   const sourceFiles = readPerformanceSourceFiles();
+  const periodShortcuts = quickPeriodLinks(basePath, params.source);
   const serviceRecordsForDay = customerServiceRecordsForDate(dailyStore.serviceRecords, entryDate);
   const assignedRecordsForDay = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, entryDate);
 
@@ -184,6 +219,11 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
           <label htmlFor="endDate">วันที่สิ้นสุด</label>
           <input id="endDate" name="endDate" type="date" defaultValue={activePeriod.endDate} />
           <button type="submit">ดูคะแนน</button>
+          <div className="performance-period-shortcuts" aria-label="ช่วงวันที่ทางลัด">
+            {periodShortcuts.map((shortcut) => (
+              <Link key={shortcut.label} href={shortcut.href}>{shortcut.label}</Link>
+            ))}
+          </div>
         </form>
       </section>
 

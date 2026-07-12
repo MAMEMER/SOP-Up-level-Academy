@@ -47,6 +47,27 @@
   cursor: pointer;
 }
 
+.performance-period-shortcuts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.performance-period-shortcuts a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .performance-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
