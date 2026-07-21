@@ -1,4 +1,5 @@
 import type { StockCountRecord } from "./performance-score.ts";
+import { resolveEmployeeCode } from "./employee-directory.ts";
 
 export type StoreHubStockTakeExportRow = {
   startTime: string;
@@ -55,13 +56,10 @@ function numberValue(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Delegates to the canonical employee directory so StoreHub name matching is driven
+// by one editable alias table instead of scattered substring checks.
 export function normalizeStoreHubEmployeeName(name: string) {
-  const normalized = name.trim().toLowerCase();
-  if (normalized.includes("ice")) return "ICE";
-  if (normalized.includes("leo")) return "Leo";
-  if (normalized.includes("boom")) return "Boom";
-  if (normalized.includes("ungkanawin") || normalized.includes("academy")) return "ICE";
-  return name.trim();
+  return resolveEmployeeCode(name);
 }
 
 export function parseStoreHubStockTakeCsv(csvText: string): StoreHubStockTakeExportRow[] {

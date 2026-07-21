@@ -3746,3 +3746,152 @@ a {
   }
 
 }
+
+/* ============================================================
+   Up Level Guild theme layer  (appended — overrides above)
+   Warm, friendly, rounded. Retints neutral surfaces + accents
+   toward the Guild palette and improves readability.
+   Status colors (green/orange/red/purple) are intentionally
+   left untouched so KPI signalling stays clear.
+   ============================================================ */
+:root {
+  --ul-brand: #f97316;        /* Guild orange */
+  --ul-brand-strong: #ea580c;
+  --ul-brand-soft: #fff2e6;
+  --ul-ink: #2b2119;          /* warm near-black text */
+  --ul-ink-soft: #7c6f64;     /* muted warm grey */
+  --ul-cream: #fbf6f0;        /* page background */
+  --ul-surface: #ffffff;      /* cards */
+  --ul-line: #ece3d8;         /* warm hairline */
+  --ul-radius: 16px;
+  --ul-radius-sm: 12px;
+  --ul-shadow: 0 8px 24px rgba(120, 84, 38, 0.10);
+  --ul-shadow-sm: 0 3px 10px rgba(120, 84, 38, 0.08);
+  --ul-font: "Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--ul-cream);
+  color: var(--ul-ink);
+  font-family: var(--ul-font);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell,
+.page {
+  background: transparent;
+  color: var(--ul-ink);
+  font-family: var(--ul-font);
+}
+
+.app-shell {
+  background: var(--ul-cream);
+}
+
+/* Readability: comfortable headings */
+h1, h2, h3 { color: var(--ul-ink); letter-spacing: -0.01em; line-height: 1.25; }
+h1 { font-weight: 600; }
+h2 { font-weight: 600; }
+.eyebrow, .sidebar-label {
+  color: var(--ul-brand-strong);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* Sidebar / topbar — warm glass */
+.sidebar {
+  background: rgba(251, 246, 240, 0.82);
+  border-bottom: 1px solid var(--ul-line);
+  color: var(--ul-ink);
+}
+.brand small, .topbar p, .sidebar .brand small { color: var(--ul-ink-soft); }
+
+/* Nav — orange active pill */
+.nav-list a {
+  border-radius: 999px;
+  color: var(--ul-ink-soft);
+  font-weight: 500;
+}
+.nav-list a.active,
+.nav-list a:hover {
+  background: var(--ul-brand-soft);
+  color: var(--ul-brand-strong);
+}
+
+/* Brand marks — retint the green gradients to Guild orange */
+.brand-mark,
+.up-logo {
+  background: linear-gradient(135deg, var(--ul-brand-strong), var(--ul-brand));
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.24);
+}
+
+/* Cards — soft, rounded, warm shadow */
+.soft-card,
+.tile,
+.board-stat,
+.board-hero,
+.apple-dashboard-card,
+.department-card,
+.performance-row,
+.runner-step {
+  border-radius: var(--ul-radius);
+  border-color: var(--ul-line);
+  box-shadow: var(--ul-shadow-sm);
+}
+
+.board-hero {
+  background: linear-gradient(135deg, #fff, var(--ul-brand-soft));
+  box-shadow: var(--ul-shadow);
+}
+.board-hero h2 { color: var(--ul-ink); }
+.board-hero p strong { color: var(--ul-brand-strong); }
+
+.board-stat strong { color: var(--ul-brand-strong); }
+
+/* Primary buttons / dark CTAs → Guild orange */
+button:not([class]),
+.btn,
+.btn-primary,
+.performance-period-form button,
+.logout-button {
+  background: var(--ul-brand);
+  border: 0;
+  color: #fff;
+  border-radius: 999px;
+  font-weight: 600;
+}
+button:not([class]):hover,
+.btn:hover,
+.btn-primary:hover,
+.performance-period-form button:hover {
+  background: var(--ul-brand-strong);
+}
+
+/* Inputs — warmer, larger tap targets, orange focus ring */
+input, select, textarea {
+  border-radius: var(--ul-radius-sm);
+}
+.performance-period-form input,
+.performance-period-form select {
+  border-color: var(--ul-line);
+  border-radius: var(--ul-radius-sm);
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--ul-brand);
+  outline-offset: 1px;
+  border-color: var(--ul-brand);
+}
+
+/* Period shortcut chips */
+.performance-period-shortcuts a {
+  border-radius: 999px;
+  border: 1px solid var(--ul-line);
+  background: var(--ul-surface);
+  color: var(--ul-ink-soft);
+}
+.performance-period-shortcuts a:hover {
+  border-color: var(--ul-brand);
+  color: var(--ul-brand-strong);
+  background: var(--ul-brand-soft);
+}

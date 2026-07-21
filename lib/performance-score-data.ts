@@ -17,6 +17,8 @@ import {
 import { monthlyPerformanceSourceFolder, readPerformanceSourceFiles } from "./performance-source-files.ts";
 import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "./storehub-stocktake-export.ts";
 import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "./storehub-timesheet-export.ts";
+import { branchFor, employeeCodes, employmentTypeFor } from "./employee-directory.ts";
+import { branchConfig, isSlowMorningCount } from "./store-config.ts";
 
 export type PerformanceReviewPeriod = {
   id: "previous-half-month" | "july-to-date" | "custom";
@@ -43,7 +45,26 @@ export type PerformanceSourceDetail = {
   whatToCheck: string[];
 };
 
-const employees = ["ICE", "Boom", "Leo"];
+const employees = employeeCodes;
+
+// Marks morning stock counts that were done but started past the branch's allowed
+// morning window (open time + grace hours) so the Stock KPI can apply the −2 slow penalty.
+function annotateSlowMorningCounts(input: {
+  employeeName: string;
+  schedules: ShiftSchedule[];
+  stockCounts: StockCountRecord[];
+}): StockCountRecord[] {
+  const grace = branchConfig(branchFor(input.employeeName)).stockCountGraceHours;
+  const morningShiftByDate = new Map(
+    input.schedules.filter(isMorningShift).map((schedule) => [schedule.workDate, schedule])
+  );
+  return input.stockCounts.map((count) => {
+    const shift = morningShiftByDate.get(count.dueDate);
+    if (!shift || !count.startedAt) return count;
+    const slow = isSlowMorningCount({ scheduledStart: shift.scheduledStart, startedAt: count.startedAt, graceHours: grace });
+    return slow ? { ...count, slowCount: true } : count;
+  });
+}
 const bangkaeTeamAssigneeName = "ทีม บางแค";
 
 export const performanceReviewPeriods: PerformanceReviewPeriod[] = [
@@ -417,7 +438,11 @@ export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod)
     const employeeSchedules = schedules.filter((item) => item.employeeName === employeeName);
     const employeePeriodSchedules = employeeSchedules.filter((item) => inPeriod(item.workDate, period));
     const employeePeriodClockEvents = getClockEventsFromExport().filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period));
-    const employeePeriodStockCounts = getStockCountsFromExport().filter((item) => item.employeeName === employeeName && inPeriod(item.dueDate, period));
+    const employeePeriodStockCounts = annotateSlowMorningCounts({
+      employeeName,
+      schedules: employeePeriodSchedules,
+      stockCounts: getStockCountsFromExport().filter((item) => item.employeeName === employeeName && inPeriod(item.dueDate, period))
+    });
     const missingStockCounts = missingMorningStockCountRecords({
       employeeName,
       schedules: employeePeriodSchedules,
@@ -433,6 +458,8 @@ export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod)
     });
     return calculateEmployeePerformanceScore({
       employeeName,
+      employmentType: employmentTypeFor(employeeName),
+      daysWorked: employeePeriodSchedules.length,
       attendance: {
         schedules: employeePeriodSchedules,
         clockEvents: employeePeriodClockEvents,

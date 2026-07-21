@@ -150,7 +150,8 @@ async function saveComplaintServiceAction(formData: FormData) {
       bucket: serviceBucket(stringValue(formData, "bucket")),
       severity: serviceSeverity(stringValue(formData, "severity")),
       count: Number(stringValue(formData, "serviceCount") || "1"),
-      note: stringValue(formData, "serviceNote")
+      note: stringValue(formData, "serviceNote"),
+      evidence: stringValue(formData, "serviceEvidence")
     });
   } catch {
     inputStatus = "service-error";
@@ -170,7 +171,8 @@ async function saveAssignedWorkAction(formData: FormData) {
       employeeName: stringValue(formData, "employeeName"),
       title,
       status: assignedStatus(stringValue(formData, "assignedStatus")),
-      note: stringValue(formData, "assignedNote")
+      note: stringValue(formData, "assignedNote"),
+      evidence: stringValue(formData, "assignedEvidence")
     });
   }
   revalidatePath("/admin/performance-score");
@@ -347,6 +349,10 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               หมายเหตุ
               <input name="serviceNote" placeholder="เช่น ตอบลูกค้าช้า / complaint เรื่องเดิม" />
             </label>
+            <label className="wide">
+              หลักฐาน (รูป/ลิงก์)
+              <input name="serviceEvidence" placeholder="วางลิงก์รูป/แชท หรือโน้ตอ้างอิงหลักฐาน" />
+            </label>
             <button type="submit">บันทึกเหตุการณ์</button>
           </form>
           <div className="performance-daily-records">
@@ -399,6 +405,10 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               หมายเหตุ
               <input name="assignedNote" placeholder="กำหนดส่ง / เหตุผล / รายละเอียดงาน" />
             </label>
+            <label className="wide">
+              หลักฐาน (รูป/ลิงก์)
+              <input name="assignedEvidence" placeholder="วางลิงก์งาน/รูปผลลัพธ์ หรือโน้ตอ้างอิงหลักฐาน" />
+            </label>
             <button type="submit">บันทึกงานที่มอบหมาย</button>
           </form>
           <div className="performance-daily-records">
@@ -435,6 +445,11 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             <div>
               <strong>{row.incentive.percent}%</strong>
               <small>{row.incentive.requiresCoaching ? "ต้องประเมินรายสัปดาห์" : "ผ่านเกณฑ์รอบนี้"}</small>
+              {row.salaryDeduction.amount > 0 ? (
+                <small className="score-badge score-badge-red" title={row.salaryDeduction.basis}>
+                  หักเงิน {row.salaryDeduction.amount.toLocaleString("th-TH")} บาท (ขาด {row.salaryDeduction.pointsShort} คะแนน)
+                </small>
+              ) : null}
             </div>
             <div className="performance-category-grid">
               {Object.entries(row.categories).map(([key, result]) => (

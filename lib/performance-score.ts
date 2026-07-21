@@ -71,8 +71,14 @@ export type StockCountRecord = {
   discrepancyStatus: "matched" | "resolved" | "real_loss" | "fraud_review" | "not_counted";
   resolvedWithin24Hours?: boolean;
   realLossOccurrence?: number;
+  /** true when a morning count started after store open / outside the 4h shift window */
+  slowCount?: boolean;
   source: DataSource;
 };
+
+// KPI rule (21 Jul 2026): StoreHub stock counts are unstable during July 2026, so real
+// stock +/- (loss) deductions only start counting from this date onward.
+export const STOCK_DIFFERENCE_DEDUCTION_START = "2026-08-01";
 
 export type ChecklistEvent = {
   type: "missing_day" | "missing_important" | "backfilled" | "false_record";
@@ -100,6 +106,16 @@ export type IncentiveTier = {
   requiresCoaching: boolean;
 };
 
+export type EmploymentType = "full_time" | "part_time";
+
+export type SalaryDeduction = {
+  amount: number;
+  employmentType: EmploymentType;
+  /** whole points below 50 (Math.ceil of 50 - score), 0 when score >= 50 */
+  pointsShort: number;
+  basis: string;
+};
+
 export type EmployeePerformanceInput = {
   employeeName: string;
   attendance: AttendanceInput;
@@ -111,6 +127,9 @@ export type EmployeePerformanceInput = {
   checklistEvents: ChecklistEvent[];
   serviceEvents: ServiceEvent[];
   assignedWorks: AssignedWork[];
+  employmentType?: EmploymentType;
+  /** scheduled work days in the month, used for part-time salary deduction */
+  daysWorked?: number;
 };
 
 export type EmployeePerformanceScore = {
@@ -128,6 +147,7 @@ export type EmployeePerformanceScore = {
   flags: string[];
   warnings: string[];
   leaveSummary: LeaveSummary;
+  salaryDeduction: SalaryDeduction;
 };
 
 function clampScore(score: number, maxScore: number) {
@@ -218,36 +238,61 @@ export function calculateAttendanceScore(input: AttendanceInput): ScoreResult {
 export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const flags: string[] = [];
+  const warnings: string[] = [];
 
-  records.forEach((record) => {
+  // not_counted is occurrence-based: first 2 missed counts cost 10 each, then 5 each.
+  // Sort by dueDate so occurrence order is deterministic regardless of input order.
+  const orderedRecords = [...records].sort((left, right) => left.dueDate.localeCompare(right.dueDate));
+  let notCountedOccurrence = 0;
+
+  orderedRecords.forEach((record) => {
     if (record.discrepancyStatus === "not_counted") {
+      notCountedOccurrence += 1;
+      const points = notCountedOccurrence <= 2 ? 10 : 5;
       deductions.push({
         category: "stock",
-        points: 10,
+        points,
         reason: "stock_not_counted",
-        detail: `${record.employeeName} did not count ${record.category} on ${record.dueDate}`,
+        detail: `${record.employeeName} did not count ${record.category} on ${record.dueDate} (ครั้งที่ ${notCountedOccurrence})`,
         source: record.source
       });
       return;
     }
 
-    if (record.discrepancyStatus === "resolved" && record.resolvedWithin24Hours) return;
-
-    if (record.discrepancyStatus === "real_loss") {
+    // Slow morning count (started after store open / outside the 4h shift window): -2.
+    if (record.slowCount) {
       deductions.push({
         category: "stock",
         points: 2,
-        reason: "stock_difference",
-        detail: `${record.category} has StoreHub Difference`,
+        reason: "stock_slow_count",
+        detail: `${record.employeeName} นับ stock ช้าเกินกรอบ 4 ชม. ${record.category} on ${record.dueDate}`,
         source: record.source
       });
+    }
+
+    if (record.discrepancyStatus === "resolved" && record.resolvedWithin24Hours) return;
+
+    if (record.discrepancyStatus === "real_loss") {
+      // July 2026 grace: StoreHub unstable, so real +/- is only flagged (warning), not deducted,
+      // until STOCK_DIFFERENCE_DEDUCTION_START.
+      if (record.dueDate < STOCK_DIFFERENCE_DEDUCTION_START) {
+        warnings.push(`${record.category} มี StoreHub Difference on ${record.dueDate} (ยังไม่หักช่วง July 2026)`);
+      } else {
+        deductions.push({
+          category: "stock",
+          points: 2,
+          reason: "stock_difference",
+          detail: `${record.category} has StoreHub Difference`,
+          source: record.source
+        });
+      }
     }
 
     if (record.discrepancyStatus === "fraud_review") flags.push("management_review_required");
   });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings };
 }
 
 export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
@@ -255,7 +300,9 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
   const flags: string[] = [];
 
   events.forEach((event) => {
-    const pointsByType = { missing_day: 10, missing_important: 2, backfilled: 1, false_record: 10 } satisfies Record<ChecklistEvent["type"], number>;
+    // KPI 21 Jul 2026: missing checklist day = -5 (was 10); no more backfill credit (checklist must
+    // close same-day) so backfilled carries no penalty; false/false-on-audit stays -10.
+    const pointsByType = { missing_day: 5, missing_important: 2, backfilled: 0, false_record: 10 } satisfies Record<ChecklistEvent["type"], number>;
     const dateDetail = event.dates?.length ? ` (${event.dates.join(", ")})` : "";
     const detailByType = {
       missing_day: `มีกะและ clock-in แต่ไม่มีข้อมูล Google Form checklist x ${event.count} วัน${dateDetail}`,
@@ -285,13 +332,16 @@ export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResu
   events.forEach((event) => {
     let targetScore = bucketScores[event.bucket];
     if (event.severity === "severe") {
+      // Severe complaint zeroes the bucket (= -10) and requires coaching.
       targetScore = 0;
       flags.push("coaching_required");
     } else if (event.severity === "repeated") {
-      targetScore = Math.min(targetScore, 5);
+      // Repeat of the same complaint zeroes the bucket (= -10) and requires coaching.
+      targetScore = 0;
       flags.push("coaching_required");
     } else {
-      targetScore = Math.max(0, targetScore - event.count * 2);
+      // First complaint / fixed on the spot: -5 per occurrence within the bucket.
+      targetScore = Math.max(0, targetScore - event.count * 5);
     }
 
     const deductionPoints = bucketScores[event.bucket] - targetScore;
@@ -316,11 +366,12 @@ export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResu
   };
 }
 
-function assignedWorkItemScore(status: AssignedWork["status"]) {
-  if (status === "early_quality") return 20;
-  if (status === "on_time") return 18;
-  if (status === "needs_revision") return 15;
-  if (status === "late_one_day") return 12;
+// KPI 21 Jul 2026: assigned work is scored by cumulative deductions from 20 (not an average).
+// early/on-time = no cut; needs revision or 1-day-late = -2; not finished / overdue = -10 + coach.
+function assignedWorkItemDeduction(status: AssignedWork["status"]) {
+  if (status === "needs_revision") return 2;
+  if (status === "late_one_day") return 2;
+  if (status === "not_finished") return 10;
   return 0;
 }
 
@@ -328,23 +379,23 @@ export function calculateAssignedWorkScore(works: AssignedWork[]): ScoreResult {
   if (works.length === 0) return { score: 20, maxScore: 20, deductions: [], flags: [], warnings: [] };
 
   const flags: string[] = [];
-  const itemScores = works.map((work) => {
-    const score = assignedWorkItemScore(work.status);
+  const deductions: DeductionRecord[] = [];
+  works.forEach((work) => {
     if (work.status === "not_finished") flags.push("coaching_required");
-    return { work, score };
+    const points = assignedWorkItemDeduction(work.status);
+    if (points > 0) {
+      deductions.push({
+        category: "assigned_work",
+        points,
+        reason: work.status,
+        detail: work.title,
+        source: work.source
+      });
+    }
   });
-  const score = clampScore(itemScores.reduce((sum, item) => sum + item.score, 0) / itemScores.length, 20);
-  const deductions = itemScores
-    .filter((item) => item.score < 20)
-    .map<DeductionRecord>((item) => ({
-      category: "assigned_work",
-      points: 20 - item.score,
-      reason: item.work.status,
-      detail: item.work.title,
-      source: item.work.source
-    }));
 
-  return { score, maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+  const totalDeduction = deductions.reduce((sum, item) => sum + item.points, 0);
+  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
 export function getIncentiveTier(totalScore: number): IncentiveTier {
@@ -353,6 +404,42 @@ export function getIncentiveTier(totalScore: number): IncentiveTier {
   if (totalScore >= 70) return { label: "70-79", percent: 50, requiresCoaching: false };
   if (totalScore >= 60) return { label: "60-69", percent: 20, requiresCoaching: false };
   return { label: "ต่ำกว่า 60", percent: 0, requiresCoaching: true };
+}
+
+// KPI 21 Jul 2026: below 50 total, salary is docked. Full time = whole points short × 500.
+// Part time = points-short percent of the month's earnings (daysWorked × dailyRate). Rounds up.
+export function calculateSalaryDeduction(
+  totalScore: number,
+  opts?: { employmentType?: EmploymentType; daysWorked?: number; dailyRate?: number; fullTimeRatePerPoint?: number }
+): SalaryDeduction {
+  const employmentType = opts?.employmentType ?? "full_time";
+  const dailyRate = opts?.dailyRate ?? 400;
+  const fullTimeRatePerPoint = opts?.fullTimeRatePerPoint ?? 500;
+  const daysWorked = opts?.daysWorked ?? 0;
+
+  if (totalScore >= 50) {
+    return { amount: 0, employmentType, pointsShort: 0, basis: "คะแนน 50 ขึ้นไป ไม่หักเงิน" };
+  }
+
+  const pointsShort = Math.ceil(50 - totalScore);
+  if (employmentType === "part_time") {
+    const monthEarnings = daysWorked * dailyRate;
+    const amount = Math.ceil((pointsShort / 100) * monthEarnings);
+    return {
+      amount,
+      employmentType,
+      pointsShort,
+      basis: `Part time: ขาด ${pointsShort}% × (${daysWorked} วัน × ${dailyRate}) = ${amount}`
+    };
+  }
+
+  const amount = pointsShort * fullTimeRatePerPoint;
+  return {
+    amount,
+    employmentType,
+    pointsShort,
+    basis: `Full time: ขาด ${pointsShort} คะแนน × ${fullTimeRatePerPoint} = ${amount}`
+  };
 }
 
 export function calculateEmployeePerformanceScore(input: EmployeePerformanceInput): EmployeePerformanceScore {
@@ -406,6 +493,10 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
       ...categories.customerService.warnings,
       ...categories.assignedWork.warnings
     ],
-    leaveSummary: summarizeLeave(leaveRecords)
+    leaveSummary: summarizeLeave(leaveRecords),
+    salaryDeduction: calculateSalaryDeduction(totalScore, {
+      employmentType: input.employmentType,
+      daysWorked: input.daysWorked
+    })
   };
 }

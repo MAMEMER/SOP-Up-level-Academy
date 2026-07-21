@@ -10,6 +10,8 @@ export type CustomerServiceRecord = {
   severity: ServiceEvent["severity"];
   count: number;
   note: string;
+  /** URL or note pointing to proof (screenshot / chat link) */
+  evidence?: string;
   recordedAt: string;
 };
 
@@ -22,6 +24,8 @@ export type AssignedWorkRecord = {
   title: string;
   status: AssignedWork["status"];
   note: string;
+  /** URL or note pointing to proof (screenshot / chat link) */
+  evidence?: string;
   recordedAt: string;
 };
 
@@ -46,6 +50,7 @@ export function addCustomerServiceRecord(records: CustomerServiceRecord[], input
       ...input,
       count: Math.max(1, Math.round(input.count || 1)),
       note: input.note.trim(),
+      evidence: (input.evidence || "").trim() || undefined,
       recordedAt,
       id: recordId("service", input, recordedAt)
     }
@@ -59,6 +64,7 @@ export function addAssignedWorkRecord(records: AssignedWorkRecord[], input: Assi
       ...input,
       title: input.title.trim(),
       note: input.note.trim(),
+      evidence: (input.evidence || "").trim() || undefined,
       recordedAt,
       id: recordId("assigned", input, recordedAt)
     }
