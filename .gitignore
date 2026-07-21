@@ -7,3 +7,6 @@ coverage/
 .superpowers/
 dist/
 .wrangler/
+
+# uploaded performance CSVs (employee data — keep out of git)
+.data/uploads/

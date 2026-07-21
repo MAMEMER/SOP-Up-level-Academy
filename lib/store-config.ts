@@ -5,8 +5,10 @@
 export type BranchConfig = {
   key: string;
   displayName: string;
-  /** local store open time HH:mm (Asia/Bangkok) */
-  openTime: string;
+  /** store open time HH:mm (Asia/Bangkok) on weekdays (Mon–Fri) */
+  openTimeWeekday: string;
+  /** store open time HH:mm on weekends (Sat–Sun) */
+  openTimeWeekend: string;
   /** hours after shift start a morning stock count may still begin without penalty */
   stockCountGraceHours: number;
 };
@@ -15,13 +17,23 @@ export const branchConfigs: BranchConfig[] = [
   {
     key: "bangkae",
     displayName: "Up Level Academy (บางแค)",
-    openTime: "11:00", // TODO: confirm real บางแค open time with Champ
+    openTimeWeekday: "11:00", // จ–ศ กะแรก 11:00
+    openTimeWeekend: "09:00", // ส–อา กะแรก 09:00
     stockCountGraceHours: 4
   }
 ];
 
 export function branchConfig(key: string): BranchConfig {
   return branchConfigs.find((branch) => branch.key === key) ?? branchConfigs[0];
+}
+
+/** Returns the branch open time HH:mm for a given YYYY-MM-DD (weekend vs weekday). */
+export function openTimeFor(branchKey: string, workDate: string): string {
+  const config = branchConfig(branchKey);
+  // Use local noon so the +07 date never rolls into the previous UTC day.
+  const day = new Date(`${workDate}T12:00:00+07:00`).getUTCDay(); // 0=Sun … 6=Sat
+  const isWeekend = day === 0 || day === 6;
+  return isWeekend ? config.openTimeWeekend : config.openTimeWeekday;
 }
 
 /**

@@ -16,7 +16,7 @@ import {
   saveAssignedWorkRecord,
   saveCustomerServiceRecord
 } from "../lib/performance-service-records.ts";
-import { readPerformanceSourceFiles, savePerformanceSourceFilePath } from "../lib/performance-source-files.ts";
+import { readPerformanceSourceFiles, savePerformanceSourceFilePath, saveUploadedPerformanceCsv } from "../lib/performance-source-files.ts";
 
 type PageProps = {
   searchParams?: Promise<{ period?: string; startDate?: string; endDate?: string; source?: string; inputStatus?: string }>;
@@ -192,6 +192,24 @@ async function saveCsvSourcePathAction(formData: FormData) {
   redirect(redirectTo);
 }
 
+async function uploadCsvSourceAction(formData: FormData) {
+  "use server";
+  const redirectTo = safeRedirectTo(formData.get("redirectTo"));
+  const sourceKey = csvSourceKey(stringValue(formData, "sourceKey"));
+  const file = formData.get("csvFile");
+  if (file && typeof file === "object" && "text" in file && (file as File).size > 0) {
+    try {
+      const content = await (file as File).text();
+      if (content.trim()) saveUploadedPerformanceCsv(sourceKey, content);
+    } catch {
+      // ignore a bad upload — keep the previous source file
+    }
+  }
+  revalidatePath("/admin/performance-score");
+  revalidatePath("/performance-score");
+  redirect(redirectTo);
+}
+
 export async function PerformanceScoreView({ searchParams, basePath = "/admin/performance-score", showAdminBackLink = false }: PerformanceScoreViewProps) {
   const params = searchParams ? await searchParams : {};
   const activePeriod = resolvePeriod(params);
@@ -260,15 +278,26 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                 <em>ดูแหล่งที่มา</em>
               </Link>
               {sourceCsvPath(source.key, sourceFiles) ? (
-                <form action={saveCsvSourcePathAction} className="performance-source-file-form">
-                  <input type="hidden" name="redirectTo" value={redirectTo} />
-                  <input type="hidden" name="sourceKey" value={source.key} />
-                  <label>
-                    ไฟล์ CSV ที่ใช้วิเคราะห์
-                    <input name="sourcePath" defaultValue={sourceCsvPath(source.key, sourceFiles)} />
-                  </label>
-                  <button type="submit">ใช้ไฟล์นี้</button>
-                </form>
+                <>
+                  <form action={uploadCsvSourceAction} className="performance-source-file-form" encType="multipart/form-data">
+                    <input type="hidden" name="redirectTo" value={redirectTo} />
+                    <input type="hidden" name="sourceKey" value={source.key} />
+                    <label>
+                      อัปโหลดไฟล์ CSV จาก StoreHub
+                      <input type="file" name="csvFile" accept=".csv,text/csv" />
+                    </label>
+                    <button type="submit">อัปโหลด + ใช้ไฟล์นี้</button>
+                  </form>
+                  <form action={saveCsvSourcePathAction} className="performance-source-file-form">
+                    <input type="hidden" name="redirectTo" value={redirectTo} />
+                    <input type="hidden" name="sourceKey" value={source.key} />
+                    <label>
+                      ไฟล์ CSV ที่ใช้วิเคราะห์
+                      <input name="sourcePath" defaultValue={sourceCsvPath(source.key, sourceFiles)} />
+                    </label>
+                    <button type="submit">ใช้ไฟล์นี้</button>
+                  </form>
+                </>
               ) : null}
             </article>
           ))}

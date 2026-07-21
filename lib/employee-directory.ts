@@ -40,7 +40,7 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
   {
     code: "Leo",
     displayName: "Leo",
-    employmentType: "full_time",
+    employmentType: "part_time",
     aliases: ["leo", "up leo"],
     branch: "bangkae"
   }
