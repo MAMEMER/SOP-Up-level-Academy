@@ -27,6 +27,17 @@
 - C (เข้ากะ): List = `09:00,11:00,13:00,13:30,15:00,OFF`
 - D (สถานะ): List = `ทำงาน,ลาป่วย,ลากิจ`
 
+## LIVE ในชีตแล้ว — 2 tab (grid → flat อัตโนมัติ)
+คนจัดตารางกรอกใน tab **`วางแผน`** (grid คน×วัน, dropdown 8 ค่า: 09:00/11:00/13:00/13:30/15:00/OFF/ป่วย/กิจ),
+tab **`KPI`** (flat ที่ app อ่าน) สร้างเองด้วย formula ใน `KPI!A2`:
+
+```
+=ARRAYFORMULA(LET(g, วางแผน!B3:AF5, dts, วางแผน!B2:AF2, emp, วางแผน!A3:A5, nR, ROWS(g), nC, COLUMNS(g), idx, SEQUENCE(nR*nC,1,0), ri, INT(idx/nC)+1, ci, MOD(idx,nC)+1, v, FLATTEN(g), e, CHOOSEROWS(emp, ri), d, CHOOSEROWS(TRANSPOSE(dts), ci), keep, (v<>"")*(v<>"OFF"), IFERROR(FILTER({TEXT(d,"yyyy-mm-dd"), e, IF((v="ป่วย")+(v="กิจ"),"OFF",IF(ISNUMBER(v),TEXT(v,"HH:MM"),v)), IFS(v="ป่วย","ลาป่วย",v="กิจ","ลากิจ",TRUE,"ทำงาน")}, keep),"")))
+```
+
+grid: `วางแผน!B1` = วันแรกของเดือน · `B2:AF2` = วันที่ (auto +1) · `A3:A5` = ICE/Boom/Leo · `B3:AF5` = ค่ากะ (dropdown).
+กติกาแปลง: OFF → ตัดออก · ป่วย/กิจ → เข้ากะ OFF + สถานะ ลาป่วย/ลากิจ · เวลา → ทำงาน. แก้ grid → KPI อัปเดตทันที.
+
 ## วิธีเปิดใช้ในเว็บ (หลัง tab พร้อม)
 ตั้ง env `SCHEDULE_SHEET_CSV_URL` = 
 `https://docs.google.com/spreadsheets/d/1C9iMNfU8PYGoAaUN68M39ihJSOW4ZcYinzYDHBgyDWw/gviz/tq?tqx=out:csv&sheet=KPI`
