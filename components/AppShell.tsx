@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DigitalClock } from "./DigitalClock.tsx";
+import { TiltInit } from "./TiltInit.tsx";
 import type { CurrentUser } from "../lib/auth.ts";
 import { createClient } from "../lib/supabase/server.ts";
 
@@ -38,6 +39,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
 
   return (
     <div className="app-shell">
+      <TiltInit />
       <aside className="sidebar">
         <div className="brand">
           <img className="brand-logo-image" src="/up-level-academy-logo.png" alt="UP LEVEL Academy" />
