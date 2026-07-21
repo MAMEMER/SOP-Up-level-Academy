@@ -80,13 +80,13 @@ describe("preview auth", () => {
     );
   });
 
-  it("limits employee staff navigation to Dashboard, Checklist, and คู่มือ", () => {
+  it("limits employee staff navigation to หน้าหลัก, เช็คลิสต์, and คู่มืองาน", () => {
     const appShellSource = readFileSync("components/AppShell.tsx", "utf8");
 
     assert.equal(appShellSource.includes("staffLinks"), true);
-    assert.equal(appShellSource.includes('{ href: "/", label: "Dashboard" }'), true);
-    assert.equal(appShellSource.includes('{ href: "/checklist", label: "Checklist" }'), true);
-    assert.equal(appShellSource.includes('{ href: "/training", label: "คู่มือ" }'), true);
+    assert.equal(appShellSource.includes('{ href: "/", label: "หน้าหลัก" }'), true);
+    assert.equal(appShellSource.includes('{ href: "/checklist", label: "เช็คลิสต์" }'), true);
+    assert.equal(appShellSource.includes('{ href: "/training", label: "คู่มืองาน" }'), true);
     assert.equal(appShellSource.includes('user.role === "employee" ? staffLinks'), true);
   });
 

@@ -5,23 +5,25 @@ import type { CurrentUser } from "../lib/auth.ts";
 import { createClient } from "../lib/supabase/server.ts";
 
 const mainLinks = [
-  { href: "/", label: "Dashboard" },
-  { href: "/checklist", label: "Checklist" },
-  { href: "/training", label: "คู่มือ" }
+  { href: "/", label: "หน้าหลัก" },
+  { href: "/checklist", label: "เช็คลิสต์" },
+  { href: "/training", label: "คู่มืองาน" }
 ];
 
-const staffLinks = [
-  { href: "/", label: "Dashboard" },
-  { href: "/checklist", label: "Checklist" },
-  { href: "/training", label: "คู่มือ" }
-];
+const staffLinks = mainLinks;
 
 const adminLinks = [
-  { href: "/admin/ops", label: "Owner Summary" },
-  { href: "/admin/performance-score", label: "Performance Score" },
-  { href: "/manager-review", label: "Review" },
-  { href: "/monthly-summary", label: "Monthly Summary" }
+  { href: "/admin/ops", label: "สรุปเจ้าของร้าน" },
+  { href: "/admin/performance-score", label: "คะแนนพนักงาน" },
+  { href: "/manager-review", label: "ตรวจงาน" },
+  { href: "/monthly-summary", label: "สรุปรายเดือน" }
 ];
+
+const roleLabels: Record<string, string> = {
+  admin: "แอดมิน",
+  leader: "หัวหน้า",
+  employee: "พนักงาน"
+};
 
 export function AppShell({ user, children }: { user: CurrentUser; children: React.ReactNode }) {
   const visibleMainLinks = user.role === "employee" ? staffLinks : mainLinks;
@@ -40,12 +42,12 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
         <div className="brand">
           <img className="brand-logo-image" src="/up-level-academy-logo.png" alt="UP LEVEL Academy" />
           <div>
-            <strong>SOP_UPLEVEL</strong>
-            <small>Checklist dashboard</small>
+            <strong>SOP Up Level</strong>
+            <small>คู่มืองาน + KPI พนักงาน</small>
           </div>
         </div>
         <section>
-          <p className="sidebar-label">Main</p>
+          <p className="sidebar-label">เมนู</p>
           <nav className="nav-list">
             {visibleMainLinks.map((item) => (
               <Link key={item.href} href={item.href}>
@@ -56,7 +58,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
         </section>
         {user.role === "admin" ? (
           <section>
-            <p className="sidebar-label">Admin</p>
+            <p className="sidebar-label">แอดมิน</p>
             <nav className="nav-list">
               {adminLinks.map((item) => (
                 <Link key={item.href} href={item.href}>
@@ -70,17 +72,17 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
       <div className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Workspace</p>
+            <p className="eyebrow">พื้นที่ทำงาน</p>
             <h1>{user.name}</h1>
             <p>
-              {user.role} · {user.departmentId ? user.departmentId : "unassigned"}
+              {roleLabels[user.role] ?? user.role} · {user.departmentId ? user.departmentId : "ยังไม่ระบุแผนก"}
             </p>
           </div>
           <div className="topbar-actions">
             <DigitalClock />
             <div className="user-chip">{user.email}</div>
             <form action={logOut}>
-              <button type="submit" className="logout-button">Log out</button>
+              <button type="submit" className="logout-button">ออกจากระบบ</button>
             </form>
           </div>
         </header>

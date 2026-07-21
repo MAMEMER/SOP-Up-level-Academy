@@ -3895,3 +3895,98 @@ input:focus, select:focus, textarea:focus {
   color: var(--ul-brand-strong);
   background: var(--ul-brand-soft);
 }
+
+/* ------------------------------------------------------------
+   Mobile usability — the desktop top-bar (brand + Main + Admin
+   nav in one flex row) overflowed on phones. Stack it and turn
+   each nav group into a horizontally-scrollable pill row so
+   front-line staff can actually tap the menu on a phone.
+   ------------------------------------------------------------ */
+@media (max-width: 860px) {
+  .app-shell {
+    padding: 0 12px 40px;
+  }
+
+  .sidebar {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    min-height: auto;
+    padding: 10px 12px;
+    background: var(--ul-cream);
+    backdrop-filter: none;
+    border-bottom: 1px solid var(--ul-line);
+  }
+
+  .sidebar section {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sidebar-label {
+    margin: 6px 2px 2px;
+  }
+
+  .nav-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav-list::-webkit-scrollbar { display: none; }
+
+  .nav-list a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: var(--ul-surface);
+    border: 1px solid var(--ul-line);
+    border-radius: 999px;
+    font-size: 15px;
+  }
+  .nav-list a.active,
+  .nav-list a[aria-current="page"] {
+    background: var(--ul-brand-soft);
+    border-color: var(--ul-brand);
+    color: var(--ul-brand-strong);
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 2px;
+  }
+  .topbar h1 { font-size: 22px; }
+  .topbar-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .user-chip {
+    font-size: 12px;
+    word-break: break-all;
+  }
+
+  /* one-column, full-width content on phones */
+  .board-hero,
+  .board-stat,
+  .performance-source-card,
+  .performance-score-hero {
+    width: 100%;
+  }
+  .performance-period-form {
+    grid-template-columns: 1fr;
+  }
+  .performance-period-form label {
+    grid-column: 1 / -1;
+  }
+}
