@@ -3781,21 +3781,30 @@ body {
 h1, h2, h3, h4, h5, h6 { font-family: var(--guild-font); letter-spacing: -0.01em; color: var(--color-ink); }
 .eyebrow, .sidebar-label { color: var(--color-orange); font-weight: 600; letter-spacing: 0.05em; }
 
-/* ---- frosted soft-card: apply to every legacy box/panel ---- */
-.soft-card, .tile, .board-stat, .board-hero, .apple-dashboard-card, .department-card,
-.performance-row, .runner-step, .performance-source-card, .performance-source-detail,
-.performance-input-form, main > section, main article, .card, .panel {
+/* ---- frosted soft-card: ONLY real leaf cards (not section/group wrappers) ---- */
+.soft-card, .tile, .board-stat, .apple-dashboard-card, .department-card,
+.performance-row, .runner-step, .performance-source-card, .card, .panel,
+.daily-phase-card, .checklist-status-cards > a, .checklist-status-cards > * {
   background: rgba(255,255,255,0.75) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255,199,142,0.28) !important;
-  border-radius: 18px !important;
+  border-radius: 16px !important;
   box-shadow: 0 4px 14px rgba(45,49,66,0.06);
 }
-.board-hero {
-  background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(255,199,142,0.22)) !important;
-  box-shadow: 0 10px 30px rgba(255,140,66,0.12);
+/* hero + group wrappers stay transparent (no nested boxes = no clutter) */
+.board-hero, main > section, .performance-input-form,
+.task-sections, .task-section, .task-section-head, .hero-metrics {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
+/* task item grid: neat 3-up cards, compact */
+.daily-phase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.daily-phase-card { padding: 14px 16px !important; }
+.checklist-status-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.checklist-status-cards > * { padding: 14px 16px !important; }
 .board-hero p strong, .board-stat strong { color: var(--color-orange); }
 
 /* ---- 3D pointer tilt (JS sets --rx/--ry/--mx/--my; graceful hover lift fallback) ---- */
@@ -3875,3 +3884,39 @@ input:focus, select:focus, textarea:focus {
   .performance-period-form { grid-template-columns: 1fr; }
   .performance-period-form label { grid-column: 1 / -1; }
 }
+
+/* ============ Right-size the dashboard (Guild = clean, not oversized) ============ */
+.board-hero { padding: 24px 0 8px !important; align-items: flex-end; }
+.board-hero h2 {
+  font-size: clamp(26px, 3.4vw, 38px) !important;
+  line-height: 1.15 !important;
+  font-weight: 600 !important;
+}
+.board-hero p { font-size: 15px; color: var(--color-ink-soft); max-width: 620px; }
+.board-hero .eyebrow { margin-bottom: 2px; }
+.hero-actions { display: flex; gap: 10px; align-items: center; }
+.hero-actions .primary-action {
+  display: inline-flex; align-items: center; padding: 0.55rem 1.15rem; border-radius: 999px;
+  font-weight: 600; background: linear-gradient(135deg, var(--color-orange), var(--color-sun));
+  color: #fff; box-shadow: 0 6px 16px rgba(255,140,66,0.3);
+}
+
+/* section headings: calmer, smaller */
+main h2 { font-size: clamp(22px, 2.6vw, 30px); }
+main h3 { font-size: 17px; font-weight: 600; }
+main .page > section { margin-top: 18px; }
+
+/* dashboard cards: tighter padding, smaller type, less shouty */
+main article, main > section .tile, .board-stat, .runner-step {
+  padding: 14px 16px !important;
+}
+.board-stat strong, main article strong { font-size: 15px; }
+.board-stat span, main article span, main article em, main article small { font-size: 13px; }
+.board-stat { gap: 4px; }
+
+/* status number pills (0/7 etc): keep readable but not huge */
+main article .num, .board-stat .value { font-size: 20px; }
+
+/* kill the oversized hero min-height (was 280px → big empty gap) */
+.apple-store-hero { min-height: 0 !important; align-items: flex-end !important; }
+.page { padding: 20px 24px 40px !important; }

@@ -155,13 +155,17 @@ describe("preview auth", () => {
     assert.equal(layoutSource.includes('apple: "/up-level-academy-logo.png"'), true);
   });
 
-  it("applies an Apple Store inspired dashboard structure", () => {
+  it("applies a clean Up Level Guild dashboard structure", () => {
     const rootSource = readFileSync("app/(dashboard)/page.tsx", "utf8");
     const styles = readFileSync("app/globals.css", "utf8");
 
-    assert.equal(rootSource.includes("apple-store-hero"), true);
-    assert.equal(rootSource.includes("apple-category-strip"), true);
-    assert.equal(styles.includes(".apple-store-hero"), true);
-    assert.equal(styles.includes("font-family: -apple-system"), true);
+    // Guild-style: compact hero + progress + tasks, no redundant category-strip clutter
+    assert.equal(rootSource.includes("SOP Up Level"), true);
+    assert.equal(rootSource.includes("DashboardChecklistStatus"), true);
+    assert.equal(rootSource.includes("DashboardTaskSections"), true);
+    assert.equal(rootSource.includes("apple-category-strip"), false);
+    // Guild design system tokens applied
+    assert.equal(styles.includes("--color-orange"), true);
+    assert.equal(styles.includes(".soft-card"), true);
   });
 });
