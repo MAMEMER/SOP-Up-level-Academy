@@ -3781,30 +3781,57 @@ body {
 h1, h2, h3, h4, h5, h6 { font-family: var(--guild-font); letter-spacing: -0.01em; color: var(--color-ink); }
 .eyebrow, .sidebar-label { color: var(--color-orange); font-weight: 600; letter-spacing: 0.05em; }
 
-/* ---- frosted soft-card: ONLY real leaf cards (not section/group wrappers) ---- */
+/* ========================================================
+   EDITORIAL layout — NO boxes. Content flows on the warm bg;
+   structure = type + spacing + hairline dividers, not framed
+   cards. (Champ: "เลิกใช้ระบบวางของในกรอบในกล่อง")
+   ======================================================== */
 .soft-card, .tile, .board-stat, .apple-dashboard-card, .department-card,
 .performance-row, .runner-step, .performance-source-card, .card, .panel,
-.daily-phase-card, .checklist-status-cards > a, .checklist-status-cards > * {
-  background: rgba(255,255,255,0.75) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,199,142,0.28) !important;
-  border-radius: 16px !important;
-  box-shadow: 0 4px 14px rgba(45,49,66,0.06);
-}
-/* hero + group wrappers stay transparent (no nested boxes = no clutter) */
+.daily-phase-card, .checklist-status-cards > *, main article,
 .board-hero, main > section, .performance-input-form,
 .task-sections, .task-section, .task-section-head, .hero-metrics {
   background: transparent !important;
   border: 0 !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
-/* task item grid: neat 3-up cards, compact */
-.daily-phase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-.daily-phase-card { padding: 14px 16px !important; }
-.checklist-status-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.checklist-status-cards > * { padding: 14px 16px !important; }
+
+/* today's status — inline stat strip, hairline dividers, no box */
+.checklist-status-cards {
+  display: flex; flex-wrap: wrap; gap: 0;
+  border-top: 1px solid rgba(45,49,66,0.1);
+}
+.checklist-status-cards > * {
+  flex: 1 1 150px; padding: 14px 20px 14px 0 !important;
+  border-right: 1px solid rgba(45,49,66,0.08) !important;
+}
+.checklist-status-cards > *:last-child { border-right: 0 !important; }
+
+/* task lists — clean rows split by a hairline, number demoted to quiet index */
+.daily-phase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 28px; }
+.daily-phase-card { display: block; padding: 13px 0 !important; border-bottom: 1px solid rgba(45,49,66,0.08) !important; }
+/* drop the orphaned 01/02/03 index chip entirely — cleaner editorial rows */
+.daily-phase-card > span:first-child { display: none !important; }
+.daily-phase-card { position: static !important; }
+/* each task row: eyebrow · title · status stacked tight, one clean column */
+.daily-phase-card > div { display: block; }
+.daily-phase-card strong { display: block; font-size: 16px; margin: 1px 0; }
+.daily-phase-card em, .daily-phase-card > div > :first-child { font-size: 12.5px; color: var(--color-ink-soft); font-style: normal; }
+
+/* status strip cells: tight vertical rhythm, no dead space */
+.checklist-status-cards > * { display: flex; flex-direction: column; gap: 3px; }
+.checklist-status-cards > * > * { margin: 0 !important; }
+.checklist-status-cards strong { font-size: 15px; }
+
+/* "ภาพรวม" quiet link, not a heavy dark chip */
+.task-section-head a, .task-section-head > :last-child:not(h3) {
+  background: transparent !important; color: var(--color-orange) !important;
+  box-shadow: none !important; padding: 0 !important; font-size: 13px; font-weight: 600;
+}
 .board-hero p strong, .board-stat strong { color: var(--color-orange); }
 
 /* ---- 3D pointer tilt (JS sets --rx/--ry/--mx/--my; graceful hover lift fallback) ---- */
