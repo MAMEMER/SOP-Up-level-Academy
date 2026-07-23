@@ -8,7 +8,7 @@ import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
 export default async function AdminStaffViewPage() {
   const user = await requireUser();
-  if (user.role !== "admin" && !isPreviewMode()) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   const staff = employeeDirectory
     .filter((entry) => entry.branch === "bangkae")

@@ -7,7 +7,7 @@ import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 
 export default async function AdminSchedulePage() {
   const user = await requireUser();
-  if (user.role !== "admin" && !isPreviewMode()) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   const staff = employeeDirectory.map((entry) => ({
     code: entry.code,

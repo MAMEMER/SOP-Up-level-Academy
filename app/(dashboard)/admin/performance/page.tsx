@@ -74,7 +74,7 @@ function streakByUser(assignments: AssignmentRow[], runs: Map<string, RunRow>) {
 
 export default async function AdminPerformancePage() {
   const user = await requireUser();
-  if (user.role !== "admin" && !isPreviewMode()) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   const supabase = await createClient();
   const [{ data: assignments }, { data: runs }, { data: logins }] = await Promise.all([
