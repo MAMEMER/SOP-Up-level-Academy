@@ -3947,3 +3947,34 @@ main article .num, .board-stat .value { font-size: 20px; }
 /* kill the oversized hero min-height (was 280px → big empty gap) */
 .apple-store-hero { min-height: 0 !important; align-items: flex-end !important; }
 .page { padding: 20px 24px 40px !important; }
+
+/* ===== proportion pass: kill dead space, balance the dashboard ===== */
+/* hero: stack title → subtitle → actions (left), compact — no far-right float/void */
+.board-hero, .apple-store-hero {
+  flex-direction: column !important; align-items: flex-start !important;
+  gap: 10px !important; padding: 20px 0 6px !important; min-height: 0 !important;
+}
+.board-hero > div { width: 100%; }
+.hero-actions { justify-content: flex-start; margin-top: 2px; }
+
+/* status strip: content-height rows (kill the space-between stretch → was 172px tall) */
+.checklist-status-cards > * {
+  justify-content: flex-start !important; align-content: start !important;
+  min-height: 0 !important; padding: 12px 22px 12px 0 !important; gap: 2px !important;
+}
+.checklist-status-cards span { text-transform: none !important; font-size: 12px; color: var(--color-ink-soft); }
+.checklist-status-cards strong { font-size: 15px !important; margin: 0 !important; }
+.checklist-status-cards small { font-size: 13px; color: var(--color-ink-soft); }
+
+/* tighter, even vertical rhythm between sections */
+main .page > section, main > section { margin-top: 22px !important; }
+.task-section { margin-top: 26px !important; }
+.task-section-head { margin-bottom: 6px !important; }
+
+/* final tighten: shrink the top band + even section rhythm */
+.page { padding-top: 4px !important; }
+.board-hero, .apple-store-hero { padding-top: 6px !important; }
+.board-hero .eyebrow { margin-bottom: 0 !important; }
+main .page > section, main > section { margin-top: 16px !important; }
+.task-section { margin-top: 18px !important; }
+.daily-phase-card { padding: 12px 0 !important; }
