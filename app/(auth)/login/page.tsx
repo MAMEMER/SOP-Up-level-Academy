@@ -28,6 +28,21 @@ export default function LoginPage() {
     }
   }
 
+  async function signInWithGoogle() {
+    const supabase = createClient();
+    const origin = window.location.origin;
+    if (isPreviewMode()) {
+      router.push("/");
+      return;
+    }
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${origin}/api/auth/callback` }
+    });
+    // Supabase redirects the browser to Google; the /api/auth/callback route then
+    // exchanges the returned code for a session (same path as the magic link).
+  }
+
   return (
     <main className="page auth-page">
       <section className="auth-shell">
@@ -56,6 +71,11 @@ export default function LoginPage() {
           </label>
           <button onClick={signIn}>ส่งลิงก์เข้า Dashboard</button>
           {sent ? <p className="auth-success">ส่งลิงก์เข้าสู่ระบบแล้ว กรุณาเช็กอีเมล</p> : null}
+          <div className="auth-divider"><span>หรือ</span></div>
+          <button type="button" className="auth-google" onClick={signInWithGoogle}>
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width={18} height={18} />
+            เข้าสู่ระบบด้วย Google
+          </button>
         </div>
       </section>
     </main>
