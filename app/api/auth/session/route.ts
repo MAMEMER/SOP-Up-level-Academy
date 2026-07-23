@@ -1,30 +1,29 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { adminAuth } from "../../../../lib/firebase-admin.ts";
+import { verifyGoogleIdToken } from "../../../../lib/firebase-token.ts";
+import { mintSession } from "../../../../lib/session-jwt.ts";
 import { sopUserForEmail } from "../../../../lib/sop-users.ts";
 import { SOP_SESSION_COOKIE, SOP_SESSION_EXPIRES_IN_MS as EXPIRES_IN_MS } from "../../../../lib/auth-session.ts";
 
-// POST: exchange a Google ID token for a server session cookie. Rejects any email
-// not on the SOP allow-list (sop-users.ts) so only staff/owners get a session.
+// POST: verify a Google ID token, check the SOP allow-list, and issue our own session
+// cookie (jose HS256 — no firebase-admin). Rejects any email not on the allow-list.
 export async function POST(request: Request) {
   const { idToken } = await request.json().catch(() => ({ idToken: null }));
   if (!idToken || typeof idToken !== "string") {
     return NextResponse.json({ error: "missing_id_token" }, { status: 400 });
   }
 
-  let decoded;
-  try {
-    decoded = await adminAuth().verifyIdToken(idToken);
-  } catch {
+  const verified = await verifyGoogleIdToken(idToken);
+  if (!verified) {
     return NextResponse.json({ error: "invalid_id_token" }, { status: 401 });
   }
 
-  if (!sopUserForEmail(decoded.email)) {
+  if (!sopUserForEmail(verified.email)) {
     return NextResponse.json({ error: "not_allowed" }, { status: 403 });
   }
 
-  const sessionCookie = await adminAuth().createSessionCookie(idToken, { expiresIn: EXPIRES_IN_MS });
-  (await cookies()).set(SOP_SESSION_COOKIE, sessionCookie, {
+  const session = await mintSession({ email: verified.email, uid: verified.uid });
+  (await cookies()).set(SOP_SESSION_COOKIE, session, {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
