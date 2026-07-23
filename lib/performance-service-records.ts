@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { effectiveAssignedWorkStatus } from "./assigned-work-status.ts";
 import type { AssignedWork, ServiceEvent } from "./performance-score.ts";
 
 export type CustomerServiceRecord = {
@@ -108,7 +109,8 @@ export function customerServiceRecordsToEvents(records: CustomerServiceRecord[])
 
 export function assignedWorkRecordsToWorks(
   records: AssignedWorkRecord[],
-  teamAssignment?: { teamAssigneeName: string; teamMembers: string[] }
+  teamAssignment?: { teamAssigneeName: string; teamMembers: string[] },
+  now = new Date()
 ) {
   return records
     .filter((record) => record.title)
@@ -118,7 +120,7 @@ export function assignedWorkRecordsToWorks(
         : [record.employeeName];
       return employeeNames.map((employeeName) => ({
         employeeName,
-        work: { title: record.title, status: record.status, source: "manual" as const }
+        work: { title: record.title, status: effectiveAssignedWorkStatus(record, now), source: "manual" as const }
       }));
     })
     .sort((left, right) => `${left.employeeName}:${left.work.title}`.localeCompare(`${right.employeeName}:${right.work.title}`));

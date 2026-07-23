@@ -14,6 +14,7 @@ import {
   getIncentiveTier,
   summarizeLeave
 } from "../lib/performance-score.ts";
+import { effectiveAssignedWorkStatus } from "../lib/assigned-work-status.ts";
 import {
   applyScheduleEditRows,
   getPerformanceScoreRows,
@@ -558,6 +559,26 @@ describe("performance score engine", () => {
 
     assert.equal(updated.record?.status, "not_finished");
     assert.equal(updated.record?.trackingNumber, "TH123");
+  });
+
+  it("treats unsubmitted assigned work as not finished after the workday deadline", () => {
+    const records = addAssignedWorkRecord([], {
+      workDate: "2026-07-23",
+      employeeName: "Boom",
+      title: "ส่งเสื้อให้ลูกค้า",
+      status: "on_time",
+      note: "ต้องส่งภายในวันนี้"
+    }, "2026-07-23T07:00:00.000Z");
+
+    assert.equal(effectiveAssignedWorkStatus(records[0], new Date("2026-07-23T16:59:00.000Z")), "on_time");
+    assert.equal(effectiveAssignedWorkStatus(records[0], new Date("2026-07-23T17:00:00.000Z")), "not_finished");
+
+    const works = assignedWorkRecordsToWorks(records, undefined, new Date("2026-07-23T17:00:00.000Z"));
+    const result = calculateAssignedWorkScore(works.map((item) => item.work));
+
+    assert.equal(result.score, 10);
+    assert.equal(result.deductions[0]?.reason, "not_finished");
+    assert.equal(result.flags.includes("coaching_required"), true);
   });
 
   it("maps Bangkae team assigned work to every team member with the same score impact", () => {

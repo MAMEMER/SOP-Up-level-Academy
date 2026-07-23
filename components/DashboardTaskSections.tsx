@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import {
@@ -37,11 +38,6 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   late_one_day: "workflow-status-orange",
   not_finished: "workflow-status-red"
 };
-
-function isAfterAssignedWorkDeadline(workDate: string, now = new Date()) {
-  const deadlineBangkok = new Date(`${workDate}T16:59:59.999Z`);
-  return now.getTime() > deadlineBangkok.getTime();
-}
 
 const weeklyStockTasks = [
   { id: "weekly-stock-sleeve-accessories", name: "Sleeve / อุปกรณ์ทั้งหมด", schedule: "อังคาร", weekday: "Tue", shiftIds: ["morning"] },
@@ -131,18 +127,19 @@ export function DashboardTaskSections({
         <div className="daily-phase-grid">
           {assignedWorkRecords.length ? (
             assignedWorkRecords.map((record, index) => {
-              const canShowStatus = canManageAssignedWork || isAfterAssignedWorkDeadline(record.workDate);
+              const effectiveStatus = effectiveAssignedWorkStatus(record);
+              const canShowStatus = canManageAssignedWork || isAssignedWorkPastDeadline(record.workDate);
               return (
                 <a
                   key={record.id}
                   href={`/assigned-work/${encodeURIComponent(record.id)}`}
-                  className={`daily-phase-card ${canShowStatus ? assignedStatusClass[record.status] : "workflow-status-white"}`}
+                  className={`daily-phase-card ${canShowStatus ? assignedStatusClass[effectiveStatus] : "workflow-status-white"}`}
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <div>
                     <small>{record.employeeName} · {record.workDate}</small>
                     <strong>{record.title}</strong>
-                    <em>{canShowStatus ? assignedStatusText[record.status] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
+                    <em>{canShowStatus ? assignedStatusText[effectiveStatus] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
                     {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
                     {record.imageEvidence?.length ? <em>รูปหลักฐาน: {record.imageEvidence.join(", ")}</em> : null}
                     {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}

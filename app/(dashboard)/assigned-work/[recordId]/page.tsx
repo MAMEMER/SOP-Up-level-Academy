@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
+import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../../../../lib/assigned-work-status.ts";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../../../lib/employee-directory.ts";
 import {
@@ -27,11 +28,6 @@ function imageEvidenceValues(formData: FormData) {
       return "name" in entry ? String(entry.name || "").trim() : "";
     })
     .filter(Boolean);
-}
-
-function isAfterAssignedWorkDeadline(workDate: string, now = new Date()) {
-  const deadlineBangkok = new Date(`${workDate}T16:59:59.999Z`);
-  return now.getTime() > deadlineBangkok.getTime();
 }
 
 const assignedStatusText: Record<AssignedWork["status"], string> = {
@@ -76,7 +72,8 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
   const store = readPerformanceDailyStore();
   const record = assignedWorkRecordById(store.assignedWorkRecords, decodeURIComponent(recordId));
   if (!record || !canAccessAssignedWork(record.employeeName, user)) notFound();
-  const canShowStatus = user.role === "admin" || isAfterAssignedWorkDeadline(record.workDate);
+  const effectiveStatus = effectiveAssignedWorkStatus(record);
+  const canShowStatus = user.role === "admin" || isAssignedWorkPastDeadline(record.workDate);
 
   return (
     <main className="page">
@@ -150,7 +147,7 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
           </div>
           <div className="performance-daily-records">
             <strong>{record.title}</strong>
-            {canShowStatus ? <span>สถานะ: {assignedStatusText[record.status]}</span> : null}
+            {canShowStatus ? <span>สถานะ: {assignedStatusText[effectiveStatus]}</span> : null}
             <span>รายละเอียด: {record.note || "-"}</span>
             <span>เลข Tracking: {record.trackingNumber || "-"}</span>
             <span>รูปหลักฐาน: {record.imageEvidence?.length ? record.imageEvidence.join(", ") : "-"}</span>
