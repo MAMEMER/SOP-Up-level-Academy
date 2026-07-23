@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { BugReportFab } from "../components/BugReportFab.tsx";
+import { HelpChat } from "../components/HelpChat.tsx";
 
 export const metadata: Metadata = {
   title: "SOP · Up Level Guild",
@@ -21,7 +23,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <HelpChat />
+        <BugReportFab />
+      </body>
     </html>
   );
 }
