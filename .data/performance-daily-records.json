@@ -20,6 +20,16 @@
       "status": "not_finished",
       "note": "บันทึกจากผู้ใช้: งานที่ให้ไปตั้งแต่เดือน 6 ยังไม่เสร็จจนถึงปัจจุบัน",
       "recordedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "id": "assigned-2026-07-23-Boom-shirt-delivery-example",
+      "workDate": "2026-07-23",
+      "employeeName": "Boom",
+      "title": "ตัวอย่าง: ต้องส่งเสื้อให้ลูกค้า",
+      "status": "on_time",
+      "note": "แพ็กเสื้อสมาชิก ส่งให้ลูกค้า และใส่เลข Tracking หลังส่ง",
+      "evidence": "รูปเสื้อ / รูปพัสดุ / เลข Tracking",
+      "recordedAt": "2026-07-23T07:10:00.000Z"
     }
   ]
 }
