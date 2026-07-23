@@ -155,12 +155,14 @@ function Drawer({ drawer, state, onClose }: { drawer: DrawerItem; state: AdminDa
   );
 }
 
-export function AdminOpsDashboard() {
+export function AdminOpsDashboard({ isOwner = false }: { isOwner?: boolean }) {
   const [state, setState] = useState(mockAdminDashboardState);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [staffFilter, setStaffFilter] = useState("all");
   const [drawer, setDrawer] = useState<DrawerItem>(null);
+  // ยอดขาย / มูลค่าเงิน = owner-only (Champ + Nem). Regular admins see "🔒".
+  const showMoney = (value: number) => (isOwner ? money(value) : "🔒");
   const [stockSource, setStockSource] = useState<"mock" | "storehub">("mock");
   const [stockMessage, setStockMessage] = useState("ใช้ข้อมูล mock ระหว่างรอการเชื่อม StoreHub");
 
@@ -393,7 +395,7 @@ export function AdminOpsDashboard() {
                       <td>{index + 1}</td>
                       <td>{item.name}</td>
                       <td>{item.remaining}</td>
-                      <td>{money(item.estimatedValue)}</td>
+                      <td>{showMoney(item.estimatedValue)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -503,7 +505,7 @@ export function AdminOpsDashboard() {
                       <td><button type="button" className="admin-link-button" onClick={() => setDrawer({ type: "order", item: order })}>{order.id}</button></td>
                       <td>{order.customerName}</td>
                       <td>{channelLabels[order.channel]}</td>
-                      <td>{money(order.total)}</td>
+                      <td>{showMoney(order.total)}</td>
                       <td><AdminStatus label={order.paymentStatus} status={order.paymentStatus} /></td>
                       <td><AdminStatus label={order.packingStatus} status={order.packingStatus} /></td>
                       <td><AdminStatus label={order.shippingStatus} status={order.shippingStatus} /></td>
@@ -522,20 +524,24 @@ export function AdminOpsDashboard() {
               {state.highValueCards.map((card) => (
                 <div key={card.id} className="admin-stock-row">
                   <strong>{card.name}</strong>
-                  <span>{card.category} · {money(card.estimatedValue)} บาท</span>
+                  <span>{card.category} · {showMoney(card.estimatedValue)}{isOwner ? " บาท" : ""}</span>
                   <AdminStatus label={card.status} status={card.status} />
                 </div>
               ))}
             </article>
             <article className="admin-card">
-              <h3>Sales & Cash Review</h3>
-              <dl className="admin-cash-list">
-                <dt>ยอดหน้าร้าน</dt><dd>{money(state.saleSummary.frontStoreSales)}</dd>
-                <dt>ยอดออนไลน์</dt><dd>{money(state.saleSummary.onlineSales)}</dd>
-                <dt>เงินทอนตั้งต้น</dt><dd>{money(state.saleSummary.openingChange)}</dd>
-                <dt>เงินสดคงเหลือ</dt><dd>{money(state.saleSummary.cashRemaining)}</dd>
-                <dt>ส่วนต่างเงิน</dt><dd>{money(state.saleSummary.cashDifference)}</dd>
-              </dl>
+              <h3>Sales &amp; Cash Review {isOwner ? "" : "🔒"}</h3>
+              {isOwner ? (
+                <dl className="admin-cash-list">
+                  <dt>ยอดหน้าร้าน</dt><dd>{money(state.saleSummary.frontStoreSales)}</dd>
+                  <dt>ยอดออนไลน์</dt><dd>{money(state.saleSummary.onlineSales)}</dd>
+                  <dt>เงินทอนตั้งต้น</dt><dd>{money(state.saleSummary.openingChange)}</dd>
+                  <dt>เงินสดคงเหลือ</dt><dd>{money(state.saleSummary.cashRemaining)}</dd>
+                  <dt>ส่วนต่างเงิน</dt><dd>{money(state.saleSummary.cashDifference)}</dd>
+                </dl>
+              ) : (
+                <p className="admin-owner-lock">🔒 ยอดขาย/เงินสด เฉพาะเจ้าของ (Champ · เนม) — admin อื่นดูไม่ได้</p>
+              )}
               <AdminStatus label="ยอดตรง" status={state.saleSummary.moneyStatus} />
             </article>
             <article className="admin-card">

@@ -25,6 +25,8 @@ type PageProps = {
 type PerformanceScoreViewProps = PageProps & {
   basePath?: "/admin/performance-score" | "/performance-score";
   showAdminBackLink?: boolean;
+  /** salary-deduction figures are owner-only (hidden from regular admins) */
+  isOwner?: boolean;
 };
 
 const categoryLabels = {
@@ -210,7 +212,7 @@ async function uploadCsvSourceAction(formData: FormData) {
   redirect(redirectTo);
 }
 
-export async function PerformanceScoreView({ searchParams, basePath = "/admin/performance-score", showAdminBackLink = false }: PerformanceScoreViewProps) {
+export async function PerformanceScoreView({ searchParams, basePath = "/admin/performance-score", showAdminBackLink = false, isOwner = false }: PerformanceScoreViewProps) {
   const params = searchParams ? await searchParams : {};
   const activePeriod = resolvePeriod(params);
   const rows = activePeriod.id === "custom" ? getPerformanceScoreRowsForRange(activePeriod) : getPerformanceScoreRows(activePeriod.id);
@@ -474,7 +476,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             <div>
               <strong>{row.incentive.percent}%</strong>
               <small>{row.incentive.requiresCoaching ? "ต้องประเมินรายสัปดาห์" : "ผ่านเกณฑ์รอบนี้"}</small>
-              {row.salaryDeduction.amount > 0 ? (
+              {isOwner && row.salaryDeduction.amount > 0 ? (
                 <small className="score-badge score-badge-red" title={row.salaryDeduction.basis}>
                   หักเงิน {row.salaryDeduction.amount.toLocaleString("th-TH")} บาท (ขาด {row.salaryDeduction.pointsShort} คะแนน)
                 </small>

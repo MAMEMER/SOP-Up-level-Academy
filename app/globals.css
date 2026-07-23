@@ -4030,3 +4030,6 @@ main .page > section, main > section { margin-top: 16px !important; }
   .fab-overlay { align-items: flex-end; }
   .chat-panel { right: 12px; left: 12px; width: auto; }
 }
+
+/* owner-only locked money note */
+.admin-owner-lock { font-size: 13px; color: var(--color-ink-soft); background: rgba(255,199,142,0.14); border: 1px dashed rgba(255,140,66,0.4); border-radius: 12px; padding: 10px 12px; margin: 0; }
