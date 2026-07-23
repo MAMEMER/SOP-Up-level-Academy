@@ -19,6 +19,29 @@ function stringValue(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
 
+function imageEvidenceValues(formData: FormData) {
+  return formData
+    .getAll("assignedImages")
+    .map((entry) => {
+      if (typeof entry === "string") return "";
+      return "name" in entry ? String(entry.name || "").trim() : "";
+    })
+    .filter(Boolean);
+}
+
+function isAfterAssignedWorkDeadline(workDate: string, now = new Date()) {
+  const deadlineBangkok = new Date(`${workDate}T16:59:59.999Z`);
+  return now.getTime() > deadlineBangkok.getTime();
+}
+
+const assignedStatusText: Record<AssignedWork["status"], string> = {
+  early_quality: "เสร็จก่อนกำหนด พร้อมคุณภาพ",
+  on_time: "เสร็จตรงเวลา",
+  needs_revision: "เสร็จแล้ว แต่ต้องแก้ไข",
+  late_one_day: "ช้ากว่ากำหนดไม่เกิน 1 วัน",
+  not_finished: "ยังไม่เสร็จ / เกินกำหนด"
+};
+
 function canAccessAssignedWork(recordEmployeeName: string, user: Awaited<ReturnType<typeof requireUser>>) {
   if (user.role === "admin") return true;
   const employeeCode = employeeCodeForEmail(user.email);
@@ -34,9 +57,11 @@ async function submitAssignedWorkAction(formData: FormData) {
   if (!record || !canAccessAssignedWork(record.employeeName, user)) notFound();
 
   updateAssignedWorkRecordSubmission(recordId, {
-    status: assignedStatus(stringValue(formData, "assignedStatus")),
+    status: user.role === "admin" ? assignedStatus(stringValue(formData, "assignedStatus")) : undefined,
     note: stringValue(formData, "assignedNote"),
-    evidence: stringValue(formData, "assignedEvidence")
+    evidence: stringValue(formData, "assignedEvidence"),
+    trackingNumber: stringValue(formData, "assignedTrackingNumber"),
+    imageEvidence: imageEvidenceValues(formData)
   });
 
   revalidatePath("/");
@@ -51,6 +76,7 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
   const store = readPerformanceDailyStore();
   const record = assignedWorkRecordById(store.assignedWorkRecords, decodeURIComponent(recordId));
   if (!record || !canAccessAssignedWork(record.employeeName, user)) notFound();
+  const canShowStatus = user.role === "admin" || isAfterAssignedWorkDeadline(record.workDate);
 
   return (
     <main className="page">
@@ -71,16 +97,18 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
           </div>
           <form action={submitAssignedWorkAction} className="performance-input-form">
             <input type="hidden" name="recordId" value={record.id} />
-            <label>
-              สถานะงาน
-              <select name="assignedStatus" defaultValue={record.status}>
-                <option value="early_quality">เสร็จก่อนกำหนด พร้อมคุณภาพ</option>
-                <option value="on_time">เสร็จตรงเวลา</option>
-                <option value="needs_revision">เสร็จแล้ว แต่ต้องแก้ไข</option>
-                <option value="late_one_day">ช้ากว่ากำหนดไม่เกิน 1 วัน</option>
-                <option value="not_finished">ยังไม่เสร็จ / เกินกำหนด</option>
-              </select>
-            </label>
+            {user.role === "admin" ? (
+              <label>
+                สถานะงาน
+                <select name="assignedStatus" defaultValue={record.status}>
+                  <option value="early_quality">เสร็จก่อนกำหนด พร้อมคุณภาพ</option>
+                  <option value="on_time">เสร็จตรงเวลา</option>
+                  <option value="needs_revision">เสร็จแล้ว แต่ต้องแก้ไข</option>
+                  <option value="late_one_day">ช้ากว่ากำหนดไม่เกิน 1 วัน</option>
+                  <option value="not_finished">ยังไม่เสร็จ / เกินกำหนด</option>
+                </select>
+              </label>
+            ) : null}
             <label className="wide">
               รายละเอียดหลังทำงาน
               <textarea
@@ -90,12 +118,24 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
                 rows={4}
               />
             </label>
+            <label>
+              เลข Tracking
+              <input
+                name="assignedTrackingNumber"
+                defaultValue={record.trackingNumber || ""}
+                placeholder="เช่น TH1234567890"
+              />
+            </label>
+            <label>
+              รูปหลักฐาน
+              <input name="assignedImages" type="file" accept="image/*" multiple />
+            </label>
             <label className="wide">
-              หลักฐาน
+              หลักฐานเพิ่มเติม
               <textarea
                 name="assignedEvidence"
                 defaultValue={record.evidence || ""}
-                placeholder="วางลิงก์รูป / สลิป / เลข Tracking / หมายเลขพัสดุ"
+                placeholder="วางลิงก์รูป / สลิป / หมายเหตุอ้างอิงหลักฐาน"
                 rows={4}
               />
             </label>
@@ -110,9 +150,11 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
           </div>
           <div className="performance-daily-records">
             <strong>{record.title}</strong>
-            <span>สถานะ: {record.status}</span>
+            {canShowStatus ? <span>สถานะ: {assignedStatusText[record.status]}</span> : null}
             <span>รายละเอียด: {record.note || "-"}</span>
-            <span>หลักฐาน: {record.evidence || "-"}</span>
+            <span>เลข Tracking: {record.trackingNumber || "-"}</span>
+            <span>รูปหลักฐาน: {record.imageEvidence?.length ? record.imageEvidence.join(", ") : "-"}</span>
+            <span>หลักฐานเพิ่มเติม: {record.evidence || "-"}</span>
             {record.submittedAt ? <span>ส่งล่าสุด: {record.submittedAt}</span> : null}
           </div>
         </article>

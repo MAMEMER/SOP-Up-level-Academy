@@ -38,6 +38,11 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   not_finished: "workflow-status-red"
 };
 
+function isAfterAssignedWorkDeadline(workDate: string, now = new Date()) {
+  const deadlineBangkok = new Date(`${workDate}T16:59:59.999Z`);
+  return now.getTime() > deadlineBangkok.getTime();
+}
+
 const weeklyStockTasks = [
   { id: "weekly-stock-sleeve-accessories", name: "Sleeve / อุปกรณ์ทั้งหมด", schedule: "อังคาร", weekday: "Tue", shiftIds: ["morning"] },
   { id: "weekly-stock-booster-box", name: "Booster box / Box all cards", schedule: "พุธ", weekday: "Wed", shiftIds: ["morning"] }
@@ -125,21 +130,26 @@ export function DashboardTaskSections({
         </div>
         <div className="daily-phase-grid">
           {assignedWorkRecords.length ? (
-            assignedWorkRecords.map((record, index) => (
-              <a
-                key={record.id}
-                href={`/assigned-work/${encodeURIComponent(record.id)}`}
-                className={`daily-phase-card ${assignedStatusClass[record.status]}`}
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <small>{record.employeeName} · {record.workDate}</small>
-                  <strong>{record.title}</strong>
-                  <em>{assignedStatusText[record.status]}{record.note ? ` · ${record.note}` : ""}</em>
-                  {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}
-                </div>
-              </a>
-            ))
+            assignedWorkRecords.map((record, index) => {
+              const canShowStatus = canManageAssignedWork || isAfterAssignedWorkDeadline(record.workDate);
+              return (
+                <a
+                  key={record.id}
+                  href={`/assigned-work/${encodeURIComponent(record.id)}`}
+                  className={`daily-phase-card ${canShowStatus ? assignedStatusClass[record.status] : "workflow-status-white"}`}
+                >
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <small>{record.employeeName} · {record.workDate}</small>
+                    <strong>{record.title}</strong>
+                    <em>{canShowStatus ? assignedStatusText[record.status] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
+                    {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
+                    {record.imageEvidence?.length ? <em>รูปหลักฐาน: {record.imageEvidence.join(", ")}</em> : null}
+                    {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}
+                  </div>
+                </a>
+              );
+            })
           ) : (
             <a
               href={canManageAssignedWork ? `/admin/performance-score?startDate=${workDate}&endDate=${workDate}` : "#assigned-work"}

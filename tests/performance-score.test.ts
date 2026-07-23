@@ -515,7 +515,7 @@ describe("performance score engine", () => {
     assert.equal(works[0].work.status, "not_finished");
   });
 
-  it("updates assigned work status, note, and evidence after staff submission", () => {
+  it("updates assigned work note, evidence, tracking number, and image names after submission", () => {
     const records = addAssignedWorkRecord([], {
       workDate: "2026-07-23",
       employeeName: "Boom",
@@ -527,15 +527,37 @@ describe("performance score engine", () => {
     const updated = updateAssignedWorkRecords(records, records[0].id, {
       status: "on_time",
       note: "ส่งแล้ว",
-      evidence: "Tracking TH123"
+      evidence: "ส่งรอบ 14:30",
+      trackingNumber: "TH123",
+      imageEvidence: ["shirt.jpg", "parcel.jpg"]
     }, "2026-07-23T08:00:00.000Z");
 
     assert.equal(updated.records.length, 1);
     assert.equal(updated.record?.id, records[0].id);
     assert.equal(updated.record?.status, "on_time");
     assert.equal(updated.record?.note, "ส่งแล้ว");
-    assert.equal(updated.record?.evidence, "Tracking TH123");
+    assert.equal(updated.record?.evidence, "ส่งรอบ 14:30");
+    assert.equal(updated.record?.trackingNumber, "TH123");
+    assert.deepEqual(updated.record?.imageEvidence, ["shirt.jpg", "parcel.jpg"]);
     assert.equal(updated.record?.submittedAt, "2026-07-23T08:00:00.000Z");
+  });
+
+  it("keeps assigned work status unchanged when staff submits evidence only", () => {
+    const records = addAssignedWorkRecord([], {
+      workDate: "2026-07-23",
+      employeeName: "Boom",
+      title: "ส่งเสื้อให้ลูกค้า",
+      status: "not_finished",
+      note: "รอส่ง"
+    }, "2026-07-23T07:00:00.000Z");
+
+    const updated = updateAssignedWorkRecords(records, records[0].id, {
+      note: "ส่งแล้ว",
+      trackingNumber: "TH123"
+    }, "2026-07-23T08:00:00.000Z");
+
+    assert.equal(updated.record?.status, "not_finished");
+    assert.equal(updated.record?.trackingNumber, "TH123");
   });
 
   it("maps Bangkae team assigned work to every team member with the same score impact", () => {

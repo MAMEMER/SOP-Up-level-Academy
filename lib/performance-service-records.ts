@@ -26,6 +26,8 @@ export type AssignedWorkRecord = {
   note: string;
   /** URL or note pointing to proof (screenshot / chat link) */
   evidence?: string;
+  trackingNumber?: string;
+  imageEvidence?: string[];
   recordedAt: string;
   submittedAt?: string;
   updatedAt?: string;
@@ -67,6 +69,8 @@ export function addAssignedWorkRecord(records: AssignedWorkRecord[], input: Assi
       title: input.title.trim(),
       note: input.note.trim(),
       evidence: (input.evidence || "").trim() || undefined,
+      trackingNumber: (input.trackingNumber || "").trim() || undefined,
+      imageEvidence: input.imageEvidence?.filter(Boolean),
       recordedAt,
       id: recordId("assigned", input, recordedAt)
     }
@@ -123,7 +127,7 @@ export function assignedWorkRecordsToWorks(
 export function updateAssignedWorkRecords(
   records: AssignedWorkRecord[],
   id: string,
-  input: { status: AssignedWork["status"]; note: string; evidence?: string },
+  input: { status?: AssignedWork["status"]; note: string; evidence?: string; trackingNumber?: string; imageEvidence?: string[] },
   recordedAt = new Date().toISOString()
 ): { records: AssignedWorkRecord[]; record: AssignedWorkRecord | null } {
   let updatedRecord: AssignedWorkRecord | null = null;
@@ -131,9 +135,11 @@ export function updateAssignedWorkRecords(
     if (record.id !== id) return record;
     updatedRecord = {
       ...record,
-      status: input.status,
+      status: input.status || record.status,
       note: input.note.trim(),
       evidence: (input.evidence || "").trim() || undefined,
+      trackingNumber: (input.trackingNumber || "").trim() || undefined,
+      imageEvidence: input.imageEvidence?.filter(Boolean),
       submittedAt: recordedAt,
       updatedAt: recordedAt
     };
@@ -176,7 +182,7 @@ export function saveAssignedWorkRecord(input: AssignedWorkRecordInput) {
 
 export function updateAssignedWorkRecordSubmission(
   id: string,
-  input: { status: AssignedWork["status"]; note: string; evidence?: string },
+  input: { status?: AssignedWork["status"]; note: string; evidence?: string; trackingNumber?: string; imageEvidence?: string[] },
   recordedAt = new Date().toISOString()
 ) {
   const store = readPerformanceDailyStore();

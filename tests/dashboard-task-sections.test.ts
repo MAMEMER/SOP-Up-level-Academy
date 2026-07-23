@@ -17,6 +17,9 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("/assigned-work/"), true);
     assert.equal(pageSource.includes("ส่งงานและหลักฐาน"), true);
     assert.equal(pageSource.includes("name=\"assignedEvidence\""), true);
+    assert.equal(pageSource.includes("name=\"assignedTrackingNumber\""), true);
+    assert.equal(pageSource.includes("name=\"assignedImages\" type=\"file\""), true);
+    assert.equal(pageSource.includes("isAfterAssignedWorkDeadline"), true);
     assert.equal(pageSource.includes("updateAssignedWorkRecordSubmission"), true);
   });
 
