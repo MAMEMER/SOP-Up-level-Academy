@@ -151,7 +151,7 @@ describe("performance score engine", () => {
     assert.deepEqual(row.shifts, { 2: "11:00", 3: "ลาป่วย", 4: "ลาป่วย", 6: "ลาป่วย", 8: "11" });
   });
 
-  it("does not reduce attendance below 0", () => {
+  it("lets a category go below 0 (ทุกหมวดหักได้เรื่อยๆ) — 15 missing clock-ins = -30 → -10", () => {
     const schedules = Array.from({ length: 15 }, (_, index) => ({
       ...schedule,
       workDate: `2026-07-${String(index + 1).padStart(2, "0")}`,
@@ -161,7 +161,8 @@ describe("performance score engine", () => {
 
     const result = calculateAttendanceScore({ schedules, clockEvents: [] });
 
-    assert.equal(result.score, 0);
+    // 15 × -2 = -30 deduction; category is not floored, so 20 - 30 = -10.
+    assert.equal(result.score, -10);
   });
 
   it("does not deduct stock points for submission delay when the StoreHub Difference is zero", () => {
@@ -317,9 +318,9 @@ describe("performance score engine", () => {
 
     const result = calculateStockScore(missed);
 
-    // 10 + 10 + 5 + 5 = 30 -> clamped to 0
+    // 10 + 10 + 5 + 5 = 30 deduction; category not floored -> 20 - 30 = -10
     assert.equal(result.deductions.map((d) => d.points).join(","), "10,10,5,5");
-    assert.equal(result.score, 0);
+    assert.equal(result.score, -10);
   });
 
   it("deducts false checklist records and flags coaching", () => {
@@ -329,12 +330,25 @@ describe("performance score engine", () => {
     assert.equal(result.flags.includes("coaching_required"), true);
   });
 
-  it("deducts 5 checklist points per day when a scheduled clocked-in employee has no Google Form submission", () => {
+  it("escalates missing checklist days: first two -10 each, then -5 (4 days = -30 -> -10)", () => {
     const result = calculateChecklistScore([{ type: "missing_day", count: 4, source: "manual" }]);
 
-    assert.equal(result.score, 0);
-    assert.equal(result.deductions[0].points, 20);
+    // 10 + 10 + 5 + 5 = 30 deduction; category not floored -> 20 - 30 = -10
+    assert.equal(result.deductions[0].points, 30);
+    assert.equal(result.score, -10);
     assert.equal(result.deductions[0].reason, "missing_day");
+  });
+
+  it("escalation persists across separate missing_day events (occurrence-based, ordered by date)", () => {
+    const result = calculateChecklistScore([
+      { type: "missing_day", count: 2, source: "manual", dates: ["2026-07-05", "2026-07-06"] },
+      { type: "missing_day", count: 1, source: "manual", dates: ["2026-07-02"] }
+    ]);
+    // Ordered by earliest date: 07-02 (occ1 -10), then 07-05/06 (occ2 -10, occ3 -5).
+    // Event with earliest date is processed first -> its single day = -10.
+    const byReason = result.deductions.filter((d) => d.reason === "missing_day");
+    assert.equal(byReason.length, 2);
+    assert.equal(result.score, -5); // total 25 deduction -> 20 - 25 = -5
   });
 
   it("no longer penalizes backfilled checklist submissions", () => {

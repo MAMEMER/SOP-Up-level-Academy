@@ -66,3 +66,18 @@ export function employmentTypeFor(code: string): EmploymentType {
 export function branchFor(code: string): string {
   return employeeDirectory.find((entry) => entry.code === code)?.branch ?? "bangkae";
 }
+
+/**
+ * Maps a Supabase login email to a staff code so the shift planner (which keys on
+ * codes) and the staff-facing "วันนี้ของฉัน" view line up. Returns undefined for
+ * accounts not in the directory (e.g. an admin who isn't rostered as staff).
+ */
+export function resolveEmployeeByEmail(email: string | null | undefined): string | undefined {
+  const normalized = (email || "").trim().toLowerCase();
+  if (!normalized) return undefined;
+  return employeeDirectory.find((entry) => entry.email?.toLowerCase() === normalized)?.code;
+}
+
+export function displayNameFor(code: string): string {
+  return employeeDirectory.find((entry) => entry.code === code)?.displayName ?? code;
+}

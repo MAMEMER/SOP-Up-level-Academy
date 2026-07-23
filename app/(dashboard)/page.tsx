@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { DashboardChecklistStatus } from "../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../components/DashboardTaskSections.tsx";
+import { MyShiftToday } from "../../components/MyShiftToday.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
 import { assignedWorkRecordsForDate, readPerformanceDailyStore } from "../../lib/performance-service-records.ts";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
+import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 
 export default async function HomePage() {
   const user = await requireUser();
   const workDate = formatWorkDate();
   const dailyStore = readPerformanceDailyStore();
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate);
+  const staffCode = resolveEmployeeByEmail(user.email);
 
   return (
     <main className="page">
@@ -25,6 +28,8 @@ export default async function HomePage() {
           {user.role === "admin" ? <Link href="/admin/performance-score" className="btn-soft">คะแนนพนักงาน</Link> : null}
         </div>
       </section>
+
+      {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} />
       <DashboardTaskSections

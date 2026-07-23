@@ -7,12 +7,17 @@ import { createClient } from "../lib/supabase/server.ts";
 const mainLinks = [
   { href: "/", label: "หน้าหลัก" },
   { href: "/checklist", label: "เช็คลิสต์" },
+  { href: "/handoff", label: "งานส่งต่อ" },
   { href: "/training", label: "คู่มืองาน" }
 ];
 
 const staffLinks = mainLinks;
 
 const adminLinks = [
+  { href: "/admin/schedule", label: "ตารางกะ" },
+  { href: "/admin/assign", label: "มอบหมายงาน" },
+  { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
+  { href: "/admin/checklist-config", label: "ปรับ Checklist" },
   { href: "/admin/ops", label: "สรุปเจ้าของร้าน" },
   { href: "/admin/performance-score", label: "คะแนนพนักงาน" },
   { href: "/manager-review", label: "ตรวจงาน" },
