@@ -12,7 +12,7 @@ export default async function AdminStaffViewPage() {
 
   const staff = employeeDirectory
     .filter((entry) => entry.branch === "bangkae")
-    .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType }));
+    .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType, email: entry.email }));
 
   return (
     <main className="page">

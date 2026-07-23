@@ -4198,3 +4198,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 .staff-review__phase strong { font-size: 14px; color: var(--color-ink); }
 .staff-review__phase ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: var(--color-ink-soft); }
 .staff-review__phase li { margin: 2px 0; }
+
+/* staff-review "view as" note */
+.staff-review__as-note { font-size: 12.5px; color: #a85a1a; background: rgba(255,199,142,0.22); border-radius: 10px; padding: 8px 14px; margin: 0 0 14px; }
+.staff-review__as-note strong { color: var(--color-ink); }
