@@ -10,6 +10,16 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes(">เปิด Stock<"), false);
   });
 
+  it("links assigned work dashboard cards to the staff submission page", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../app/(dashboard)/assigned-work/[recordId]/page.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("/assigned-work/"), true);
+    assert.equal(pageSource.includes("ส่งงานและหลักฐาน"), true);
+    assert.equal(pageSource.includes("name=\"assignedEvidence\""), true);
+    assert.equal(pageSource.includes("updateAssignedWorkRecordSubmission"), true);
+  });
+
   it("requires StoreHub Stock Take Completed status before stock submission", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 

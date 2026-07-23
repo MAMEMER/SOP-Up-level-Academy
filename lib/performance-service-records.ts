@@ -27,6 +27,8 @@ export type AssignedWorkRecord = {
   /** URL or note pointing to proof (screenshot / chat link) */
   evidence?: string;
   recordedAt: string;
+  submittedAt?: string;
+  updatedAt?: string;
 };
 
 export type AssignedWorkRecordInput = Omit<AssignedWorkRecord, "id" | "recordedAt">;
@@ -79,6 +81,10 @@ export function assignedWorkRecordsForDate(records: AssignedWorkRecord[], workDa
   return records.filter((record) => record.workDate === workDate);
 }
 
+export function assignedWorkRecordById(records: AssignedWorkRecord[], id: string) {
+  return records.find((record) => record.id === id) || null;
+}
+
 export function customerServiceRecordsToEvents(records: CustomerServiceRecord[]) {
   const grouped = new Map<string, { employeeName: string; event: ServiceEvent }>();
   records.forEach((record) => {
@@ -114,6 +120,28 @@ export function assignedWorkRecordsToWorks(
     .sort((left, right) => `${left.employeeName}:${left.work.title}`.localeCompare(`${right.employeeName}:${right.work.title}`));
 }
 
+export function updateAssignedWorkRecords(
+  records: AssignedWorkRecord[],
+  id: string,
+  input: { status: AssignedWork["status"]; note: string; evidence?: string },
+  recordedAt = new Date().toISOString()
+): { records: AssignedWorkRecord[]; record: AssignedWorkRecord | null } {
+  let updatedRecord: AssignedWorkRecord | null = null;
+  const nextRecords = records.map((record) => {
+    if (record.id !== id) return record;
+    updatedRecord = {
+      ...record,
+      status: input.status,
+      note: input.note.trim(),
+      evidence: (input.evidence || "").trim() || undefined,
+      submittedAt: recordedAt,
+      updatedAt: recordedAt
+    };
+    return updatedRecord;
+  });
+  return { records: nextRecords, record: updatedRecord };
+}
+
 export function readPerformanceDailyStore(): PerformanceDailyStore {
   if (!existsSync(storePath)) return emptyStore;
   try {
@@ -144,4 +172,18 @@ export function saveAssignedWorkRecord(input: AssignedWorkRecordInput) {
   const next = { ...store, assignedWorkRecords: addAssignedWorkRecord(store.assignedWorkRecords, input) };
   writePerformanceDailyStore(next);
   return next;
+}
+
+export function updateAssignedWorkRecordSubmission(
+  id: string,
+  input: { status: AssignedWork["status"]; note: string; evidence?: string },
+  recordedAt = new Date().toISOString()
+) {
+  const store = readPerformanceDailyStore();
+  const updated = updateAssignedWorkRecords(store.assignedWorkRecords, id, input, recordedAt);
+  if (!updated.record) return { store, record: null };
+
+  const next = { ...store, assignedWorkRecords: updated.records };
+  writePerformanceDailyStore(next);
+  return { store: next, record: updated.record };
 }

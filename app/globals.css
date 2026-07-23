@@ -303,7 +303,8 @@
 }
 
 .performance-input-form input,
-.performance-input-form select {
+.performance-input-form select,
+.performance-input-form textarea {
   min-width: 0;
   min-height: 40px;
   border: 1px solid #cbd5e1;
@@ -312,6 +313,11 @@
   padding: 0 10px;
   color: #111827;
   font: inherit;
+}
+
+.performance-input-form textarea {
+  padding: 10px;
+  resize: vertical;
 }
 
 .performance-input-form button {

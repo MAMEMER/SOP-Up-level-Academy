@@ -31,7 +31,8 @@ import {
   assignedWorkRecordsForDate,
   assignedWorkRecordsToWorks,
   customerServiceRecordsForDate,
-  customerServiceRecordsToEvents
+  customerServiceRecordsToEvents,
+  updateAssignedWorkRecords
 } from "../lib/performance-service-records.ts";
 import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "../lib/storehub-stocktake-export.ts";
 import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "../lib/storehub-timesheet-export.ts";
@@ -512,6 +513,29 @@ describe("performance score engine", () => {
     assert.equal(assignedWorkRecordsForDate(records, "2026-07-11").length, 0);
     assert.equal(works[0].employeeName, "ICE");
     assert.equal(works[0].work.status, "not_finished");
+  });
+
+  it("updates assigned work status, note, and evidence after staff submission", () => {
+    const records = addAssignedWorkRecord([], {
+      workDate: "2026-07-23",
+      employeeName: "Boom",
+      title: "ส่งเสื้อให้ลูกค้า",
+      status: "not_finished",
+      note: "รอส่ง"
+    }, "2026-07-23T07:00:00.000Z");
+
+    const updated = updateAssignedWorkRecords(records, records[0].id, {
+      status: "on_time",
+      note: "ส่งแล้ว",
+      evidence: "Tracking TH123"
+    }, "2026-07-23T08:00:00.000Z");
+
+    assert.equal(updated.records.length, 1);
+    assert.equal(updated.record?.id, records[0].id);
+    assert.equal(updated.record?.status, "on_time");
+    assert.equal(updated.record?.note, "ส่งแล้ว");
+    assert.equal(updated.record?.evidence, "Tracking TH123");
+    assert.equal(updated.record?.submittedAt, "2026-07-23T08:00:00.000Z");
   });
 
   it("maps Bangkae team assigned work to every team member with the same score impact", () => {

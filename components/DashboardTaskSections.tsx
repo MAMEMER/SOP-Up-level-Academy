@@ -128,7 +128,7 @@ export function DashboardTaskSections({
             assignedWorkRecords.map((record, index) => (
               <a
                 key={record.id}
-                href={`/admin/performance-score?startDate=${record.workDate}&endDate=${record.workDate}`}
+                href={`/assigned-work/${encodeURIComponent(record.id)}`}
                 className={`daily-phase-card ${assignedStatusClass[record.status]}`}
               >
                 <span>{String(index + 1).padStart(2, "0")}</span>
@@ -141,7 +141,10 @@ export function DashboardTaskSections({
               </a>
             ))
           ) : (
-            <a href={`/admin/performance-score?startDate=${workDate}&endDate=${workDate}`} className="daily-phase-card workflow-status-white">
+            <a
+              href={canManageAssignedWork ? `/admin/performance-score?startDate=${workDate}&endDate=${workDate}` : "#assigned-work"}
+              className="daily-phase-card workflow-status-white"
+            >
               <span>00</span>
               <div>
                 <small>{workDate}</small>

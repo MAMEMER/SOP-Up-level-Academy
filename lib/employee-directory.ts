@@ -40,6 +40,7 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
   {
     code: "Leo",
     displayName: "Leo",
+    email: "nuslove2560@gmail.com",
     employmentType: "part_time",
     aliases: ["leo", "up leo"],
     branch: "bangkae"
@@ -57,6 +58,12 @@ export function resolveEmployeeCode(rawName: string): string {
     .filter((candidate) => normalized.includes(candidate.alias))
     .sort((a, b) => b.alias.length - a.alias.length)[0];
   return match ? match.code : rawName.trim();
+}
+
+export function employeeCodeForEmail(email: string | null | undefined) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return null;
+  return employeeDirectory.find((entry) => entry.email?.toLowerCase() === normalized)?.code || null;
 }
 
 export function employmentTypeFor(code: string): EmploymentType {
