@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
+import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import {
   canPersistWorkflowRecords,
   formatWorkDate,
@@ -19,6 +20,22 @@ const statusText = {
   orange: "เกินเวลา",
   red: "เลยเวลา",
   purple: "ต่อเนื่อง 3 วัน"
+};
+
+const assignedStatusText: Record<AssignedWorkRecord["status"], string> = {
+  early_quality: "เสร็จก่อนกำหนด",
+  on_time: "เสร็จตรงเวลา",
+  needs_revision: "ต้องแก้ไข",
+  late_one_day: "ช้าไม่เกิน 1 วัน",
+  not_finished: "ยังไม่เสร็จ"
+};
+
+const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
+  early_quality: "workflow-status-green",
+  on_time: "workflow-status-green",
+  needs_revision: "workflow-status-orange",
+  late_one_day: "workflow-status-orange",
+  not_finished: "workflow-status-red"
 };
 
 const weeklyStockTasks = [
@@ -44,9 +61,19 @@ const monthlyStockTasks = [
   { id: "monthly-stock-discrepancy", name: "สรุปยอดต่างและรายการที่ต้องปรับในระบบ", schedule: "หลังนับ Stock เสร็จ", shiftIds: ["admin-assigned"] }
 ];
 
-export function DashboardTaskSections({ phases }: { phases: WorkflowPhase[] }) {
+export function DashboardTaskSections({
+  phases,
+  assignedWorkRecords = [],
+  workDate: currentWorkDate,
+  canManageAssignedWork = false
+}: {
+  phases: WorkflowPhase[];
+  assignedWorkRecords?: AssignedWorkRecord[];
+  workDate?: string;
+  canManageAssignedWork?: boolean;
+}) {
   const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
-  const workDate = formatWorkDate();
+  const workDate = currentWorkDate || formatWorkDate();
   const stockPhase = phases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
 
@@ -84,6 +111,48 @@ export function DashboardTaskSections({ phases }: { phases: WorkflowPhase[] }) {
 
   return (
     <section className="task-sections">
+      <article id="assigned-work" className="task-section assigned-work-task">
+        <div className="task-section-head">
+          <div>
+            <p className="eyebrow">Assigned work</p>
+            <h3>งานที่มอบหมาย</h3>
+          </div>
+          {canManageAssignedWork ? (
+            <a className="status-pill" href={`/admin/performance-score?startDate=${workDate}&endDate=${workDate}`}>
+              บันทึกงาน
+            </a>
+          ) : null}
+        </div>
+        <div className="daily-phase-grid">
+          {assignedWorkRecords.length ? (
+            assignedWorkRecords.map((record, index) => (
+              <a
+                key={record.id}
+                href={`/admin/performance-score?startDate=${record.workDate}&endDate=${record.workDate}`}
+                className={`daily-phase-card ${assignedStatusClass[record.status]}`}
+              >
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <small>{record.employeeName} · {record.workDate}</small>
+                  <strong>{record.title}</strong>
+                  <em>{assignedStatusText[record.status]}{record.note ? ` · ${record.note}` : ""}</em>
+                  {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}
+                </div>
+              </a>
+            ))
+          ) : (
+            <a href={`/admin/performance-score?startDate=${workDate}&endDate=${workDate}`} className="daily-phase-card workflow-status-white">
+              <span>00</span>
+              <div>
+                <small>{workDate}</small>
+                <strong>ยังไม่มีงานที่มอบหมายวันนี้</strong>
+                <em>เพิ่มจากหน้า Performance แล้วงานจะขึ้นบน dashboard ทันที</em>
+              </div>
+            </a>
+          )}
+        </div>
+      </article>
+
       <article id="daily-task" className="task-section daily-task">
         <div className="task-section-head">
           <div>

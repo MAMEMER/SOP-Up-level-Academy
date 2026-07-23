@@ -3,9 +3,14 @@ import { DashboardChecklistStatus } from "../../components/DashboardChecklistSta
 import { DashboardTaskSections } from "../../components/DashboardTaskSections.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
+import { assignedWorkRecordsForDate, readPerformanceDailyStore } from "../../lib/performance-service-records.ts";
+import { formatWorkDate } from "../../lib/workflow-records.ts";
 
 export default async function HomePage() {
   const user = await requireUser();
+  const workDate = formatWorkDate();
+  const dailyStore = readPerformanceDailyStore();
+  const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate);
 
   return (
     <main className="page">
@@ -22,7 +27,12 @@ export default async function HomePage() {
       </section>
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} />
-      <DashboardTaskSections phases={cardStoreWorkflow} />
+      <DashboardTaskSections
+        phases={cardStoreWorkflow}
+        assignedWorkRecords={assignedWorkRecords}
+        workDate={workDate}
+        canManageAssignedWork={user.role === "admin"}
+      />
     </main>
   );
 }
