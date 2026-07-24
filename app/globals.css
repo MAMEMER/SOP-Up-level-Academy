@@ -4338,8 +4338,17 @@ main .page > section, main > section { margin-top: 16px !important; }
 /* staff name = colored chip on a full-height opaque layer (fills the whole cell, name centered) */
 .shift-planner__staff { padding: 0 !important; text-align: center; }
 .shift-planner__staff-bg { position: absolute; inset: 0; z-index: 0; }
-.shift-planner__staff-fill { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; height: 100%; min-height: 100%; padding: 6px 8px; box-sizing: border-box; }
+.shift-planner__staff-fill { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 6px 8px; box-sizing: border-box; }
 .shift-planner__staff-chip { display: inline-flex; align-items: center; gap: 5px; border: 2px solid; border-radius: 999px; padding: 3px 10px; }
 .shift-planner__staff-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 .shift-planner__staff-name { font-size: 13px; font-weight: 700; }
 .shift-planner__staff-type { font-size: 10px; color: var(--color-ink-soft); }
+
+/* shift swap */
+.shift-planner__swap-bar { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 92vw; background: #fff; border: 2px solid #b8b0ff; border-radius: 14px; padding: 12px 16px; font-size: 13px; box-shadow: 0 8px 28px rgba(0,0,0,0.18); }
+.shift-planner__swap-bar select, .shift-planner__swap-bar input { border: 1px solid rgba(184,176,255,0.6); border-radius: 8px; padding: 6px 10px; font-family: inherit; font-size: 13px; }
+.shift-planner__swap-bar input { flex: 1; min-width: 140px; }
+.shift-planner__actual-row { display: flex; gap: 2px; align-items: center; justify-content: center; margin-top: 2px; }
+.shift-planner__swap-btn { border: 1px solid #b8b0ff; background: rgba(184,176,255,0.2); color: #6a5acd; border-radius: 6px; width: 20px; height: 22px; font-size: 11px; cursor: pointer; flex: 0 0 auto; padding: 0; }
+.shift-planner__swap-btn:hover { background: #b8b0ff; color: #fff; }
+.shift-planner__actual--swap { color: #6a5acd; background: rgba(184,176,255,0.35); }

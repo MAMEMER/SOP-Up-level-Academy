@@ -16,6 +16,7 @@ import {
   savePlanCell,
   saveDayEvent,
   setActualStatus,
+  setSwap,
   type ActualDoc,
   type DayActivity,
   type EventDoc,
@@ -130,6 +131,9 @@ export function ShiftPlanner({
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [density, setDensity] = useState<"compact" | "normal" | "large">("normal");
   const [showIssues, setShowIssues] = useState(false);
+  const [swapCell, setSwapCell] = useState<{ date: string; staffCode: string } | null>(null);
+  const [swapTarget, setSwapTarget] = useState("");
+  const [swapNote, setSwapNote] = useState("");
 
   const dates = useMemo(() => monthDates(month), [month]);
 
@@ -287,6 +291,25 @@ export function ShiftPlanner({
     }
   }
 
+  async function confirmSwap() {
+    if (!swapCell || !swapTarget) return;
+    const { date, staffCode } = swapCell;
+    const key = cellKey(date, staffCode);
+    setActuals((prev) => {
+      const base = prev[key] ?? ({ branch, month: date.slice(0, 7), workDate: date, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
+      return { ...prev, [key]: { ...base, swappedTo: swapTarget, swapNote: swapNote || undefined, leaveType: undefined, absent: undefined } };
+    });
+    setSwapCell(null);
+    setSwapTarget("");
+    const note = swapNote;
+    setSwapNote("");
+    try {
+      await setSwap({ branch, workDate: date, staffCode, swappedTo: swapTarget, note, updatedBy: plannedBy });
+    } catch {
+      setError("บันทึกการสลับไม่สำเร็จ");
+    }
+  }
+
   async function syncClockIn() {
     setSyncMsg("กำลังดึง clock-in จาก StoreHub…");
     try {
@@ -376,6 +399,23 @@ export function ShiftPlanner({
         <span className="shift-planner__autosave-note">บันทึกอัตโนมัติทุกการแก้ไข</span>
         <button type="button" className="shift-planner__save-btn" onClick={saveAll}>💾 บันทึกทั้งหมด</button>
       </div>
+
+      {swapCell ? (
+        <div className="shift-planner__swap-bar">
+          <span>
+            สลับกะ: <strong>{staff.find((s) => s.code === swapCell.staffCode)?.displayName}</strong> วันที่ {swapCell.date.slice(-2)} → ให้
+          </span>
+          <select value={swapTarget} onChange={(e) => setSwapTarget(e.target.value)}>
+            <option value="">เลือกคน</option>
+            {staff.filter((s) => s.code !== swapCell.staffCode).map((s) => (
+              <option key={s.code} value={s.code}>{s.displayName}</option>
+            ))}
+          </select>
+          <input value={swapNote} onChange={(e) => setSwapNote(e.target.value)} placeholder="เหตุผล (เช่น ติดธุระ)" />
+          <button type="button" className="primary-action" onClick={confirmSwap} disabled={!swapTarget}>ยืนยันสลับ</button>
+          <button type="button" className="btn-soft" onClick={() => { setSwapCell(null); setSwapTarget(""); setSwapNote(""); }}>ยกเลิก</button>
+        </div>
+      ) : null}
 
       {syncMsg ? <p className="shift-planner__sync-msg">{syncMsg}</p> : null}
 
@@ -552,20 +592,27 @@ export function ShiftPlanner({
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
-                          {actualStatus === "normal" && actual?.clockIn ? (
+                          {actual?.swappedTo ? (
+                            <span className="shift-planner__actual shift-planner__actual--swap" title={actual.swapNote ? `เพราะ ${actual.swapNote}` : "สลับกะ"}>
+                              ⇄ {staff.find((s) => s.code === actual.swappedTo)?.displayName ?? actual.swappedTo}
+                            </span>
+                          ) : actualStatus === "normal" && actual?.clockIn ? (
                             <span className={`shift-planner__actual shift-planner__actual--${late ? "late" : "ontime"}`}>เข้า {actual.clockIn}</span>
                           ) : null}
-                          <select
-                            className={`shift-planner__actual-sel${actualStatus !== "normal" ? " shift-planner__actual-sel--flag" : ""}`}
-                            value={actualStatus}
-                            onChange={(e) => onActualChange(date, entry.code, e.target.value as "normal" | "leave_personal" | "leave_sick" | "absent")}
-                            title="สิ่งที่เกิดขึ้นจริง (ลา/ขาด)"
-                          >
-                            <option value="normal">ตามจริง</option>
-                            <option value="leave_personal">ลากิจ</option>
-                            <option value="leave_sick">ลาป่วย</option>
-                            <option value="absent">ขาด</option>
-                          </select>
+                          <div className="shift-planner__actual-row">
+                            <select
+                              className={`shift-planner__actual-sel${actualStatus !== "normal" || actual?.swappedTo ? " shift-planner__actual-sel--flag" : ""}`}
+                              value={actualStatus}
+                              onChange={(e) => onActualChange(date, entry.code, e.target.value as "normal" | "leave_personal" | "leave_sick" | "absent")}
+                              title="สิ่งที่เกิดขึ้นจริง (ลา/ขาด)"
+                            >
+                              <option value="normal">ตามจริง</option>
+                              <option value="leave_personal">ลากิจ</option>
+                              <option value="leave_sick">ลาป่วย</option>
+                              <option value="absent">ขาด</option>
+                            </select>
+                            <button type="button" className="shift-planner__swap-btn" title="สลับกะให้คนอื่น" onClick={() => { setSwapCell({ date, staffCode: entry.code }); setSwapTarget(""); setSwapNote(""); }}>⇄</button>
+                          </div>
                         </td>
                       );
                     })}

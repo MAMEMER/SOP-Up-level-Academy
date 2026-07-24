@@ -85,6 +85,9 @@ export type ActualDoc = {
   leaveNote?: string;
   /** planned to work but no clock-in and no leave */
   absent?: boolean;
+  /** shift swapped to another staff (they work + clock in instead); excused for KPI */
+  swappedTo?: string;
+  swapNote?: string;
   updatedAt: string;
   updatedBy: string;
 };
@@ -224,7 +227,36 @@ export async function setActualStatus(input: {
     updatedAt: nowIso,
     updatedBy: input.updatedBy,
     leaveType: input.status === "leave_personal" ? "personal" : input.status === "leave_sick" ? "sick" : deleteField(),
-    absent: input.status === "absent" ? true : deleteField()
+    absent: input.status === "absent" ? true : deleteField(),
+    // any explicit status clears a prior swap
+    swappedTo: deleteField(),
+    swapNote: deleteField()
+  };
+  await setDoc(doc(db, ACTUAL, shiftDocId(input.branch, input.workDate, input.staffCode)), record, { merge: true });
+}
+
+/** Records a shift swap: this staff's shift is covered by `swappedTo` (who clocks in
+ *  normally). Excused for the original in KPI. Clears any leave/absent on the day. */
+export async function setSwap(input: {
+  branch: string;
+  workDate: string;
+  staffCode: string;
+  swappedTo: string;
+  note?: string;
+  updatedBy: string;
+}): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const record: Record<string, unknown> = {
+    branch: input.branch,
+    month: monthOf(input.workDate),
+    workDate: input.workDate,
+    staffCode: input.staffCode,
+    updatedAt: nowIso,
+    updatedBy: input.updatedBy,
+    swappedTo: input.swappedTo,
+    swapNote: input.note || deleteField(),
+    leaveType: deleteField(),
+    absent: deleteField()
   };
   await setDoc(doc(db, ACTUAL, shiftDocId(input.branch, input.workDate, input.staffCode)), record, { merge: true });
 }

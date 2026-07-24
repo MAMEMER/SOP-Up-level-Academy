@@ -8,7 +8,7 @@ import { restListCollection } from "./firestore-rest.ts";
 // in the planner (ICE/Boom/Leo) is exactly the KPI employeeName, so no mapping needed.
 
 type ShiftDoc = { branch?: string; workDate?: string; staffCode?: string; assignment?: string; startTime?: string };
-type ActualDoc = { branch?: string; workDate?: string; staffCode?: string; clockIn?: string; leaveType?: string };
+type ActualDoc = { branch?: string; workDate?: string; staffCode?: string; clockIn?: string; leaveType?: string; swappedTo?: string };
 
 function addHoursIso(startIso: string, hours: number): string {
   return new Date(Date.parse(startIso) + hours * 3600 * 1000).toISOString();
@@ -24,8 +24,15 @@ export async function fetchAttendanceSource(branch: string): Promise<AttendanceS
   const clockEvents: ClockEvent[] = [];
   const leaves: LeaveRecord[] = [];
 
+  // Swapped shifts: the original isn't expected to work (someone else covers), so drop
+  // their scheduled shift that day = no missing-clock-in penalty.
+  const swapped = new Set(
+    actuals.filter((a) => a.branch === branch && a.swappedTo && a.workDate && a.staffCode).map((a) => `${a.workDate}__${a.staffCode}`)
+  );
+
   for (const s of shifts) {
     if (s.branch !== branch || !s.workDate || !s.staffCode) continue;
+    if (swapped.has(`${s.workDate}__${s.staffCode}`)) continue;
     if (s.assignment === "s1" || s.assignment === "s2") {
       const start = s.startTime || (s.assignment === "s1" ? "09:00" : "11:30");
       const scheduledStart = `${s.workDate}T${start}:00+07:00`;
