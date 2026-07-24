@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
+import { storehubStocktakesUrl, weeklyStockSleevePhase } from "../../../lib/weekly-stock-workflow.ts";
 
 const manualMedia: Record<string, {
   src: string;
@@ -177,6 +178,65 @@ export default function TrainingPage() {
           </article>
           );
         })}
+
+        <article
+          id={weeklyStockSleevePhase.id}
+          className={`training-card wi-manual phase-${weeklyStockSleevePhase.category}`}
+        >
+          <div className="workflow-card-head">
+            <span className="phase-icon">{weeklyStockSleevePhase.icon}</span>
+            <div>
+              <p className="eyebrow">WI-W1 · {weeklyStockSleevePhase.timeLabel}</p>
+              <h3>{weeklyStockSleevePhase.title}</h3>
+            </div>
+          </div>
+
+          <div className="wi-manual-body">
+            <div className="wi-content">
+              <section className="wi-summary-grid">
+                <div>
+                  <h4>วัตถุประสงค์</h4>
+                  <p>{weeklyStockSleevePhase.goal}</p>
+                </div>
+                <div>
+                  <h4>ขอบเขต / เวลา</h4>
+                  <p>{weeklyStockSleevePhase.timeLabel}</p>
+                </div>
+              </section>
+
+              <section>
+                <h4>จุดตรวจใน Checklist</h4>
+                <ul>
+                  {weeklyStockSleevePhase.checklist.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </section>
+
+              <section className="wi-summary-grid">
+                <div>
+                  <h4>หลักฐานที่ต้องแนบ</h4>
+                  <ul>
+                    <li>รูปแคปหน้า StoreHub Stock Take หลังนับสินค้า</li>
+                    <li>สรุปรายการอุปกรณ์ / Sleeve ทั้งหมด (ชื่อสินค้า | จำนวนที่เหลือ)</li>
+                    <li>สรุปรายการที่ตรงและไม่ตรง</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4>สิ่งที่ต้องระวัง</h4>
+                  <p>{weeklyStockSleevePhase.caution}</p>
+                </div>
+              </section>
+
+              <section>
+                <h4>ระบบที่เกี่ยวข้อง</h4>
+                <ul>
+                  <li>
+                    <a href={storehubStocktakesUrl} target="_blank" rel="noreferrer">StoreHub Stock Take</a>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </article>
       </div>
     </main>
   );

@@ -217,7 +217,7 @@ export function DashboardTaskSections({
                 </a>
               );
             })()}
-            <a href="#stock-weekly" className="daily-phase-card workflow-status-white" id="stock-weekly">
+            <a href="/checklist-weekly#stock-sleeve-work" className="daily-phase-card workflow-status-white" id="stock-weekly">
               <span>02</span>
               <div>
                 <small>{stockWorkSummaryCards[1].kicker}</small>
