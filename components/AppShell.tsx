@@ -1,18 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { DigitalClock } from "./DigitalClock.tsx";
 import type { CurrentUser } from "../lib/auth.ts";
-import { createClient } from "../lib/supabase/server.ts";
+import { SOP_SESSION_COOKIE } from "../lib/auth-session.ts";
 
 const mainLinks = [
   { href: "/", label: "หน้าหลัก" },
   { href: "/checklist", label: "เช็คลิสต์" },
+  { href: "/handoff", label: "งานส่งต่อ" },
   { href: "/training", label: "คู่มืองาน" }
 ];
 
 const staffLinks = mainLinks;
 
 const adminLinks = [
+  { href: "/admin/schedule", label: "ตารางกะ" },
+  { href: "/admin/assign", label: "มอบหมายงาน" },
+  { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
+  { href: "/admin/checklist-config", label: "ปรับ Checklist" },
   { href: "/admin/ops", label: "สรุปเจ้าของร้าน" },
   { href: "/admin/performance-score", label: "คะแนนพนักงาน" },
   { href: "/manager-review", label: "ตรวจงาน" },
@@ -30,9 +36,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
 
   async function logOut() {
     "use server";
-
-    const supabase = await createClient();
-    await supabase.auth.signOut();
+    (await cookies()).delete(SOP_SESSION_COOKIE);
     redirect("/login");
   }
 

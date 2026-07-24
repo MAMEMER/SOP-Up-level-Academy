@@ -154,6 +154,14 @@ function clampScore(score: number, maxScore: number) {
   return Math.min(maxScore, Math.max(0, Math.round(score * 100) / 100));
 }
 
+// KPI 23 Jul 2026: "ทุกหมวดหักได้เรื่อยๆ" — a category is NOT floored at 0. A category
+// with deductions beyond its 20-point capacity goes negative and drags the total down
+// (heavier salary impact). Upper-capped at 20 (can't earn above the category max),
+// rounded to 2 decimals. The TOTAL is still floored at [0,100] (see clampScore).
+function categoryScore(totalDeduction: number) {
+  return Math.min(20, Math.round((20 - totalDeduction) * 100) / 100);
+}
+
 function dateKey(employeeName: string, workDate: string) {
   return `${employeeName.trim().toLowerCase()}:${workDate}`;
 }
@@ -232,7 +240,7 @@ export function calculateAttendanceScore(input: AttendanceInput): ScoreResult {
   });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [], warnings };
+  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [], warnings };
 }
 
 export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
@@ -292,78 +300,86 @@ export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
   });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings };
+  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings };
 }
 
 export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const flags: string[] = [];
 
-  events.forEach((event) => {
-    // KPI 21 Jul 2026: missing checklist day = -5 (was 10); no more backfill credit (checklist must
-    // close same-day) so backfilled carries no penalty; false/false-on-audit stays -10.
-    const pointsByType = { missing_day: 5, missing_important: 2, backfilled: 0, false_record: 10 } satisfies Record<ChecklistEvent["type"], number>;
+  // KPI 23 Jul 2026: a missed checklist day escalates like stock — first 2 misses cost
+  // 10 each, then 5 each. No backfill/ส่งย้อนหลัง (checklist closes same day 23:59), so a
+  // missing_day always counts. false_record (สุ่มตรวจไม่เจอ/ข้อมูลไม่จริง) = -10 + coach.
+  // Occurrence order is deterministic: missing_day events processed by earliest date.
+  const missingDayEvents = events
+    .filter((event) => event.type === "missing_day")
+    .sort((left, right) => (left.dates?.[0] ?? "").localeCompare(right.dates?.[0] ?? ""));
+  let missingOccurrence = 0;
+  missingDayEvents.forEach((event) => {
+    let points = 0;
+    for (let i = 0; i < event.count; i += 1) {
+      missingOccurrence += 1;
+      points += missingOccurrence <= 2 ? 10 : 5;
+    }
     const dateDetail = event.dates?.length ? ` (${event.dates.join(", ")})` : "";
-    const detailByType = {
-      missing_day: `มีกะและ clock-in แต่ไม่มีข้อมูล Google Form checklist x ${event.count} วัน${dateDetail}`,
-      missing_important: `missing_important x ${event.count}`,
-      backfilled: `backfilled x ${event.count}`,
-      false_record: `false_record x ${event.count}`
-    } satisfies Record<ChecklistEvent["type"], string>;
     deductions.push({
       category: "checklist",
-      points: pointsByType[event.type] * event.count,
-      reason: event.type,
-      detail: detailByType[event.type],
+      points,
+      reason: "missing_day",
+      detail: `ขาด checklist x ${event.count} วัน${dateDetail} (สะสม ${missingOccurrence} ครั้ง)`,
       source: event.source
     });
-    if (event.type === "false_record") flags.push("coaching_required");
   });
 
+  events
+    .filter((event) => event.type !== "missing_day")
+    .forEach((event) => {
+      const pointsByType = { missing_important: 2, backfilled: 0, false_record: 10 } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, number>;
+      const detailByType = {
+        missing_important: `missing_important x ${event.count}`,
+        backfilled: `backfilled x ${event.count}`,
+        false_record: `สุ่มตรวจไม่เจอข้อมูล/ข้อมูลไม่ตรงจริง x ${event.count}`
+      } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, string>;
+      deductions.push({
+        category: "checklist",
+        points: pointsByType[event.type as Exclude<ChecklistEvent["type"], "missing_day">] * event.count,
+        reason: event.type,
+        detail: detailByType[event.type as Exclude<ChecklistEvent["type"], "missing_day">],
+        source: event.source
+      });
+      if (event.type === "false_record") flags.push("coaching_required");
+    });
+
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
 export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResult {
+  // KPI 23 Jul 2026: pure deduction model (no per-bucket floor, category can go negative).
+  // First complaint / fixed on the spot = -5 each. Repeat of the same issue = -10 + coach.
+  // Severe complaint = -10 + coach. Applies to both the feedback and event-response buckets.
   const deductions: DeductionRecord[] = [];
   const flags: string[] = [];
-  const bucketScores = { feedback: 10, event_response: 10 };
 
   events.forEach((event) => {
-    let targetScore = bucketScores[event.bucket];
-    if (event.severity === "severe") {
-      // Severe complaint zeroes the bucket (= -10) and requires coaching.
-      targetScore = 0;
-      flags.push("coaching_required");
-    } else if (event.severity === "repeated") {
-      // Repeat of the same complaint zeroes the bucket (= -10) and requires coaching.
-      targetScore = 0;
+    let points: number;
+    if (event.severity === "severe" || event.severity === "repeated") {
+      points = 10 * event.count;
       flags.push("coaching_required");
     } else {
-      // First complaint / fixed on the spot: -5 per occurrence within the bucket.
-      targetScore = Math.max(0, targetScore - event.count * 5);
+      points = 5 * event.count;
     }
-
-    const deductionPoints = bucketScores[event.bucket] - targetScore;
-    if (deductionPoints > 0) {
-      deductions.push({
-        category: "customer_service",
-        points: deductionPoints,
-        reason: `${event.bucket}_${event.severity}`,
-        detail: `${event.bucket} ${event.severity} x ${event.count}`,
-        source: event.source
-      });
-    }
-    bucketScores[event.bucket] = targetScore;
+    deductions.push({
+      category: "customer_service",
+      points,
+      reason: `${event.bucket}_${event.severity}`,
+      detail: `${event.bucket} ${event.severity} x ${event.count}`,
+      source: event.source
+    });
   });
 
-  return {
-    score: clampScore(bucketScores.feedback + bucketScores.event_response, 20),
-    maxScore: 20,
-    deductions,
-    flags: [...new Set(flags)],
-    warnings: []
-  };
+  const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
+  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
 // KPI 21 Jul 2026: assigned work is scored by cumulative deductions from 20 (not an average).
@@ -395,7 +411,7 @@ export function calculateAssignedWorkScore(works: AssignedWork[]): ScoreResult {
   });
 
   const totalDeduction = deductions.reduce((sum, item) => sum + item.points, 0);
-  return { score: clampScore(20 - totalDeduction, 20), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
 export function getIncentiveTier(totalScore: number): IncentiveTier {

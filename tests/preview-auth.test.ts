@@ -99,10 +99,12 @@ describe("preview auth", () => {
     assert.equal(serverSource.includes("user: null"), true);
   });
 
-  it("routes preview login to the dashboard", () => {
+  it("signs in with Google and routes to the dashboard", () => {
     const loginSource = readFileSync("app/(auth)/login/page.tsx", "utf8");
 
-    assert.equal(loginSource.includes("previewLoginEmailCookieName"), true);
+    // Auth is now Firebase Google sign-in → session cookie via /api/auth/session.
+    assert.match(loginSource, /signInWithPopup/);
+    assert.match(loginSource, /\/api\/auth\/session/);
     assert.match(loginSource, /router\.push\("\/"\)/);
     assert.doesNotMatch(loginSource, /router\.push\("\/checklist"\)/);
   });

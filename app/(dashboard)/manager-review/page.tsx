@@ -7,7 +7,7 @@ import { isPreviewMode } from "../../../lib/preview-data.ts";
 
 export default async function ManagerReviewPage() {
   const user = await requireUser();
-  if (user.role !== "admin" && !isPreviewMode()) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   const checklistPhases = cardStoreWorkflow.filter((phase) => phase.checklist.length > 0);
 

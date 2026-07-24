@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   assignedWorkRecordsToWorks,
   customerServiceRecordsToEvents,
-  readPerformanceDailyStore
+  type PerformanceDailyStore
 } from "./performance-service-records.ts";
 import { monthlyPerformanceSourceFolder, readPerformanceSourceFiles } from "./performance-source-files.ts";
 import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "./storehub-stocktake-export.ts";
@@ -421,23 +421,43 @@ function inYear(date: string, year: string) {
   return date.startsWith(`${year}-`);
 }
 
-export function getPerformanceScoreRows(periodId: PerformanceReviewPeriod["id"]): EmployeePerformanceScore[] {
+// Real attendance override sourced from the Firestore planner (shift plan + StoreHub
+// clock-in). When provided, it replaces the CSV/sheet fixtures for schedules, clock-in
+// and leave — so the KPI attendance score matches the live grid. Stock stays on CSV.
+export type AttendanceSource = {
+  schedules: ShiftSchedule[];
+  clockEvents: ClockEvent[];
+  leaves: LeaveRecord[];
+};
+
+export function getPerformanceScoreRows(
+  periodId: PerformanceReviewPeriod["id"],
+  dailyStore: PerformanceDailyStore,
+  attendance?: AttendanceSource
+): EmployeePerformanceScore[] {
   const period = performanceReviewPeriods.find((item) => item.id === periodId) || performanceReviewPeriods[0];
-  return getPerformanceScoreRowsForRange(period);
+  return getPerformanceScoreRowsForRange(period, dailyStore, attendance);
 }
 
-export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod): EmployeePerformanceScore[] {
+export function getPerformanceScoreRowsForRange(
+  period: PerformanceReviewPeriod,
+  dailyStore: PerformanceDailyStore,
+  attendance?: AttendanceSource
+): EmployeePerformanceScore[] {
   const year = period.startDate.slice(0, 4);
-  const dailyStore = readPerformanceDailyStore();
+  const srcSchedules = attendance?.schedules ?? schedules;
+  const srcClock = attendance?.clockEvents ?? getClockEventsFromExport();
+  const srcLeaves = attendance?.leaves ?? leaveRecords;
+  const srcAnnualSchedules = attendance?.schedules ?? leaveEligibleSchedules;
   const serviceEventsFromRecords = customerServiceRecordsToEvents(dailyStore.serviceRecords.filter((record) => inPeriod(record.workDate, period)));
   const assignedWorksFromRecords = assignedWorkRecordsToWorks(dailyStore.assignedWorkRecords.filter((record) => inPeriod(record.workDate, period)), {
     teamAssigneeName: bangkaeTeamAssigneeName,
     teamMembers: employees
   });
   return employees.map((employeeName) => {
-    const employeeSchedules = schedules.filter((item) => item.employeeName === employeeName);
+    const employeeSchedules = srcSchedules.filter((item) => item.employeeName === employeeName);
     const employeePeriodSchedules = employeeSchedules.filter((item) => inPeriod(item.workDate, period));
-    const employeePeriodClockEvents = getClockEventsFromExport().filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period));
+    const employeePeriodClockEvents = srcClock.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period));
     const employeePeriodStockCounts = annotateSlowMorningCounts({
       employeeName,
       schedules: employeePeriodSchedules,
@@ -447,7 +467,7 @@ export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod)
       employeeName,
       schedules: employeePeriodSchedules,
       stockCounts: employeePeriodStockCounts,
-      leaveRecords: leaveRecords.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
+      leaveRecords: srcLeaves.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
     });
     const derivedChecklistEvents = missingChecklistEventsFromAttendance({
       employeeName,
@@ -463,11 +483,11 @@ export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod)
       attendance: {
         schedules: employeePeriodSchedules,
         clockEvents: employeePeriodClockEvents,
-        leaveRecords: leaveRecords.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
+        leaveRecords: srcLeaves.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
       },
       annualLeave: {
-        schedules: leaveEligibleSchedules.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year)),
-        records: leaveRecords.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year))
+        schedules: srcAnnualSchedules.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year)),
+        records: srcLeaves.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year))
       },
       stockCounts: [...employeePeriodStockCounts, ...missingStockCounts],
       checklistEvents: derivedChecklistEvents,

@@ -6,7 +6,7 @@ import { isOwner } from "../../../../lib/owner.ts";
 
 export default async function AdminOpsPage() {
   const user = await requireUser();
-  if (user.role !== "admin" && !isPreviewMode()) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   // ยอดขาย/เงินสด = owner-only (Champ + Nem), hidden from regular admins
   return <AdminOpsDashboard isOwner={isOwner(user.email)} />;

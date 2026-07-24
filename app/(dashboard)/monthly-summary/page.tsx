@@ -6,7 +6,7 @@ import { isPreviewMode } from "../../../lib/preview-data.ts";
 
 export default async function MonthlySummaryPage() {
   const user = await requireUser();
-  if (user.role !== "admin" && !isPreviewMode()) redirect("/");
+  if (user.role !== "admin") redirect("/");
 
   return (
     <main className="page">
