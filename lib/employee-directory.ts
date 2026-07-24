@@ -24,9 +24,10 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
     displayName: "ICE",
     email: "phooreephat.k@gmail.com",
     employmentType: "full_time",
-    // "Ungkanawin Narawit" / "...Academy" are the manager-verifier rows StoreHub
-    // attributes to the ICE account; keep mapping them to ICE to preserve behavior.
-    aliases: ["ice", "up ice", "ungkanawin", "academy"],
+    // Only ICE's own accounts. Do NOT alias "academy"/"ungkanawin" here — "Uplevel
+    // Academy" is the STORE account (uplevel.ad) and "Narawit Ungkanawin" is a separate
+    // person; mapping them to ICE polluted ICE's clock-in with store-account logins.
+    aliases: ["ice", "up ice"],
     branch: "bangkae"
   },
   {
