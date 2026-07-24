@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { storehubStocktakesUrl, weeklyStockSleevePhase } from "../../../lib/weekly-stock-workflow.ts";
+import { monthlyStockSinglePhase } from "../../../lib/monthly-stock-single-workflow.ts";
 
 const manualMedia: Record<string, {
   src: string;
@@ -223,6 +224,65 @@ export default function TrainingPage() {
                 <div>
                   <h4>สิ่งที่ต้องระวัง</h4>
                   <p>{weeklyStockSleevePhase.caution}</p>
+                </div>
+              </section>
+
+              <section>
+                <h4>ระบบที่เกี่ยวข้อง</h4>
+                <ul>
+                  <li>
+                    <a href={storehubStocktakesUrl} target="_blank" rel="noreferrer">StoreHub Stock Take</a>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <article
+          id={monthlyStockSinglePhase.id}
+          className={`training-card wi-manual phase-${monthlyStockSinglePhase.category}`}
+        >
+          <div className="workflow-card-head">
+            <span className="phase-icon">{monthlyStockSinglePhase.icon}</span>
+            <div>
+              <p className="eyebrow">WI-M1 · {monthlyStockSinglePhase.timeLabel}</p>
+              <h3>{monthlyStockSinglePhase.title}</h3>
+            </div>
+          </div>
+
+          <div className="wi-manual-body">
+            <div className="wi-content">
+              <section className="wi-summary-grid">
+                <div>
+                  <h4>วัตถุประสงค์</h4>
+                  <p>{monthlyStockSinglePhase.goal}</p>
+                </div>
+                <div>
+                  <h4>ขอบเขต / เวลา</h4>
+                  <p>{monthlyStockSinglePhase.timeLabel}</p>
+                </div>
+              </section>
+
+              <section>
+                <h4>จุดตรวจใน Checklist</h4>
+                <ul>
+                  {monthlyStockSinglePhase.checklist.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </section>
+
+              <section className="wi-summary-grid">
+                <div>
+                  <h4>หลักฐานที่ต้องแนบ</h4>
+                  <ul>
+                    <li>รูป Binder / ตู้ / กล่อง Stock ก่อนเริ่มนับ และแคปหน้า StoreHub</li>
+                    <li>รูปหลังนับ / จัดเข้าที่ ของการ์ดมูลค่าสูงหรือรายการที่ไม่ตรง</li>
+                    <li>สรุปรายการ +/- พร้อมสาเหตุและรายการที่ต้องให้หัวหน้าตรวจ</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4>สิ่งที่ต้องระวัง</h4>
+                  <p>{monthlyStockSinglePhase.caution}</p>
                 </div>
               </section>
 

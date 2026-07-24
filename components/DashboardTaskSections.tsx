@@ -225,7 +225,7 @@ export function DashboardTaskSections({
                 <em>ยังไม่เริ่ม · 0/{weeklyStockTasks.length}</em>
               </div>
             </a>
-            <a href="#stock-monthly" className="daily-phase-card workflow-status-white" id="stock-monthly">
+            <a href="/checklist-monthly#stock-single-card-work" className="daily-phase-card workflow-status-white" id="stock-monthly">
               <span>03</span>
               <div>
                 <small>{stockWorkSummaryCards[2].kicker}</small>
