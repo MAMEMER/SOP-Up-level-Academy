@@ -11,6 +11,7 @@ import {
   type ShiftCode
 } from "../lib/shift-schedule.ts";
 import { generateMonthPlan } from "../lib/shift-auto.ts";
+import { gamePresets, gamePreset, datesForWeekday, holidayName } from "../lib/planner-activities.ts";
 import {
   loadMonthPlan,
   savePlanCell,
@@ -97,7 +98,7 @@ export function ShiftPlanner({
 }) {
   const [month, setMonth] = useState(currentMonth);
   const [plans, setPlans] = useState<Record<string, CellValue>>({});
-  const [events, setEvents] = useState<Record<string, string>>({});
+  const [events, setEvents] = useState<Record<string, { title: string; game?: string; time?: string }>>({});
   const [actuals, setActuals] = useState<Record<string, ActualDoc>>({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -106,6 +107,9 @@ export function ShiftPlanner({
   const [autoDaysOff, setAutoDaysOff] = useState<Record<string, number[]>>({});
   const [autoStart, setAutoStart] = useState<Record<string, ShiftCode | "">>({});
   const [autoBusy, setAutoBusy] = useState(false);
+  const [presetGame, setPresetGame] = useState(gamePresets[0].key);
+  const [presetWeekday, setPresetWeekday] = useState(2); // Tue default
+  const [presetTime, setPresetTime] = useState("19:00");
 
   const dates = useMemo(() => monthDates(month), [month]);
 
@@ -120,8 +124,8 @@ export function ShiftPlanner({
         for (const plan of data.plans as PlanDoc[]) {
           planMap[cellKey(plan.workDate, plan.staffCode)] = { assignment: plan.assignment, startTime: plan.startTime };
         }
-        const eventMap: Record<string, string> = {};
-        for (const ev of data.events as EventDoc[]) eventMap[ev.workDate] = ev.title;
+        const eventMap: Record<string, { title: string; game?: string; time?: string }> = {};
+        for (const ev of data.events as EventDoc[]) eventMap[ev.workDate] = { title: ev.title, game: ev.game, time: ev.time };
         const actualMap: Record<string, ActualDoc> = {};
         for (const actual of data.actuals) actualMap[cellKey(actual.workDate, actual.staffCode)] = actual;
         setPlans(planMap);
@@ -164,11 +168,33 @@ export function ShiftPlanner({
 
   async function onEventBlur(workDate: string, title: string) {
     const trimmed = title.trim();
-    setEvents((prev) => ({ ...prev, [workDate]: trimmed }));
+    const existing = events[workDate];
+    setEvents((prev) => ({ ...prev, [workDate]: { ...prev[workDate], title: trimmed } }));
     try {
-      await saveDayEvent({ branch, workDate, title: trimmed, updatedBy: plannedBy });
+      await saveDayEvent({ branch, workDate, title: trimmed, game: existing?.game, time: existing?.time, updatedBy: plannedBy });
     } catch {
       setError("บันทึกกิจกรรมไม่สำเร็จ");
+    }
+  }
+
+  // Recurring activity preset: e.g. every Tuesday = Pokémon 19:00 → stamps the event
+  // (with a game logo) on every matching weekday of the month.
+  async function applyActivityPreset(gameKey: string, weekday: number, time: string) {
+    const preset = gamePresets.find((g) => g.key === gameKey);
+    if (!preset) return;
+    const targetDates = datesForWeekday(month, weekday);
+    setError(null);
+    setEvents((prev) => {
+      const next = { ...prev };
+      for (const d of targetDates) next[d] = { title: preset.label, game: preset.key, time };
+      return next;
+    });
+    try {
+      await Promise.all(
+        targetDates.map((d) => saveDayEvent({ branch, workDate: d, title: preset.label, game: preset.key, time, updatedBy: plannedBy }))
+      );
+    } catch {
+      setError("ลงกิจกรรมไม่สำเร็จ");
     }
   }
 
@@ -242,6 +268,25 @@ export function ShiftPlanner({
         </div>
       </header>
 
+      <div className="shift-planner__preset-bar">
+        <span className="shift-planner__preset-label">ลงกิจกรรมประจำ:</span>
+        <select value={presetGame} onChange={(e) => setPresetGame(e.target.value)}>
+          {gamePresets.map((g) => (
+            <option key={g.key} value={g.key}>{g.label}</option>
+          ))}
+        </select>
+        <span>ทุก</span>
+        <select value={presetWeekday} onChange={(e) => setPresetWeekday(Number(e.target.value))}>
+          {WEEKDAY_TH.map((w, wd) => (
+            <option key={wd} value={wd}>{w}</option>
+          ))}
+        </select>
+        <input type="time" value={presetTime} onChange={(e) => setPresetTime(e.target.value)} />
+        <button type="button" className="shift-planner__preset-apply" onClick={() => applyActivityPreset(presetGame, presetWeekday, presetTime)}>
+          ลงทั้งเดือน
+        </button>
+      </div>
+
       {showAuto ? (
         <section className="shift-auto">
           <p className="shift-auto__title">จัดกะอัตโนมัติเดือน {month} — ตั้งวันหยุดประจำ + กะเริ่ม แล้วกดจัดให้ทีเดียว (ปรับเองทีหลังได้)</p>
@@ -304,26 +349,37 @@ export function ShiftPlanner({
             <thead>
               <tr>
                 <th className="shift-planner__sticky">พนักงาน</th>
-                {dates.map((date) => (
-                  <th key={date} className={understaffedDates.has(date) ? "shift-planner__day shift-planner__day--warn" : "shift-planner__day"}>
-                    <span className="shift-planner__daynum">{Number(date.slice(-2))}</span>
-                    <span className="shift-planner__weekday">{weekdayLabel(date)}</span>
-                  </th>
-                ))}
+                {dates.map((date) => {
+                  const holiday = holidayName(date);
+                  return (
+                    <th key={date} className={`${understaffedDates.has(date) ? "shift-planner__day shift-planner__day--warn" : "shift-planner__day"}${holiday ? " shift-planner__day--holiday" : ""}`}>
+                      <span className="shift-planner__daynum">{Number(date.slice(-2))}</span>
+                      <span className="shift-planner__weekday">{weekdayLabel(date)}</span>
+                      {holiday ? <span className="shift-planner__holiday" title={holiday}>{holiday}</span> : null}
+                    </th>
+                  );
+                })}
                 <th className="shift-planner__summary-head">สรุป</th>
               </tr>
               <tr>
                 <th className="shift-planner__sticky shift-planner__event-label">กิจกรรม</th>
-                {dates.map((date) => (
-                  <th key={date} className="shift-planner__event-cell">
-                    <input
-                      defaultValue={events[date] ?? ""}
-                      placeholder="—"
-                      onBlur={(e) => onEventBlur(date, e.target.value)}
-                      aria-label={`กิจกรรมวันที่ ${date}`}
-                    />
-                  </th>
-                ))}
+                {dates.map((date) => {
+                  const ev = events[date];
+                  const preset = gamePreset(ev?.game);
+                  return (
+                    <th key={date} className="shift-planner__event-cell">
+                      {preset ? <img className="shift-planner__game-logo" src={preset.logo} alt={preset.label} title={`${preset.label}${ev?.time ? ` ${ev.time}` : ""}`} /> : null}
+                      <input
+                        value={ev?.title ?? ""}
+                        placeholder="—"
+                        onChange={(e) => setEvents((prev) => ({ ...prev, [date]: { ...prev[date], title: e.target.value } }))}
+                        onBlur={(e) => onEventBlur(date, e.target.value)}
+                        aria-label={`กิจกรรมวันที่ ${date}`}
+                      />
+                      {ev?.time ? <span className="shift-planner__event-time">{ev.time}</span> : null}
+                    </th>
+                  );
+                })}
                 <th />
               </tr>
             </thead>

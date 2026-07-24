@@ -60,6 +60,10 @@ export type EventDoc = {
   workDate: string;
   title: string;
   note?: string;
+  /** card-game preset key (planner-activities) → shows a logo on the day */
+  game?: string;
+  /** activity time HH:MM */
+  time?: string;
   updatedAt: string;
   updatedBy: string;
 };
@@ -140,6 +144,8 @@ export async function saveDayEvent(input: {
   workDate: string;
   title: string;
   note?: string;
+  game?: string;
+  time?: string;
   updatedBy: string;
 }): Promise<void> {
   const nowIso = new Date().toISOString();
@@ -149,6 +155,8 @@ export async function saveDayEvent(input: {
     workDate: input.workDate,
     title: input.title,
     ...(input.note ? { note: input.note } : {}),
+    ...(input.game ? { game: input.game } : {}),
+    ...(input.time ? { time: input.time } : {}),
     updatedAt: nowIso,
     updatedBy: input.updatedBy
   };
