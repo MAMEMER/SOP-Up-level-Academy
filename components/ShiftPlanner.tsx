@@ -7,8 +7,10 @@ import {
   shiftEndTime,
   summariseStaff,
   type PlanCell,
-  type ShiftAssignment
+  type ShiftAssignment,
+  type ShiftCode
 } from "../lib/shift-schedule.ts";
+import { generateMonthPlan } from "../lib/shift-auto.ts";
 import {
   loadMonthPlan,
   savePlanCell,
@@ -100,6 +102,10 @@ export function ShiftPlanner({
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAuto, setShowAuto] = useState(false);
+  const [autoDaysOff, setAutoDaysOff] = useState<Record<string, number[]>>({});
+  const [autoStart, setAutoStart] = useState<Record<string, ShiftCode | "">>({});
+  const [autoBusy, setAutoBusy] = useState(false);
 
   const dates = useMemo(() => monthDates(month), [month]);
 
@@ -166,6 +172,47 @@ export function ShiftPlanner({
     }
   }
 
+  function toggleDayOff(code: string, weekday: number) {
+    setAutoDaysOff((prev) => {
+      const current = prev[code] ?? [];
+      const next = current.includes(weekday) ? current.filter((d) => d !== weekday) : [...current, weekday];
+      return { ...prev, [code]: next };
+    });
+  }
+
+  // Generate a whole month in one click, then the owner tweaks by hand. Writes every
+  // cell to Firestore, overwriting the current month's plan.
+  async function applyAuto() {
+    if (!window.confirm(`จัดกะอัตโนมัติทับแผนเดือน ${month} ทั้งหมด? (ปรับเองทีหลังได้)`)) return;
+    setAutoBusy(true);
+    setError(null);
+    try {
+      const cells = generateMonthPlan({
+        month,
+        staff: staff.map((s) => ({
+          code: s.code,
+          daysOff: autoDaysOff[s.code] ?? [],
+          ...(autoStart[s.code] ? { startShift: autoStart[s.code] as ShiftCode } : {})
+        }))
+      });
+      // optimistic local update
+      const nextPlans: Record<string, CellValue> = {};
+      for (const cell of cells) nextPlans[cellKey(cell.workDate, cell.staffCode)] = { assignment: cell.assignment, startTime: cell.startTime };
+      setPlans(nextPlans);
+      // persist all cells
+      await Promise.all(
+        cells.map((cell) =>
+          savePlanCell({ branch, workDate: cell.workDate, staffCode: cell.staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy })
+        )
+      );
+      setShowAuto(false);
+    } catch {
+      setError("จัดกะอัตโนมัติไม่สำเร็จ");
+    } finally {
+      setAutoBusy(false);
+    }
+  }
+
   function actualBadge(workDate: string, staffCode: string): { text: string; tone: string } | null {
     const actual = actuals[cellKey(workDate, staffCode)];
     const plan = plans[cellKey(workDate, staffCode)];
@@ -187,8 +234,53 @@ export function ShiftPlanner({
           <strong>{month}</strong>
           <button type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="เดือนถัดไป">›</button>
         </div>
-        <p className="shift-planner__hint">กะ1 = เปิดร้าน · กะ2 = ปิดร้าน · ทำงาน 9 ชม.เท่ากันทุกกะ</p>
+        <div className="shift-planner__bar-right">
+          <p className="shift-planner__hint">กะ1 = เปิดร้าน · กะ2 = ปิดร้าน · ทำงาน 9 ชม.</p>
+          <button type="button" className="shift-planner__auto-btn" onClick={() => setShowAuto((v) => !v)}>
+            ⚡ จัดกะอัตโนมัติ
+          </button>
+        </div>
       </header>
+
+      {showAuto ? (
+        <section className="shift-auto">
+          <p className="shift-auto__title">จัดกะอัตโนมัติเดือน {month} — ตั้งวันหยุดประจำ + กะเริ่ม แล้วกดจัดให้ทีเดียว (ปรับเองทีหลังได้)</p>
+          <div className="shift-auto__grid">
+            {staff.map((s) => (
+              <div key={s.code} className="shift-auto__row">
+                <span className="shift-auto__name">{s.displayName}</span>
+                <div className="shift-auto__days">
+                  <span className="shift-auto__label">หยุดประจำ:</span>
+                  {WEEKDAY_TH.map((w, wd) => (
+                    <button
+                      key={wd}
+                      type="button"
+                      className={(autoDaysOff[s.code] ?? []).includes(wd) ? "shift-auto__day is-off" : "shift-auto__day"}
+                      onClick={() => toggleDayOff(s.code, wd)}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+                <label className="shift-auto__start">
+                  เริ่ม
+                  <select value={autoStart[s.code] ?? ""} onChange={(e) => setAutoStart((prev) => ({ ...prev, [s.code]: e.target.value as ShiftCode | "" }))}>
+                    <option value="">อัตโนมัติ</option>
+                    <option value="s1">กะ1</option>
+                    <option value="s2">กะ2</option>
+                  </select>
+                </label>
+              </div>
+            ))}
+          </div>
+          <div className="shift-auto__actions">
+            <button type="button" className="primary-action" onClick={applyAuto} disabled={autoBusy}>
+              {autoBusy ? "กำลังจัด…" : "จัดกะทั้งเดือน"}
+            </button>
+            <button type="button" className="btn-soft" onClick={() => setShowAuto(false)}>ยกเลิก</button>
+          </div>
+        </section>
+      ) : null}
 
       {error ? <p className="shift-planner__error">{error}</p> : null}
 

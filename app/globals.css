@@ -4213,3 +4213,20 @@ main .page > section, main > section { margin-top: 16px !important; }
 .evidence-input__link { flex: 1; border: 1px solid rgba(255,199,142,0.5); border-radius: 10px; padding: 8px 11px; font-size: 13px; font-family: inherit; }
 .evidence-input__preview { max-width: 140px; max-height: 100px; border-radius: 8px; border: 1px solid rgba(255,199,142,0.5); object-fit: cover; }
 .evidence-input__error { font-size: 12px; color: #c0392b; }
+
+/* ── Auto shift generator panel ───────────────────────────────────────────── */
+.shift-planner__bar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.shift-planner__auto-btn { border: 1px solid var(--color-orange); background: rgba(255,140,66,0.1); color: var(--color-orange); border-radius: 999px; padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.shift-planner__auto-btn:hover { background: var(--color-orange); color: #fff; }
+.shift-auto { background: #fff; border: 1px solid rgba(255,199,142,0.5); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.shift-auto__title { font-size: 13px; color: var(--color-ink-soft); margin: 0 0 12px; }
+.shift-auto__grid { display: flex; flex-direction: column; gap: 10px; }
+.shift-auto__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.shift-auto__name { font-weight: 600; min-width: 70px; }
+.shift-auto__days { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.shift-auto__label { font-size: 12px; color: var(--color-ink-soft); margin-right: 2px; }
+.shift-auto__day { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,199,142,0.5); background: #fff; font-size: 12px; cursor: pointer; color: var(--color-ink-soft); }
+.shift-auto__day.is-off { background: rgba(255,205,210,0.6); border-color: #e88; color: #b0343f; font-weight: 600; }
+.shift-auto__start { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-ink-soft); }
+.shift-auto__start select { border: 1px solid rgba(255,199,142,0.5); border-radius: 8px; padding: 5px 8px; font-family: inherit; }
+.shift-auto__actions { display: flex; gap: 10px; margin-top: 14px; }
