@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
+import { weeklyStockSleevePhase } from "../lib/weekly-stock-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import {
   canPersistWorkflowRecords,
@@ -38,11 +39,6 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   late_one_day: "workflow-status-orange",
   not_finished: "workflow-status-red"
 };
-
-const weeklyStockTasks = [
-  { id: "weekly-stock-sleeve-accessories", name: "Sleeve / อุปกรณ์ทั้งหมด", schedule: "อังคาร", weekday: "Tue", shiftIds: ["morning"] },
-  { id: "weekly-stock-booster-box", name: "Booster box / Box all cards", schedule: "พุธ", weekday: "Wed", shiftIds: ["morning"] }
-];
 
 const weeklyEventTasks = [
   { id: "weekly-event-tournament", name: "Tournament", schedule: "สัปดาห์สุดท้ายของเดือน", shiftIds: ["morning", "afternoon"] },
@@ -222,7 +218,7 @@ export function DashboardTaskSections({
               <div>
                 <small>{stockWorkSummaryCards[1].kicker}</small>
                 <strong>{stockWorkSummaryCards[1].title}</strong>
-                <em>ยังไม่เริ่ม · 0/{weeklyStockTasks.length}</em>
+                <em>ยังไม่เริ่ม · 0/{weeklyStockSleevePhase.checklist.length}</em>
               </div>
             </a>
             <a href="/checklist-monthly#stock-single-card-work" className="daily-phase-card workflow-status-white" id="stock-monthly">
