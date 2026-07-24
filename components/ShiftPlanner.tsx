@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   SHIFT_START_OPTIONS,
   auditPlan,
-  shiftEndTime,
   summariseStaff,
   type PlanCell,
   type ShiftAssignment,
@@ -114,6 +113,7 @@ export function ShiftPlanner({
   const [presetTime, setPresetTime] = useState("19:00");
   const [reloadNonce, setReloadNonce] = useState(0);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [density, setDensity] = useState<"compact" | "normal" | "large">("normal");
 
   const dates = useMemo(() => monthDates(month), [month]);
 
@@ -315,8 +315,17 @@ export function ShiftPlanner({
           <button type="button" className="shift-planner__auto-btn" onClick={syncClockIn}>
             ดึง clock-in StoreHub
           </button>
+          <div className="shift-planner__density">
+            <span>ขนาด</span>
+            {(["compact", "normal", "large"] as const).map((d) => (
+              <button key={d} type="button" className={density === d ? "is-active" : ""} onClick={() => setDensity(d)}>
+                {d === "compact" ? "เล็ก" : d === "normal" ? "ปกติ" : "ใหญ่"}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
+      <p className="shift-planner__autosave-note">บันทึกอัตโนมัติทุกการแก้ไข</p>
 
       {syncMsg ? <p className="shift-planner__sync-msg">{syncMsg}</p> : null}
 
@@ -397,7 +406,7 @@ export function ShiftPlanner({
         <p className="shift-planner__loading">กำลังโหลดตาราง…</p>
       ) : (
         <div className="shift-planner__scroll">
-          <table className="shift-planner__grid">
+          <table className={`shift-planner__grid shift-planner__grid--${density}`}>
             <thead>
               <tr>
                 <th className="shift-planner__sticky">พนักงาน</th>
@@ -475,9 +484,6 @@ export function ShiftPlanner({
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
-                          {working ? (
-                            <span className="shift-planner__end">ออก {shiftEndTime(plans[key]?.startTime ?? "")}</span>
-                          ) : null}
                           {actualStatus === "normal" && actual?.clockIn ? (
                             <span className={`shift-planner__actual shift-planner__actual--${late ? "late" : "ontime"}`}>เข้า {actual.clockIn}</span>
                           ) : null}
