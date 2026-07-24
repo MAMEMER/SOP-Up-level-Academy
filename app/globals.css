@@ -4277,3 +4277,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__grid--large .shift-planner__event-cell input { width: 96px; font-size: 13px; }
 .shift-planner__grid--large .shift-planner__act img { width: 26px; height: 26px; }
 .shift-planner__grid--large .shift-planner__sticky { min-width: 120px; }
+
+.shift-planner__save-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.shift-planner__save-btn { border: 1px solid #8fce9e; background: rgba(184,230,193,0.4); color: #2e7d5b; border-radius: 999px; padding: 6px 18px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.shift-planner__save-btn:hover { background: #8fce9e; color: #fff; }

@@ -240,6 +240,34 @@ export function ShiftPlanner({
     }
   }
 
+  // Manual "save everything" fallback in case an auto-save didn't land. Re-persists the
+  // full current grid: plans, day activities, and any actual leave/absent overrides
+  // (clock-in stays owned by the StoreHub sync).
+  async function saveAll() {
+    setSyncMsg("กำลังบันทึกทั้งหมด…");
+    try {
+      const jobs: Promise<unknown>[] = [];
+      for (const [key, cell] of Object.entries(plans)) {
+        const [workDate, staffCode] = key.split("__");
+        jobs.push(savePlanCell({ branch, workDate, staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy }));
+      }
+      for (const [workDate, day] of Object.entries(events)) {
+        if (day.title || day.activities.length) jobs.push(saveDayEvent({ branch, workDate, title: day.title, activities: day.activities, updatedBy: plannedBy }));
+      }
+      for (const [key, actual] of Object.entries(actuals)) {
+        const status = actual.leaveType === "personal" ? "leave_personal" : actual.leaveType === "sick" ? "leave_sick" : actual.absent ? "absent" : null;
+        if (status) {
+          const [workDate, staffCode] = key.split("__");
+          jobs.push(setActualStatus({ branch, workDate, staffCode, status, updatedBy: plannedBy }));
+        }
+      }
+      await Promise.all(jobs);
+      setSyncMsg(`บันทึกแล้ว ${jobs.length} รายการ`);
+    } catch {
+      setSyncMsg("บันทึกบางส่วนไม่สำเร็จ ลองอีกครั้ง");
+    }
+  }
+
   async function syncClockIn() {
     setSyncMsg("กำลังดึง clock-in จาก StoreHub…");
     try {
@@ -325,7 +353,10 @@ export function ShiftPlanner({
           </div>
         </div>
       </header>
-      <p className="shift-planner__autosave-note">บันทึกอัตโนมัติทุกการแก้ไข</p>
+      <div className="shift-planner__save-bar">
+        <span className="shift-planner__autosave-note">บันทึกอัตโนมัติทุกการแก้ไข</span>
+        <button type="button" className="shift-planner__save-btn" onClick={saveAll}>💾 บันทึกทั้งหมด</button>
+      </div>
 
       {syncMsg ? <p className="shift-planner__sync-msg">{syncMsg}</p> : null}
 
