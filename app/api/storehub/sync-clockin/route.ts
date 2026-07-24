@@ -13,7 +13,10 @@ import { restUpsertDoc } from "../../../../lib/firestore-rest.ts";
 // Vercel cron with the CRON_SECRET.
 async function isAllowed(request: Request): Promise<boolean> {
   const url = new URL(request.url);
-  if (process.env.CRON_SECRET && url.searchParams.get("key") === process.env.CRON_SECRET) return true;
+  const secret = process.env.CRON_SECRET;
+  if (secret && url.searchParams.get("key") === secret) return true;
+  // Vercel Cron sends this header automatically when CRON_SECRET is set.
+  if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
   const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
   if (!cookie) return false;
   const session = await verifySession(cookie);
