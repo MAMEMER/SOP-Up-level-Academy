@@ -477,7 +477,8 @@ export function ShiftPlanner({
                             return (
                               <span key={i} className="shift-planner__act" title={`${preset?.label ?? act.game}${act.time ? ` ${act.time}` : ""}`}>
                                 {preset ? <img src={preset.logo} alt={preset.label} /> : null}
-                                <small>{act.time}</small>
+                                <span className="shift-planner__act-name">{preset?.label ?? act.game}</span>
+                                {act.time ? <span className="shift-planner__act-time">{act.time}</span> : null}
                                 <button type="button" onClick={() => removeActivity(date, i)} aria-label="ลบ">×</button>
                               </span>
                             );
@@ -504,10 +505,12 @@ export function ShiftPlanner({
                 const color = STAFF_COLORS[staffIndex % STAFF_COLORS.length];
                 return (
                   <tr key={entry.code} style={{ ["--staff-color" as string]: color }}>
-                    <th className="shift-planner__sticky shift-planner__staff" style={{ borderLeft: `5px solid ${color}` }}>
-                      <span className="shift-planner__staff-dot" style={{ background: color }} />
-                      <span className="shift-planner__staff-name" style={{ color }}>{entry.displayName}</span>
-                      <span className="shift-planner__staff-type">{entry.employmentType === "full_time" ? "Full" : "Part"}</span>
+                    <th className="shift-planner__sticky shift-planner__staff">
+                      <span className="shift-planner__staff-chip" style={{ borderColor: color, background: `${color}1a` }}>
+                        <span className="shift-planner__staff-dot" style={{ background: color }} />
+                        <span className="shift-planner__staff-name" style={{ color }}>{entry.displayName}</span>
+                        <span className="shift-planner__staff-type">{entry.employmentType === "full_time" ? "Full" : "Part"}</span>
+                      </span>
                     </th>
                     {dates.map((date) => {
                       const key = cellKey(date, entry.code);

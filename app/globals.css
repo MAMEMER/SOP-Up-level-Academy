@@ -4318,3 +4318,21 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__staff { flex-flow: row wrap; align-items: center; gap: 4px; padding-left: 4px; }
 .shift-planner__staff-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 .shift-planner__staff-name { font-size: 13px; }
+
+/* activity chips: stack vertically, show full game name per line */
+.shift-planner__acts { flex-direction: column; gap: 2px; align-items: stretch; }
+.shift-planner__act { display: flex; align-items: center; gap: 3px; background: rgba(184,176,255,0.16); border-radius: 5px; padding: 1px 3px; }
+.shift-planner__act img { width: 14px; height: 14px; flex: 0 0 auto; }
+.shift-planner__act-name { font-size: 9px; font-weight: 600; color: var(--color-ink); flex: 1; text-align: left; line-height: 1.15; }
+.shift-planner__act-time { font-size: 8.5px; color: #6a5acd; flex: 0 0 auto; }
+.shift-planner__act button { border: none; background: transparent; color: #b0343f; font-size: 11px; cursor: pointer; padding: 0 1px; line-height: 1; flex: 0 0 auto; }
+.shift-planner__event-cell { min-width: 92px; }
+.shift-planner__grid--large .shift-planner__act-name { font-size: 12px; }
+.shift-planner__grid--large .shift-planner__act img { width: 20px; height: 20px; }
+
+/* staff name = colored chip (th stays table-cell so the sticky column stays aligned) */
+.shift-planner__staff { text-align: left; padding: 4px 6px !important; }
+.shift-planner__staff-chip { display: inline-flex; align-items: center; gap: 5px; border: 2px solid; border-radius: 999px; padding: 3px 10px; }
+.shift-planner__staff-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.shift-planner__staff-name { font-size: 13px; font-weight: 700; }
+.shift-planner__staff-type { font-size: 10px; color: var(--color-ink-soft); }
