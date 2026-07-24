@@ -4,14 +4,14 @@ import { DashboardTaskSections } from "../../components/DashboardTaskSections.ts
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
-import { assignedWorkRecordsForDate, readPerformanceDailyStore } from "../../lib/performance-service-records.ts";
+import { assignedWorkRecordsForDate, fetchPerformanceDailyStore } from "../../lib/performance-service-records.ts";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
 import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 
 export default async function HomePage() {
   const user = await requireUser();
   const workDate = formatWorkDate();
-  const dailyStore = readPerformanceDailyStore();
+  const dailyStore = await fetchPerformanceDailyStore();
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate);
   const staffCode = resolveEmployeeByEmail(user.email);
 

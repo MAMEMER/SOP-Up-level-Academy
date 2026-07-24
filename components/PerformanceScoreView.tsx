@@ -12,7 +12,7 @@ import {
 import {
   assignedWorkRecordsForDate,
   customerServiceRecordsForDate,
-  readPerformanceDailyStore,
+  fetchPerformanceDailyStore,
   saveAssignedWorkRecord,
   saveCustomerServiceRecord
 } from "../lib/performance-service-records.ts";
@@ -147,7 +147,7 @@ async function saveComplaintServiceAction(formData: FormData) {
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
   let inputStatus: "service-saved" | "service-error" = "service-saved";
   try {
-    saveCustomerServiceRecord({
+    await saveCustomerServiceRecord({
       workDate: stringValue(formData, "serviceDate"),
       employeeName: stringValue(formData, "employeeName"),
       bucket: serviceBucket(stringValue(formData, "bucket")),
@@ -169,7 +169,7 @@ async function saveAssignedWorkAction(formData: FormData) {
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
   const title = stringValue(formData, "assignedTitle");
   if (title) {
-    saveAssignedWorkRecord({
+    await saveAssignedWorkRecord({
       workDate: stringValue(formData, "assignedDate"),
       employeeName: stringValue(formData, "employeeName"),
       title,
@@ -216,13 +216,13 @@ async function uploadCsvSourceAction(formData: FormData) {
 export async function PerformanceScoreView({ searchParams, basePath = "/admin/performance-score", showAdminBackLink = false, isOwner = false }: PerformanceScoreViewProps) {
   const params = searchParams ? await searchParams : {};
   const activePeriod = resolvePeriod(params);
-  const rows = activePeriod.id === "custom" ? getPerformanceScoreRowsForRange(activePeriod) : getPerformanceScoreRows(activePeriod.id);
+  const dailyStore = await fetchPerformanceDailyStore();
+  const rows = activePeriod.id === "custom" ? getPerformanceScoreRowsForRange(activePeriod, dailyStore) : getPerformanceScoreRows(activePeriod.id, dailyStore);
   const summary = getPerformanceSummary(rows);
   const activeSourceDetail = getPerformanceSourceDetail(params.source || "");
   const redirectTo = `${basePath}?startDate=${activePeriod.startDate}&endDate=${activePeriod.endDate}${params.source ? `&source=${params.source}` : ""}`;
   const inputStatus = params.inputStatus;
   const entryDate = activePeriod.endDate;
-  const dailyStore = readPerformanceDailyStore();
   const sourceFiles = readPerformanceSourceFiles();
   const periodShortcuts = quickPeriodLinks(basePath, params.source);
   const serviceRecordsForDay = customerServiceRecordsForDate(dailyStore.serviceRecords, entryDate);

@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import type { AssignedWork, ServiceEvent } from "./performance-score.ts";
+import { restListCollection, restUpsertDoc } from "./firestore-rest.ts";
+
+const SERVICE_COLLECTION = "sop_service_records";
+const ASSIGNED_COLLECTION = "sop_assigned_records";
 
 export type CustomerServiceRecord = {
   id: string;
@@ -35,9 +37,6 @@ export type PerformanceDailyStore = {
   serviceRecords: CustomerServiceRecord[];
   assignedWorkRecords: AssignedWorkRecord[];
 };
-
-const emptyStore: PerformanceDailyStore = { serviceRecords: [], assignedWorkRecords: [] };
-const storePath = join(process.cwd(), ".data", "performance-daily-records.json");
 
 function recordId(prefix: string, input: { workDate: string; employeeName: string }, recordedAt: string) {
   return `${prefix}-${input.workDate}-${input.employeeName}-${recordedAt}`.replace(/[^a-zA-Z0-9-]/g, "-");
@@ -114,34 +113,43 @@ export function assignedWorkRecordsToWorks(
     .sort((left, right) => `${left.employeeName}:${left.work.title}`.localeCompare(`${right.employeeName}:${right.work.title}`));
 }
 
-export function readPerformanceDailyStore(): PerformanceDailyStore {
-  if (!existsSync(storePath)) return emptyStore;
-  try {
-    const parsed = JSON.parse(readFileSync(storePath, "utf8"));
-    return {
-      serviceRecords: Array.isArray(parsed.serviceRecords) ? parsed.serviceRecords : [],
-      assignedWorkRecords: Array.isArray(parsed.assignedWorkRecords) ? parsed.assignedWorkRecords : []
-    };
-  } catch {
-    return emptyStore;
-  }
+// Records now persist in Firestore (sop_service_records / sop_assigned_records) so
+// they survive Vercel cold starts — the old local-JSON store was ephemeral there.
+export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStore> {
+  const [serviceRecords, assignedWorkRecords] = await Promise.all([
+    restListCollection<CustomerServiceRecord>(SERVICE_COLLECTION),
+    restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION)
+  ]);
+  return { serviceRecords, assignedWorkRecords };
 }
 
-export function writePerformanceDailyStore(store: PerformanceDailyStore) {
-  mkdirSync(dirname(storePath), { recursive: true });
-  writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+export async function saveCustomerServiceRecord(input: CustomerServiceRecordInput) {
+  const record = addCustomerServiceRecord([], input)[0];
+  await restUpsertDoc(SERVICE_COLLECTION, record.id, {
+    id: record.id,
+    workDate: record.workDate,
+    employeeName: record.employeeName,
+    bucket: record.bucket,
+    severity: record.severity,
+    count: record.count,
+    note: record.note,
+    evidence: record.evidence,
+    recordedAt: record.recordedAt
+  });
+  return record;
 }
 
-export function saveCustomerServiceRecord(input: CustomerServiceRecordInput) {
-  const store = readPerformanceDailyStore();
-  const next = { ...store, serviceRecords: addCustomerServiceRecord(store.serviceRecords, input) };
-  writePerformanceDailyStore(next);
-  return next;
-}
-
-export function saveAssignedWorkRecord(input: AssignedWorkRecordInput) {
-  const store = readPerformanceDailyStore();
-  const next = { ...store, assignedWorkRecords: addAssignedWorkRecord(store.assignedWorkRecords, input) };
-  writePerformanceDailyStore(next);
-  return next;
+export async function saveAssignedWorkRecord(input: AssignedWorkRecordInput) {
+  const record = addAssignedWorkRecord([], input)[0];
+  await restUpsertDoc(ASSIGNED_COLLECTION, record.id, {
+    id: record.id,
+    workDate: record.workDate,
+    employeeName: record.employeeName,
+    title: record.title,
+    status: record.status,
+    note: record.note,
+    evidence: record.evidence,
+    recordedAt: record.recordedAt
+  });
+  return record;
 }

@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   assignedWorkRecordsToWorks,
   customerServiceRecordsToEvents,
-  readPerformanceDailyStore
+  type PerformanceDailyStore
 } from "./performance-service-records.ts";
 import { monthlyPerformanceSourceFolder, readPerformanceSourceFiles } from "./performance-source-files.ts";
 import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "./storehub-stocktake-export.ts";
@@ -421,14 +421,13 @@ function inYear(date: string, year: string) {
   return date.startsWith(`${year}-`);
 }
 
-export function getPerformanceScoreRows(periodId: PerformanceReviewPeriod["id"]): EmployeePerformanceScore[] {
+export function getPerformanceScoreRows(periodId: PerformanceReviewPeriod["id"], dailyStore: PerformanceDailyStore): EmployeePerformanceScore[] {
   const period = performanceReviewPeriods.find((item) => item.id === periodId) || performanceReviewPeriods[0];
-  return getPerformanceScoreRowsForRange(period);
+  return getPerformanceScoreRowsForRange(period, dailyStore);
 }
 
-export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod): EmployeePerformanceScore[] {
+export function getPerformanceScoreRowsForRange(period: PerformanceReviewPeriod, dailyStore: PerformanceDailyStore): EmployeePerformanceScore[] {
   const year = period.startDate.slice(0, 4);
-  const dailyStore = readPerformanceDailyStore();
   const serviceEventsFromRecords = customerServiceRecordsToEvents(dailyStore.serviceRecords.filter((record) => inPeriod(record.workDate, period)));
   const assignedWorksFromRecords = assignedWorkRecordsToWorks(dailyStore.assignedWorkRecords.filter((record) => inPeriod(record.workDate, period)), {
     teamAssigneeName: bangkaeTeamAssigneeName,

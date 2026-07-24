@@ -37,6 +37,8 @@ import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "../
 import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "../lib/storehub-timesheet-export.ts";
 import { resolveMonthlyPerformanceSourceFiles } from "../lib/performance-source-files.ts";
 
+const EMPTY_DAILY_STORE = { serviceRecords: [], assignedWorkRecords: [] };
+
 const schedule = {
   employeeName: "ICE",
   workDate: "2026-07-01",
@@ -621,7 +623,7 @@ describe("performance score engine", () => {
     const period = performanceReviewPeriods.find((item) => item.id === "july-to-date");
     assert.ok(period);
 
-    const rows = getPerformanceScoreRows(period.id);
+    const rows = getPerformanceScoreRows(period.id, EMPTY_DAILY_STORE);
     const ice = rows.find((row) => row.employeeName === "ICE");
     const boom = rows.find((row) => row.employeeName === "Boom");
     const leo = rows.find((row) => row.employeeName === "Leo");
@@ -650,7 +652,7 @@ describe("performance score engine", () => {
   });
 
   it("does not deduct previous half-month checklist without verified missing checklist data", () => {
-    const rows = getPerformanceScoreRows("previous-half-month");
+    const rows = getPerformanceScoreRows("previous-half-month", EMPTY_DAILY_STORE);
     const ice = rows.find((row) => row.employeeName === "ICE");
 
     assert.ok(ice);
@@ -660,7 +662,7 @@ describe("performance score engine", () => {
 
   // re-verify on data machine: attendance detail depends on StoreHub Timesheets CSV (not in repo).
   it.skip("calculates score rows for a custom date range", () => {
-    const rows = getPerformanceScoreRowsForRange({ id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-03" });
+    const rows = getPerformanceScoreRowsForRange({ id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-03" }, EMPTY_DAILY_STORE);
     const ice = rows.find((row) => row.employeeName === "ICE");
 
     assert.ok(ice);
@@ -670,7 +672,7 @@ describe("performance score engine", () => {
   });
 
   it("summarizes Boom annual sick leave only on scheduled work days", () => {
-    const julyRows = getPerformanceScoreRowsForRange({ id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-03" });
+    const julyRows = getPerformanceScoreRowsForRange({ id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-03" }, EMPTY_DAILY_STORE);
     const julyBoom = julyRows.find((row) => row.employeeName === "Boom");
     assert.ok(julyBoom);
     assert.equal(julyBoom.leaveSummary.sickUsed, 9);
@@ -679,7 +681,7 @@ describe("performance score engine", () => {
       ["2026-06-25", "2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06"]
     );
 
-    const previousRows = getPerformanceScoreRows("previous-half-month");
+    const previousRows = getPerformanceScoreRows("previous-half-month", EMPTY_DAILY_STORE);
     const previousBoom = previousRows.find((row) => row.employeeName === "Boom");
     assert.ok(previousBoom);
     assert.equal(previousBoom.leaveSummary.sickUsed, 9);
@@ -778,7 +780,7 @@ describe("performance score engine", () => {
     assert.equal(source.includes("withInputStatus"), true);
     assert.equal(source.includes("service-saved"), true);
     assert.equal(source.includes("service-error"), true);
-    assert.equal(source.includes("try {\n    saveCustomerServiceRecord"), true);
+    assert.equal(source.includes("try {\n    await saveCustomerServiceRecord"), true);
     assert.equal(source.includes("catch"), true);
   });
 
