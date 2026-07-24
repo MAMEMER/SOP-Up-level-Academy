@@ -508,8 +508,8 @@ export function ShiftPlanner({
                 const color = STAFF_COLORS[staffIndex % STAFF_COLORS.length];
                 return (
                   <tr key={entry.code} style={{ ["--staff-color" as string]: color }}>
-                    <th className="shift-planner__sticky shift-planner__staff">
-                      <span className="shift-planner__staff-chip" style={{ borderColor: color, background: `${color}1a` }}>
+                    <th className="shift-planner__sticky shift-planner__staff" style={{ background: `color-mix(in srgb, ${color} 12%, #fff)` }}>
+                      <span className="shift-planner__staff-chip" style={{ borderColor: color, background: "#fff" }}>
                         <span className="shift-planner__staff-dot" style={{ background: color }} />
                         <span className="shift-planner__staff-name" style={{ color }}>{entry.displayName}</span>
                         <span className="shift-planner__staff-type">{entry.employmentType === "full_time" ? "Full" : "Part"}</span>

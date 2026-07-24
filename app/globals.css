@@ -4049,7 +4049,8 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__issue--understaffed { background: rgba(255,205,210,0.5); color: #b0343f; }
 .shift-planner__issue--shift_imbalance { background: rgba(255,199,142,0.28); color: #a85a1a; }
 
-.shift-planner__scroll { overflow-x: auto; border: 1px solid rgba(255,199,142,0.4); border-radius: 14px; background: #fff; }
+.shift-planner__scroll { overflow-x: auto; border: 1px solid rgba(255,199,142,0.4); border-radius: 14px; background: #fff; padding-bottom: 16px; }
+.shift-planner__grid tfoot td, .shift-planner__grid tfoot th { padding-bottom: 8px; }
 .shift-planner__grid { border-collapse: separate; border-spacing: 0; font-size: 12px; }
 .shift-planner__grid th, .shift-planner__grid td { padding: 3px 4px; text-align: center; vertical-align: top; border-bottom: 1px solid rgba(255,199,142,0.25); border-right: 1px solid rgba(255,199,142,0.18); }
 .shift-planner__sticky { position: sticky; left: 0; z-index: 3; background: #fff; text-align: left; min-width: 96px; vertical-align: middle; box-shadow: 2px 0 4px rgba(0,0,0,0.08); }
