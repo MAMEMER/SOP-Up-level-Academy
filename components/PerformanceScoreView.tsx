@@ -17,6 +17,7 @@ import {
   saveCustomerServiceRecord
 } from "../lib/performance-service-records.ts";
 import { readPerformanceSourceFiles, savePerformanceSourceFilePath, saveUploadedPerformanceCsv } from "../lib/performance-source-files.ts";
+import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
 
 type PageProps = {
   searchParams?: Promise<{ period?: string; startDate?: string; endDate?: string; source?: string; inputStatus?: string }>;
@@ -382,7 +383,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label className="wide">
               หลักฐาน (รูป/ลิงก์)
-              <input name="serviceEvidence" placeholder="วางลิงก์รูป/แชท หรือโน้ตอ้างอิงหลักฐาน" />
+              <EvidenceImageInput name="serviceEvidence" />
             </label>
             <button type="submit">บันทึกเหตุการณ์</button>
           </form>
@@ -438,7 +439,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label className="wide">
               หลักฐาน (รูป/ลิงก์)
-              <input name="assignedEvidence" placeholder="วางลิงก์งาน/รูปผลลัพธ์ หรือโน้ตอ้างอิงหลักฐาน" />
+              <EvidenceImageInput name="assignedEvidence" />
             </label>
             <button type="submit">บันทึกงานที่มอบหมาย</button>
           </form>

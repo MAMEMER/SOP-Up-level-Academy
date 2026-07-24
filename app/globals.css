@@ -4204,3 +4204,12 @@ main .page > section, main > section { margin-top: 16px !important; }
 .staff-review__as-note strong { color: var(--color-ink); }
 
 .auth-error { color: #c0392b; font-size: 13px; margin: 10px 0 0; }
+
+/* ── Evidence image input (performance form) ──────────────────────────────── */
+.evidence-input { display: flex; flex-direction: column; gap: 6px; }
+.evidence-input__row { display: flex; gap: 8px; align-items: stretch; }
+.evidence-input__file { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px dashed rgba(255,140,66,0.6); color: var(--color-orange); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; white-space: nowrap; background: rgba(255,140,66,0.06); }
+.evidence-input__file input { display: none; }
+.evidence-input__link { flex: 1; border: 1px solid rgba(255,199,142,0.5); border-radius: 10px; padding: 8px 11px; font-size: 13px; font-family: inherit; }
+.evidence-input__preview { max-width: 140px; max-height: 100px; border-radius: 8px; border: 1px solid rgba(255,199,142,0.5); object-fit: cover; }
+.evidence-input__error { font-size: 12px; color: #c0392b; }
