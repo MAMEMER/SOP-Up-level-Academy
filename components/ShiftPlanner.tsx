@@ -110,6 +110,8 @@ export function ShiftPlanner({
   const [presetGame, setPresetGame] = useState(gamePresets[0].key);
   const [presetWeekday, setPresetWeekday] = useState(2); // Tue default
   const [presetTime, setPresetTime] = useState("19:00");
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const dates = useMemo(() => monthDates(month), [month]);
 
@@ -137,7 +139,7 @@ export function ShiftPlanner({
     return () => {
       alive = false;
     };
-  }, [branch, month]);
+  }, [branch, month, reloadNonce]);
 
   const planCells: PlanCell[] = useMemo(
     () =>
@@ -195,6 +197,24 @@ export function ShiftPlanner({
       );
     } catch {
       setError("ลงกิจกรรมไม่สำเร็จ");
+    }
+  }
+
+  async function syncClockIn() {
+    setSyncMsg("กำลังดึง clock-in จาก StoreHub…");
+    try {
+      const res = await fetch(`/api/storehub/sync-clockin?month=${month}&branch=${branch}`);
+      const data = await res.json();
+      if (res.ok) {
+        setSyncMsg(`ดึง clock-in สำเร็จ ${data.synced} รายการ`);
+        setReloadNonce((n) => n + 1);
+      } else if (res.status === 503) {
+        setSyncMsg("StoreHub ยังไม่ได้ตั้งค่า (env)");
+      } else {
+        setSyncMsg("ดึงไม่สำเร็จ");
+      }
+    } catch {
+      setSyncMsg("ดึงไม่สำเร็จ");
     }
   }
 
@@ -265,8 +285,13 @@ export function ShiftPlanner({
           <button type="button" className="shift-planner__auto-btn" onClick={() => setShowAuto((v) => !v)}>
             ⚡ จัดกะอัตโนมัติ
           </button>
+          <button type="button" className="shift-planner__auto-btn" onClick={syncClockIn}>
+            ดึง clock-in StoreHub
+          </button>
         </div>
       </header>
+
+      {syncMsg ? <p className="shift-planner__sync-msg">{syncMsg}</p> : null}
 
       <div className="shift-planner__preset-bar">
         <span className="shift-planner__preset-label">ลงกิจกรรมประจำ:</span>

@@ -64,13 +64,21 @@ export async function restListCollection<T>(collection: string): Promise<T[]> {
   return docs;
 }
 
-/** Upserts a document by id (PATCH creates or replaces). Throws on failure. */
+/**
+ * Upserts a document by id. Uses a field-scoped updateMask so it MERGES the provided
+ * fields into an existing doc (rather than replacing it) — e.g. a clock-in sync won't
+ * wipe a leave record already on the same schedule_actual doc. Creates the doc if new.
+ */
 export async function restUpsertDoc(collection: string, docId: string, data: Record<string, Primitive | undefined>): Promise<void> {
-  const url = `${BASE}/${collection}/${encodeURIComponent(docId)}?key=${API_KEY}`;
+  const fields = encodeFields(data);
+  const mask = Object.keys(fields)
+    .map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`)
+    .join("&");
+  const url = `${BASE}/${collection}/${encodeURIComponent(docId)}?key=${API_KEY}&${mask}`;
   const res = await fetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: encodeFields(data) }),
+    body: JSON.stringify({ fields }),
     cache: "no-store"
   });
   if (!res.ok) throw new Error(`Firestore upsert failed: ${res.status}`);
