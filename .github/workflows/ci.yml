@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22" # ต้อง 22+ เพราะ test ใช้ --experimental-strip-types
+          node-version: "24" # 24 = npm 11 (ตรงกับ lockfile); 22+ จำเป็นเพราะ test ใช้ --experimental-strip-types
           cache: "npm"
       - run: npm ci
       - name: Lint (tsc)
