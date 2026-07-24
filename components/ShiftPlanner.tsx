@@ -133,9 +133,12 @@ export function ShiftPlanner({
           planMap[cellKey(plan.workDate, plan.staffCode)] = { assignment: plan.assignment, startTime: plan.startTime };
         }
         const eventMap: Record<string, { title: string; activities: DayActivity[] }> = {};
+        const gameLabels = new Set(gamePresets.map((g) => g.label));
         for (const ev of data.events as EventDoc[]) {
           const activities = ev.activities ?? (ev.game ? [{ game: ev.game, time: ev.time ?? "" }] : []);
-          eventMap[ev.workDate] = { title: ev.title, activities };
+          // Drop a stale auto-title that just repeats a game name (it now shows as a chip).
+          const title = gameLabels.has(ev.title) ? "" : ev.title;
+          eventMap[ev.workDate] = { title, activities };
         }
         const actualMap: Record<string, ActualDoc> = {};
         for (const actual of data.actuals) actualMap[cellKey(actual.workDate, actual.staffCode)] = actual;
@@ -487,7 +490,7 @@ export function ShiftPlanner({
                       ) : null}
                       <input
                         value={ev?.title ?? ""}
-                        placeholder="—"
+                        placeholder={ev?.activities?.length ? "โน้ต" : "—"}
                         onChange={(e) => setEvents((prev) => ({ ...prev, [date]: { title: e.target.value, activities: prev[date]?.activities ?? [] } }))}
                         onBlur={(e) => onEventBlur(date, e.target.value)}
                         aria-label={`กิจกรรมวันที่ ${date}`}
