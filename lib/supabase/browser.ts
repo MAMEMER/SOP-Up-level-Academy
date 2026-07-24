@@ -104,6 +104,9 @@ export function createClient() {
       auth: {
         async signInWithOtp() {
           return { data: null, error: null };
+        },
+        async signInWithOAuth() {
+          return { data: null, error: null };
         }
       },
       from(table: string) {

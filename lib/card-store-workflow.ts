@@ -1,3 +1,5 @@
+import type { ShiftCode } from "./shift-schedule.ts";
+
 export type WorkflowSection = {
   title: string;
   tasks: string[];
@@ -11,6 +13,12 @@ export type WorkflowPhase = {
   icon: string;
   goal: string;
   caution: string;
+  /**
+   * Which shift(s) this phase belongs to. Shift 1 (opening) does เปิดร้าน; shift 2
+   * (closing) does ปิดร้าน; stock + shipping are shared by both. Omitted = shown to
+   * every shift (safe default so a new phase never disappears by accident).
+   */
+  shift?: ShiftCode[];
   sections: WorkflowSection[];
   checklist: string[];
   example?: string;
@@ -18,6 +26,11 @@ export type WorkflowPhase = {
 
 export function workflowManualHref(phaseId: string) {
   return `/training#${phaseId}`;
+}
+
+/** Phases a given shift should see: tagged for that shift, or untagged (shared). */
+export function phasesForShift(phases: WorkflowPhase[], shift: ShiftCode): WorkflowPhase[] {
+  return phases.filter((phase) => !phase.shift || phase.shift.includes(shift));
 }
 
 export const stockWorkSummaryCards = [
@@ -32,6 +45,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
     title: "เปิดร้าน",
     timeLabel: "ก่อนเปิด 30 นาที",
     category: "open",
+    shift: ["s1"],
     icon: "OP",
     goal: "เตรียมร้านให้พร้อมขาย ระบบพร้อมใช้ สินค้าพร้อมโชว์ และพื้นที่พร้อมรับลูกค้า",
     caution: "ห้ามเปิดบริการถ้าเงินทอน POS QR Payment อินเทอร์เน็ต หรือสินค้ามูลค่าสูงยังไม่เรียบร้อย",
@@ -87,6 +101,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
     title: "Stock",
     timeLabel: "ระหว่างเปิดบริการ",
     category: "stock",
+    shift: ["s1", "s2"],
     icon: "ST",
     goal: "ดึงผลการนับ Stock น้ำและขนมจาก StoreHub Stock Take ให้ตรงของจริง พร้อมสรุปรายการที่ต้องสั่งเพิ่ม",
     caution: "ข้อแรกจะ approve ได้เมื่อสถานะใน StoreHub Stock Take เป็น Completed และต้องมีหลักฐานรูปหรือแคปหน้าจอทุกครั้ง",
@@ -156,6 +171,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
     title: "จัดส่งสินค้า",
     timeLabel: "ระหว่างเปิดบริการ",
     category: "shipping",
+    shift: ["s1", "s2"],
     icon: "DW",
     goal: "จัดการออเดอร์ที่ต้องจัดส่งให้ครบ ตั้งแต่ตรวจสินค้า แพ็ค นำส่ง และแจ้งเลข tracking ลูกค้า",
     caution: "ห้ามส่งของก่อนตรวจรายการ สภาพสินค้า ที่อยู่ และต้องลงเลข tracking ให้เรียบร้อยทุกออเดอร์",
@@ -182,6 +198,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
     title: "ปิดร้าน",
     timeLabel: "1 ชั่วโมงก่อนปิดร้าน",
     category: "close",
+    shift: ["s2"],
     icon: "CL",
     goal: "เคลียร์ออเดอร์ พื้นที่ สต๊อกสำคัญ ยอดขาย และล็อกร้านให้ครบก่อนออกจากร้าน",
     caution: "ยอดขาย เงินสด หลักฐานสลิป สินค้าแพง และรูปยืนยันปิดร้านต้องครบก่อนออกจากร้าน",

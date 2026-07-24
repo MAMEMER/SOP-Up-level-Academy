@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import type { Role } from "./permissions.ts";
-import { isPreviewMode } from "./preview-data.ts";
-import { createClient } from "./supabase/server.ts";
+import { hasSessionSecret, verifySession } from "./session-jwt.ts";
+import { sopUserForEmail } from "./sop-users.ts";
+import { SOP_SESSION_COOKIE } from "./auth-session.ts";
 
 export type CurrentUser = {
   id: string;
@@ -11,39 +13,36 @@ export type CurrentUser = {
   departmentId: string | null;
 };
 
+// Auth = Firebase Google sign-in (shared up-level-guild project). The client signs in
+// with Google; /api/auth/session verifies the Google ID token and mints our own signed
+// session cookie (jose HS256). Here we verify that session and map the email to a role
+// via the SOP allow-list (sop-users.ts). When no SESSION_SECRET is configured (local
+// dev), fall back to a preview admin so the app runs with `npm run dev` and no login.
 export async function requireUser(): Promise<CurrentUser> {
-  const supabase = await createClient();
-  const { data: authData } = await supabase.auth.getUser();
-
-  if (!authData.user) {
-    redirect("/login");
+  if (!hasSessionSecret()) {
+    return {
+      id: "preview-admin-champ",
+      name: "Champ Master",
+      email: "champ.championest@gmail.com",
+      role: "admin",
+      departmentId: "admin"
+    };
   }
 
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("id,name,email,role,department_id,active")
-    .eq("id", authData.user.id)
-    .single();
+  const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
+  if (!cookie) redirect("/login");
 
-  if (error || !profile || !profile.active) {
-    redirect("/login");
-  }
+  const session = await verifySession(cookie);
+  if (!session) redirect("/login");
 
-  if (!isPreviewMode()) {
-    const today = new Date().toISOString().slice(0, 10);
-    await supabase
-      .from("employee_login_events")
-      .upsert(
-        { user_id: profile.id, work_date: today, last_seen_at: new Date().toISOString() },
-        { onConflict: "user_id,work_date" }
-      );
-  }
+  const sopUser = sopUserForEmail(session.email);
+  if (!sopUser) redirect("/login?denied=1");
 
   return {
-    id: profile.id,
-    name: profile.name,
-    email: profile.email,
-    role: profile.role,
-    departmentId: profile.department_id
+    id: session.uid,
+    name: sopUser.name,
+    email: sopUser.email,
+    role: sopUser.role,
+    departmentId: sopUser.departmentId
   };
 }

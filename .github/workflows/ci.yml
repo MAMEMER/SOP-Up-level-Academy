@@ -1,0 +1,24 @@
+name: CI
+
+# รัน lint + test อัตโนมัติทุก PR เข้า main และทุก push บน main
+# ใช้เป็น required check ของ branch protection → PR ต้องเขียวก่อน merge
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24" # 24 = npm 11 (ตรงกับ lockfile); 22+ จำเป็นเพราะ test ใช้ --experimental-strip-types
+          cache: "npm"
+      - run: npm ci
+      - name: Lint (tsc)
+        run: npm run lint
+      - name: Unit tests
+        run: npm test

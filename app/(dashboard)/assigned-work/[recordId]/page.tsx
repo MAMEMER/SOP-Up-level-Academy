@@ -6,7 +6,7 @@ import { requireUser } from "../../../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../../../lib/employee-directory.ts";
 import {
   assignedWorkRecordById,
-  readPerformanceDailyStore,
+  fetchPerformanceDailyStore,
   updateAssignedWorkRecordSubmission
 } from "../../../../lib/performance-service-records.ts";
 import type { AssignedWork } from "../../../../lib/performance-score.ts";
@@ -48,11 +48,11 @@ async function submitAssignedWorkAction(formData: FormData) {
   "use server";
   const user = await requireUser();
   const recordId = stringValue(formData, "recordId");
-  const store = readPerformanceDailyStore();
+  const store = await fetchPerformanceDailyStore();
   const record = assignedWorkRecordById(store.assignedWorkRecords, recordId);
   if (!record || !canAccessAssignedWork(record.employeeName, user)) notFound();
 
-  updateAssignedWorkRecordSubmission(recordId, {
+  await updateAssignedWorkRecordSubmission(recordId, {
     status: user.role === "admin" ? assignedStatus(stringValue(formData, "assignedStatus")) : undefined,
     note: stringValue(formData, "assignedNote"),
     evidence: stringValue(formData, "assignedEvidence"),
@@ -69,7 +69,7 @@ async function submitAssignedWorkAction(formData: FormData) {
 export default async function AssignedWorkSubmitPage({ params }: { params: Promise<{ recordId: string }> }) {
   const { recordId } = await params;
   const user = await requireUser();
-  const store = readPerformanceDailyStore();
+  const store = await fetchPerformanceDailyStore();
   const record = assignedWorkRecordById(store.assignedWorkRecords, decodeURIComponent(recordId));
   if (!record || !canAccessAssignedWork(record.employeeName, user)) notFound();
   const effectiveStatus = effectiveAssignedWorkStatus(record);

@@ -2,29 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { isPreviewMode, previewLoginEmailCookieName } from "../../../lib/preview-data.ts";
-import { createClient } from "../../../lib/supabase/browser.ts";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "../../../lib/firebase-client.ts";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  async function signIn() {
-    const supabase = createClient();
-    const origin = window.location.origin;
-
-    await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${origin}/api/auth/callback`
+  async function signInWithGoogle() {
+    setBusy(true);
+    setError(null);
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      const idToken = await cred.user.getIdToken();
+      const res = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken })
+      });
+      if (res.ok) {
+        router.push("/");
+        router.refresh();
+      } else if (res.status === 403) {
+        setError("อีเมลนี้ยังไม่มีสิทธิ์เข้าระบบ — ติดต่อแอดมินให้เพิ่มสิทธิ์");
+        await auth.signOut();
+      } else {
+        setError("เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้ง");
       }
-    });
-
-    setSent(true);
-    if (isPreviewMode()) {
-      document.cookie = `${previewLoginEmailCookieName}=${encodeURIComponent(email.trim())}; path=/; max-age=2592000; SameSite=Lax`;
-      router.push("/");
+    } catch {
+      setError("ยกเลิก/เข้าสู่ระบบไม่สำเร็จ");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -44,18 +53,13 @@ export default function LoginPage() {
           <div className="auth-panel-head">
             <p>Secure sign in</p>
             <h2>เข้าสู่ระบบทีม</h2>
-            <span>ใช้ magic link ผ่านอีเมลบริษัทเพื่อเข้า dashboard ประจำวัน</span>
+            <span>เข้าด้วยบัญชี Google ของทีม (เฉพาะอีเมลที่มีสิทธิ์)</span>
           </div>
-          <label className="auth-field">
-            <span>Company email</span>
-            <input
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@uplevelacademy.com"
-            />
-          </label>
-          <button onClick={signIn}>ส่งลิงก์เข้า Dashboard</button>
-          {sent ? <p className="auth-success">ส่งลิงก์เข้าสู่ระบบแล้ว กรุณาเช็กอีเมล</p> : null}
+          <button type="button" className="auth-google" onClick={signInWithGoogle} disabled={busy}>
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width={18} height={18} />
+            {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบด้วย Google"}
+          </button>
+          {error ? <p className="auth-error">{error}</p> : null}
         </div>
       </section>
     </main>
