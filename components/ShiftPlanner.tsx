@@ -34,12 +34,15 @@ type CellValue = { assignment: ShiftAssignment; startTime?: string };
 // A single dropdown encodes shift + entry time so the owner picks in one click.
 // PLAN dropdown = the planned shift only. Leave/absent is what ACTUALLY happened on the
 // day (not planned), so it's recorded in the ACTUAL row instead — see onActualChange.
+// One distinct accent color per staff so a row reads as "whose" at a glance.
+const STAFF_COLORS = ["#4A90D9", "#FF8C42", "#2E9E6B", "#B8477E", "#8F6FE6", "#C9902B"];
+
 const CELL_OPTIONS: { value: string; label: string; cell: CellValue }[] = [
   { value: "off", label: "OFF", cell: { assignment: "off" } },
-  { value: "s1|09:00", label: "กะ1 · 09:00", cell: { assignment: "s1", startTime: "09:00" } },
-  { value: "s1|11:00", label: "กะ1 · 11:00", cell: { assignment: "s1", startTime: "11:00" } },
-  { value: "s2|11:30", label: "กะ2 · 11:30", cell: { assignment: "s2", startTime: "11:30" } },
-  { value: "s2|13:00", label: "กะ2 · 13:00", cell: { assignment: "s2", startTime: "13:00" } }
+  { value: "s1|09:00", label: "ก1 09:00", cell: { assignment: "s1", startTime: "09:00" } },
+  { value: "s1|11:00", label: "ก1 11:00", cell: { assignment: "s1", startTime: "11:00" } },
+  { value: "s2|11:30", label: "ก2 11:30", cell: { assignment: "s2", startTime: "11:30" } },
+  { value: "s2|13:00", label: "ก2 13:00", cell: { assignment: "s2", startTime: "13:00" } }
 ];
 
 function cellToValue(cell: CellValue | undefined): string {
@@ -495,13 +498,15 @@ export function ShiftPlanner({
               </tr>
             </thead>
             <tbody>
-              {staff.map((entry) => {
+              {staff.map((entry, staffIndex) => {
                 const summary = summariseStaff(entry.code, planCells);
                 const actualLeaveCount = dates.filter((d) => actuals[cellKey(d, entry.code)]?.leaveType).length;
+                const color = STAFF_COLORS[staffIndex % STAFF_COLORS.length];
                 return (
-                  <tr key={entry.code}>
-                    <th className="shift-planner__sticky shift-planner__staff">
-                      <span className="shift-planner__staff-name">{entry.displayName}</span>
+                  <tr key={entry.code} style={{ ["--staff-color" as string]: color }}>
+                    <th className="shift-planner__sticky shift-planner__staff" style={{ borderLeft: `5px solid ${color}` }}>
+                      <span className="shift-planner__staff-dot" style={{ background: color }} />
+                      <span className="shift-planner__staff-name" style={{ color }}>{entry.displayName}</span>
                       <span className="shift-planner__staff-type">{entry.employmentType === "full_time" ? "Full" : "Part"}</span>
                     </th>
                     {dates.map((date) => {
@@ -512,12 +517,13 @@ export function ShiftPlanner({
                       const actualStatus = actual?.leaveType === "personal" ? "leave_personal" : actual?.leaveType === "sick" ? "leave_sick" : actual?.absent ? "absent" : "normal";
                       const late = actualStatus === "normal" && actual?.clockIn && plans[key]?.startTime && actual.clockIn > (plans[key]?.startTime ?? "");
                       return (
-                        <td key={date} className={`shift-planner__cell${working ? " shift-planner__cell--work" : ""}`}>
+                        <td key={date} className="shift-planner__cell" style={{ background: working ? `${color}14` : undefined }}>
                           <select
                             value={value}
                             onChange={(e) => onCellChange(date, entry.code, e.target.value)}
                             disabled={savingKey === key}
                             className={value.startsWith("s1") ? "sel-s1" : value.startsWith("s2") ? "sel-s2" : "sel-off"}
+                            style={working ? { borderColor: color, color } : undefined}
                           >
                             {CELL_OPTIONS.map((option) => (
                               <option key={option.value} value={option.value}>{option.label}</option>
