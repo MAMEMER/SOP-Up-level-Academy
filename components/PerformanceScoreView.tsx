@@ -18,6 +18,7 @@ import {
 } from "../lib/performance-service-records.ts";
 import { readPerformanceSourceFiles, savePerformanceSourceFilePath, saveUploadedPerformanceCsv } from "../lib/performance-source-files.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
+import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
 
 type PageProps = {
   searchParams?: Promise<{ period?: string; startDate?: string; endDate?: string; source?: string; inputStatus?: string }>;
@@ -217,7 +218,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const params = searchParams ? await searchParams : {};
   const activePeriod = resolvePeriod(params);
   const dailyStore = await fetchPerformanceDailyStore();
-  const rows = activePeriod.id === "custom" ? getPerformanceScoreRowsForRange(activePeriod, dailyStore) : getPerformanceScoreRows(activePeriod.id, dailyStore);
+  const attendance = await fetchAttendanceSource("bangkae");
+  const rows = activePeriod.id === "custom" ? getPerformanceScoreRowsForRange(activePeriod, dailyStore, attendance) : getPerformanceScoreRows(activePeriod.id, dailyStore, attendance);
   const summary = getPerformanceSummary(rows);
   const activeSourceDetail = getPerformanceSourceDetail(params.source || "");
   const redirectTo = `${basePath}?startDate=${activePeriod.startDate}&endDate=${activePeriod.endDate}${params.source ? `&source=${params.source}` : ""}`;
