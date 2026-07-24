@@ -17,6 +17,7 @@
 
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -54,15 +55,18 @@ export type PlanDoc = {
   updatedBy: string;
 };
 
+export type DayActivity = { game: string; time: string; title?: string };
+
 export type EventDoc = {
   branch: string;
   month: string;
   workDate: string;
   title: string;
   note?: string;
-  /** card-game preset key (planner-activities) → shows a logo on the day */
+  /** multiple activities can share a day/time — the store has space for parallel events */
+  activities?: DayActivity[];
+  /** legacy single-activity fields (kept for backward-compat reads) */
   game?: string;
-  /** activity time HH:MM */
   time?: string;
   updatedAt: string;
   updatedBy: string;
@@ -144,8 +148,7 @@ export async function saveDayEvent(input: {
   workDate: string;
   title: string;
   note?: string;
-  game?: string;
-  time?: string;
+  activities?: DayActivity[];
   updatedBy: string;
 }): Promise<void> {
   const nowIso = new Date().toISOString();
@@ -155,8 +158,7 @@ export async function saveDayEvent(input: {
     workDate: input.workDate,
     title: input.title,
     ...(input.note ? { note: input.note } : {}),
-    ...(input.game ? { game: input.game } : {}),
-    ...(input.time ? { time: input.time } : {}),
+    ...(input.activities && input.activities.length ? { activities: input.activities } : {}),
     updatedAt: nowIso,
     updatedBy: input.updatedBy
   };
@@ -182,6 +184,33 @@ export async function logLeave(input: {
     ...(input.note ? { leaveNote: input.note } : {}),
     updatedAt: nowIso,
     updatedBy: input.updatedBy
+  };
+  await setDoc(doc(db, ACTUAL, shiftDocId(input.branch, input.workDate, input.staffCode)), record, { merge: true });
+}
+
+/**
+ * Sets the ACTUAL day status the owner records for a staff-day — leave/absent is a real
+ * event, not part of the plan, so it lives here (same cell as clock-in), not the plan
+ * dropdown. Merges so a StoreHub clock-in on the same doc is preserved; "normal" clears
+ * any leave/absent override so the clock-in shows through again.
+ */
+export async function setActualStatus(input: {
+  branch: string;
+  workDate: string;
+  staffCode: string;
+  status: "normal" | "leave_personal" | "leave_sick" | "absent";
+  updatedBy: string;
+}): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const record: Record<string, unknown> = {
+    branch: input.branch,
+    month: monthOf(input.workDate),
+    workDate: input.workDate,
+    staffCode: input.staffCode,
+    updatedAt: nowIso,
+    updatedBy: input.updatedBy,
+    leaveType: input.status === "leave_personal" ? "personal" : input.status === "leave_sick" ? "sick" : deleteField(),
+    absent: input.status === "absent" ? true : deleteField()
   };
   await setDoc(doc(db, ACTUAL, shiftDocId(input.branch, input.workDate, input.staffCode)), record, { merge: true });
 }

@@ -16,7 +16,9 @@ import {
   loadMonthPlan,
   savePlanCell,
   saveDayEvent,
+  setActualStatus,
   type ActualDoc,
+  type DayActivity,
   type EventDoc,
   type PlanDoc
 } from "../lib/shift-schedule-store.ts";
@@ -31,14 +33,14 @@ type StaffEntry = {
 type CellValue = { assignment: ShiftAssignment; startTime?: string };
 
 // A single dropdown encodes shift + entry time so the owner picks in one click.
+// PLAN dropdown = the planned shift only. Leave/absent is what ACTUALLY happened on the
+// day (not planned), so it's recorded in the ACTUAL row instead — see onActualChange.
 const CELL_OPTIONS: { value: string; label: string; cell: CellValue }[] = [
   { value: "off", label: "OFF", cell: { assignment: "off" } },
   { value: "s1|09:00", label: "กะ1 · 09:00", cell: { assignment: "s1", startTime: "09:00" } },
   { value: "s1|11:00", label: "กะ1 · 11:00", cell: { assignment: "s1", startTime: "11:00" } },
   { value: "s2|11:30", label: "กะ2 · 11:30", cell: { assignment: "s2", startTime: "11:30" } },
-  { value: "s2|13:00", label: "กะ2 · 13:00", cell: { assignment: "s2", startTime: "13:00" } },
-  { value: "leave_personal", label: "ลากิจ", cell: { assignment: "leave_personal" } },
-  { value: "leave_sick", label: "ลาป่วย", cell: { assignment: "leave_sick" } }
+  { value: "s2|13:00", label: "กะ2 · 13:00", cell: { assignment: "s2", startTime: "13:00" } }
 ];
 
 function cellToValue(cell: CellValue | undefined): string {
@@ -98,7 +100,7 @@ export function ShiftPlanner({
 }) {
   const [month, setMonth] = useState(currentMonth);
   const [plans, setPlans] = useState<Record<string, CellValue>>({});
-  const [events, setEvents] = useState<Record<string, { title: string; game?: string; time?: string }>>({});
+  const [events, setEvents] = useState<Record<string, { title: string; activities: DayActivity[] }>>({});
   const [actuals, setActuals] = useState<Record<string, ActualDoc>>({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -126,8 +128,11 @@ export function ShiftPlanner({
         for (const plan of data.plans as PlanDoc[]) {
           planMap[cellKey(plan.workDate, plan.staffCode)] = { assignment: plan.assignment, startTime: plan.startTime };
         }
-        const eventMap: Record<string, { title: string; game?: string; time?: string }> = {};
-        for (const ev of data.events as EventDoc[]) eventMap[ev.workDate] = { title: ev.title, game: ev.game, time: ev.time };
+        const eventMap: Record<string, { title: string; activities: DayActivity[] }> = {};
+        for (const ev of data.events as EventDoc[]) {
+          const activities = ev.activities ?? (ev.game ? [{ game: ev.game, time: ev.time ?? "" }] : []);
+          eventMap[ev.workDate] = { title: ev.title, activities };
+        }
         const actualMap: Record<string, ActualDoc> = {};
         for (const actual of data.actuals) actualMap[cellKey(actual.workDate, actual.staffCode)] = actual;
         setPlans(planMap);
@@ -168,35 +173,70 @@ export function ShiftPlanner({
     }
   }
 
-  async function onEventBlur(workDate: string, title: string) {
-    const trimmed = title.trim();
-    const existing = events[workDate];
-    setEvents((prev) => ({ ...prev, [workDate]: { ...prev[workDate], title: trimmed } }));
+  async function persistDay(workDate: string, day: { title: string; activities: DayActivity[] }) {
     try {
-      await saveDayEvent({ branch, workDate, title: trimmed, game: existing?.game, time: existing?.time, updatedBy: plannedBy });
+      await saveDayEvent({ branch, workDate, title: day.title, activities: day.activities, updatedBy: plannedBy });
     } catch {
       setError("บันทึกกิจกรรมไม่สำเร็จ");
     }
   }
 
-  // Recurring activity preset: e.g. every Tuesday = Pokémon 19:00 → stamps the event
-  // (with a game logo) on every matching weekday of the month.
+  async function onEventBlur(workDate: string, title: string) {
+    const trimmed = title.trim();
+    const day = { title: trimmed, activities: events[workDate]?.activities ?? [] };
+    setEvents((prev) => ({ ...prev, [workDate]: day }));
+    await persistDay(workDate, day);
+  }
+
+  async function removeActivity(workDate: string, index: number) {
+    const day = events[workDate];
+    if (!day) return;
+    const next = { ...day, activities: day.activities.filter((_, i) => i !== index) };
+    setEvents((prev) => ({ ...prev, [workDate]: next }));
+    await persistDay(workDate, next);
+  }
+
+  // Recurring activity preset: e.g. every Tuesday = Pokémon 19:00 → ADDS the activity
+  // (with a game logo) to every matching weekday — multiple games can share a day/time
+  // since the store has space for parallel events. Dedupes exact game+time.
   async function applyActivityPreset(gameKey: string, weekday: number, time: string) {
     const preset = gamePresets.find((g) => g.key === gameKey);
     if (!preset) return;
     const targetDates = datesForWeekday(month, weekday);
     setError(null);
+    const updated: Record<string, { title: string; activities: DayActivity[] }> = {};
     setEvents((prev) => {
       const next = { ...prev };
-      for (const d of targetDates) next[d] = { title: preset.label, game: preset.key, time };
+      for (const d of targetDates) {
+        const existing = next[d] ?? { title: "", activities: [] };
+        const already = existing.activities.some((a) => a.game === preset.key && a.time === time);
+        const day = already ? existing : { ...existing, activities: [...existing.activities, { game: preset.key, time, title: preset.label }] };
+        next[d] = day;
+        updated[d] = day;
+      }
       return next;
     });
     try {
-      await Promise.all(
-        targetDates.map((d) => saveDayEvent({ branch, workDate: d, title: preset.label, game: preset.key, time, updatedBy: plannedBy }))
-      );
+      await Promise.all(Object.entries(updated).map(([d, day]) => saveDayEvent({ branch, workDate: d, title: day.title, activities: day.activities, updatedBy: plannedBy })));
     } catch {
       setError("ลงกิจกรรมไม่สำเร็จ");
+    }
+  }
+
+  // ACTUAL status (leave/absent) — a real event on the day, recorded in the ACTUAL row.
+  async function onActualChange(workDate: string, staffCode: string, status: "normal" | "leave_personal" | "leave_sick" | "absent") {
+    const key = cellKey(workDate, staffCode);
+    setActuals((prev) => {
+      const base = prev[key] ?? ({ branch, month: workDate.slice(0, 7), workDate, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
+      const next: ActualDoc = { ...base };
+      next.leaveType = status === "leave_personal" ? "personal" : status === "leave_sick" ? "sick" : undefined;
+      next.absent = status === "absent" ? true : undefined;
+      return { ...prev, [key]: next };
+    });
+    try {
+      await setActualStatus({ branch, workDate, staffCode, status, updatedBy: plannedBy });
+    } catch {
+      setError("บันทึกสถานะจริงไม่สำเร็จ");
     }
   }
 
@@ -257,19 +297,6 @@ export function ShiftPlanner({
     } finally {
       setAutoBusy(false);
     }
-  }
-
-  function actualBadge(workDate: string, staffCode: string): { text: string; tone: string } | null {
-    const actual = actuals[cellKey(workDate, staffCode)];
-    const plan = plans[cellKey(workDate, staffCode)];
-    if (actual?.leaveType) return { text: actual.leaveType === "sick" ? "ลาป่วย" : "ลากิจ", tone: "leave" };
-    if (actual?.clockIn) {
-      const late = plan?.startTime && actual.clockIn > plan.startTime;
-      return { text: `เข้า ${actual.clockIn}`, tone: late ? "late" : "ontime" };
-    }
-    const planned = plan?.assignment === "s1" || plan?.assignment === "s2";
-    if (planned && isPast(workDate)) return { text: "ยังไม่มีข้อมูล", tone: "missing" };
-    return null;
   }
 
   return (
@@ -390,18 +417,29 @@ export function ShiftPlanner({
                 <th className="shift-planner__sticky shift-planner__event-label">กิจกรรม</th>
                 {dates.map((date) => {
                   const ev = events[date];
-                  const preset = gamePreset(ev?.game);
                   return (
                     <th key={date} className="shift-planner__event-cell">
-                      {preset ? <img className="shift-planner__game-logo" src={preset.logo} alt={preset.label} title={`${preset.label}${ev?.time ? ` ${ev.time}` : ""}`} /> : null}
+                      {ev?.activities?.length ? (
+                        <div className="shift-planner__acts">
+                          {ev.activities.map((act, i) => {
+                            const preset = gamePreset(act.game);
+                            return (
+                              <span key={i} className="shift-planner__act" title={`${preset?.label ?? act.game}${act.time ? ` ${act.time}` : ""}`}>
+                                {preset ? <img src={preset.logo} alt={preset.label} /> : null}
+                                <small>{act.time}</small>
+                                <button type="button" onClick={() => removeActivity(date, i)} aria-label="ลบ">×</button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : null}
                       <input
                         value={ev?.title ?? ""}
                         placeholder="—"
-                        onChange={(e) => setEvents((prev) => ({ ...prev, [date]: { ...prev[date], title: e.target.value } }))}
+                        onChange={(e) => setEvents((prev) => ({ ...prev, [date]: { title: e.target.value, activities: prev[date]?.activities ?? [] } }))}
                         onBlur={(e) => onEventBlur(date, e.target.value)}
                         aria-label={`กิจกรรมวันที่ ${date}`}
                       />
-                      {ev?.time ? <span className="shift-planner__event-time">{ev.time}</span> : null}
                     </th>
                   );
                 })}
@@ -411,6 +449,7 @@ export function ShiftPlanner({
             <tbody>
               {staff.map((entry) => {
                 const summary = summariseStaff(entry.code, planCells);
+                const actualLeaveCount = dates.filter((d) => actuals[cellKey(d, entry.code)]?.leaveType).length;
                 return (
                   <tr key={entry.code}>
                     <th className="shift-planner__sticky shift-planner__staff">
@@ -420,15 +459,17 @@ export function ShiftPlanner({
                     {dates.map((date) => {
                       const key = cellKey(date, entry.code);
                       const value = cellToValue(plans[key]);
-                      const badge = actualBadge(date, entry.code);
                       const working = value.startsWith("s");
+                      const actual = actuals[key];
+                      const actualStatus = actual?.leaveType === "personal" ? "leave_personal" : actual?.leaveType === "sick" ? "leave_sick" : actual?.absent ? "absent" : "normal";
+                      const late = actualStatus === "normal" && actual?.clockIn && plans[key]?.startTime && actual.clockIn > (plans[key]?.startTime ?? "");
                       return (
                         <td key={date} className={`shift-planner__cell${working ? " shift-planner__cell--work" : ""}`}>
                           <select
                             value={value}
                             onChange={(e) => onCellChange(date, entry.code, e.target.value)}
                             disabled={savingKey === key}
-                            className={value.startsWith("s1") ? "sel-s1" : value.startsWith("s2") ? "sel-s2" : value.startsWith("leave") ? "sel-leave" : "sel-off"}
+                            className={value.startsWith("s1") ? "sel-s1" : value.startsWith("s2") ? "sel-s2" : "sel-off"}
                           >
                             {CELL_OPTIONS.map((option) => (
                               <option key={option.value} value={option.value}>{option.label}</option>
@@ -437,14 +478,27 @@ export function ShiftPlanner({
                           {working ? (
                             <span className="shift-planner__end">ออก {shiftEndTime(plans[key]?.startTime ?? "")}</span>
                           ) : null}
-                          {badge ? <span className={`shift-planner__actual shift-planner__actual--${badge.tone}`}>{badge.text}</span> : null}
+                          {actualStatus === "normal" && actual?.clockIn ? (
+                            <span className={`shift-planner__actual shift-planner__actual--${late ? "late" : "ontime"}`}>เข้า {actual.clockIn}</span>
+                          ) : null}
+                          <select
+                            className={`shift-planner__actual-sel${actualStatus !== "normal" ? " shift-planner__actual-sel--flag" : ""}`}
+                            value={actualStatus}
+                            onChange={(e) => onActualChange(date, entry.code, e.target.value as "normal" | "leave_personal" | "leave_sick" | "absent")}
+                            title="สิ่งที่เกิดขึ้นจริง (ลา/ขาด)"
+                          >
+                            <option value="normal">ตามจริง</option>
+                            <option value="leave_personal">ลากิจ</option>
+                            <option value="leave_sick">ลาป่วย</option>
+                            <option value="absent">ขาด</option>
+                          </select>
                         </td>
                       );
                     })}
                     <td className="shift-planner__summary">
                       <span>รวม {summary.totalWorkDays}</span>
                       <span>ก1 {summary.s1Count} · ก2 {summary.s2Count}</span>
-                      <span>ลา {summary.personalLeave + summary.sickLeave}</span>
+                      <span>ลา {actualLeaveCount}</span>
                     </td>
                   </tr>
                 );
