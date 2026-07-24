@@ -114,6 +114,7 @@ export function ShiftPlanner({
   const [reloadNonce, setReloadNonce] = useState(0);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [density, setDensity] = useState<"compact" | "normal" | "large">("normal");
+  const [showIssues, setShowIssues] = useState(false);
 
   const dates = useMemo(() => monthDates(month), [month]);
 
@@ -422,13 +423,20 @@ export function ShiftPlanner({
       {error ? <p className="shift-planner__error">{error}</p> : null}
 
       {issues.length > 0 ? (
-        <ul className="shift-planner__issues">
-          {issues.map((issue) => (
-            <li key={`${issue.kind}-${issue.ref}`} className={`shift-planner__issue shift-planner__issue--${issue.kind}`}>
-              {issue.message}
-            </li>
-          ))}
-        </ul>
+        <div className="shift-planner__warn">
+          <button type="button" className="shift-planner__warn-toggle" onClick={() => setShowIssues((v) => !v)}>
+            ⚠️ {issues.length} คำเตือน {showIssues ? "▲" : "▼"}
+          </button>
+          {showIssues ? (
+            <ul className="shift-planner__issues">
+              {issues.map((issue) => (
+                <li key={`${issue.kind}-${issue.ref}`} className={`shift-planner__issue shift-planner__issue--${issue.kind}`}>
+                  {issue.message}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : (
         <p className="shift-planner__ok">แผนสมดุล — ทุกวันมีคนพอ และกะเฉลี่ยดี</p>
       )}

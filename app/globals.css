@@ -4281,3 +4281,8 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__save-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .shift-planner__save-btn { border: 1px solid #8fce9e; background: rgba(184,230,193,0.4); color: #2e7d5b; border-radius: 999px; padding: 6px 18px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .shift-planner__save-btn:hover { background: #8fce9e; color: #fff; }
+
+/* collapsed warnings */
+.shift-planner__warn { margin-bottom: 10px; }
+.shift-planner__warn-toggle { border: 1px solid rgba(255,140,66,0.5); background: rgba(255,199,142,0.2); color: #a85a1a; border-radius: 999px; padding: 5px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.shift-planner__warn .shift-planner__issues { margin-top: 8px; }
