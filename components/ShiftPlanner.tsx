@@ -520,11 +520,16 @@ export function ShiftPlanner({
                 const color = STAFF_COLORS[staffIndex % STAFF_COLORS.length];
                 return (
                   <tr key={entry.code} style={{ ["--staff-color" as string]: color }}>
-                    <th className="shift-planner__sticky shift-planner__staff" style={{ background: tintColor(color, 0.12) }}>
-                      <span className="shift-planner__staff-chip" style={{ borderColor: color, background: "#fff" }}>
-                        <span className="shift-planner__staff-dot" style={{ background: color }} />
-                        <span className="shift-planner__staff-name" style={{ color }}>{entry.displayName}</span>
-                        <span className="shift-planner__staff-type">{entry.employmentType === "full_time" ? "Full" : "Part"}</span>
+                    <th className="shift-planner__sticky shift-planner__staff">
+                      {/* opaque bg as an absolute layer = fills the full row height even in
+                          Safari (sticky cells there don't paint bg for the whole cell) */}
+                      <span className="shift-planner__staff-bg" style={{ background: tintColor(color, 0.12) }} />
+                      <span className="shift-planner__staff-fill">
+                        <span className="shift-planner__staff-chip" style={{ borderColor: color, background: "#fff" }}>
+                          <span className="shift-planner__staff-dot" style={{ background: color }} />
+                          <span className="shift-planner__staff-name" style={{ color }}>{entry.displayName}</span>
+                          <span className="shift-planner__staff-type">{entry.employmentType === "full_time" ? "Full" : "Part"}</span>
+                        </span>
                       </span>
                     </th>
                     {dates.map((date) => {
