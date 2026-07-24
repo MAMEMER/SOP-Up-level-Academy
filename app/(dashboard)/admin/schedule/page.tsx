@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ShiftPlanner } from "../../../../components/ShiftPlanner.tsx";
+import { StoreAuditPanel } from "../../../../components/StoreAuditPanel.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { isPreviewMode } from "../../../../lib/preview-data.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
@@ -27,6 +28,7 @@ export default async function AdminSchedulePage() {
         </div>
       </section>
       <ShiftPlanner staff={staff} plannedBy={user.email ?? user.name} branch="bangkae" />
+      <StoreAuditPanel branch="bangkae" />
     </main>
   );
 }

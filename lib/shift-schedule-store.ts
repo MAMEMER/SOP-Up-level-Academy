@@ -89,6 +89,20 @@ export type ActualDoc = {
   updatedBy: string;
 };
 
+export type StoreAuditDoc = {
+  branch: string;
+  month: string;
+  workDate: string;
+  openTime?: string;
+  closeTime?: string;
+};
+
+/** Store open/close audit (from the Uplevel Academy store account), separate from staff. */
+export async function fetchStoreAudit(branch: string, month: string): Promise<StoreAuditDoc[]> {
+  const snap = await getDocs(query(collection(db, "store_audit"), where("branch", "==", branch), where("month", "==", month)));
+  return snap.docs.map((d) => d.data() as StoreAuditDoc).sort((a, b) => a.workDate.localeCompare(b.workDate));
+}
+
 export type MonthPlan = {
   plans: PlanDoc[];
   events: EventDoc[];

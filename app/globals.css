@@ -4286,3 +4286,16 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__warn { margin-bottom: 10px; }
 .shift-planner__warn-toggle { border: 1px solid rgba(255,140,66,0.5); background: rgba(255,199,142,0.2); color: #a85a1a; border-radius: 999px; padding: 5px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .shift-planner__warn .shift-planner__issues { margin-top: 8px; }
+
+/* ── Store open/close audit ───────────────────────────────────────────────── */
+.store-audit { margin-top: 26px; background: #fff; border: 1px solid rgba(184,176,255,0.4); border-radius: 16px; padding: 18px; }
+.store-audit__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.store-audit__head h3 { margin: 2px 0; }
+.store-audit__sub { font-size: 12px; color: var(--color-ink-soft); margin: 0; }
+.store-audit__head input { border: 1px solid rgba(184,176,255,0.5); border-radius: 10px; padding: 7px 11px; font-family: inherit; }
+.store-audit__empty { font-size: 13px; color: var(--color-ink-soft); }
+.store-audit__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.store-audit__day { display: flex; flex-direction: column; gap: 2px; border: 1px solid rgba(184,176,255,0.35); border-radius: 10px; padding: 8px 12px; background: rgba(184,176,255,0.06); }
+.store-audit__date { font-weight: 700; font-size: 13px; }
+.store-audit__open { font-size: 12px; color: #2e7d5b; }
+.store-audit__close { font-size: 12px; color: #b0343f; }

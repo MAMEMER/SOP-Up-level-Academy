@@ -43,11 +43,23 @@ export async function GET(request: Request) {
     const { fromIso, toIso } = monthRange(month);
     const [names, timesheets] = await Promise.all([fetchEmployeeNames(), fetchTimesheets(fromIso, toIso)]);
 
-    // earliest clock-in per staff-day
+    // earliest clock-in per staff-day; store-account (Uplevel Academy) sessions go to a
+    // separate open/close audit (store open = earliest clock-in, close = latest clock-out).
     const earliest = new Map<string, { workDate: string; staffCode: string; time: string }>();
+    const audit = new Map<string, { workDate: string; open?: string; close?: string }>();
     for (const ts of timesheets) {
       if (!ts.clockInTime) continue;
-      const name = names[ts.employeeId];
+      const name = names[ts.employeeId] || "";
+      const isStore = name.toLowerCase().includes("academy");
+      if (isStore) {
+        const { workDate, time: open } = toBangkok(ts.clockInTime);
+        const close = ts.clockOutTime ? toBangkok(ts.clockOutTime).time : undefined;
+        const cur = audit.get(workDate) ?? { workDate };
+        if (!cur.open || open < cur.open) cur.open = open;
+        if (close && (!cur.close || close > cur.close)) cur.close = close;
+        audit.set(workDate, cur);
+        continue;
+      }
       const staffCode = name ? resolveEmployeeCode(name) : "";
       if (!staffCode || staffCode === name) continue; // unresolved → skip
       const { workDate, time } = toBangkok(ts.clockInTime);
@@ -72,7 +84,21 @@ export async function GET(request: Request) {
       )
     );
 
-    return NextResponse.json({ ok: true, month, synced: earliest.size });
+    await Promise.all(
+      [...audit.values()].map((a) =>
+        restUpsertDoc("store_audit", `${branch}__${a.workDate}`, {
+          branch,
+          month,
+          workDate: a.workDate,
+          ...(a.open ? { openTime: a.open } : {}),
+          ...(a.close ? { closeTime: a.close } : {}),
+          updatedAt: nowIso,
+          updatedBy: "storehub-sync"
+        })
+      )
+    );
+
+    return NextResponse.json({ ok: true, month, synced: earliest.size, audit: audit.size });
   } catch (error) {
     return NextResponse.json({ error: "sync_failed", detail: String(error) }, { status: 500 });
   }
