@@ -37,6 +37,18 @@ type CellValue = { assignment: ShiftAssignment; startTime?: string };
 // One distinct accent color per staff so a row reads as "whose" at a glance.
 const STAFF_COLORS = ["#4A90D9", "#FF8C42", "#2E9E6B", "#B8477E", "#8F6FE6", "#C9902B"];
 
+// Opaque light tint of a staff color (blend with white) — computed in JS instead of CSS
+// color-mix so it renders solidly on every browser (older Safari lacks color-mix, which
+// left the sticky name cell transparent = the "see-through" gap the owner reported).
+function tintColor(hex: string, pct: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const mix = (c: number) => Math.round(c * pct + 255 * (1 - pct));
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
 const CELL_OPTIONS: { value: string; label: string; cell: CellValue }[] = [
   { value: "off", label: "OFF", cell: { assignment: "off" } },
   { value: "s1|09:00", label: "ก1 09:00", cell: { assignment: "s1", startTime: "09:00" } },
@@ -508,7 +520,7 @@ export function ShiftPlanner({
                 const color = STAFF_COLORS[staffIndex % STAFF_COLORS.length];
                 return (
                   <tr key={entry.code} style={{ ["--staff-color" as string]: color }}>
-                    <th className="shift-planner__sticky shift-planner__staff" style={{ background: `color-mix(in srgb, ${color} 12%, #fff)` }}>
+                    <th className="shift-planner__sticky shift-planner__staff" style={{ background: tintColor(color, 0.12) }}>
                       <span className="shift-planner__staff-chip" style={{ borderColor: color, background: "#fff" }}>
                         <span className="shift-planner__staff-dot" style={{ background: color }} />
                         <span className="shift-planner__staff-name" style={{ color }}>{entry.displayName}</span>
