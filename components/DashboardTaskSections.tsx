@@ -15,6 +15,17 @@ import {
   workflowVisualStatus,
   type WorkflowDailyRecord
 } from "../lib/workflow-records.ts";
+import {
+  bangkokMonthKey,
+  monthlyStockTasks,
+  monthlyTaskOccurrences,
+  monthlyTaskStatusClass,
+  monthlyTaskStatusText,
+  monthlyTasks,
+  monthlyTasksSubmitHref,
+  type MonthlyTaskStatus
+} from "../lib/monthly-event-tasks.ts";
+import { readMonthlyEventStates } from "../lib/monthly-event-store.ts";
 
 const statusText = {
   white: "ยังไม่เริ่ม",
@@ -45,19 +56,6 @@ const weeklyEventTasks = [
   { id: "weekly-event-lorcana", name: "ป้ายยา Lorcana", schedule: "สัปดาห์แรก และสัปดาห์ที่ 3 ของเดือน", shiftIds: ["morning", "afternoon"] }
 ];
 
-const monthlyEventTasks = [
-  { id: "monthly-event-booth", name: "ออกบูธ", schedule: "กำหนดก่อนสิ้นเดือนที่ผ่านมา", shiftIds: ["admin-assigned"] },
-  { id: "monthly-event-large", name: "งานอีเว้นใหญ่", schedule: "กำหนดก่อนสิ้นเดือนที่ผ่านมา", shiftIds: ["admin-assigned"] }
-];
-
-const monthlyStockTasks = [
-  { id: "monthly-stock-count", name: "นับ Stock รวมประจำเดือน", schedule: "กำหนดก่อนสิ้นเดือน", shiftIds: ["admin-assigned"] },
-  { id: "monthly-stock-single-pokemon", name: "นับ Single card - Pokémon", schedule: "กำหนดก่อนสิ้นเดือน", shiftIds: ["admin-assigned"] },
-  { id: "monthly-stock-single-lorcana", name: "นับ Single card - Lorcana", schedule: "กำหนดก่อนสิ้นเดือน", shiftIds: ["admin-assigned"] },
-  { id: "monthly-stock-single-lift-bound", name: "นับ Single card - Lift Bound", schedule: "กำหนดก่อนสิ้นเดือน", shiftIds: ["admin-assigned"] },
-  { id: "monthly-stock-discrepancy", name: "สรุปยอดต่างและรายการที่ต้องปรับในระบบ", schedule: "หลังนับ Stock เสร็จ", shiftIds: ["admin-assigned"] }
-];
-
 export function DashboardTaskSections({
   phases,
   assignedWorkRecords = [],
@@ -70,6 +68,8 @@ export function DashboardTaskSections({
   canManageAssignedWork?: boolean;
 }) {
   const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
+  const [monthlyStatus, setMonthlyStatus] = useState<Record<string, MonthlyTaskStatus>>({});
+  const [monthLabel, setMonthLabel] = useState<string>("");
   const workDate = currentWorkDate || formatWorkDate();
   const stockPhase = phases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
@@ -105,6 +105,16 @@ export function DashboardTaskSections({
       window.localStorage.setItem(workflowStorageKey, JSON.stringify(recordsWithMissed));
     }
   }, [phases, workDate]);
+
+  // งานประจำเดือน: คำนวณสถานะฝั่ง client เท่านั้น (กัน hydration mismatch จาก new Date())
+  useEffect(() => {
+    const now = new Date();
+    const occurrences = monthlyTaskOccurrences(bangkokMonthKey(now), readMonthlyEventStates(), undefined, now);
+    const statusByTask: Record<string, MonthlyTaskStatus> = {};
+    for (const occurrence of occurrences) statusByTask[occurrence.taskId] = occurrence.status;
+    setMonthlyStatus(statusByTask);
+    setMonthLabel(occurrences[0]?.monthLabel ?? "");
+  }, []);
 
   return (
     <section className="task-sections">
@@ -261,19 +271,29 @@ export function DashboardTaskSections({
             <p className="eyebrow">Monthly</p>
             <h3>Monthly task</h3>
           </div>
-          <span className="status-pill">ภาพรวม</span>
+          <a className="status-pill" href={monthlyTasksSubmitHref()}>
+            {canManageAssignedWork ? "จัดการ / ตรวจงาน" : "ส่งงาน"}
+          </a>
         </div>
         <div className="daily-phase-grid">
-          {monthlyEventTasks.map((task, index) => (
-            <a key={task.id} href="#monthly-task" className="daily-phase-card workflow-status-white">
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <small>Monthly</small>
-                <strong>{task.name}</strong>
-                <em>{task.schedule}</em>
-              </div>
-            </a>
-          ))}
+          {monthlyTasks.map((task, index) => {
+            const status = monthlyStatus[task.id] ?? "not_started";
+            const done = status === "done";
+            return (
+              <a
+                key={task.id}
+                href={monthlyTasksSubmitHref(task.id)}
+                className={`daily-phase-card ${monthlyTaskStatusClass[status]}`}
+              >
+                <span>{done ? "✓" : String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <small>{task.category === "event" ? "งานอีเว้นต์" : "งาน Stock"}{monthLabel ? ` · ${monthLabel}` : ""}</small>
+                  <strong>{task.name}</strong>
+                  <em>{monthlyTaskStatusText[status]} · {task.schedule}</em>
+                </div>
+              </a>
+            );
+          })}
         </div>
       </article>
     </section>
