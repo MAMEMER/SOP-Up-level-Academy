@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import { weeklyStockSleevePhase } from "../lib/weekly-stock-workflow.ts";
+import {
+  bangkokDateKey,
+  weeklyTaskOccurrences,
+  weeklyTaskStatusClass,
+  weeklyTaskStatusText,
+  type WeeklyTaskOccurrence
+} from "../lib/weekly-event-tasks.ts";
+import { readWeeklyEventDoneKeys, weeklyTasksSubmitHref } from "../lib/weekly-event-store.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import {
   canPersistWorkflowRecords,
@@ -40,11 +48,6 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   not_finished: "workflow-status-red"
 };
 
-const weeklyEventTasks = [
-  { id: "weekly-event-tournament", name: "Tournament", schedule: "สัปดาห์สุดท้ายของเดือน", shiftIds: ["morning", "afternoon"] },
-  { id: "weekly-event-lorcana", name: "ป้ายยา Lorcana", schedule: "สัปดาห์แรก และสัปดาห์ที่ 3 ของเดือน", shiftIds: ["morning", "afternoon"] }
-];
-
 const monthlyEventTasks = [
   { id: "monthly-event-booth", name: "ออกบูธ", schedule: "กำหนดก่อนสิ้นเดือนที่ผ่านมา", shiftIds: ["admin-assigned"] },
   { id: "monthly-event-large", name: "งานอีเว้นใหญ่", schedule: "กำหนดก่อนสิ้นเดือนที่ผ่านมา", shiftIds: ["admin-assigned"] }
@@ -70,6 +73,7 @@ export function DashboardTaskSections({
   canManageAssignedWork?: boolean;
 }) {
   const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
+  const [weeklyOccurrences, setWeeklyOccurrences] = useState<WeeklyTaskOccurrence[]>([]);
   const workDate = currentWorkDate || formatWorkDate();
   const stockPhase = phases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
@@ -105,6 +109,13 @@ export function DashboardTaskSections({
       window.localStorage.setItem(workflowStorageKey, JSON.stringify(recordsWithMissed));
     }
   }, [phases, workDate]);
+
+  // งานประจำสัปดาห์: คำนวณฝั่ง client เท่านั้น (กัน hydration mismatch จาก new Date())
+  useEffect(() => {
+    const now = new Date();
+    const todayKey = bangkokDateKey(now);
+    setWeeklyOccurrences(weeklyTaskOccurrences(todayKey, readWeeklyEventDoneKeys(), undefined, now));
+  }, []);
 
   return (
     <section className="task-sections">
@@ -239,19 +250,36 @@ export function DashboardTaskSections({
             <p className="eyebrow">Weekly</p>
             <h3>Weekly task</h3>
           </div>
-          <span className="status-pill">ภาพรวม</span>
+          <a className="status-pill" href={weeklyTasksSubmitHref()}>
+            {canManageAssignedWork ? "จัดการ / ตรวจงาน" : "ส่งงาน"}
+          </a>
         </div>
         <div className="daily-phase-grid">
-          {weeklyEventTasks.map((task, index) => (
-            <a key={task.id} href="#weekly-task" className="daily-phase-card workflow-status-white">
-              <span>{String(index + 1).padStart(2, "0")}</span>
+          {weeklyOccurrences.length ? (
+            weeklyOccurrences.map((occurrence, index) => (
+              <a
+                key={occurrence.key}
+                href={weeklyTasksSubmitHref(occurrence.taskId)}
+                className={`daily-phase-card ${weeklyTaskStatusClass[occurrence.status]}`}
+              >
+                <span>{occurrence.status === "done" ? "✓" : String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <small>{occurrence.weekdayLabel} · {occurrence.roundLabel}</small>
+                  <strong>{occurrence.name}</strong>
+                  <em>{weeklyTaskStatusText[occurrence.status]} · {occurrence.game}</em>
+                </div>
+              </a>
+            ))
+          ) : (
+            <a href={weeklyTasksSubmitHref()} className="daily-phase-card workflow-status-white">
+              <span>00</span>
               <div>
                 <small>Weekly</small>
-                <strong>{task.name}</strong>
-                <em>{task.schedule}</em>
+                <strong>ไม่มีงานประจำสัปดาห์ในรอบนี้</strong>
+                <em>รอตามรอบกิจกรรมของสัปดาห์</em>
               </div>
             </a>
-          ))}
+          )}
         </div>
       </article>
 
