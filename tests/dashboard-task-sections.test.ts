@@ -100,6 +100,16 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("จำนวนออเดอร์ทั้งหมดที่ต้องส่ง"), true);
   });
 
+  it("renders the weekly task section as a real status-driven checklist linked to /weekly-tasks", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("weeklyTaskOccurrences"), true);
+    assert.equal(source.includes("weeklyTaskStatusText"), true);
+    assert.equal(source.includes("weeklyTasksSubmitHref"), true);
+    // weekly section now offers a real manage/submit action instead of a static overview pill
+    assert.equal(source.includes('{canManageAssignedWork ? "จัดการ / ตรวจงาน" : "ส่งงาน"}'), true);
+  });
+
   it("removes close-store phase helper text and adds closing proof fields", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 

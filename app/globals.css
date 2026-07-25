@@ -4358,3 +4358,20 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__swap-btn { border: 1px solid #b8b0ff; background: rgba(184,176,255,0.2); color: #6a5acd; border-radius: 6px; width: 20px; height: 22px; font-size: 11px; cursor: pointer; flex: 0 0 auto; padding: 0; }
 .shift-planner__swap-btn:hover { background: #b8b0ff; color: #fff; }
 .shift-planner__actual--swap { color: #6a5acd; background: rgba(184,176,255,0.35); }
+
+/* weekly event tasks status pills */
+.weekly-status-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.7;
+  vertical-align: middle;
+}
+.weekly-pill-waiting { background: #f2f2f5; color: #6e6e73; }
+.weekly-pill-pending { background: rgba(255,140,66,0.16); color: #b45309; }
+.weekly-pill-done { background: rgba(52,168,83,0.16); color: #1e7d43; }
+.weekly-pill-overdue { background: rgba(220,38,38,0.14); color: #c0392b; }
