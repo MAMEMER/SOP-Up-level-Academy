@@ -4358,3 +4358,41 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__swap-btn { border: 1px solid #b8b0ff; background: rgba(184,176,255,0.2); color: #6a5acd; border-radius: 6px; width: 20px; height: 22px; font-size: 11px; cursor: pointer; flex: 0 0 auto; padding: 0; }
 .shift-planner__swap-btn:hover { background: #b8b0ff; color: #fff; }
 .shift-planner__actual--swap { color: #6a5acd; background: rgba(184,176,255,0.35); }
+
+/* monthly task status pills + state buttons */
+.monthly-status-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.7;
+  vertical-align: middle;
+}
+.monthly-pill-idle { background: #f2f2f5; color: #6e6e73; }
+.monthly-pill-active { background: rgba(255,140,66,0.16); color: #b45309; }
+.monthly-pill-review { background: rgba(29,29,31,0.9); color: #fff; }
+.monthly-pill-done { background: rgba(52,168,83,0.16); color: #1e7d43; }
+.monthly-pill-overdue { background: rgba(220,38,38,0.14); color: #c0392b; }
+
+.monthly-state-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+.monthly-state-btn {
+  border: 1px solid #d2d2d7;
+  background: #fff;
+  color: #6e6e73;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.monthly-state-btn:hover { border-color: #FF8C42; color: #b45309; }
+.monthly-state-btn.active { border-color: #FF8C42; background: rgba(255,140,66,0.16); color: #b45309; }

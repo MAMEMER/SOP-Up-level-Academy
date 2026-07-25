@@ -100,6 +100,21 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("จำนวนออเดอร์ทั้งหมดที่ต้องส่ง"), true);
   });
 
+  it("renders the monthly task section as a real status-driven checklist linked to /monthly-tasks", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../app/(dashboard)/monthly-tasks/page.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("monthlyTaskOccurrences"), true);
+    assert.equal(source.includes("monthlyTaskStatusText"), true);
+    assert.equal(source.includes("monthlyTaskStatusClass"), true);
+    assert.equal(source.includes("monthlyTasksSubmitHref"), true);
+    // monthly section offers a real manage/submit action instead of a static overview pill
+    assert.equal(source.includes('{canManageAssignedWork ? "จัดการ / ตรวจงาน" : "ส่งงาน"}'), true);
+    // checklist page renders staff/owner submission UI
+    assert.equal(pageSource.includes("MonthlyEventChecklist"), true);
+    assert.equal(pageSource.includes("requireUser"), true);
+  });
+
   it("removes close-store phase helper text and adds closing proof fields", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 
