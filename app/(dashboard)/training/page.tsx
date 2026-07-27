@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { storehubStocktakesUrl, weeklyStockSleevePhase } from "../../../lib/weekly-stock-workflow.ts";
 import { monthlyStockSinglePhase } from "../../../lib/monthly-stock-single-workflow.ts";
+import { seatingTableRules, weeklyEvents } from "../../../lib/weekly-event-tasks.ts";
 
 const manualMedia: Record<string, {
   src: string;
@@ -297,6 +298,69 @@ export default function TrainingPage() {
             </div>
           </div>
         </article>
+
+        {weeklyEvents.map((event) => (
+          <article key={event.id} id={event.id} className="training-card wi-manual phase-event">
+            <div className="workflow-card-head">
+              <span className="phase-icon">EV</span>
+              <div>
+                <p className="eyebrow">Weekly event · {event.timeWindow}</p>
+                <h3>{event.name}</h3>
+              </div>
+            </div>
+
+            <div className="wi-manual-body">
+              <div className="wi-content">
+                <section className="wi-summary-grid">
+                  <div>
+                    <h4>วัตถุประสงค์</h4>
+                    <p>
+                      บันทึกงานหลักของวันกิจกรรม {event.name} ตั้งแต่ Final ของแจกจนถึงสรุปและประกาศของรางวัล ·
+                      ลงผลแต่ละรอบใน{event.lineGroup}
+                    </p>
+                  </div>
+                  <div>
+                    <h4>ขอบเขต / เวลา</h4>
+                    <p>{event.timeWindow}</p>
+                  </div>
+                </section>
+
+                <section>
+                  <h4>Checklist วันกิจกรรม ({event.checklist.length} ข้อ)</h4>
+                  <ol className="wi-step-list">
+                    {event.checklist.map((item) => (
+                      <li key={item.id}>
+                        <strong>{item.title}</strong>
+                        {item.rule ? <span> — {item.rule}</span> : null}
+                        <ul>
+                          <li>ข้อมูลที่ต้องกรอก: {item.requiredData.map((field) => field.label).join(", ")}</li>
+                          <li>หลักฐาน: {item.evidence.join(", ")}</li>
+                          {item.hint ? <li>{item.hint}</li> : null}
+                        </ul>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+
+                <section>
+                  <h4>กติกาจำนวนโต๊ะตามจำนวนผู้เล่น</h4>
+                  <ul>
+                    {seatingTableRules.map((rule) => (
+                      <li key={rule.players}>
+                        {rule.players} = {rule.tables}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+
+                <section className="example-box">
+                  <strong>ตัวอย่างข้อความสรุป</strong>
+                  <pre className="weekly-event-summary">{event.summaryTemplate}</pre>
+                </section>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
     </main>
   );
