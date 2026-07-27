@@ -37,13 +37,13 @@ describe("dashboard task sections UI", () => {
     assert.equal(pageSource.includes("assignedWorkFeedForViewer"), true);
   });
 
-  it("requires StoreHub Stock Take Completed status before stock submission", () => {
+  it("requires a StoreHub Stock Take status (In Progress or Completed) before stock submission", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 
     assert.equal(source.includes("stocktake-status"), true);
     assert.equal(source.includes("Completed"), true);
     assert.equal(source.includes("missingStockTakeApproval"), true);
-    assert.equal(source.includes("StoreHub Stock Take ต้องเป็น Completed ก่อนส่งงาน Stock"), true);
+    assert.equal(source.includes("เลือกสถานะ StoreHub Stock Take เป็น In Progress หรือ Completed ก่อนส่งงาน"), true);
   });
 
   it("links the stock room count box to the Google Sheet tracker", () => {
