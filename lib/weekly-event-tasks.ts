@@ -217,5 +217,9 @@ export function canSubmitWeeklyEvent(event: WeeklyEvent, ticked: Record<string, 
 }
 
 export function weeklyEventHref(eventId?: string): string {
-  return eventId ? `/weekly-task#${eventId}` : "/weekly-task";
+  if (!eventId) return "/weekly-task";
+  // แต่ละกิจกรรมมีหน้า checklist ของตัวเอง (/weekly-task/<key>)
+  const event = weeklyEventById(eventId);
+  const key = event?.key ?? eventId.replace(/^weekly-event-/, "");
+  return `/weekly-task/${key}`;
 }

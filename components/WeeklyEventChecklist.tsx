@@ -24,8 +24,13 @@ import {
 } from "../lib/weekly-event-store.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
-export function WeeklyEventChecklist() {
+export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
+  // แสดงเฉพาะกิจกรรมที่ระบุ (แยกหน้าละกิจกรรม) — ถ้าไม่ระบุ แสดงทั้งหมด
+  const events = useMemo(
+    () => (eventId ? weeklyEvents.filter((event) => event.id === eventId) : weeklyEvents),
+    [eventId]
+  );
   // periodKey (ISO week) คำนวณ client-side เท่านั้น กัน hydration mismatch จาก new Date()
   const [periodKey, setPeriodKey] = useState<string>("");
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
@@ -94,7 +99,7 @@ export function WeeklyEventChecklist() {
       </div>
 
       <div className="checklist-workflow">
-        {weeklyEvents.map((event) => (
+        {events.map((event) => (
           <WeeklyEventCard
             key={event.id}
             event={event}
