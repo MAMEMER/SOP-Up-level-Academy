@@ -477,6 +477,27 @@ function CloseStoreTaskDetails({
     );
   }
 
+  if (index === 4) {
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-head">
+          <strong>งานส่งต่อกะถัดไป</strong>
+          <small>สรุปงานที่กะเปิดร้านวันถัดไปต้องทำต่อ ให้เห็นก่อนออกจากร้าน</small>
+        </div>
+        <label className="workflow-note-field compact">
+          <span>สรุปงานส่งต่อให้กะเปิดร้านวันถัดไป</span>
+          <textarea
+            value={details[detailKey(workDate, "closing-handoff-summary")] || ""}
+            disabled={!canEdit}
+            onChange={(event) => updateDetail("closing-handoff-summary", event.target.value)}
+            placeholder="ตัวอย่าง: ส่งออเดอร์ Shopee 3 กล่องเช้าพรุ่งนี้, ลูกค้าฝากการ์ดไว้ 1 ใบ, เติมน้ำเปล่า 2 แพ็ค"
+          />
+        </label>
+        <a href="/handoff" className="detail-action-link">เปิดหน้า งานส่งต่อ (Handoff)</a>
+      </div>
+    );
+  }
+
   return null;
 }
 
@@ -952,6 +973,11 @@ export function WorkflowChecklist({
     return status !== "In Progress" && status !== "Completed";
   }
 
+  function missingHandoffSummary(phase: WorkflowPhase) {
+    if (phase.id !== "close-store") return false;
+    return !details[detailKey(workDate, "closing-handoff-summary")]?.trim();
+  }
+
   return (
     <section className="workflow-panel">
       <ChecklistCompleteOverlay show={redirecting} />
@@ -989,7 +1015,17 @@ export function WorkflowChecklist({
           const canEdit = withinWorkHours && canEditWorkflowRecord(record, { adminOverride: isAdmin }) && unlocked && (isAdmin || flexible || !isExpired);
           const missingStockReorderList = stockReorderListMissing(phase);
           const missingStockTakeStatus = missingStockTakeApproval(phase);
-          const canSubmit = canEdit && done === phase.checklist.length && !missingStockReorderList && !missingStockTakeStatus;
+          const missingHandoff = missingHandoffSummary(phase);
+          const previousHandoff =
+            phase.id === "open-store"
+              ? (details[detailKey(previousWorkDateKey(workDate), "closing-handoff-summary")] || "").trim()
+              : "";
+          const canSubmit =
+            canEdit &&
+            done === phase.checklist.length &&
+            !missingStockReorderList &&
+            !missingStockTakeStatus &&
+            !missingHandoff;
           const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now) && !adminUnlocked && !trialMode;
           const schedule = phaseScheduleForWorkDate(phase.id, workDate);
           return (
@@ -1005,6 +1041,12 @@ export function WorkflowChecklist({
                   <em>{done}/{phase.checklist.length}</em>
                 </div>
               </div>
+              {previousHandoff ? (
+                <div className="handoff-inbox">
+                  <p className="eyebrow">งานส่งต่อจากกะปิดร้านเมื่อวาน</p>
+                  <p>{previousHandoff}</p>
+                </div>
+              ) : null}
               <p className="phase-window">
                 เวลาที่กำหนด {schedule.startLabel}-{schedule.endLabel}
                 {isExpired && !flexible && !isAdmin && !adminUnlocked ? " · เลยเวลาแล้ว ไม่สามารถกลับไปทำได้" : ""}
@@ -1020,7 +1062,7 @@ export function WorkflowChecklist({
                     phase.id === "open-store" ||
                     phase.id === "stock-work" ||
                     (phase.id === "daytime-work" && index <= 2) ||
-                    (phase.id === "close-store" && index <= 3);
+                    (phase.id === "close-store" && index <= 4);
                   return (
                     <div key={key} className={hasDetail ? "tick-group has-detail" : "tick-group"}>
                       <label
@@ -1086,6 +1128,9 @@ export function WorkflowChecklist({
               ) : null}
               {missingStockTakeStatus ? (
                 <p className="phase-warning">StoreHub Stock Take ต้องเป็น In Progress หรือ Completed ก่อนส่งงาน Stock</p>
+              ) : null}
+              {missingHandoff ? (
+                <p className="phase-warning">กรอกสรุปงานส่งต่อให้กะเปิดร้านวันถัดไปก่อนส่งงาน</p>
               ) : null}
               <div className="workflow-record-actions">
                 <button type="button" className="soft-button" onClick={() => recordPhase(phase, "saved")} disabled={!canEdit}>

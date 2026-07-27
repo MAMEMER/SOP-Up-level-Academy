@@ -3498,6 +3498,23 @@ a {
   font-weight: 800;
 }
 
+.handoff-inbox {
+  margin: 12px 0 0;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid #FF8C42;
+}
+
+.handoff-inbox .eyebrow {
+  margin: 0 0 4px;
+  color: #b45309;
+}
+
+.handoff-inbox p:last-child {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #4b3a2f;
+}
+
 .workflow-record-actions {
   display: flex;
   flex-wrap: wrap;
