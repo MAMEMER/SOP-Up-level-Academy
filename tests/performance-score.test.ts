@@ -23,6 +23,7 @@ import {
   leaveTypeFromScheduleValue,
   missingChecklistEventsFromAttendance,
   missingMorningStockCountRecords,
+  stockDataCoverageEnd,
   performanceReviewPeriods,
   performanceSourceStatuses
 } from "../lib/performance-score-data.ts";
@@ -484,6 +485,94 @@ describe("performance score engine", () => {
     });
 
     assert.equal(records.length, 0);
+  });
+
+  it("does not flag a morning shift beyond the stock data coverage window (ticket ZDjzavu0t1fhNplxlORR)", () => {
+    // ICE has a July 27 morning shift from the live planner, but the loaded StoreHub
+    // stocktake CSV only spans up to July 8 — so July 27 is un-exported, not un-counted.
+    const records = missingMorningStockCountRecords({
+      employeeName: "ICE",
+      schedules: [
+        {
+          employeeName: "ICE",
+          workDate: "2026-07-27",
+          scheduledStart: "2026-07-27T09:00:00+07:00",
+          scheduledEnd: "2026-07-27T18:00:00+07:00",
+          shiftLabel: "morning",
+          source: "live"
+        }
+      ],
+      stockCounts: [
+        {
+          employeeName: "ICE",
+          owner: "ICE",
+          category: "น้ำ,ขนม",
+          countType: "weekly",
+          dueDate: "2026-07-08",
+          startedAt: "2026-07-08T09:30:00+07:00",
+          submittedAt: "2026-07-08T10:00:00+07:00",
+          expectedQuantity: 10,
+          actualQuantity: 10,
+          discrepancyStatus: "matched",
+          source: "storehub"
+        }
+      ],
+      coverageEndDate: "2026-07-08"
+    });
+
+    assert.equal(records.length, 0);
+  });
+
+  it("still flags a missed count on a day WITHIN the stock data coverage window", () => {
+    const records = missingMorningStockCountRecords({
+      employeeName: "ICE",
+      schedules: [
+        {
+          employeeName: "ICE",
+          workDate: "2026-07-05",
+          scheduledStart: "2026-07-05T09:00:00+07:00",
+          scheduledEnd: "2026-07-05T18:00:00+07:00",
+          shiftLabel: "morning",
+          source: "live"
+        }
+      ],
+      stockCounts: [],
+      coverageEndDate: "2026-07-08"
+    });
+
+    assert.equal(records.length, 1);
+    assert.equal(records[0].dueDate, "2026-07-05");
+    assert.equal(records[0].discrepancyStatus, "not_counted");
+  });
+
+  it("emits nothing when there is no stock data at all (no coverage → cannot prove a miss)", () => {
+    const records = missingMorningStockCountRecords({
+      employeeName: "ICE",
+      schedules: [
+        {
+          employeeName: "ICE",
+          workDate: "2026-07-05",
+          scheduledStart: "2026-07-05T09:00:00+07:00",
+          scheduledEnd: "2026-07-05T18:00:00+07:00",
+          shiftLabel: "morning",
+          source: "live"
+        }
+      ],
+      stockCounts: []
+    });
+
+    assert.equal(records.length, 0);
+  });
+
+  it("stockDataCoverageEnd returns the latest count date across records", () => {
+    assert.equal(
+      stockDataCoverageEnd([
+        { employeeName: "ICE", owner: "ICE", category: "น้ำ,ขนม", countType: "weekly", dueDate: "2026-07-04", expectedQuantity: 0, actualQuantity: 0, discrepancyStatus: "matched", source: "storehub" },
+        { employeeName: "Leo", owner: "Leo", category: "น้ำ,ขนม", countType: "weekly", dueDate: "2026-07-08", expectedQuantity: 0, actualQuantity: 0, discrepancyStatus: "matched", source: "storehub" }
+      ]),
+      "2026-07-08"
+    );
+    assert.equal(stockDataCoverageEnd([]), undefined);
   });
 
   it("sets severe service complaint bucket to 0", () => {
