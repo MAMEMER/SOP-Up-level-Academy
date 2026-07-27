@@ -6,6 +6,7 @@ import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../lib/employee-directory.ts";
 import { assignedWorkRecordsForDate, fetchPerformanceDailyStore } from "../../lib/performance-service-records.ts";
+import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assigned-work-feed.ts";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
 import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 
@@ -15,9 +16,15 @@ export default async function HomePage() {
   const dailyStore = await fetchPerformanceDailyStore();
   const employeeCode = employeeCodeForEmail(user.email);
   const staffCode = resolveEmployeeByEmail(user.email);
+  const branch = staffCode ? branchFor(staffCode) : "bangkae";
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter((record) => {
     if (user.role === "admin") return true;
     return Boolean(employeeCode && (record.employeeName === employeeCode || record.employeeName === "ทีม บางแค"));
+  });
+  // งานที่มอบหมายจาก 2 ส่วน: เจ้าของร้านมอบหมาย (work_assignments) + ส่งต่อจากกะปิดร้าน (work_handoffs)
+  const assignedWorkFeed = assignedWorkFeedForViewer(await fetchAssignedWorkFeed(branch, workDate), {
+    isAdmin: user.role === "admin",
+    employeeCode
   });
 
   return (
@@ -40,6 +47,7 @@ export default async function HomePage() {
       <DashboardTaskSections
         phases={cardStoreWorkflow}
         assignedWorkRecords={assignedWorkRecords}
+        assignedWorkFeed={assignedWorkFeed}
         workDate={workDate}
         canManageAssignedWork={user.role === "admin"}
       />

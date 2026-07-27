@@ -24,13 +24,26 @@ describe("dashboard task sections UI", () => {
     assert.equal(pageSource.includes("updateAssignedWorkRecordSubmission"), true);
   });
 
-  it("requires StoreHub Stock Take Completed status before stock submission", () => {
+  it("renders assigned work from both owner assignments and closing-shift handoffs", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../app/(dashboard)/page.tsx", import.meta.url), "utf8");
+
+    // component accepts + renders the merged feed alongside the KPI records
+    assert.equal(source.includes("assignedWorkFeed"), true);
+    assert.equal(source.includes("item.originLabel"), true);
+    assert.equal(source.includes("assignedWorkRecords.length || assignedWorkFeed.length"), true);
+    // dashboard page wires the two real-time sources through the viewer filter
+    assert.equal(pageSource.includes("fetchAssignedWorkFeed"), true);
+    assert.equal(pageSource.includes("assignedWorkFeedForViewer"), true);
+  });
+
+  it("requires a StoreHub Stock Take status (In Progress or Completed) before stock submission", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 
     assert.equal(source.includes("stocktake-status"), true);
     assert.equal(source.includes("Completed"), true);
     assert.equal(source.includes("missingStockTakeApproval"), true);
-    assert.equal(source.includes("StoreHub Stock Take ต้องเป็น Completed ก่อนส่งงาน Stock"), true);
+    assert.equal(source.includes("เลือกสถานะ StoreHub Stock Take เป็น In Progress หรือ Completed ก่อนส่งงาน"), true);
   });
 
   it("links the stock room count box to the Google Sheet tracker", () => {
