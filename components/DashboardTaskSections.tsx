@@ -58,11 +58,6 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   not_finished: "workflow-status-red"
 };
 
-// Tournament ยังเป็นการ์ดภาพรวม (ไม่มี checklist วันกิจกรรมเหมือนกิจกรรมเกม)
-const weeklyOverviewExtras = [
-  { id: "weekly-event-tournament", name: "Tournament", schedule: "สัปดาห์สุดท้ายของเดือน" }
-];
-
 export function DashboardTaskSections({
   phases,
   assignedWorkRecords = [],
@@ -295,16 +290,6 @@ export function DashboardTaskSections({
               </a>
             );
           })}
-          {weeklyOverviewExtras.map((task) => (
-            <a key={task.id} href="#weekly-task" className="daily-phase-card workflow-status-white">
-              <span>—</span>
-              <div>
-                <small>Weekly · ภาพรวม</small>
-                <strong>{task.name}</strong>
-                <em>{task.schedule}</em>
-              </div>
-            </a>
-          ))}
         </div>
       </article>
 
