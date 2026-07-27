@@ -520,7 +520,7 @@ function StockTaskDetails({
           ))}
         </div>
         <p className="detail-hint">
-          {stocktakeStatus === "Completed" ? "พร้อม approve ตามสถานะ StoreHub Stock Take" : "รอ StoreHub Stock Take เป็น Completed ก่อนส่งงาน"}
+          {stocktakeStatus === "In Progress" || stocktakeStatus === "Completed" ? "พร้อมส่งงานตามสถานะ StoreHub Stock Take" : "เลือกสถานะ StoreHub Stock Take เป็น In Progress หรือ Completed ก่อนส่งงาน"}
         </p>
       </div>
     );
@@ -935,7 +935,8 @@ export function WorkflowChecklist({
 
   function missingStockTakeApproval(phase: WorkflowPhase) {
     if (phase.id !== "stock-work") return false;
-    return details[detailKey(workDate, "stocktake-status")] !== "Completed";
+    const status = details[detailKey(workDate, "stocktake-status")];
+    return status !== "In Progress" && status !== "Completed";
   }
 
   return (
@@ -1070,7 +1071,7 @@ export function WorkflowChecklist({
                 <p className="phase-warning">กรอกรายการและจำนวนที่ต้องสั่งเพิ่มก่อนส่งงาน</p>
               ) : null}
               {missingStockTakeStatus ? (
-                <p className="phase-warning">StoreHub Stock Take ต้องเป็น Completed ก่อนส่งงาน Stock</p>
+                <p className="phase-warning">StoreHub Stock Take ต้องเป็น In Progress หรือ Completed ก่อนส่งงาน Stock</p>
               ) : null}
               <div className="workflow-record-actions">
                 <button type="button" className="soft-button" onClick={() => recordPhase(phase, "saved")} disabled={!canEdit}>
