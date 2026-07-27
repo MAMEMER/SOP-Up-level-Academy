@@ -359,25 +359,39 @@ export function missingMorningStockCountRecords(input: {
   schedules: ShiftSchedule[];
   stockCounts: StockCountRecord[];
   leaveRecords?: LeaveRecord[];
+  /**
+   * Store-level day credit (ticket 1SZjSo2wVRZXeR5sATw9). The morning stock count is a
+   * once-per-day STORE task: whoever opens counts once for the whole store. StoreHub often
+   * attributes that count to the store POS account ("Uplevel Academy") or the colleague who
+   * happened to be logged in — NOT necessarily to the person who physically counted. Matching
+   * "not_counted" against only THIS employee's own attributed counts therefore produced false
+   * penalties (Leo showed "ขาด" on days StoreHub clearly recorded a count). So the day-existence
+   * check now uses every staff member's counts for the period. Defaults to the employee's own
+   * counts to preserve existing call sites/tests.
+   */
+  allStockCounts?: StockCountRecord[];
 }): StockCountRecord[] {
   const leaveDays = new Set((input.leaveRecords || []).map((record) => `${record.employeeName}:${record.workDate}`));
+  // Calendar days that have ANY StoreHub stock count (any staff). A morning shift on one of
+  // these days is credited regardless of who StoreHub attributed the count to.
+  const countedDays = new Set(
+    (input.allStockCounts ?? input.stockCounts)
+      .filter((count) => Boolean(count.startedAt))
+      .map((count) => count.dueDate || count.startedAt!.slice(0, 10))
+  );
   return input.schedules
     .filter((schedule) => schedule.employeeName === input.employeeName && isMorningShift(schedule))
     .filter((schedule) => !leaveDays.has(`${schedule.employeeName}:${schedule.workDate}`))
     .filter((schedule) => {
-      // A morning shift counts as "done" when the employee has ANY StoreHub stock count on
-      // the SAME CALENDAR DAY. Bugfix (ticket fxs2huYeIiaFlEW44CHo): the old check matched
-      // the count's start time against the shift's exact [start, start+9h] window AND required
-      // a Completed status (submittedAt). That produced false "not_counted" penalties when the
-      // count was started before the scheduled shift start (e.g. a late/part-time shift while
-      // the count is done at store open) or was still "In Progress" — StoreHub clearly shows a
-      // count on that day, so the KPI must credit it. A late-started count still gets the −2
-      // slowCount penalty via annotateSlowMorningCounts; it just no longer counts as "not counted".
-      return !input.stockCounts.some((count) => {
-        if (count.employeeName !== input.employeeName || !count.startedAt) return false;
-        const countDate = count.dueDate || count.startedAt.slice(0, 10);
-        return countDate === schedule.workDate;
-      });
+      // A morning shift counts as "done" when there is ANY StoreHub stock count on the SAME
+      // CALENDAR DAY. History:
+      //  • ticket fxs2huYeIiaFlEW44CHo: dropped the exact [start, start+9h] window + Completed
+      //    requirement (false penalties for before-shift / In-Progress counts).
+      //  • ticket 1SZjSo2wVRZXeR5sATw9: dropped the per-employee name match — StoreHub attributes
+      //    the shared morning count to the store account/opener, so requiring it be attributed to
+      //    THIS person falsely flagged "not_counted". A late-started count still gets the −2
+      //    slowCount penalty via annotateSlowMorningCounts; it just no longer counts as "not counted".
+      return !countedDays.has(schedule.workDate);
     })
     .map((schedule) => ({
       employeeName: input.employeeName,
@@ -460,6 +474,10 @@ export function getPerformanceScoreRowsForRange(
     teamAssigneeName: bangkaeTeamAssigneeName,
     teamMembers: employees
   });
+  // Every staff member's StoreHub counts for the period, so the morning "not_counted" check
+  // can credit the shared once-a-day store count no matter who StoreHub attributed it to
+  // (ticket 1SZjSo2wVRZXeR5sATw9).
+  const allPeriodStockCounts = getStockCountsFromExport().filter((item) => inPeriod(item.dueDate, period));
   return employees.map((employeeName) => {
     const employeeSchedules = srcSchedules.filter((item) => item.employeeName === employeeName);
     const employeePeriodSchedules = employeeSchedules.filter((item) => inPeriod(item.workDate, period));
@@ -467,12 +485,13 @@ export function getPerformanceScoreRowsForRange(
     const employeePeriodStockCounts = annotateSlowMorningCounts({
       employeeName,
       schedules: employeePeriodSchedules,
-      stockCounts: getStockCountsFromExport().filter((item) => item.employeeName === employeeName && inPeriod(item.dueDate, period))
+      stockCounts: allPeriodStockCounts.filter((item) => item.employeeName === employeeName)
     });
     const missingStockCounts = missingMorningStockCountRecords({
       employeeName,
       schedules: employeePeriodSchedules,
       stockCounts: employeePeriodStockCounts,
+      allStockCounts: allPeriodStockCounts,
       leaveRecords: srcLeaves.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
     });
     const derivedChecklistEvents = missingChecklistEventsFromAttendance({

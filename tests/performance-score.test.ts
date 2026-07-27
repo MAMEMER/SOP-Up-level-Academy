@@ -486,6 +486,79 @@ describe("performance score engine", () => {
     assert.equal(records.length, 0);
   });
 
+  it("credits a morning shift when the same-day StoreHub count was attributed to another staff/store account (ticket 1SZjSo2wVRZXeR5sATw9)", () => {
+    const records = missingMorningStockCountRecords({
+      employeeName: "Leo",
+      schedules: [
+        {
+          employeeName: "Leo",
+          workDate: "2026-07-20",
+          scheduledStart: "2026-07-20T10:00:00+07:00",
+          scheduledEnd: "2026-07-20T19:00:00+07:00",
+          shiftLabel: "morning",
+          source: "live"
+        }
+      ],
+      // Leo has NO count attributed to himself...
+      stockCounts: [],
+      // ...but the shared morning count exists in StoreHub under the store account / a colleague.
+      allStockCounts: [
+        {
+          employeeName: "ICE",
+          owner: "ICE",
+          category: "น้ำ,ขนม",
+          countType: "weekly",
+          dueDate: "2026-07-20",
+          startedAt: "2026-07-20T09:50:00+07:00",
+          submittedAt: "2026-07-20T10:30:00+07:00",
+          expectedQuantity: 10,
+          actualQuantity: 10,
+          discrepancyStatus: "matched",
+          source: "storehub"
+        }
+      ]
+    });
+
+    assert.equal(records.length, 0);
+  });
+
+  it("still flags not_counted when NO staff recorded a StoreHub count that day (ticket 1SZjSo2wVRZXeR5sATw9)", () => {
+    const records = missingMorningStockCountRecords({
+      employeeName: "Leo",
+      schedules: [
+        {
+          employeeName: "Leo",
+          workDate: "2026-07-21",
+          scheduledStart: "2026-07-21T10:00:00+07:00",
+          scheduledEnd: "2026-07-21T19:00:00+07:00",
+          shiftLabel: "morning",
+          source: "live"
+        }
+      ],
+      stockCounts: [],
+      // A count exists but on a DIFFERENT day → the 2026-07-21 morning shift is still uncounted.
+      allStockCounts: [
+        {
+          employeeName: "ICE",
+          owner: "ICE",
+          category: "น้ำ,ขนม",
+          countType: "weekly",
+          dueDate: "2026-07-22",
+          startedAt: "2026-07-22T09:50:00+07:00",
+          submittedAt: "2026-07-22T10:30:00+07:00",
+          expectedQuantity: 10,
+          actualQuantity: 10,
+          discrepancyStatus: "matched",
+          source: "storehub"
+        }
+      ]
+    });
+
+    assert.equal(records.length, 1);
+    assert.equal(records[0].dueDate, "2026-07-21");
+    assert.equal(records[0].discrepancyStatus, "not_counted");
+  });
+
   it("sets severe service complaint bucket to 0", () => {
     const result = calculateCustomerServiceScore([{ bucket: "feedback", severity: "severe", count: 1, source: "manual" }]);
 
