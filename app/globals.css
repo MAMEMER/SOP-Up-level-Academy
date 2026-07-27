@@ -4462,3 +4462,63 @@ main .page > section, main > section { margin-top: 16px !important; }
   .weekly-event-fields { grid-template-columns: 1fr; }
   .weekly-event-card .workflow-card-meta { justify-items: start; text-align: left; }
 }
+
+/* ยืนยันหลังส่งงานครบ 100% ก่อนพากลับหน้า Dashboard (ticket voIikgnzV1yA7vwUw55v) */
+.checklist-done-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(9, 14, 27, 0.62);
+  backdrop-filter: blur(3px);
+  animation: checklist-done-fade 160ms ease-out;
+}
+
+.checklist-done-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 28px 34px;
+  border-radius: 18px;
+  background: #101a30;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  max-width: 320px;
+}
+
+.checklist-done-card strong { font-size: 1.05rem; color: #f8fafc; }
+.checklist-done-card span { color: #94a3b8; font-size: 0.9rem; }
+
+.checklist-done-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+  font-size: 1.6rem;
+  font-weight: 700;
+  animation: checklist-done-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes checklist-done-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes checklist-done-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checklist-done-overlay,
+  .checklist-done-check { animation: none; }
+}

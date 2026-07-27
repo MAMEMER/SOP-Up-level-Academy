@@ -13,6 +13,7 @@ import {
   submittableStocktakeStatuses,
   type MonthlyStockSinglePhase
 } from "../lib/monthly-stock-single-workflow.ts";
+import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
 const monthlyCheckedStorageKey = "up-level-monthly-single-checked";
 const monthlyDetailStorageKey = "up-level-monthly-single-details";
@@ -376,6 +377,7 @@ export function MonthlyStockSingleChecklist({
   const [status, setStatus] = useState<string>("");
   const [discrepancyStatus, setDiscrepancyStatus] = useState<string>("");
   const trialMode = !canPersistWorkflowRecords();
+  const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
 
   useEffect(() => {
     setChecked(readStore(monthlyCheckedStorageKey) as Record<string, boolean>);
@@ -460,10 +462,13 @@ export function MonthlyStockSingleChecklist({
   function submitWork() {
     if (!canSubmit) return;
     saveProgress();
+    // checklist นับสต๊อกรายเดือนครบ 100% แล้ว → กลับหน้า Dashboard
+    goToDashboard();
   }
 
   return (
     <section className="workflow-panel">
+      <ChecklistCompleteOverlay show={redirecting} />
       {trialMode ? (
         <div className="trial-banner">
           <strong>โหมดทดลองใช้งาน</strong>

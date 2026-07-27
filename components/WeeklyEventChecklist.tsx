@@ -22,8 +22,10 @@ import {
   tickKey,
   weeklyEventPeriodKey
 } from "../lib/weekly-event-store.ts";
+import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
 export function WeeklyEventChecklist() {
+  const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
   // periodKey (ISO week) คำนวณ client-side เท่านั้น กัน hydration mismatch จาก new Date()
   const [periodKey, setPeriodKey] = useState<string>("");
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
@@ -76,10 +78,13 @@ export function WeeklyEventChecklist() {
       persistWeeklyEventSubmitted(next);
       return next;
     });
+    // checklist ของกิจกรรมนี้ครบ 100% แล้ว (ส่งได้เมื่อทำครบทุกข้อ) → กลับหน้า Dashboard
+    goToDashboard();
   }
 
   return (
     <section className="workflow-panel">
+      <ChecklistCompleteOverlay show={redirecting} />
       <div className="trial-banner">
         <strong>Checklist วันกิจกรรม</strong>
         <span>

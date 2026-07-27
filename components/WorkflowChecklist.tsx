@@ -19,6 +19,7 @@ import {
   type WorkflowDailyRecord,
   type WorkflowRecordStatus
 } from "../lib/workflow-records.ts";
+import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
 function itemKey(phaseId: string, index: number) {
   return `${phaseId}:${index}`;
@@ -689,6 +690,7 @@ export function WorkflowChecklist({
   const isAdmin = userRole === "admin";
   const trialMode = !canPersistWorkflowRecords();
   const withinWorkHours = isWithinWorkflowWorkHours(now);
+  const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
 
   useEffect(() => {
     const currentTime = new Date();
@@ -843,6 +845,17 @@ export function WorkflowChecklist({
     if (canPersistWorkflowRecords()) {
       window.localStorage.setItem(workflowStorageKey, JSON.stringify(next));
     }
+    // เมื่อกดส่งงานแล้วทุก phase ของ checklist วันนี้ถูกส่งครบ 100% → กลับหน้า Dashboard อัตโนมัติ
+    if (status === "submitted") {
+      const allSubmitted =
+        checklistPhases.length > 0 &&
+        checklistPhases.every(
+          (item) =>
+            next.find((record) => record.workDate === workDate && record.phaseId === item.id)?.status ===
+            "submitted"
+        );
+      if (allSubmitted) goToDashboard();
+    }
   }
 
   function recordPhase(phase: WorkflowPhase, status: WorkflowRecordStatus) {
@@ -941,6 +954,7 @@ export function WorkflowChecklist({
 
   return (
     <section className="workflow-panel">
+      <ChecklistCompleteOverlay show={redirecting} />
       {trialMode ? (
         <div className="trial-banner">
           <strong>โหมดทดลองใช้งาน</strong>
