@@ -2,7 +2,7 @@
 // ตั้งแต่ Final ของแจก จนถึง สรุปและประกาศของรางวัล
 //
 // ต่างจากงาน stock/monthly: อันนี้เป็น checklist "วันจัดกิจกรรม" ของแต่ละเกม (Gym Pokémon,
-// ป้ายยา Lorcana, ป้ายยา Rift Bound) — ใช้ logic เดียวกันทุกเกม ต่างแค่ชื่อเกม + กลุ่ม LINE
+// Lorcana, Rift Bound) — ใช้ logic เดียวกันทุกเกม ต่างแค่ชื่อเกม + กลุ่ม LINE
 // ที่ต้องลงผล
 //
 // completionScope = "weekly-event" → ความคืบหน้านับจากจำนวน checklist ที่ติ๊กครบ (0/6 … 6/6)
@@ -186,14 +186,14 @@ export const weeklyEvents: WeeklyEvent[] = [
   }),
   makeEvent({
     key: "lorcana",
-    name: "ป้ายยา Lorcana",
+    name: "Lorcana",
     game: "Lorcana",
     lineGroup: "กลุ่ม LINE Lorcana",
     schedule: "สัปดาห์แรก และสัปดาห์ที่ 3 ของเดือน"
   }),
   makeEvent({
     key: "riftbound",
-    name: "ป้ายยา Rift Bound",
+    name: "Rift Bound",
     game: "Rift Bound",
     lineGroup: "กลุ่ม LINE Rift Bound",
     schedule: "วันจัดกิจกรรม Rift Bound ประจำสัปดาห์"

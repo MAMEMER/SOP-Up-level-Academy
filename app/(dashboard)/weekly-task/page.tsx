@@ -13,7 +13,7 @@ export default async function WeeklyTaskPage() {
           <p className="eyebrow">Weekly event</p>
           <h2>Checklist งานกิจกรรมประจำสัปดาห์</h2>
           <p>
-            บันทึกงานหลักของวันกิจกรรม (Gym Pokémon / ป้ายยา Lorcana / Rift Bound) ตั้งแต่ Final ของแจก
+            บันทึกงานหลักของวันกิจกรรม (Gym Pokémon / Lorcana / Rift Bound) ตั้งแต่ Final ของแจก
             เตรียมพื้นที่ เตรียมเว็บ pairing เริ่มกิจกรรม ลงผลแต่ละรอบในกลุ่ม LINE จนถึงสรุปและประกาศของรางวัล
           </p>
         </div>
