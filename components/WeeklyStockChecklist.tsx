@@ -11,6 +11,7 @@ import {
   weeklyStockSleevePhase,
   type WeeklyStockPhase
 } from "../lib/weekly-stock-workflow.ts";
+import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
 const weeklyCheckedStorageKey = "up-level-weekly-stock-checked";
 const weeklyDetailStorageKey = "up-level-weekly-stock-details";
@@ -185,6 +186,7 @@ export function WeeklyStockChecklist({
   const [details, setDetails] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<string>("");
   const trialMode = !canPersistWorkflowRecords();
+  const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
 
   useEffect(() => {
     setChecked(readStore(weeklyCheckedStorageKey) as Record<string, boolean>);
@@ -247,10 +249,13 @@ export function WeeklyStockChecklist({
   function submitWork() {
     if (!canSubmit) return;
     saveProgress();
+    // checklist สต๊อกรายสัปดาห์ครบ 100% แล้ว → กลับหน้า Dashboard
+    goToDashboard();
   }
 
   return (
     <section className="workflow-panel">
+      <ChecklistCompleteOverlay show={redirecting} />
       {trialMode ? (
         <div className="trial-banner">
           <strong>โหมดทดลองใช้งาน</strong>
