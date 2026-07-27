@@ -24,6 +24,19 @@ describe("dashboard task sections UI", () => {
     assert.equal(pageSource.includes("updateAssignedWorkRecordSubmission"), true);
   });
 
+  it("renders assigned work from both owner assignments and closing-shift handoffs", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../app/(dashboard)/page.tsx", import.meta.url), "utf8");
+
+    // component accepts + renders the merged feed alongside the KPI records
+    assert.equal(source.includes("assignedWorkFeed"), true);
+    assert.equal(source.includes("item.originLabel"), true);
+    assert.equal(source.includes("assignedWorkRecords.length || assignedWorkFeed.length"), true);
+    // dashboard page wires the two real-time sources through the viewer filter
+    assert.equal(pageSource.includes("fetchAssignedWorkFeed"), true);
+    assert.equal(pageSource.includes("assignedWorkFeedForViewer"), true);
+  });
+
   it("requires StoreHub Stock Take Completed status before stock submission", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 

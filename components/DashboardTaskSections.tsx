@@ -5,6 +5,7 @@ import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import { weeklyStockSleevePhase } from "../lib/weekly-stock-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
+import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
 import {
   canPersistWorkflowRecords,
   formatWorkDate,
@@ -61,11 +62,13 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
 export function DashboardTaskSections({
   phases,
   assignedWorkRecords = [],
+  assignedWorkFeed = [],
   workDate: currentWorkDate,
   canManageAssignedWork = false
 }: {
   phases: WorkflowPhase[];
   assignedWorkRecords?: AssignedWorkRecord[];
+  assignedWorkFeed?: AssignedWorkFeedItem[];
   workDate?: string;
   canManageAssignedWork?: boolean;
 }) {
@@ -148,28 +151,41 @@ export function DashboardTaskSections({
           ) : null}
         </div>
         <div className="daily-phase-grid">
-          {assignedWorkRecords.length ? (
-            assignedWorkRecords.map((record, index) => {
-              const effectiveStatus = effectiveAssignedWorkStatus(record);
-              const canShowStatus = canManageAssignedWork || isAssignedWorkPastDeadline(record.workDate);
-              return (
-                <a
-                  key={record.id}
-                  href={`/assigned-work/${encodeURIComponent(record.id)}`}
-                  className={`daily-phase-card ${canShowStatus ? assignedStatusClass[effectiveStatus] : "workflow-status-white"}`}
-                >
-                  <span>{String(index + 1).padStart(2, "0")}</span>
+          {assignedWorkRecords.length || assignedWorkFeed.length ? (
+            <>
+              {assignedWorkRecords.map((record, index) => {
+                const effectiveStatus = effectiveAssignedWorkStatus(record);
+                const canShowStatus = canManageAssignedWork || isAssignedWorkPastDeadline(record.workDate);
+                return (
+                  <a
+                    key={record.id}
+                    href={`/assigned-work/${encodeURIComponent(record.id)}`}
+                    className={`daily-phase-card ${canShowStatus ? assignedStatusClass[effectiveStatus] : "workflow-status-white"}`}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <div>
+                      <small>{record.employeeName} · {record.workDate}</small>
+                      <strong>{record.title}</strong>
+                      <em>{canShowStatus ? assignedStatusText[effectiveStatus] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
+                      {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
+                      {record.imageEvidence?.length ? <em>รูปหลักฐาน: {record.imageEvidence.join(", ")}</em> : null}
+                      {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}
+                    </div>
+                  </a>
+                );
+              })}
+              {assignedWorkFeed.map((item, index) => (
+                <a key={item.id} href={item.href} className={`daily-phase-card ${item.statusClass}`}>
+                  <span>{String(assignedWorkRecords.length + index + 1).padStart(2, "0")}</span>
                   <div>
-                    <small>{record.employeeName} · {record.workDate}</small>
-                    <strong>{record.title}</strong>
-                    <em>{canShowStatus ? assignedStatusText[effectiveStatus] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
-                    {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
-                    {record.imageEvidence?.length ? <em>รูปหลักฐาน: {record.imageEvidence.join(", ")}</em> : null}
-                    {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}
+                    <small>{item.assigneeLabel} · {item.workDate}</small>
+                    <strong>{item.title}</strong>
+                    <em>{item.originLabel} · {item.statusText}</em>
+                    {item.detail ? <em>{item.detail}</em> : null}
                   </div>
                 </a>
-              );
-            })
+              ))}
+            </>
           ) : (
             <a
               href={canManageAssignedWork ? `/admin/performance-score?startDate=${workDate}&endDate=${workDate}` : "#assigned-work"}
@@ -179,7 +195,7 @@ export function DashboardTaskSections({
               <div>
                 <small>{workDate}</small>
                 <strong>ยังไม่มีงานที่มอบหมายวันนี้</strong>
-                <em>เพิ่มจากหน้า Performance แล้วงานจะขึ้นบน dashboard ทันที</em>
+                <em>เพิ่มจากหน้า Performance หรือหน้า มอบหมายงาน แล้วงานจะขึ้นบน dashboard ทันที</em>
               </div>
             </a>
           )}
