@@ -365,12 +365,18 @@ export function missingMorningStockCountRecords(input: {
     .filter((schedule) => schedule.employeeName === input.employeeName && isMorningShift(schedule))
     .filter((schedule) => !leaveDays.has(`${schedule.employeeName}:${schedule.workDate}`))
     .filter((schedule) => {
-      const start = Date.parse(schedule.scheduledStart);
-      const end = Date.parse(schedule.scheduledEnd);
+      // A morning shift counts as "done" when the employee has ANY StoreHub stock count on
+      // the SAME CALENDAR DAY. Bugfix (ticket fxs2huYeIiaFlEW44CHo): the old check matched
+      // the count's start time against the shift's exact [start, start+9h] window AND required
+      // a Completed status (submittedAt). That produced false "not_counted" penalties when the
+      // count was started before the scheduled shift start (e.g. a late/part-time shift while
+      // the count is done at store open) or was still "In Progress" — StoreHub clearly shows a
+      // count on that day, so the KPI must credit it. A late-started count still gets the −2
+      // slowCount penalty via annotateSlowMorningCounts; it just no longer counts as "not counted".
       return !input.stockCounts.some((count) => {
-        if (count.employeeName !== input.employeeName || !count.startedAt || !count.submittedAt) return false;
-        const countedAt = Date.parse(count.startedAt);
-        return Number.isFinite(countedAt) && countedAt >= start && countedAt <= end;
+        if (count.employeeName !== input.employeeName || !count.startedAt) return false;
+        const countDate = count.dueDate || count.startedAt.slice(0, 10);
+        return countDate === schedule.workDate;
       });
     })
     .map((schedule) => ({

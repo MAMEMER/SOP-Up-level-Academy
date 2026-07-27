@@ -11,3 +11,4 @@ dist/
 # uploaded performance CSVs (employee data — keep out of git)
 .data/uploads/
 .vercel
+tsconfig.tsbuildinfo

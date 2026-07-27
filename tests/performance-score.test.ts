@@ -431,6 +431,61 @@ describe("performance score engine", () => {
     assert.equal(records[0].discrepancyStatus, "not_counted");
   });
 
+  it("credits a same-day count even when it started before the scheduled shift or is still In Progress (ticket fxs2huYeIiaFlEW44CHo)", () => {
+    const records = missingMorningStockCountRecords({
+      employeeName: "Leo",
+      schedules: [
+        {
+          employeeName: "Leo",
+          workDate: "2026-07-15",
+          scheduledStart: "2026-07-15T11:30:00+07:00",
+          scheduledEnd: "2026-07-15T20:30:00+07:00",
+          shiftLabel: "late",
+          source: "live"
+        },
+        {
+          employeeName: "Leo",
+          workDate: "2026-07-16",
+          scheduledStart: "2026-07-16T11:30:00+07:00",
+          scheduledEnd: "2026-07-16T20:30:00+07:00",
+          shiftLabel: "late",
+          source: "live"
+        }
+      ],
+      stockCounts: [
+        {
+          // counted at store open, BEFORE the 11:30 scheduled start → old window match missed it
+          employeeName: "Leo",
+          owner: "Leo",
+          category: "น้ำ,ขนม",
+          countType: "weekly",
+          dueDate: "2026-07-15",
+          startedAt: "2026-07-15T10:05:00+07:00",
+          submittedAt: "2026-07-15T10:40:00+07:00",
+          expectedQuantity: 10,
+          actualQuantity: 10,
+          discrepancyStatus: "matched",
+          source: "storehub"
+        },
+        {
+          // In Progress count (no submittedAt) → old check required Completed, wrongly flagged
+          employeeName: "Leo",
+          owner: "Leo",
+          category: "น้ำ,ขนม",
+          countType: "weekly",
+          dueDate: "2026-07-16",
+          startedAt: "2026-07-16T10:15:00+07:00",
+          expectedQuantity: 10,
+          actualQuantity: 8,
+          discrepancyStatus: "matched",
+          source: "storehub"
+        }
+      ]
+    });
+
+    assert.equal(records.length, 0);
+  });
+
   it("sets severe service complaint bucket to 0", () => {
     const result = calculateCustomerServiceScore([{ bucket: "feedback", severity: "severe", count: 1, source: "manual" }]);
 
