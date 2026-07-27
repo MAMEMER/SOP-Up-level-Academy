@@ -4396,3 +4396,69 @@ main .page > section, main > section { margin-top: 16px !important; }
 }
 .monthly-state-btn:hover { border-color: #FF8C42; color: #b45309; }
 .monthly-state-btn.active { border-color: #FF8C42; background: rgba(255,140,66,0.16); color: #b45309; }
+
+/* ---- Weekly event checklist (งานกิจกรรมประจำสัปดาห์) ---- */
+.weekly-event-card { margin-bottom: 22px; }
+
+.weekly-event-card .workflow-card-meta {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  text-align: right;
+}
+
+.weekly-event-rule {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.weekly-event-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin-top: 8px;
+}
+.weekly-event-fields .workflow-note-field { margin-top: 0; }
+.weekly-event-fields .workflow-note-field.full { grid-column: 1 / -1; }
+.weekly-event-fields .workflow-note-field.highlight span { color: #1d4ed8; }
+.weekly-event-fields .workflow-note-field.highlight input {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: #eff6ff;
+}
+
+.weekly-event-tablerule {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(46, 125, 79, 0.3);
+  border-radius: 10px;
+  background: rgba(240, 253, 244, 0.7);
+}
+.weekly-event-tablerule strong { display: block; margin-bottom: 6px; color: #173526; }
+.weekly-event-tablerule ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.weekly-event-tablerule li { font-weight: 600; color: #173526; }
+
+.weekly-event-evidence { margin-top: 14px; }
+.weekly-event-evidence > span { font-weight: 800; color: #173526; }
+.weekly-event-evidence ul { margin: 6px 0 10px; padding-left: 18px; display: grid; gap: 3px; }
+.weekly-event-evidence li { font-weight: 500; color: #326b4c; }
+
+.weekly-event-summary {
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(46, 125, 79, 0.2);
+  color: #173526;
+  font: inherit;
+  font-weight: 500;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .weekly-event-fields { grid-template-columns: 1fr; }
+  .weekly-event-card .workflow-card-meta { justify-items: start; text-align: left; }
+}

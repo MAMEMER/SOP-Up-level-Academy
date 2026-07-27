@@ -26,6 +26,13 @@ import {
   type MonthlyTaskStatus
 } from "../lib/monthly-event-tasks.ts";
 import { readMonthlyEventStates } from "../lib/monthly-event-store.ts";
+import {
+  weeklyEventCompleted,
+  weeklyEventHref,
+  weeklyEvents,
+  type WeeklyEvent
+} from "../lib/weekly-event-tasks.ts";
+import { readWeeklyEventTicks, tickKey, weeklyEventPeriodKey } from "../lib/weekly-event-store.ts";
 
 const statusText = {
   white: "ยังไม่เริ่ม",
@@ -51,9 +58,9 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   not_finished: "workflow-status-red"
 };
 
-const weeklyEventTasks = [
-  { id: "weekly-event-tournament", name: "Tournament", schedule: "สัปดาห์สุดท้ายของเดือน", shiftIds: ["morning", "afternoon"] },
-  { id: "weekly-event-lorcana", name: "ป้ายยา Lorcana", schedule: "สัปดาห์แรก และสัปดาห์ที่ 3 ของเดือน", shiftIds: ["morning", "afternoon"] }
+// Tournament ยังเป็นการ์ดภาพรวม (ไม่มี checklist วันกิจกรรมเหมือนกิจกรรมเกม)
+const weeklyOverviewExtras = [
+  { id: "weekly-event-tournament", name: "Tournament", schedule: "สัปดาห์สุดท้ายของเดือน" }
 ];
 
 export function DashboardTaskSections({
@@ -70,6 +77,8 @@ export function DashboardTaskSections({
   const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, MonthlyTaskStatus>>({});
   const [monthLabel, setMonthLabel] = useState<string>("");
+  const [weeklyTicks, setWeeklyTicks] = useState<Record<string, boolean>>({});
+  const [weeklyPeriodKey, setWeeklyPeriodKey] = useState<string>("");
   const workDate = currentWorkDate || formatWorkDate();
   const stockPhase = phases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
@@ -115,6 +124,19 @@ export function DashboardTaskSections({
     setMonthlyStatus(statusByTask);
     setMonthLabel(occurrences[0]?.monthLabel ?? "");
   }, []);
+
+  // Weekly event checklist: อ่านความคืบหน้า (ติ๊กกี่ข้อ) ของสัปดาห์นี้จาก localStorage
+  useEffect(() => {
+    setWeeklyPeriodKey(weeklyEventPeriodKey(workDate));
+    setWeeklyTicks(readWeeklyEventTicks());
+  }, [workDate]);
+
+  function weeklyEventTickedMap(event: WeeklyEvent): Record<string, boolean> {
+    const map: Record<string, boolean> = {};
+    if (!weeklyPeriodKey) return map;
+    for (const item of event.checklist) map[item.id] = Boolean(weeklyTicks[tickKey(weeklyPeriodKey, event.id, item.id)]);
+    return map;
+  }
 
   return (
     <section className="task-sections">
@@ -249,14 +271,35 @@ export function DashboardTaskSections({
             <p className="eyebrow">Weekly</p>
             <h3>Weekly task</h3>
           </div>
-          <span className="status-pill">ภาพรวม</span>
+          <a className="status-pill" href={weeklyEventHref()}>
+            เปิด checklist
+          </a>
         </div>
         <div className="daily-phase-grid">
-          {weeklyEventTasks.map((task, index) => (
+          {weeklyEvents.map((event, index) => {
+            const completed = weeklyEventCompleted(event, weeklyEventTickedMap(event));
+            const total = event.checklist.length;
+            const done = completed === total && completed > 0;
+            return (
+              <a
+                key={event.id}
+                href={weeklyEventHref(event.id)}
+                className={`daily-phase-card ${done ? "workflow-status-green" : "workflow-status-white"}`}
+              >
+                <span>{done ? "✓" : String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <small>Weekly event · {event.game}</small>
+                  <strong>{event.name}</strong>
+                  <em>{event.schedule} · {completed}/{total}</em>
+                </div>
+              </a>
+            );
+          })}
+          {weeklyOverviewExtras.map((task) => (
             <a key={task.id} href="#weekly-task" className="daily-phase-card workflow-status-white">
-              <span>{String(index + 1).padStart(2, "0")}</span>
+              <span>—</span>
               <div>
-                <small>Weekly</small>
+                <small>Weekly · ภาพรวม</small>
                 <strong>{task.name}</strong>
                 <em>{task.schedule}</em>
               </div>
