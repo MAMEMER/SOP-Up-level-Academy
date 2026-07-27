@@ -371,29 +371,41 @@ function CloseStoreTaskDetails({
   canEdit,
   workDate,
   details,
-  updateDetail
+  updateDetail,
+  onNoOrderChange
 }: {
   index: number;
   canEdit: boolean;
   workDate: string;
   details: Record<string, string>;
   updateDetail: (key: string, value: string) => void;
+  onNoOrderChange: (isNoOrder: boolean) => void;
 }) {
   if (index === 0) {
+    const noOrder = details[detailKey(workDate, "closing-no-order")] === "ไม่มีออเดอร์";
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
           <strong>แพ็คออเดอร์ที่ค้าง</strong>
-          <small>ใส่จำนวนออเดอร์ที่ค้างและแจ้งงานส่งของพรุ่งนี้ในกลุ่มแอดมิน</small>
+          <small>ถ้าไม่มีออเดอร์ค้าง ให้ติ๊ก “ไม่มีออเดอร์” เพื่อข้ามการแพ็คและอัปโหลดรูป</small>
         </div>
+        <label className="detail-check">
+          <input
+            type="checkbox"
+            checked={noOrder}
+            disabled={!canEdit}
+            onChange={(event) => onNoOrderChange(event.target.checked)}
+          />
+          <span>ไม่มีออเดอร์</span>
+        </label>
         <label className="workflow-note-field compact">
           <span>จำนวนออเดอร์ที่ค้าง</span>
           <input
             type="number"
             inputMode="numeric"
             min="0"
-            value={details[detailKey(workDate, "closing-order-count")] || ""}
-            disabled={!canEdit}
+            value={noOrder ? "" : details[detailKey(workDate, "closing-order-count")] || ""}
+            disabled={!canEdit || noOrder}
             onChange={(event) => updateDetail("closing-order-count", event.target.value)}
             placeholder="เช่น 8"
           />
@@ -401,15 +413,15 @@ function CloseStoreTaskDetails({
         <label className="detail-check">
           <input
             type="checkbox"
-            checked={details[detailKey(workDate, "closing-admin-next-day-shipping")] === "แจ้งแล้ว"}
-            disabled={!canEdit}
+            checked={!noOrder && details[detailKey(workDate, "closing-admin-next-day-shipping")] === "แจ้งแล้ว"}
+            disabled={!canEdit || noOrder}
             onChange={(event) => updateDetail("closing-admin-next-day-shipping", event.target.checked ? "แจ้งแล้ว" : "")}
           />
           <span>แจ้งในกลุ่มแอดมินเพื่อส่งของในวันพรุ่งนี้</span>
         </label>
         <label className="detail-upload">
           <span>อัปโหลดรูปแพ็คออเดอร์ที่ค้าง</span>
-          <input type="file" accept="image/*" disabled={!canEdit} />
+          <input type="file" accept="image/*" disabled={!canEdit || noOrder} />
         </label>
       </div>
     );
@@ -925,6 +937,28 @@ export function WorkflowChecklist({
     });
   }
 
+  // "ไม่มีออเดอร์" สำหรับกะปิดร้าน: ข้ามเฉพาะข้อแพ็คออเดอร์ (ข้อแรก) โดยไม่ข้ามทั้ง phase
+  // ทำให้ส่งงานได้เมื่อไม่มีออเดอร์ค้าง แต่ยังต้องทำงานปิดร้านอื่นครบ (เก็บของ ปิดยอด ล็อกร้าน)
+  function setCloseStoreNoOrder(phase: WorkflowPhase, isNoOrder: boolean) {
+    const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
+    if (!isWithinWorkflowWorkHours(now)) return;
+    if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records)) return;
+
+    updateDetail("closing-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
+    if (isNoOrder) {
+      // เคลียร์รายละเอียดออเดอร์ที่ไม่จำเป็นแล้ว
+      updateDetail("closing-order-count", "");
+      updateDetail("closing-admin-next-day-shipping", "");
+    }
+    const key = itemKey(phase.id, 0);
+    setChecked((current) => {
+      const next = { ...current, [key]: isNoOrder };
+      if (!record) persistPhaseRecord(phase, "saved", next);
+      return next;
+    });
+  }
+
   function unlockPhaseForAdmin(phase: WorkflowPhase) {
     if (!isAdmin) return;
     const existing = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
@@ -1057,7 +1091,11 @@ export function WorkflowChecklist({
                 {phase.checklist.map((item, index) => {
                   const key = itemKey(phase.id, index);
                   const noOrderKey = noOrderKeyForPhase(phase);
-                  const disabledByNoOrder = Boolean(noOrderKey && checked[noOrderKey] && key !== noOrderKey);
+                  const closeNoOrderActive =
+                    phase.id === "close-store" && details[detailKey(workDate, "closing-no-order")] === "ไม่มีออเดอร์";
+                  const disabledByNoOrder =
+                    Boolean(noOrderKey && checked[noOrderKey] && key !== noOrderKey) ||
+                    (closeNoOrderActive && index === 0);
                   const hasDetail =
                     phase.id === "open-store" ||
                     phase.id === "stock-work" ||
@@ -1115,6 +1153,7 @@ export function WorkflowChecklist({
                               workDate={workDate}
                               details={details}
                               updateDetail={updateDetail}
+                              onNoOrderChange={(isNoOrder) => setCloseStoreNoOrder(phase, isNoOrder)}
                             />
                           ) : null}
                         </>
