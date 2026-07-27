@@ -460,6 +460,14 @@ export type AttendanceSource = {
   schedules: ShiftSchedule[];
   clockEvents: ClockEvent[];
   leaves: LeaveRecord[];
+  // Schedule set used ONLY for annual leave-allowance eligibility (how many sick/personal
+  // days count against the yearly allowance). It must include the days the person was
+  // supposed to work, INCLUDING days that turned into leave. In the live planner a PLANNED
+  // leave (assignment=leave_sick/leave_personal) produces a leave record but NO work-shift
+  // schedule entry, so it would be dropped by scheduledLeaveRecords() — under-counting leave
+  // (ticket bP6dfamNSqXQb7TAWVD3: Boom's June sick leave was planned and never counted).
+  // fetchAttendanceSource fills this with work shifts + synthetic entries for every leave day.
+  annualSchedules?: ShiftSchedule[];
 };
 
 export function getPerformanceScoreRows(
@@ -480,7 +488,7 @@ export function getPerformanceScoreRowsForRange(
   const srcSchedules = attendance?.schedules ?? schedules;
   const srcClock = attendance?.clockEvents ?? getClockEventsFromExport();
   const srcLeaves = attendance?.leaves ?? leaveRecords;
-  const srcAnnualSchedules = attendance?.schedules ?? leaveEligibleSchedules;
+  const srcAnnualSchedules = attendance?.annualSchedules ?? attendance?.schedules ?? leaveEligibleSchedules;
   // Load the stocktake export ONCE and derive the GLOBAL coverage boundary (across all
   // employees) so a "not counted" penalty is only ever raised for days the CSV actually
   // spans. Days beyond it are un-exported, not un-counted (ticket ZDjzavu0t1fhNplxlORR).

@@ -898,6 +898,49 @@ describe("performance score engine", () => {
     assert.equal(previousBoom.leaveSummary.sickUsed, 9);
   });
 
+  it("counts planned LIVE leave days (no work shift) against the annual allowance", () => {
+    // Regression for ticket bP6dfamNSqXQb7TAWVD3: in the live Firestore planner a PLANNED
+    // sick leave (assignment=leave_sick) yields a leave record but NO work-shift schedule
+    // entry, so scheduledLeaveRecords() dropped it and under-counted. annualSchedules must
+    // carry those leave days so they still count toward the yearly allowance.
+    const shift = (workDate: string, label: string) => ({
+      employeeName: "Boom",
+      workDate,
+      scheduledStart: `${workDate}T09:00:00+07:00`,
+      scheduledEnd: `${workDate}T18:00:00+07:00`,
+      shiftLabel: label,
+      source: "live" as const
+    });
+    const attendance = {
+      // Only ONE real work shift; the leave days have no s1/s2 shift (planned leave).
+      schedules: [shift("2026-07-02", "live 09:00")],
+      clockEvents: [],
+      leaves: [
+        { employeeName: "Boom", workDate: "2026-06-24", type: "sick" as const, source: "live" as const },
+        { employeeName: "Boom", workDate: "2026-06-25", type: "sick" as const, source: "live" as const },
+        { employeeName: "Boom", workDate: "2026-06-26", type: "sick" as const, source: "live" as const }
+      ],
+      annualSchedules: [
+        shift("2026-07-02", "live 09:00"),
+        shift("2026-06-24", "leave (allowance-eligibility only)"),
+        shift("2026-06-25", "leave (allowance-eligibility only)"),
+        shift("2026-06-26", "leave (allowance-eligibility only)")
+      ]
+    };
+    const rows = getPerformanceScoreRowsForRange(
+      { id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-31" },
+      EMPTY_DAILY_STORE,
+      attendance
+    );
+    const boom = rows.find((row) => row.employeeName === "Boom");
+    assert.ok(boom);
+    assert.equal(boom.leaveSummary.sickUsed, 3);
+    assert.deepEqual(
+      boom.leaveSummary.records.map((record) => record.workDate),
+      ["2026-06-24", "2026-06-25", "2026-06-26"]
+    );
+  });
+
   it("defines drilldown source details for every performance source card", () => {
     performanceSourceStatuses.forEach((source) => {
       const detail = getPerformanceSourceDetail(source.key);

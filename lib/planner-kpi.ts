@@ -67,5 +67,29 @@ export async function fetchAttendanceSource(branch: string): Promise<AttendanceS
     }
   }
 
-  return { schedules, clockEvents, leaves };
+  // Annual leave-allowance eligibility: a leave record only counts against the yearly
+  // sick/personal allowance if it fell on a day the person was supposed to work. A PLANNED
+  // leave (assignment=leave_sick/leave_personal) has no s1/s2 shift, so it is absent from
+  // `schedules` and would otherwise be dropped by scheduledLeaveRecords() — under-counting
+  // leave (ticket bP6dfamNSqXQb7TAWVD3). Build a schedule set that also treats every leave
+  // day as a scheduled work day. This set is used ONLY for allowance eligibility, never for
+  // attendance/missing-clock-in penalties, so a synthetic shift here can't add a false penalty.
+  const annualSchedules: ShiftSchedule[] = [...schedules];
+  const scheduledDayKeys = new Set(schedules.map((s) => `${s.workDate}__${s.employeeName}`));
+  for (const l of leaves) {
+    const key = `${l.workDate}__${l.employeeName}`;
+    if (scheduledDayKeys.has(key)) continue;
+    scheduledDayKeys.add(key);
+    const scheduledStart = `${l.workDate}T09:00:00+07:00`;
+    annualSchedules.push({
+      employeeName: l.employeeName,
+      workDate: l.workDate,
+      scheduledStart,
+      scheduledEnd: addHoursIso(scheduledStart, 9),
+      shiftLabel: "leave (allowance-eligibility only)",
+      source: "live"
+    });
+  }
+
+  return { schedules, clockEvents, leaves, annualSchedules };
 }
