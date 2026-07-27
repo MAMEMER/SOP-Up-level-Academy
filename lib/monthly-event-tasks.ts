@@ -95,8 +95,10 @@ export const monthlyStockTasks: MonthlyEventTask[] = [
   }
 ];
 
-// รายการงานประจำเดือนทั้งหมด (event ก่อน แล้วตามด้วย stock)
-export const monthlyTasks: MonthlyEventTask[] = [...monthlyEventTasks, ...monthlyStockTasks];
+// รายการงานประจำเดือนที่แสดงใน "Monthly task" — เหลือแค่งาน event ที่แอดมินมอบหมาย
+// (ออกบูธ + งานอีเว้นใหญ่). งาน stock รายเดือนยังมีอยู่ใน monthlyStockTasks และแสดง
+// ในหมวด Stock / หน้า /checklist-monthly แยกต่างหาก จึงไม่ซ้ำซ้อนใน Monthly task อีก
+export const monthlyTasks: MonthlyEventTask[] = [...monthlyEventTasks];
 
 export const monthlyTaskStatusText: Record<MonthlyTaskStatus, string> = {
   not_started: "ยังไม่เริ่ม",

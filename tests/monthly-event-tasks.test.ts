@@ -22,10 +22,13 @@ describe("monthly event tasks", () => {
     assert.equal(monthlyEventTasks.every((task) => task.category === "event"), true);
     assert.equal(monthlyStockTasks.length, 5);
     assert.equal(monthlyStockTasks.every((task) => task.category === "stock"), true);
-    // combined list keeps event first, then stock
-    assert.equal(monthlyTasks.length, 7);
-    assert.equal(monthlyTasks[0].id, "monthly-event-booth");
-    assert.equal(monthlyTasks[2].category, "stock");
+    // "Monthly task" now shows only the two admin-assigned events (stock lives in its own section)
+    assert.equal(monthlyTasks.length, 2);
+    assert.deepEqual(
+      monthlyTasks.map((task) => task.id),
+      ["monthly-event-booth", "monthly-event-large"]
+    );
+    assert.equal(monthlyTasks.every((task) => task.category === "event"), true);
   });
 
   it("derives the Bangkok month key and Thai label", () => {
@@ -77,12 +80,12 @@ describe("monthly event tasks", () => {
     const now = new Date("2026-07-15T12:00:00+07:00");
     const states = {
       [occurrenceKey("monthly-event-booth", "2026-07")]: "submitted" as const,
-      [occurrenceKey("monthly-stock-count", "2026-07")]: "done" as const
+      [occurrenceKey("monthly-event-large", "2026-07")]: "done" as const
     };
     const occurrences = monthlyTaskOccurrences("2026-07", states, undefined, now);
     const booth = occurrences.find((occurrence) => occurrence.taskId === "monthly-event-booth");
-    const stock = occurrences.find((occurrence) => occurrence.taskId === "monthly-stock-count");
+    const large = occurrences.find((occurrence) => occurrence.taskId === "monthly-event-large");
     assert.equal(booth?.status, "submitted");
-    assert.equal(stock?.status, "done");
+    assert.equal(large?.status, "done");
   });
 });
