@@ -54,6 +54,7 @@
 ## 8. Stock grace period — `lib/performance-score.ts` (L79-81)
 - `STOCK_DIFFERENCE_DEDUCTION_START = "2026-08-01"`. ก่อนวันนี้ **ไม่หัก** stock difference (StoreHub ไม่นิ่งช่วง July). หลังวันนี้ -2/loss.
 - **ห้ามหลวม:** เลื่อนวันมา July (หักย้อนหลังไม่เป็นธรรม) / เพิ่ม penalty เกิน -2 / ปลด grace โดยไม่แจ้ง.
+- 📄 สรุปเต็มหมวด Stock (เต็ม 20, not_counted -10/-10/-5…, ช้า >4ชม -2, difference -2, ที่มา StoreHub + การ group): ดู `docs/stock-scoring-logic.md`.
 
 ## 9. Checklist escalation — `lib/performance-score.ts` (L306-355)
 - ขาด checklist 2 วันแรก **-10/วัน** จากนั้น **-5/วัน**. Occurrence counter **ต่อคน ไม่ reset ในรอบ**.
