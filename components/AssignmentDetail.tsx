@@ -100,7 +100,9 @@ export function AssignmentDetail({
   }
 
   const actionable = record.status === "open" || record.status === "needs_revision";
+  const hasNote = note.trim().length > 0;
   const hasEvidence = images.length > 0 || Boolean(link.trim());
+  const canSubmit = hasNote && hasEvidence;
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -139,8 +141,12 @@ export function AssignmentDetail({
   }
 
   async function onSubmit() {
+    if (!note.trim()) {
+      setError("ต้องกรอกรายละเอียดสิ่งที่ทำหลังทำงานก่อนส่งงาน");
+      return;
+    }
     if (!hasEvidence) {
-      setError("ต้องแนบหลักฐานอย่างน้อย 1 อย่าง (รูป หรือ ลิงก์) ก่อนส่งงาน");
+      setError("ต้องแนบหลักฐานอย่างน้อย 1 อย่าง (รูป / เลขแทค / ลิงก์) ก่อนส่งงาน");
       return;
     }
     setError(null);
@@ -250,7 +256,7 @@ export function AssignmentDetail({
             </div>
             <div className="performance-input-form">
               <label className="wide">
-                รายละเอียด / สิ่งที่ทำ
+                รายละเอียด / สิ่งที่ทำ (จำเป็น)
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
@@ -260,7 +266,7 @@ export function AssignmentDetail({
               </label>
 
               <div className="evidence-input">
-                <span className="assign-work__pick-label">หลักฐาน (จำเป็น — แนบรูป หรือ วางลิงก์)</span>
+                <span className="assign-work__pick-label">หลักฐาน (จำเป็น — แนบรูป / เลขแทค / ลิงก์ อย่างน้อย 1 อย่าง)</span>
                 <div className="evidence-input__row">
                   <label className="evidence-input__file">
                     {uploading ? "กำลังอัปโหลด…" : "แนบรูป"}
@@ -270,7 +276,7 @@ export function AssignmentDetail({
                     className="evidence-input__link"
                     value={link}
                     onChange={(e) => setLink(e.target.value)}
-                    placeholder="หรือวางลิงก์รูป/แชท/สลิป"
+                    placeholder="หรือวางลิงก์รูป/แชท/สลิป หรือเลขแทค"
                   />
                   <button type="button" className="btn-soft" onClick={addLink} disabled={!link.trim()}>
                     เพิ่มลิงก์
@@ -293,7 +299,14 @@ export function AssignmentDetail({
               </div>
 
               {error ? <span className="evidence-input__error">{error}</span> : null}
-              <button type="button" className="primary-action" onClick={onSubmit} disabled={busy || uploading || !hasEvidence}>
+              {!canSubmit && !error ? (
+                <span className="evidence-input__hint">
+                  {!hasNote
+                    ? "กรอกรายละเอียดสิ่งที่ทำ + แนบหลักฐาน ก่อนถึงจะส่งงานได้"
+                    : "แนบหลักฐานอย่างน้อย 1 อย่าง (รูป / เลขแทค / ลิงก์) ก่อนถึงจะส่งงานได้"}
+                </span>
+              ) : null}
+              <button type="button" className="primary-action" onClick={onSubmit} disabled={busy || uploading || !canSubmit}>
                 {record.status === "needs_revision" ? "ส่งงานที่แก้แล้ว" : "ส่งงาน"}
               </button>
             </div>

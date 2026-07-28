@@ -156,9 +156,23 @@ export async function submitAssignment(
   id: string,
   input: { note: string; evidence?: string; imageEvidence?: string[]; submittedAtIso: string }
 ): Promise<void> {
+  // Guard: never record a submission (status "submitted" + submittedAt) unless the
+  // staff actually filled in what they did AND attached at least one piece of evidence.
+  // This is the last line of defence against blank "งานเปล่า" submits even if the UI
+  // validation is bypassed. See ticket OqnaLeJC4NkP7qCFFVY1.
+  const note = input.note.trim();
+  const hasEvidence =
+    (input.imageEvidence?.some((u) => u.trim().length > 0) ?? false) ||
+    Boolean(input.evidence?.trim());
+  if (!note) {
+    throw new Error("ต้องกรอกรายละเอียดสิ่งที่ทำก่อนส่งงาน");
+  }
+  if (!hasEvidence) {
+    throw new Error("ต้องแนบหลักฐานอย่างน้อย 1 อย่างก่อนส่งงาน");
+  }
   await updateDoc(doc(db, ASSIGNMENTS, id), {
     status: "submitted",
-    note: input.note,
+    note,
     evidence: input.evidence ?? "",
     imageEvidence: input.imageEvidence ?? [],
     submittedAt: input.submittedAtIso,
