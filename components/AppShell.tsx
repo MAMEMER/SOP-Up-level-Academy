@@ -7,6 +7,7 @@ import { SOP_SESSION_COOKIE } from "../lib/auth-session.ts";
 
 const mainLinks = [
   { href: "/", label: "หน้าหลัก" },
+  { href: "/my-view", label: "งานของฉัน" },
   { href: "/checklist", label: "เช็คลิสต์" },
   { href: "/handoff", label: "งานส่งต่อ" },
   { href: "/training", label: "คู่มืองาน" }
