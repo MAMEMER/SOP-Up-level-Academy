@@ -42,6 +42,10 @@ export type WorkAssignment = {
   staffCode: string; // who it's for
   title: string;
   detail?: string;
+  // Reference material the owner attaches when handing the task out (แนบตอนสั่งงาน) —
+  // e.g. รูปสินค้า / ใบปะหน้า / สลิป. Separate from staff-submitted imageEvidence below.
+  attachments?: string[]; // ไฟล์/รูปแนบจากเจ้าของร้าน (URL)
+  trackingNumber?: string; // เลขแทค/เลขพัสดุ สำหรับงานส่งสินค้า
   status: AssignmentStatus;
   assignedBy: string;
   createdAt: string;
@@ -86,6 +90,8 @@ export async function assignWork(input: {
   staffCode: string;
   title: string;
   detail?: string;
+  attachments?: string[];
+  trackingNumber?: string;
   assignedBy: string;
   createdAtIso: string;
 }): Promise<void> {
@@ -97,6 +103,8 @@ export async function assignWork(input: {
     staffCode: input.staffCode,
     title: input.title,
     ...(input.detail ? { detail: input.detail } : {}),
+    ...(input.attachments && input.attachments.length ? { attachments: input.attachments } : {}),
+    ...(input.trackingNumber ? { trackingNumber: input.trackingNumber } : {}),
     status: "open",
     assignedBy: input.assignedBy,
     createdAt: input.createdAtIso

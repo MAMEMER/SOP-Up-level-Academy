@@ -4211,6 +4211,16 @@ main .page > section, main > section { margin-top: 16px !important; }
 .assign-work__row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); flex: 1; min-width: 140px; }
 .assign-work__form input, .assign-work__form select { border: 1px solid rgba(255,199,142,0.5); border-radius: 10px; padding: 9px 12px; font-size: 14px; font-family: inherit; }
 .assign-work__form > button { align-self: flex-start; }
+.assign-work__detail { border: 1px solid rgba(255,199,142,0.5); border-radius: 10px; padding: 9px 12px; font-size: 14px; font-family: inherit; resize: vertical; }
+.assign-work__tracking { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); }
+.assign-work__attach { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed rgba(255,199,142,0.6); border-radius: 12px; background: rgba(255,140,66,0.04); }
+.assign-work__attach-row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.assign-work__attach-file { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px dashed rgba(255,140,66,0.6); color: var(--color-orange); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; white-space: nowrap; background: rgba(255,140,66,0.06); }
+.assign-work__attach-file input { display: none; }
+.assign-work__attach-link { flex: 1; min-width: 160px; }
+.assign-work__attach-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.assign-work__attach-list li { display: inline-flex; align-items: center; gap: 6px; }
+.assignment-detail__attachments { margin-top: 10px; }
 .assign-work__empty { font-size: 13px; color: var(--color-ink-soft); }
 .assign-work__list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .assign-work__item { display: flex; gap: 10px; align-items: center; background: #fff; border: 1px solid rgba(255,199,142,0.4); border-radius: 12px; padding: 11px 14px; }

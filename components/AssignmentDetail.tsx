@@ -207,10 +207,27 @@ export function AssignmentDetail({
         </span>
       </section>
 
-      {record.detail ? (
+      {record.detail || record.trackingNumber || record.attachments?.length ? (
         <section className="assignment-detail__brief soft-card">
           <p className="assign-work__label">รายละเอียดงานจากเจ้าของร้าน</p>
-          <p>{record.detail}</p>
+          {record.detail ? <p style={{ whiteSpace: "pre-wrap" }}>{record.detail}</p> : null}
+          {record.trackingNumber ? (
+            <p><strong>เลขแทค / พัสดุ ส่งสินค้า:</strong> {record.trackingNumber}</p>
+          ) : null}
+          {record.attachments?.length ? (
+            <div className="assignment-detail__attachments">
+              <p className="assign-work__label">ไฟล์แนบจากเจ้าของร้าน</p>
+              <div className="assignment-detail__evidence-view">
+                {record.attachments.map((u) =>
+                  isImageUrl(u) ? (
+                    <img key={u} className="evidence-input__preview" src={u} alt="ไฟล์แนบ" />
+                  ) : (
+                    <a key={u} href={u} target="_blank" rel="noreferrer">{u}</a>
+                  )
+                )}
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
