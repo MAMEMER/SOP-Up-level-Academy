@@ -274,23 +274,36 @@ function ShippingTaskDetails({
   canEdit,
   workDate,
   details,
-  updateDetail
+  noOrder,
+  updateDetail,
+  onNoOrderChange
 }: {
   index: number;
   canEdit: boolean;
   workDate: string;
   details: Record<string, string>;
+  noOrder: boolean;
   updateDetail: (key: string, value: string) => void;
+  onNoOrderChange: (isNoOrder: boolean) => void;
 }) {
   if (index === 0) {
-    const channels = ["Facebook", "IG", "Line group", "Shopee", "ไม่มีออเดอร์"] as const;
+    const channels = ["Facebook", "IG", "Line group", "Shopee"] as const;
 
     return (
       <div className="detail-panel">
         <div className="detail-panel-head">
           <strong>ช่องทางออเดอร์</strong>
-          <small>ตรวจสอบเช็คสินค้าที่ต้องจัดส่งจากช่องทางที่มีงานวันนี้</small>
+          <small>ถ้าวันนี้ไม่มีออเดอร์ต้องส่ง ให้ติ๊ก “ไม่มีออเดอร์” เพื่อข้ามขั้นตอนที่เหลือและกดส่งงานได้เลย</small>
         </div>
+        <label className="detail-check">
+          <input
+            type="checkbox"
+            checked={noOrder}
+            disabled={!canEdit}
+            onChange={(event) => onNoOrderChange(event.target.checked)}
+          />
+          <span>ไม่มีออเดอร์</span>
+        </label>
         <div className="detail-grid">
           {channels.map((channel) => {
             const key = `shipping-channel-${channel.toLowerCase().replaceAll(" ", "-")}`;
@@ -298,8 +311,8 @@ function ShippingTaskDetails({
               <label key={channel} className="detail-check">
                 <input
                   type="checkbox"
-                  checked={details[detailKey(workDate, key)] === "มี"}
-                  disabled={!canEdit}
+                  checked={!noOrder && details[detailKey(workDate, key)] === "มี"}
+                  disabled={!canEdit || noOrder}
                   onChange={(event) => updateDetail(key, event.target.checked ? "มี" : "")}
                 />
                 <span>{channel}</span>
@@ -324,8 +337,8 @@ function ShippingTaskDetails({
             type="number"
             inputMode="numeric"
             min="0"
-            value={details[detailKey(workDate, "shipping-total-order-count")] || ""}
-            disabled={!canEdit}
+            value={noOrder ? "" : details[detailKey(workDate, "shipping-total-order-count")] || ""}
+            disabled={!canEdit || noOrder}
             onChange={(event) => updateDetail("shipping-total-order-count", event.target.value)}
             placeholder="เช่น 12"
           />
@@ -344,8 +357,8 @@ function ShippingTaskDetails({
         <label className="detail-check">
           <input
             type="checkbox"
-            checked={details[detailKey(workDate, "shipping-dispatched-with-tracking-record")] === "เรียบร้อย"}
-            disabled={!canEdit}
+            checked={!noOrder && details[detailKey(workDate, "shipping-dispatched-with-tracking-record")] === "เรียบร้อย"}
+            disabled={!canEdit || noOrder}
             onChange={(event) => updateDetail("shipping-dispatched-with-tracking-record", event.target.checked ? "เรียบร้อย" : "")}
           />
           <span>จัดส่งสินค้าพร้อมเพิ่ม record เลข track</span>
@@ -353,8 +366,8 @@ function ShippingTaskDetails({
         <label className="workflow-note-field compact">
           <span>เลข track</span>
           <textarea
-            value={details[detailKey(workDate, "shipping-tracking-number")] || ""}
-            disabled={!canEdit}
+            value={noOrder ? "" : details[detailKey(workDate, "shipping-tracking-number")] || ""}
+            disabled={!canEdit || noOrder}
             onChange={(event) => updateDetail("shipping-tracking-number", event.target.value)}
             placeholder="กรอกเลข tracking หลังจัดส่ง"
           />
@@ -959,6 +972,31 @@ export function WorkflowChecklist({
     });
   }
 
+  // "ไม่มีออเดอร์" สำหรับหัวข้อจัดส่งสินค้า (daytime-work): ทั้ง phase เป็นงานเกี่ยวกับออเดอร์
+  // เมื่อไม่มีออเดอร์ต้องส่ง → ติ๊กทุกข้ออัตโนมัติ ข้ามขั้นตอนที่เหลือ ให้กดส่งงานได้เลย
+  function setDaytimeNoOrder(phase: WorkflowPhase, isNoOrder: boolean) {
+    const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
+    if (!isWithinWorkflowWorkHours(now)) return;
+    if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records)) return;
+
+    updateDetail("shipping-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
+    if (isNoOrder) {
+      // เคลียร์รายละเอียดออเดอร์ที่ไม่จำเป็นแล้ว
+      updateDetail("shipping-total-order-count", "");
+      updateDetail("shipping-dispatched-with-tracking-record", "");
+      updateDetail("shipping-tracking-number", "");
+    }
+    setChecked((current) => {
+      const next = { ...current };
+      phase.checklist.forEach((_, index) => {
+        next[itemKey(phase.id, index)] = isNoOrder;
+      });
+      if (!record) persistPhaseRecord(phase, "saved", next);
+      return next;
+    });
+  }
+
   function unlockPhaseForAdmin(phase: WorkflowPhase) {
     if (!isAdmin) return;
     const existing = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
@@ -1093,9 +1131,12 @@ export function WorkflowChecklist({
                   const noOrderKey = noOrderKeyForPhase(phase);
                   const closeNoOrderActive =
                     phase.id === "close-store" && details[detailKey(workDate, "closing-no-order")] === "ไม่มีออเดอร์";
+                  const daytimeNoOrderActive =
+                    phase.id === "daytime-work" && details[detailKey(workDate, "shipping-no-order")] === "ไม่มีออเดอร์";
                   const disabledByNoOrder =
                     Boolean(noOrderKey && checked[noOrderKey] && key !== noOrderKey) ||
-                    (closeNoOrderActive && index === 0);
+                    (closeNoOrderActive && index === 0) ||
+                    daytimeNoOrderActive;
                   const hasDetail =
                     phase.id === "open-store" ||
                     phase.id === "stock-work" ||
@@ -1143,7 +1184,9 @@ export function WorkflowChecklist({
                               canEdit={canEdit}
                               workDate={workDate}
                               details={details}
+                              noOrder={daytimeNoOrderActive}
                               updateDetail={updateDetail}
+                              onNoOrderChange={(isNoOrder) => setDaytimeNoOrder(phase, isNoOrder)}
                             />
                           ) : null}
                           {phase.id === "close-store" ? (
