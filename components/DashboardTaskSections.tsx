@@ -320,13 +320,8 @@ export function DashboardTaskSections({
             const active = isWeeklyEventActiveOn(event, workDate);
             // ยังไม่ถึงวันจัด → โชว์สีเทา (muted) และไม่นับเป็น assigned work
             const statusClass = !active ? "workflow-status-white is-muted" : done ? "workflow-status-green" : "workflow-status-white";
-            return (
-              <a
-                key={event.id}
-                href={weeklyEventHref(event.id)}
-                className={`daily-phase-card ${statusClass}`}
-                aria-disabled={!active}
-              >
+            const cardInner = (
+              <>
                 <span>{done ? "✓" : String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <small>Weekly event · {event.game}</small>
@@ -334,9 +329,30 @@ export function DashboardTaskSections({
                   {active ? (
                     <em>ถึงกำหนดวันนี้ · {event.schedule} · {completed}/{total}</em>
                   ) : (
-                    <em>ยังไม่ถึงกำหนด · จัดวัน{weeklyEventDaysLabel(event)}</em>
+                    <em>🔒 ยังไม่ถึงกำหนด · จัดวัน{weeklyEventDaysLabel(event)}</em>
                   )}
                 </div>
+              </>
+            );
+            // ยังไม่ถึงวันจัด → ปิดการกด (render เป็น div ไม่ใช่ลิงก์) ห้ามเข้าไปทำ
+            if (!active) {
+              return (
+                <div
+                  key={event.id}
+                  className={`daily-phase-card ${statusClass} is-locked`}
+                  aria-disabled="true"
+                >
+                  {cardInner}
+                </div>
+              );
+            }
+            return (
+              <a
+                key={event.id}
+                href={weeklyEventHref(event.id)}
+                className={`daily-phase-card ${statusClass}`}
+              >
+                {cardInner}
               </a>
             );
           })}

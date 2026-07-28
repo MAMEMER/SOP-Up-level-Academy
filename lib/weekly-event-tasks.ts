@@ -224,6 +224,12 @@ export function weekdayOfWorkDate(workDate: string): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
+/** วันทำงานวันนี้ตามเวลาไทย ("YYYY-MM-DD") — ใช้ฝั่ง server เพื่อ gate การเข้าทำ weekly task */
+export function todayWorkDate(now: Date = new Date()): string {
+  // en-CA ให้รูปแบบ YYYY-MM-DD, บังคับ timezone ไทยเพื่อไม่ให้ UTC เลื่อนวัน
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(now);
+}
+
 /** งานกิจกรรมนี้ active (ถึงวันจัด) ในวัน workDate หรือไม่ */
 export function isWeeklyEventActiveOn(event: WeeklyEvent, workDate: string): boolean {
   return event.activeDays.includes(weekdayOfWorkDate(workDate));

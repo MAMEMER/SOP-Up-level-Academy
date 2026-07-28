@@ -2961,6 +2961,32 @@ a {
   opacity: 0.75;
 }
 
+/* การ์ด weekly ที่ยังไม่ถึงวันจัด → ปิดการกด (ไม่ใช่ลิงก์ ห้ามเข้าไปทำ) */
+.daily-phase-card.is-locked {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* กล่องแจ้งเตือนเมื่อพยายามเข้าหน้า weekly task ที่ยังไม่ถึงกำหนด */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  text-align: center;
+  background: #f5f5f7;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  color: #48484a;
+}
+
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
 .workflow-status-purple {
   background: #1d1d1f;
   border-left-color: #000;
