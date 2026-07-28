@@ -43,6 +43,12 @@ export type WeeklyEvent = {
   /** ชื่อกลุ่ม LINE ที่ต้องลงผลของเกมนี้ */
   lineGroup: string;
   schedule: string;
+  /**
+   * วันในสัปดาห์ที่กิจกรรมนี้จัด (0=อาทิตย์ … 6=เสาร์) — งานจะ "active"
+   * และขึ้นเป็น Assigned work เฉพาะวันเหล่านี้เท่านั้น วันอื่นจะโชว์สีเทา (ยังไม่ถึงกำหนด)
+   * ตรงกับตารางที่กำหนดใน /admin/schedule
+   */
+  activeDays: number[];
   timeWindow: string;
   completionScope: typeof WEEKLY_EVENT_COMPLETION_SCOPE;
   trainingHref: string;
@@ -159,6 +165,7 @@ function makeEvent(params: {
   game: string;
   lineGroup: string;
   schedule: string;
+  activeDays: number[];
 }): WeeklyEvent {
   const id = `weekly-event-${params.key}`;
   return {
@@ -168,6 +175,7 @@ function makeEvent(params: {
     game: params.game,
     lineGroup: params.lineGroup,
     schedule: params.schedule,
+    activeDays: params.activeDays,
     timeWindow: "09:00-23:59 ของวันกิจกรรม",
     completionScope: WEEKLY_EVENT_COMPLETION_SCOPE,
     trainingHref: `/training#${id}`,
@@ -182,23 +190,54 @@ export const weeklyEvents: WeeklyEvent[] = [
     name: "Gym pokemon",
     game: "Pokemon",
     lineGroup: "กลุ่ม LINE Pokemon",
-    schedule: "วันจัดกิจกรรม Gym Pokémon ประจำสัปดาห์"
+    schedule: "ทุกวันอังคาร ศุกร์ เสาร์",
+    // อังคาร(2), ศุกร์(5), เสาร์(6)
+    activeDays: [2, 5, 6]
   }),
   makeEvent({
     key: "lorcana",
     name: "Lorcana",
     game: "Lorcana",
     lineGroup: "กลุ่ม LINE Lorcana",
-    schedule: "สัปดาห์แรก และสัปดาห์ที่ 3 ของเดือน"
+    schedule: "ทุกวันพุธ ถึง อาทิตย์",
+    // พุธ(3), พฤหัส(4), ศุกร์(5), เสาร์(6), อาทิตย์(0)
+    activeDays: [3, 4, 5, 6, 0]
   }),
   makeEvent({
     key: "riftbound",
     name: "Rift Bound",
     game: "Rift Bound",
     lineGroup: "กลุ่ม LINE Rift Bound",
-    schedule: "วันจัดกิจกรรม Rift Bound ประจำสัปดาห์"
+    schedule: "ทุกวันเสาร์ อาทิตย์",
+    // เสาร์(6), อาทิตย์(0) — ค่าเริ่มต้น รอ Champ ยืนยันวันจริง
+    activeDays: [6, 0]
   })
 ];
+
+// ชื่อวันภาษาไทย (0=อาทิตย์ … 6=เสาร์)
+export const thaiWeekdayNames = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"] as const;
+
+/** วันในสัปดาห์ของ workDate ("YYYY-MM-DD") แบบไม่โดน timezone เลื่อน (0=อาทิตย์ … 6=เสาร์) */
+export function weekdayOfWorkDate(workDate: string): number {
+  const [year, month, day] = workDate.split("-").map(Number);
+  if (!year || !month || !day) return new Date(`${workDate}T00:00:00`).getDay();
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+/** งานกิจกรรมนี้ active (ถึงวันจัด) ในวัน workDate หรือไม่ */
+export function isWeeklyEventActiveOn(event: WeeklyEvent, workDate: string): boolean {
+  return event.activeDays.includes(weekdayOfWorkDate(workDate));
+}
+
+/** รายการงานกิจกรรมที่ active ในวัน workDate (เรียงตามลำดับเดิม) */
+export function weeklyEventsActiveOn(workDate: string): WeeklyEvent[] {
+  return weeklyEvents.filter((event) => isWeeklyEventActiveOn(event, workDate));
+}
+
+/** ป้ายชื่อวันที่จัดกิจกรรม เช่น "อังคาร ศุกร์ เสาร์" */
+export function weeklyEventDaysLabel(event: WeeklyEvent): string {
+  return event.activeDays.map((day) => thaiWeekdayNames[day]).join(" ");
+}
 
 export function weeklyEventById(id: string): WeeklyEvent | undefined {
   return weeklyEvents.find((event) => event.id === id);

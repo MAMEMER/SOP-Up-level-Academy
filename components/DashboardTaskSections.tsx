@@ -28,7 +28,9 @@ import {
 } from "../lib/monthly-event-tasks.ts";
 import { readMonthlyEventStates } from "../lib/monthly-event-store.ts";
 import {
+  isWeeklyEventActiveOn,
   weeklyEventCompleted,
+  weeklyEventDaysLabel,
   weeklyEventHref,
   weeklyEvents,
   type WeeklyEvent
@@ -136,6 +138,10 @@ export function DashboardTaskSections({
     return map;
   }
 
+  // งานกิจกรรมที่ "ถึงกำหนด" ในวันนี้เท่านั้น → ขึ้นเป็น Assigned work + ลิงก์ส่งงาน/หลักฐาน
+  // งานที่ยังไม่ถึงกำหนดจะไม่ถูกนับเป็น assigned work (โชว์สีเทาในหมวด Weekly task แทน)
+  const activeWeeklyEvents = weeklyEvents.filter((event) => isWeeklyEventActiveOn(event, workDate));
+
   return (
     <section className="task-sections">
       <article id="assigned-work" className="task-section assigned-work-task">
@@ -151,7 +157,7 @@ export function DashboardTaskSections({
           ) : null}
         </div>
         <div className="daily-phase-grid">
-          {assignedWorkRecords.length || assignedWorkFeed.length ? (
+          {assignedWorkRecords.length || assignedWorkFeed.length || activeWeeklyEvents.length ? (
             <>
               {assignedWorkRecords.map((record, index) => {
                 const effectiveStatus = effectiveAssignedWorkStatus(record);
@@ -185,6 +191,26 @@ export function DashboardTaskSections({
                   </div>
                 </a>
               ))}
+              {activeWeeklyEvents.map((event, index) => {
+                const completed = weeklyEventCompleted(event, weeklyEventTickedMap(event));
+                const total = event.checklist.length;
+                const done = completed === total && completed > 0;
+                const seq = assignedWorkRecords.length + assignedWorkFeed.length + index + 1;
+                return (
+                  <a
+                    key={`weekly-${event.id}`}
+                    href={weeklyEventHref(event.id)}
+                    className={`daily-phase-card ${done ? "workflow-status-green" : "workflow-status-white"}`}
+                  >
+                    <span>{done ? "✓" : String(seq).padStart(2, "0")}</span>
+                    <div>
+                      <small>Weekly event · {event.game} · {workDate}</small>
+                      <strong>{event.name}</strong>
+                      <em>ถึงกำหนดวันนี้ · ส่งงาน/หลักฐาน · {completed}/{total}</em>
+                    </div>
+                  </a>
+                );
+              })}
             </>
           ) : (
             <a
@@ -291,17 +317,25 @@ export function DashboardTaskSections({
             const completed = weeklyEventCompleted(event, weeklyEventTickedMap(event));
             const total = event.checklist.length;
             const done = completed === total && completed > 0;
+            const active = isWeeklyEventActiveOn(event, workDate);
+            // ยังไม่ถึงวันจัด → โชว์สีเทา (muted) และไม่นับเป็น assigned work
+            const statusClass = !active ? "workflow-status-white is-muted" : done ? "workflow-status-green" : "workflow-status-white";
             return (
               <a
                 key={event.id}
                 href={weeklyEventHref(event.id)}
-                className={`daily-phase-card ${done ? "workflow-status-green" : "workflow-status-white"}`}
+                className={`daily-phase-card ${statusClass}`}
+                aria-disabled={!active}
               >
                 <span>{done ? "✓" : String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <small>Weekly event · {event.game}</small>
                   <strong>{event.name}</strong>
-                  <em>{event.schedule} · {completed}/{total}</em>
+                  {active ? (
+                    <em>ถึงกำหนดวันนี้ · {event.schedule} · {completed}/{total}</em>
+                  ) : (
+                    <em>ยังไม่ถึงกำหนด · จัดวัน{weeklyEventDaysLabel(event)}</em>
+                  )}
                 </div>
               </a>
             );

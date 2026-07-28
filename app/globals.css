@@ -2950,6 +2950,17 @@ a {
   border-left-color: #424245;
 }
 
+/* งาน weekly ที่ยังไม่ถึงวันจัด → สีเทา จางลง สื่อว่ายังไม่ active */
+.daily-phase-card.is-muted {
+  background: #f5f5f7;
+  border-left-color: #d2d2d7;
+  opacity: 0.55;
+}
+
+.daily-phase-card.is-muted:hover {
+  opacity: 0.75;
+}
+
 .workflow-status-purple {
   background: #1d1d1f;
   border-left-color: #000;
