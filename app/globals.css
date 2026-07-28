@@ -4539,3 +4539,115 @@ main .page > section, main > section { margin-top: 16px !important; }
   .checklist-done-overlay,
   .checklist-done-check { animation: none; }
 }
+
+/* ========================================================
+   Staff self-view (มุมมองพนักงาน) — editorial, no boxes.
+   ======================================================== */
+.staff-empty {
+  margin-top: 24px;
+  padding: 28px 0;
+  border-top: 1px solid rgba(45,49,66,0.12);
+}
+.staff-empty p { font-size: 17px; color: var(--color-ink); margin: 0 0 6px; }
+.staff-empty small { color: var(--color-ink-soft); }
+
+.staff-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(45,49,66,0.12);
+}
+.staff-switch label { font-size: 13px; color: var(--color-ink-soft); }
+.staff-switch select {
+  font-family: var(--guild-font);
+  font-size: 14px;
+  padding: 6px 10px;
+  border: 1px solid rgba(45,49,66,0.2);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.6);
+  color: var(--color-ink);
+}
+.staff-switch button {
+  font-family: var(--guild-font);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-orange);
+  color: #fff;
+  cursor: pointer;
+}
+
+.staff-score {
+  margin-top: 22px;
+  padding-top: 8px;
+}
+.staff-score-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.staff-score-head h3 { margin: 2px 0 0; font-size: 18px; }
+
+.staff-score-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 32px;
+  margin: 16px 0 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(45,49,66,0.12);
+}
+.staff-score-total { display: flex; align-items: baseline; gap: 8px; }
+.staff-score-total strong { font-size: 56px; line-height: 1; color: var(--color-orange); }
+.staff-score-total span { font-size: 15px; color: var(--color-ink-soft); }
+.staff-score-incentive { display: flex; flex-direction: column; gap: 1px; }
+.staff-score-incentive span { font-size: 12px; color: var(--color-orange); font-weight: 600; letter-spacing: 0.05em; }
+.staff-score-incentive strong { font-size: 26px; line-height: 1.1; color: var(--color-ink); }
+.staff-score-incentive em { font-style: normal; font-size: 14px; color: var(--color-ink); }
+.staff-score-incentive small { font-size: 12.5px; color: var(--color-ink-soft); }
+
+.staff-score-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-bottom: 22px;
+}
+.staff-score-categories span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--color-ink-soft);
+}
+.staff-score-categories strong { font-size: 16px; color: var(--color-ink); }
+
+.staff-score-leave { margin-bottom: 22px; }
+.staff-score-leave > div { display: flex; flex-wrap: wrap; gap: 12px 40px; margin-top: 8px; }
+.staff-score-leave span { display: flex; flex-direction: column; gap: 1px; font-size: 13px; color: var(--color-ink-soft); }
+.staff-score-leave strong { font-size: 18px; color: var(--color-ink); }
+.staff-score-leave small { font-size: 12px; color: var(--color-ink-soft); }
+
+.staff-score-deductions { margin-bottom: 18px; }
+.staff-score-deductions ul { list-style: none; margin: 10px 0 0; padding: 0; }
+.staff-score-deductions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(45,49,66,0.1);
+}
+.staff-deduction-cat { font-weight: 600; color: var(--color-ink); font-size: 14px; }
+.staff-deduction-points { color: #b91c1c; font-weight: 700; font-size: 14px; }
+.staff-deduction-detail { flex: 1 1 260px; color: var(--color-ink); font-size: 14px; }
+.staff-deduction-source { font-size: 12.5px; color: var(--color-ink-soft); }
+.staff-score-clear { margin-top: 8px; color: #15803d; font-size: 14px; }
+
+.staff-score-leave-records > div { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; }
+.staff-score-leave-records span { font-size: 13px; color: var(--color-ink-soft); }
