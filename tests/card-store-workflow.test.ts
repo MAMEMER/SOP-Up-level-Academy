@@ -4,7 +4,7 @@ import { cardStoreWorkflow, phasesForShift, stockWorkSummaryCards, workflowManua
 
 describe("card store workflow content", () => {
   it("covers the full day from opening preparation to closing", () => {
-    assert.deepEqual(cardStoreWorkflow.map((phase) => phase.title), ["เปิดร้าน", "จัดส่งสินค้า", "Stock", "ปิดร้าน"]);
+    assert.deepEqual(cardStoreWorkflow.map((phase) => phase.title), ["เปิดร้าน", "Stock", "จัดส่งสินค้า", "ปิดร้าน"]);
   });
 
   it("separates stock from daytime shipping work", () => {
@@ -65,8 +65,8 @@ describe("card store workflow content", () => {
       cardStoreWorkflow.map((phase) => [phase.title, workflowManualHref(phase.id)]),
       [
         ["เปิดร้าน", "/training#open-store"],
-        ["จัดส่งสินค้า", "/training#daytime-work"],
         ["Stock", "/training#stock-work"],
+        ["จัดส่งสินค้า", "/training#daytime-work"],
         ["ปิดร้าน", "/training#close-store"]
       ]
     );
