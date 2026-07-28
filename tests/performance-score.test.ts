@@ -1077,6 +1077,21 @@ describe("performance score engine", () => {
     assert.equal(records[0].discrepancyStatus, "real_loss");
   });
 
+  it("maps a positive-only StoreHub Difference (overage, not a loss) to matched, not real_loss", () => {
+    const csv = [
+      '"Start Time","Completed Time","Description","Store","Supplier","Product Name","SKU","Barcode","Category","Cost (RM)","Expected Qty","Counted Qty","Difference","Cost Difference","Status","Started By","Completed By"',
+      '"07/08/2026 12:00","07/08/2026 12:15","","Up level Academy","น้ำ,ขนม","Coke","drink01","","Drink","0.00","10.000","10.000","0.000","0.00","Completed","Up LEO","Ungkanawin Narawit"',
+      '"07/08/2026 12:00","07/08/2026 12:15","","Up level Academy","น้ำ,ขนม","Water","drink05","","Drink","0.00","5.000","7.000","2.000","0.00","Completed","Up LEO","Ungkanawin Narawit"'
+    ].join("\n");
+
+    const records = mapStoreHubStockTakeRowsToCounts(parseStoreHubStockTakeCsv(csv));
+
+    assert.equal(records.length, 1);
+    assert.equal(records[0].expectedQuantity, 15);
+    assert.equal(records[0].actualQuantity, 17);
+    assert.equal(records[0].discrepancyStatus, "matched");
+  });
+
   it("parses StoreHub grouped timesheet CSV export into first daily clock-ins", () => {
     const csv = [
       '"Last Name","First Name","Email","Time In","Time Out","Total Hours"',

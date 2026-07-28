@@ -108,7 +108,11 @@ export function mapStoreHubStockTakeRowsToCounts(rows: StoreHubStockTakeExportRo
       const detailRows = group.filter((item) => item.productName || item.expectedQuantity || item.countedQuantity || item.difference);
       const expectedQuantity = detailRows.reduce((sum, item) => sum + item.expectedQuantity, 0);
       const actualQuantity = detailRows.reduce((sum, item) => sum + item.countedQuantity, 0);
-      const hasDifference = detailRows.some((item) => item.difference !== 0);
+      // Ticket AVPJxqNQ621m5blXa9rk: only a NEGATIVE StoreHub Difference (stock ติดลบ — counted
+      // fewer than expected = real loss) maps to "real_loss" and can deduct points. A positive
+      // Difference (overage / นับได้เกิน) is NOT a loss and must not trigger a stock deduction,
+      // so it stays "matched". Previously ANY non-zero difference (incl. overage) became real_loss.
+      const hasNegativeDifference = detailRows.some((item) => item.difference < 0);
       return {
         employeeName,
         owner: employeeName,
@@ -119,7 +123,7 @@ export function mapStoreHubStockTakeRowsToCounts(rows: StoreHubStockTakeExportRo
         submittedAt: row.status === "Completed" ? completedAt : undefined,
         expectedQuantity,
         actualQuantity,
-        discrepancyStatus: hasDifference ? "real_loss" as const : "matched" as const,
+        discrepancyStatus: hasNegativeDifference ? "real_loss" as const : "matched" as const,
         source: "storehub"
       };
     });
