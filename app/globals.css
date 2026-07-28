@@ -4192,7 +4192,30 @@ main .page > section, main > section { margin-top: 16px !important; }
 .assign-work__check { border: 1px solid rgba(255,140,66,0.5); background: #fff; border-radius: 999px; width: 26px; height: 26px; color: var(--color-orange); cursor: pointer; flex: 0 0 auto; }
 .assign-work__item-main { flex: 1; display: flex; flex-direction: column; }
 .assign-work__item-main em { font-style: normal; font-size: 12px; color: var(--color-ink-soft); }
+.assign-work__item { align-items: flex-start; }
+.assign-work__item--submitted { background: rgba(255,199,142,0.14); border-color: #ffb26b; }
+.assign-work__item--needs_revision { background: rgba(255,120,120,0.12); border-color: #f08a8a; }
+.assign-work__item-main em a { color: var(--color-orange); text-decoration: underline; }
+.assign-work__open { font-size: 12px; color: var(--color-orange); margin-top: 2px; }
+.assign-work__actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; flex: 0 0 auto; }
+.assign-work__accept { border: 1px solid #8fce9e; background: rgba(184,230,193,0.35); color: #2f7d43; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; cursor: pointer; }
+.assign-work__revise { border: 1px solid #f0b48a; background: #fff; color: #b0663f; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; cursor: pointer; }
 .assign-work__del { border: none; background: transparent; color: #b0343f; font-size: 12.5px; cursor: pointer; flex: 0 0 auto; }
+
+/* ── Staff: งานที่มอบหมายกับฉัน (grouped) + submit page ───────────────────── */
+.my-assigned__groups { display: flex; flex-direction: column; gap: 16px; }
+.my-assigned__group-label { font-size: 13px; font-weight: 700; margin: 0 0 8px; color: var(--color-ink-soft); }
+.my-assigned__group-label.is-red { color: #b0343f; }
+.my-assigned__group-label.is-green { color: #2f7d43; }
+.my-shift__task-link { display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: inherit; }
+.my-shift__task-flag { font-size: 11.5px; color: var(--color-orange) !important; }
+.my-shift__task-flag.is-red { color: #b0343f !important; }
+.assignment-detail__brief, .assignment-detail__revision { padding: 14px 16px; margin-bottom: 14px; }
+.assignment-detail__revision { border: 1px solid #f08a8a; background: rgba(255,120,120,0.1); }
+.assignment-detail__ok { color: #2f7d43; font-weight: 600; margin: 8px 0; }
+.assignment-detail__evidence { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.assignment-detail__evidence li { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.assignment-detail__evidence-view { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
 
 /* ── Owner: ปรับ Checklist daily ──────────────────────────────────────────── */
 .checklist-config { display: flex; flex-direction: column; gap: 14px; }

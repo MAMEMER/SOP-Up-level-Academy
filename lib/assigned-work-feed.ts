@@ -24,8 +24,10 @@ export type OwnerAssignmentInput = {
   staffCode: string;
   title: string;
   detail?: string;
-  status: "open" | "done";
+  status: "open" | "submitted" | "needs_revision" | "done";
   assignedBy?: string;
+  note?: string;
+  submittedAt?: string;
 };
 
 export type HandoffInput = {
@@ -48,7 +50,7 @@ export type AssignedWorkFeedItem = {
   workDate: string;
   assigneeLabel: string;
   originLabel: string;
-  statusClass: "workflow-status-white" | "workflow-status-orange" | "workflow-status-green";
+  statusClass: "workflow-status-white" | "workflow-status-orange" | "workflow-status-green" | "workflow-status-red";
   statusText: string;
   href: string;
   // raw fields used only for viewer filtering
@@ -58,8 +60,18 @@ export type AssignedWorkFeedItem = {
   claimedBy: string | null;
 };
 
+const OWNER_STATUS_META: Record<
+  OwnerAssignmentInput["status"],
+  { statusClass: AssignedWorkFeedItem["statusClass"]; statusText: string }
+> = {
+  open: { statusClass: "workflow-status-white", statusText: "ยังไม่ส่ง" },
+  submitted: { statusClass: "workflow-status-orange", statusText: "ส่งแล้ว รอตรวจ" },
+  needs_revision: { statusClass: "workflow-status-red", statusText: "ต้องแก้ไข" },
+  done: { statusClass: "workflow-status-green", statusText: "รับงานแล้ว" }
+};
+
 export function ownerAssignmentToFeedItem(assignment: OwnerAssignmentInput): AssignedWorkFeedItem {
-  const done = assignment.status === "done";
+  const meta = OWNER_STATUS_META[assignment.status] ?? OWNER_STATUS_META.open;
   return {
     id: assignment.id,
     origin: "owner",
@@ -68,9 +80,10 @@ export function ownerAssignmentToFeedItem(assignment: OwnerAssignmentInput): Ass
     workDate: assignment.workDate,
     assigneeLabel: displayNameFor(assignment.staffCode),
     originLabel: "มอบหมายโดยเจ้าของร้าน",
-    statusClass: done ? "workflow-status-green" : "workflow-status-white",
-    statusText: done ? "เสร็จแล้ว" : "รอทำ",
-    href: "/admin/assign",
+    statusClass: meta.statusClass,
+    statusText: meta.statusText,
+    // Click straight into the staff submit/detail page — staff ส่งงาน, เจ้าของร้านตรวจได้ที่นี่.
+    href: `/assigned-work/task/${encodeURIComponent(assignment.id)}`,
     staffCode: assignment.staffCode,
     toStaff: null,
     fromStaff: null,

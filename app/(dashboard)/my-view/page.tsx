@@ -16,6 +16,7 @@ import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { resolveStaffViewSelection } from "../../../lib/staff-view.ts";
 import { StaffScoreCard } from "../../../components/StaffScoreCard.tsx";
 import { MyShiftToday } from "../../../components/MyShiftToday.tsx";
+import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
 
@@ -106,6 +107,8 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       {row ? <StaffScoreCard row={row} periodLabel={PERIOD_LABEL} /> : null}
 
       <MyShiftToday staffCode={selectedCode} branch={branch} workDate={workDate} />
+
+      <MyAssignedWork staffCode={selectedCode} branch={branch} workDate={workDate} />
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} />
       <DashboardTaskSections

@@ -8,10 +8,10 @@ import {
   fetchMyAssignments,
   fetchOpenHandoffs,
   handoffsForStaff,
-  markAssignmentDone,
   type WorkAssignment,
   type WorkHandoff
 } from "../lib/work-assignments-store.ts";
+import { assignmentStatusLabel } from "../lib/assignment-view.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 
 type LoadState = {
@@ -19,10 +19,6 @@ type LoadState = {
   assignments: WorkAssignment[];
   handoffs: WorkHandoff[];
 };
-
-function assignmentIso() {
-  return new Date().toISOString();
-}
 
 export function MyShiftToday({
   staffCode,
@@ -60,20 +56,9 @@ export function MyShiftToday({
   const shift = working ? (assignment as ShiftCode) : null;
   const start = state.plan?.startTime;
 
-  const openAssignments = state.assignments.filter((a) => a.status === "open");
+  // Still needs the staff member's action: not yet submitted, or bounced back to fix.
+  const openAssignments = state.assignments.filter((a) => a.status === "open" || a.status === "needs_revision");
   const openHandoffs = state.handoffs.filter((h) => h.status !== "done");
-
-  async function completeAssignment(id: string) {
-    setState((prev) => ({
-      ...prev,
-      assignments: prev.assignments.map((a) => (a.id === id ? { ...a, status: "done" } : a))
-    }));
-    try {
-      await markAssignmentDone(id, assignmentIso());
-    } catch {
-      /* optimistic — stays checked locally even if the write is retried later */
-    }
-  }
 
   return (
     <section className="my-shift">
@@ -113,15 +98,18 @@ export function MyShiftToday({
               <ul className="my-shift__list">
                 {openAssignments.map((a) => (
                   <li key={a.id}>
-                    <button type="button" onClick={() => completeAssignment(a.id)} aria-label="ทำเสร็จ">○</button>
-                    <span>
+                    <Link href={`/assigned-work/task/${encodeURIComponent(a.id)}`} className="my-shift__task-link">
                       <strong>{a.title}</strong>
                       {a.detail ? <em>{a.detail}</em> : null}
-                    </span>
+                      <em className={a.status === "needs_revision" ? "my-shift__task-flag is-red" : "my-shift__task-flag"}>
+                        {assignmentStatusLabel[a.status]} → กดเพื่อส่งงาน
+                      </em>
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
+            <Link href="/my-view" className="my-shift__link">ดูงานที่มอบหมายทั้งหมด →</Link>
           </article>
 
           <article className="my-shift__card">

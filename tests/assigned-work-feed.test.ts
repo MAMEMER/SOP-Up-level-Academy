@@ -37,16 +37,28 @@ describe("assigned-work feed mappers", () => {
     assert.equal(item.title, "ส่งเสื้อให้ลูกค้าคุณ A");
     assert.equal(item.assigneeLabel, "ICE");
     assert.equal(item.originLabel, "มอบหมายโดยเจ้าของร้าน");
-    assert.equal(item.statusText, "รอทำ");
+    assert.equal(item.statusText, "ยังไม่ส่ง");
     assert.equal(item.statusClass, "workflow-status-white");
-    assert.equal(item.href, "/admin/assign");
+    assert.equal(item.href, "/assigned-work/task/wa__2026-07-27__ICE__x");
     assert.equal(item.staffCode, "ICE");
   });
 
   it("marks a done owner assignment green", () => {
     const item = ownerAssignmentToFeedItem({ ...ownerAssignment, status: "done" });
-    assert.equal(item.statusText, "เสร็จแล้ว");
+    assert.equal(item.statusText, "รับงานแล้ว");
     assert.equal(item.statusClass, "workflow-status-green");
+  });
+
+  it("shows a submitted assignment as awaiting review (orange)", () => {
+    const item = ownerAssignmentToFeedItem({ ...ownerAssignment, status: "submitted" });
+    assert.equal(item.statusText, "ส่งแล้ว รอตรวจ");
+    assert.equal(item.statusClass, "workflow-status-orange");
+  });
+
+  it("flags a bounced-back assignment as needs-revision (red)", () => {
+    const item = ownerAssignmentToFeedItem({ ...ownerAssignment, status: "needs_revision" });
+    assert.equal(item.statusText, "ต้องแก้ไข");
+    assert.equal(item.statusClass, "workflow-status-red");
   });
 
   it("maps a closing-shift handoff to a feed item flagged as handoff", () => {

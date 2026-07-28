@@ -16,6 +16,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
@@ -27,6 +28,13 @@ import { db } from "./firebase-client.ts";
 const ASSIGNMENTS = "work_assignments";
 const HANDOFFS = "work_handoffs";
 
+// Assignment lifecycle (separate from the KPI "performance status"):
+//   open           — มอบหมายแล้ว ยังไม่ส่งงาน
+//   submitted      — staff ส่งงานพร้อมหลักฐานแล้ว รอเจ้าของร้านตรวจ
+//   needs_revision — เจ้าของร้านขอให้แก้ไข → staff ต้องแก้แล้วส่งใหม่
+//   done           — เจ้าของร้านรับงานแล้ว จบ
+export type AssignmentStatus = "open" | "submitted" | "needs_revision" | "done";
+
 export type WorkAssignment = {
   id: string;
   branch: string;
@@ -34,9 +42,17 @@ export type WorkAssignment = {
   staffCode: string; // who it's for
   title: string;
   detail?: string;
-  status: "open" | "done";
+  status: AssignmentStatus;
   assignedBy: string;
   createdAt: string;
+  // Submission fields — filled by the staff member when they send the work in.
+  note?: string; // สรุปสิ่งที่ทำ (staff แก้ไขได้)
+  evidence?: string; // ลิงก์/URL รูปหลักฐาน (จาก Firebase Storage หรือแปะลิงก์เอง)
+  imageEvidence?: string[]; // เผื่อแนบหลายรูป
+  submittedAt?: string;
+  // Review fields — filled by the owner when they accept or bounce it back.
+  revisionNote?: string; // เหตุผลที่ขอให้แก้
+  reviewedAt?: string;
   doneAt?: string;
 };
 
@@ -107,6 +123,53 @@ export async function fetchAssignmentsForDate(branch: string, workDate: string):
     query(collection(db, ASSIGNMENTS), where("branch", "==", branch), where("workDate", "==", workDate))
   );
   return snap.docs.map((d) => d.data() as WorkAssignment);
+}
+
+/** Every assignment ever given to one staff member (feeds the grouped "งานของฉัน" list). */
+export async function fetchAssignmentsForStaff(branch: string, staffCode: string): Promise<WorkAssignment[]> {
+  const snap = await getDocs(
+    query(collection(db, ASSIGNMENTS), where("branch", "==", branch), where("staffCode", "==", staffCode))
+  );
+  return snap.docs.map((d) => d.data() as WorkAssignment);
+}
+
+/** One assignment by id (the staff submit/detail page). */
+export async function fetchAssignmentById(id: string): Promise<WorkAssignment | null> {
+  const snap = await getDoc(doc(db, ASSIGNMENTS, id));
+  return snap.exists() ? (snap.data() as WorkAssignment) : null;
+}
+
+/**
+ * Staff submits the work with evidence. Requires at least one piece of evidence
+ * (an image URL or a written note) — enforced by the caller UI. Clears any prior
+ * revision request so the record reads clean on resubmission.
+ */
+export async function submitAssignment(
+  id: string,
+  input: { note: string; evidence?: string; imageEvidence?: string[]; submittedAtIso: string }
+): Promise<void> {
+  await updateDoc(doc(db, ASSIGNMENTS, id), {
+    status: "submitted",
+    note: input.note,
+    evidence: input.evidence ?? "",
+    imageEvidence: input.imageEvidence ?? [],
+    submittedAt: input.submittedAtIso,
+    revisionNote: ""
+  });
+}
+
+/** Owner bounces a submission back for changes. */
+export async function requestAssignmentRevision(id: string, note: string, reviewedAtIso: string): Promise<void> {
+  await updateDoc(doc(db, ASSIGNMENTS, id), {
+    status: "needs_revision",
+    revisionNote: note,
+    reviewedAt: reviewedAtIso
+  });
+}
+
+/** Owner accepts a submission — final. */
+export async function acceptAssignment(id: string, reviewedAtIso: string): Promise<void> {
+  await updateDoc(doc(db, ASSIGNMENTS, id), { status: "done", doneAt: reviewedAtIso, reviewedAt: reviewedAtIso });
 }
 
 export async function markAssignmentDone(id: string, doneAtIso: string): Promise<void> {

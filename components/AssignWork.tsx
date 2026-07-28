@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
+  acceptAssignment,
   assignWork,
   deleteAssignment,
   fetchAssignmentsForDate,
-  markAssignmentDone,
+  requestAssignmentRevision,
   type WorkAssignment
 } from "../lib/work-assignments-store.ts";
+import { assignmentStatusClass, assignmentStatusLabel } from "../lib/assignment-view.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 
 type StaffOption = { code: string; displayName: string; employmentType: "full_time" | "part_time" };
@@ -80,9 +83,16 @@ export function AssignWork({
     }
   }
 
-  async function toggleDone(row: WorkAssignment) {
+  async function accept(row: WorkAssignment) {
     if (row.status === "done") return;
-    await markAssignmentDone(row.id, new Date().toISOString());
+    await acceptAssignment(row.id, new Date().toISOString());
+    await reload();
+  }
+
+  async function bounce(row: WorkAssignment) {
+    const note = window.prompt("บอก staff ว่าต้องแก้อะไร:");
+    if (!note || !note.trim()) return;
+    await requestAssignmentRevision(row.id, note.trim(), new Date().toISOString());
     await reload();
   }
 
@@ -127,24 +137,48 @@ export function AssignWork({
           <p className="assign-work__empty">ยังไม่มีงานมอบหมายวันนี้</p>
         ) : (
           <ul>
-            {rows.map((row) => (
-              <li key={row.id} className={`assign-work__item assign-work__item--${row.status}`}>
-                <button type="button" className="assign-work__check" onClick={() => toggleDone(row)} aria-label="ทำเสร็จ">
-                  {row.status === "done" ? "●" : "○"}
-                </button>
-                <div className="assign-work__item-main">
-                  <strong>{row.title}</strong>
-                  <em>
-                    {displayNameFor(row.staffCode)}
-                    {row.detail ? ` · ${row.detail}` : ""}
-                    {row.status === "done" ? " · เสร็จแล้ว" : ""}
-                  </em>
-                </div>
-                <button type="button" className="assign-work__del" onClick={() => remove(row.id)} aria-label="ลบ">
-                  ลบ
-                </button>
-              </li>
-            ))}
+            {rows.map((row) => {
+              const submitted = row.status === "submitted" || row.status === "needs_revision";
+              return (
+                <li key={row.id} className={`assign-work__item assign-work__item--${row.status}`}>
+                  <div className="assign-work__item-main">
+                    <strong>{row.title}</strong>
+                    <em>
+                      {displayNameFor(row.staffCode)}
+                      {row.detail ? ` · ${row.detail}` : ""}
+                    </em>
+                    <em className={assignmentStatusClass[row.status]}>สถานะ: {assignmentStatusLabel[row.status]}</em>
+                    {row.note ? <em>สิ่งที่ทำ: {row.note}</em> : null}
+                    {row.imageEvidence?.length ? (
+                      <em>
+                        หลักฐาน:{" "}
+                        {row.imageEvidence.map((u, i) => (
+                          <a key={u} href={u} target="_blank" rel="noreferrer">รูป{i + 1} </a>
+                        ))}
+                      </em>
+                    ) : null}
+                    <Link href={`/assigned-work/task/${encodeURIComponent(row.id)}`} className="assign-work__open">
+                      เปิดดูรายละเอียด →
+                    </Link>
+                  </div>
+                  <div className="assign-work__actions">
+                    {row.status !== "done" ? (
+                      <button type="button" className="assign-work__accept" onClick={() => accept(row)} title="รับงาน">
+                        ✓ รับงาน
+                      </button>
+                    ) : null}
+                    {submitted ? (
+                      <button type="button" className="assign-work__revise" onClick={() => bounce(row)} title="ขอให้แก้">
+                        ขอให้แก้
+                      </button>
+                    ) : null}
+                    <button type="button" className="assign-work__del" onClick={() => remove(row.id)} aria-label="ลบ">
+                      ลบ
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
