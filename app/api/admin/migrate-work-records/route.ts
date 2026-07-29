@@ -6,8 +6,8 @@ import { WORK_RECORDS_COLLECTION, workRecordDocId, type WorkRecordDoc } from "..
 
 // Moves checklist history from one employeeKey to another after a staff code is renamed.
 //
-//   GET /api/admin/migrate-work-records?from=ICE&to=UP-004        → preview
-//   GET /api/admin/migrate-work-records?from=ICE&to=UP-004&apply=1
+//   GET  /api/admin/migrate-work-records?from=ICE&to=UP-004   → preview, never writes
+//   POST /api/admin/migrate-work-records?from=ICE&to=UP-004   → performs the move
 //
 // The key is the staff code and it prefixes the document id, so a rename leaves the old
 // days stranded: the person stops seeing their own history, and the next tick opens a
@@ -17,7 +17,7 @@ import { WORK_RECORDS_COLLECTION, workRecordDocId, type WorkRecordDoc } from "..
 // open it), so the migration has to run here rather than from a local script.
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+async function migrate(request: Request, apply: boolean) {
   const user = await requireUser();
   if (user.role !== "admin" || user.isImpersonating) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -29,7 +29,6 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const from = (params.get("from") || "").trim();
   const to = (params.get("to") || "").trim();
-  const apply = params.get("apply") === "1";
   if (!from || !to || from === to) {
     return NextResponse.json({ error: "from_and_to_required" }, { status: 400 });
   }
@@ -60,4 +59,13 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ ok: true, from, to, applied: apply, count: moves.length, moves });
+}
+
+/** Preview only — a GET must never move data, so nothing here can fire from a prefetch. */
+export async function GET(request: Request) {
+  return migrate(request, false);
+}
+
+export async function POST(request: Request) {
+  return migrate(request, true);
 }
