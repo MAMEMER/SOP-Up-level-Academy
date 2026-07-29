@@ -181,7 +181,24 @@ function minutesLate(scheduledStart: string, clockIn: string) {
   return Math.max(0, Math.floor((Date.parse(clockIn) - Date.parse(scheduledStart)) / 60_000));
 }
 
-export function summarizeLeave(records: LeaveRecord[]): LeaveSummary {
+/**
+ * One leave day per person per date.
+ *
+ * The live planner reports a leave twice when it is both PLANNED (schedule_shifts
+ * assignment=leave_sick) and LOGGED on the day (schedule_actual leaveType) — which is the
+ * normal case for an absence that was known in advance. Counting the array straight
+ * charged those days to the annual allowance twice: Boom's June/July sick leave showed
+ * 14 days against 10 actual days off.
+ *
+ * Later records win, so a leave logged on the day overrides what was planned.
+ */
+function uniqueLeaveDays(records: LeaveRecord[]): LeaveRecord[] {
+  const byDay = new Map(records.map((record) => [`${record.employeeName.trim().toLowerCase()}:${record.workDate}`, record]));
+  return [...byDay.values()].sort((left, right) => left.workDate.localeCompare(right.workDate));
+}
+
+export function summarizeLeave(input: LeaveRecord[]): LeaveSummary {
+  const records = uniqueLeaveDays(input);
   const sickUsed = records.filter((record) => record.type === "sick").length;
   const personalUsed = records.filter((record) => record.type === "personal").length;
   return {

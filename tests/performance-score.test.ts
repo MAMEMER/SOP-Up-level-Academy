@@ -1152,3 +1152,43 @@ describe("employees with no shifts in the window", () => {
     assert.equal(getPerformanceSummary([worked, newHire]).teamAverage, worked.totalScore);
   });
 });
+
+describe("leave allowance counting", () => {
+  const leave = (workDate: string, type: "sick" | "personal", source: "live" | "google-sheet" = "live") => ({
+    employeeName: "Boom",
+    workDate,
+    type,
+    source
+  });
+
+  it("counts a day taken off once even when it is both planned and logged", () => {
+    // The planner reports a known-in-advance absence twice: once as the planned shift
+    // (schedule_shifts assignment=leave_sick) and once as the leave logged on the day
+    // (schedule_actual leaveType). That is the normal case, not a data error.
+    const summary = summarizeLeave([
+      leave("2026-06-26", "sick"),
+      leave("2026-06-27", "sick"),
+      leave("2026-06-26", "sick"),
+      leave("2026-06-27", "sick"),
+      leave("2026-07-02", "sick")
+    ]);
+
+    assert.equal(summary.sickUsed, 3);
+    assert.equal(summary.sickRemaining, 27);
+    assert.deepEqual(summary.records.map((record) => record.workDate), ["2026-06-26", "2026-06-27", "2026-07-02"]);
+  });
+
+  it("keeps the leave logged on the day over the one that was planned", () => {
+    const summary = summarizeLeave([leave("2026-07-02", "sick"), leave("2026-07-02", "personal")]);
+
+    assert.equal(summary.sickUsed, 0);
+    assert.equal(summary.personalUsed, 1);
+  });
+
+  it("still counts separate days separately", () => {
+    const summary = summarizeLeave([leave("2026-07-02", "sick"), leave("2026-07-03", "sick"), leave("2026-07-17", "personal")]);
+
+    assert.equal(summary.sickUsed, 2);
+    assert.equal(summary.personalUsed, 1);
+  });
+});
