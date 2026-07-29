@@ -5,10 +5,8 @@ import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 import { EvidenceImageInput } from "../../../../components/EvidenceImageInput.tsx";
+import { deleteStockCheckRecord, fetchStockCheckRecords, saveStockCheckRecord } from "../../../../lib/stock-check-store.ts";
 import {
-  deleteStockCheckRecord,
-  fetchStockCheckRecords,
-  saveStockCheckRecord,
   stockCheckResultOptions,
   stockCountTypeOptions,
   stockCheckRecordsForDate,

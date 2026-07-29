@@ -1,7 +1,8 @@
 import { effectiveAssignedWorkStatus } from "./assigned-work-status.ts";
 import type { AssignedWork, ServiceEvent } from "./performance-score.ts";
 import { restListCollection, restUpsertDoc } from "./firestore-rest.ts";
-import { fetchStockCheckRecords, type StockCheckRecord } from "./stock-check-records.ts";
+import { fetchStockCheckRecords } from "./stock-check-store.ts";
+import type { StockCheckRecord } from "./stock-check-records.ts";
 
 const SERVICE_COLLECTION = "sop_service_records";
 const ASSIGNED_COLLECTION = "sop_assigned_records";

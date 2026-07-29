@@ -1,5 +1,4 @@
 import type { StockCountRecord } from "./performance-score.ts";
-import { restDeleteDoc, restListCollection, restUpsertDoc } from "./firestore-rest.ts";
 
 // Owner-entered stock checks — the input for the Stock KPI category.
 //
@@ -10,10 +9,10 @@ import { restDeleteDoc, restListCollection, restUpsertDoc } from "./firestore-re
 // responsible, what was counted, whether it matched, and a screenshot of the StoreHub
 // screen as proof.
 //
-// Records persist in Firestore (same REST path as the other manual KPI inputs) so they
-// survive a Vercel cold start.
+// Storage lives in lib/stock-check-store.ts. This half stays free of server-only imports
+// so the scoring conversion can be unit-tested.
 
-const STOCK_COLLECTION = "sop_stock_checks";
+export const STOCK_CHECK_COLLECTION = "sop_stock_checks";
 
 export const STOREHUB_STOCKTAKE_URL = "https://uplevel.storehubhq.com/stocks/stocktakes";
 
@@ -96,31 +95,4 @@ export function stockCheckRecordsToCounts(records: StockCheckRecord[]): StockCou
 
 export function stockCheckRecordsForDate(records: StockCheckRecord[], workDate: string) {
   return records.filter((record) => record.workDate === workDate);
-}
-
-export async function fetchStockCheckRecords(): Promise<StockCheckRecord[]> {
-  const records = await restListCollection<StockCheckRecord>(STOCK_COLLECTION);
-  return records.sort((left, right) => left.workDate.localeCompare(right.workDate));
-}
-
-export async function saveStockCheckRecord(input: StockCheckRecordInput): Promise<StockCheckRecord> {
-  const record = buildStockCheckRecord(input);
-  await restUpsertDoc(STOCK_COLLECTION, record.id, {
-    id: record.id,
-    workDate: record.workDate,
-    employeeName: record.employeeName,
-    countType: record.countType,
-    category: record.category,
-    result: record.result,
-    slowCount: record.slowCount,
-    note: record.note,
-    evidence: record.evidence,
-    recordedAt: record.recordedAt,
-    recordedBy: record.recordedBy
-  });
-  return record;
-}
-
-export async function deleteStockCheckRecord(id: string): Promise<void> {
-  await restDeleteDoc(STOCK_COLLECTION, id);
 }
