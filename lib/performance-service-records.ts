@@ -1,7 +1,6 @@
 import { effectiveAssignedWorkStatus } from "./assigned-work-status.ts";
 import type { AssignedWork, ServiceEvent } from "./performance-score.ts";
 import { restListCollection, restUpsertDoc } from "./firestore-rest.ts";
-import { fetchStockCheckRecords } from "./stock-check-store.ts";
 import type { StockCheckRecord } from "./stock-check-records.ts";
 
 const SERVICE_COLLECTION = "sop_service_records";
@@ -156,12 +155,14 @@ export function updateAssignedWorkRecords(
 // Records now persist in Firestore (sop_service_records / sop_assigned_records) so
 // they survive Vercel cold starts — the old local-JSON store was ephemeral there.
 export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStore> {
-  const [serviceRecords, assignedWorkRecords, stockCheckRecords] = await Promise.all([
+  // Stock checks are written with the service account, so they are fetched by the
+  // server-only composer in lib/performance-daily-store.ts. Keeping that import out of
+  // this module lets the record helpers here stay unit-testable.
+  const [serviceRecords, assignedWorkRecords] = await Promise.all([
     restListCollection<CustomerServiceRecord>(SERVICE_COLLECTION),
-    restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION),
-    fetchStockCheckRecords()
+    restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION)
   ]);
-  return { serviceRecords, assignedWorkRecords, stockCheckRecords };
+  return { serviceRecords, assignedWorkRecords, stockCheckRecords: [] };
 }
 
 export async function saveCustomerServiceRecord(input: CustomerServiceRecordInput) {

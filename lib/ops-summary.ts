@@ -5,10 +5,11 @@ import { isoWeekKey } from "./periodic-tasks.ts";
 import { recordsFromDayPayloads, type WorkflowDailyRecord, type WorkflowDayPayload } from "./workflow-records.ts";
 import { cardStoreWorkflow } from "./card-store-workflow.ts";
 import { fetchAssignmentsForDate, fetchOpenHandoffs, type WorkAssignment, type WorkHandoff } from "./work-assignments-store.ts";
-import { customerServiceRecordsForDate, fetchPerformanceDailyStore, type CustomerServiceRecord } from "./performance-service-records.ts";
+import { customerServiceRecordsForDate, type CustomerServiceRecord } from "./performance-service-records.ts";
 import { monthlyTasks } from "./monthly-event-tasks.ts";
 import { weeklyEvents } from "./weekly-event-tasks.ts";
 import { employeeDirectory } from "./employee-directory.ts";
+import { fetchPerformanceDailyStore } from "./performance-daily-store.ts";
 
 // Everything the owner dashboard shows, read straight from the records staff actually
 // write. No fixtures: if a number is not backed by a real source it is not on the page.

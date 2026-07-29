@@ -6,10 +6,10 @@ import { requireUser } from "../../../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../../../lib/employee-directory.ts";
 import {
   assignedWorkRecordById,
-  fetchPerformanceDailyStore,
   updateAssignedWorkRecordSubmission
 } from "../../../../lib/performance-service-records.ts";
 import type { AssignedWork } from "../../../../lib/performance-score.ts";
+import { fetchPerformanceDailyStore } from "../../../../lib/performance-daily-store.ts";
 
 function assignedStatus(value: string): AssignedWork["status"] {
   if (value === "early_quality" || value === "on_time" || value === "needs_revision" || value === "late_one_day" || value === "not_finished") return value;

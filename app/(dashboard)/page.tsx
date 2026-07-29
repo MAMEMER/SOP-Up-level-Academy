@@ -5,10 +5,11 @@ import { MyShiftToday } from "../../components/MyShiftToday.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../lib/employee-directory.ts";
-import { assignedWorkRecordsForDate, fetchPerformanceDailyStore } from "../../lib/performance-service-records.ts";
+import { assignedWorkRecordsForDate } from "../../lib/performance-service-records.ts";
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assigned-work-feed.ts";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
 import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
+import { fetchPerformanceDailyStore } from "../../lib/performance-daily-store.ts";
 
 export default async function HomePage() {
   const user = await requireUser();

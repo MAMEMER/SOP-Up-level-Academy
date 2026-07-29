@@ -9,7 +9,7 @@ import {
 } from "../../../lib/employee-directory.ts";
 import { currentReviewPeriod, getPerformanceScoreRows } from "../../../lib/performance-score-data.ts";
 import { fetchAttendanceSource } from "../../../lib/planner-kpi.ts";
-import { assignedWorkRecordsForDate, fetchPerformanceDailyStore } from "../../../lib/performance-service-records.ts";
+import { assignedWorkRecordsForDate } from "../../../lib/performance-service-records.ts";
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../../lib/assigned-work-feed.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
@@ -19,6 +19,7 @@ import { MyShiftToday } from "../../../components/MyShiftToday.tsx";
 import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
+import { fetchPerformanceDailyStore } from "../../../lib/performance-daily-store.ts";
 
 // KPI window follows the calendar: 1st of this month → today (Asia/Bangkok)
 const reviewPeriod = () => currentReviewPeriod();
