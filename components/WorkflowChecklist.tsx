@@ -24,6 +24,7 @@ import {
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 import { useWorkRecordWindow } from "../lib/work-records-client.ts";
 import { SaveIndicator } from "./SaveIndicator.tsx";
+import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import { dailyScopeKey, shiftWorkDate } from "../lib/work-records.ts";
 
 function itemKey(phaseId: string, index: number) {
@@ -653,10 +654,15 @@ function StockTaskDetails({
             );
           })}
         </div>
-        <label className="detail-upload">
-          <span>อัปโหลดรูปหลังเติมสินค้า</span>
-          <input type="file" accept="image/*" disabled={!canEdit} />
-        </label>
+        <div className="detail-upload">
+          <span>อัปโหลดรูปหลังเติมสินค้า (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={details[detailKey(workDate, "stock-refill-photos")] || ""}
+            onChange={(value) => updateDetail("stock-refill-photos", value)}
+            disabled={!canEdit}
+            max={3}
+          />
+        </div>
       </div>
     );
   }
