@@ -27,7 +27,7 @@ import {
   weeklyEvents,
   type WeeklyEvent
 } from "../lib/weekly-event-tasks.ts";
-import { readWeeklyEventTicks, tickKey, weeklyEventPeriodKey } from "../lib/weekly-event-store.ts";
+import { fetchWeeklyEventPayload, tickKey, weeklyEventPeriodKey } from "../lib/weekly-event-store.ts";
 
 const statusText = {
   white: "ยังไม่เริ่ม",
@@ -96,10 +96,17 @@ export function DashboardTaskSections({
     };
   }, []);
 
-  // Weekly event checklist: อ่านความคืบหน้า (ติ๊กกี่ข้อ) ของสัปดาห์นี้จาก localStorage
+  // Weekly event checklist: อ่านความคืบหน้า (ติ๊กกี่ข้อ) ของสัปดาห์นี้จาก server record
   useEffect(() => {
-    setWeeklyPeriodKey(weeklyEventPeriodKey(workDate));
-    setWeeklyTicks(readWeeklyEventTicks());
+    let alive = true;
+    const key = weeklyEventPeriodKey(workDate);
+    setWeeklyPeriodKey(key);
+    fetchWeeklyEventPayload(key)
+      .then((payload) => alive && setWeeklyTicks(payload.ticks))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, [workDate]);
 
   function weeklyEventTickedMap(event: WeeklyEvent): Record<string, boolean> {

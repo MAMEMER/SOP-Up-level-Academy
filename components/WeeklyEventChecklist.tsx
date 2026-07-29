@@ -11,16 +11,13 @@ import {
   type WeeklyEventChecklistItem
 } from "../lib/weekly-event-tasks.ts";
 import {
+  fetchWeeklyEventPayload,
   fieldKey,
-  persistWeeklyEventData,
-  persistWeeklyEventSubmitted,
-  persistWeeklyEventTicks,
-  readWeeklyEventData,
-  readWeeklyEventSubmitted,
-  readWeeklyEventTicks,
+  saveWeeklyEventPayload,
   submitKey,
   tickKey,
-  weeklyEventPeriodKey
+  weeklyEventPeriodKey,
+  type WeeklyEventPayload
 } from "../lib/weekly-event-store.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
@@ -37,13 +34,30 @@ export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   const [data, setData] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
   const [savedAt, setSavedAt] = useState<Record<string, string>>({});
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setPeriodKey(weeklyEventPeriodKey(formatWorkDate()));
-    setTicks(readWeeklyEventTicks());
-    setData(readWeeklyEventData());
-    setSubmitted(readWeeklyEventSubmitted());
+    let alive = true;
+    const key = weeklyEventPeriodKey(formatWorkDate());
+    setPeriodKey(key);
+    fetchWeeklyEventPayload(key)
+      .then((payload) => {
+        if (!alive) return;
+        setTicks(payload.ticks);
+        setData(payload.data);
+        setSubmitted(payload.submitted);
+      })
+      .catch(() => undefined)
+      .finally(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  function persist(next: Partial<WeeklyEventPayload>) {
+    if (!periodKey) return;
+    void saveWeeklyEventPayload(periodKey, { ticks, data, submitted, ...next });
+  }
 
   function eventTicked(event: WeeklyEvent): Record<string, boolean> {
     const map: Record<string, boolean> = {};
@@ -52,37 +66,31 @@ export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   }
 
   function toggle(event: WeeklyEvent, itemId: string) {
-    if (!periodKey) return;
-    setTicks((current) => {
-      const key = tickKey(periodKey, event.id, itemId);
-      const next = { ...current, [key]: !current[key] };
-      persistWeeklyEventTicks(next);
-      return next;
-    });
+    if (!periodKey || !loaded) return;
+    const key = tickKey(periodKey, event.id, itemId);
+    const next = { ...ticks, [key]: !ticks[key] };
+    setTicks(next);
+    persist({ ticks: next });
   }
 
   function updateField(event: WeeklyEvent, itemId: string, field: string, value: string) {
-    if (!periodKey) return;
-    setData((current) => {
-      const next = { ...current, [fieldKey(periodKey, event.id, itemId, field)]: value };
-      persistWeeklyEventData(next);
-      return next;
-    });
+    if (!periodKey || !loaded) return;
+    const next = { ...data, [fieldKey(periodKey, event.id, itemId, field)]: value };
+    setData(next);
+    persist({ data: next });
   }
 
   function saveDraft(event: WeeklyEvent) {
-    persistWeeklyEventTicks(ticks);
-    persistWeeklyEventData(data);
+    if (!loaded) return;
+    persist({});
     setSavedAt((current) => ({ ...current, [event.id]: new Date().toLocaleTimeString("th-TH") }));
   }
 
   function submit(event: WeeklyEvent) {
-    if (!periodKey || !canSubmitWeeklyEvent(event, eventTicked(event))) return;
-    setSubmitted((current) => {
-      const next = { ...current, [submitKey(periodKey, event.id)]: true };
-      persistWeeklyEventSubmitted(next);
-      return next;
-    });
+    if (!periodKey || !loaded || !canSubmitWeeklyEvent(event, eventTicked(event))) return;
+    const next = { ...submitted, [submitKey(periodKey, event.id)]: true };
+    setSubmitted(next);
+    persist({ submitted: next });
     // checklist ของกิจกรรมนี้ครบ 100% แล้ว (ส่งได้เมื่อทำครบทุกข้อ) → กลับหน้า Dashboard
     goToDashboard();
   }
