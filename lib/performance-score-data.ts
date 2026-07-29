@@ -225,70 +225,6 @@ function isMorningShift(schedule: ShiftSchedule) {
   return Number.isFinite(hour) && hour < 13;
 }
 
-// The last calendar day the StoreHub stocktake CSV actually contains data for. A day
-// after this boundary has NO StoreHub data at all (the CSV simply hasn't been re-exported
-// that far), so absence of a count there is NOT evidence of "not counted".
-export function stockDataCoverageEnd(stockCounts: StockCountRecord[]): string | undefined {
-  let latest: string | undefined;
-  for (const count of stockCounts) {
-    const date = count.dueDate || count.startedAt?.slice(0, 10) || "";
-    if (date && (!latest || date > latest)) latest = date;
-  }
-  return latest;
-}
-
-export function missingMorningStockCountRecords(input: {
-  employeeName: string;
-  schedules: ShiftSchedule[];
-  stockCounts: StockCountRecord[];
-  leaveRecords?: LeaveRecord[];
-  /**
-   * Latest date the StoreHub stocktake data covers (see stockDataCoverageEnd). Morning
-   * shifts AFTER this date are not flagged "not counted" — there is no StoreHub data yet,
-   * so absence proves nothing. Bugfix (ticket ZDjzavu0t1fhNplxlORR): the KPI was marking
-   * ICE "did not count น้ำ,ขนม on 2026-07-27" purely because the loaded CSV export stopped
-   * days earlier while the live planner had ICE on a morning shift that day. Pass the GLOBAL
-   * coverage end (across all employees' counts) so one person's export gap can't silently
-   * zero out everyone. When omitted, coverage is derived from the passed stockCounts, and if
-   * there are no counts at all we emit nothing (no data → can't prove a miss).
-   */
-  coverageEndDate?: string;
-}): StockCountRecord[] {
-  const leaveDays = new Set((input.leaveRecords || []).map((record) => `${record.employeeName}:${record.workDate}`));
-  const coverageEnd = input.coverageEndDate ?? stockDataCoverageEnd(input.stockCounts);
-  if (!coverageEnd) return [];
-  return input.schedules
-    .filter((schedule) => schedule.employeeName === input.employeeName && isMorningShift(schedule))
-    .filter((schedule) => schedule.workDate <= coverageEnd)
-    .filter((schedule) => !leaveDays.has(`${schedule.employeeName}:${schedule.workDate}`))
-    .filter((schedule) => {
-      // A morning shift counts as "done" when the employee has ANY StoreHub stock count on
-      // the SAME CALENDAR DAY. Bugfix (ticket fxs2huYeIiaFlEW44CHo): the old check matched
-      // the count's start time against the shift's exact [start, start+9h] window AND required
-      // a Completed status (submittedAt). That produced false "not_counted" penalties when the
-      // count was started before the scheduled shift start (e.g. a late/part-time shift while
-      // the count is done at store open) or was still "In Progress" — StoreHub clearly shows a
-      // count on that day, so the KPI must credit it. A late-started count still gets the −2
-      // slowCount penalty via annotateSlowMorningCounts; it just no longer counts as "not counted".
-      return !input.stockCounts.some((count) => {
-        if (count.employeeName !== input.employeeName || !count.startedAt) return false;
-        const countDate = count.dueDate || count.startedAt.slice(0, 10);
-        return countDate === schedule.workDate;
-      });
-    })
-    .map((schedule) => ({
-      employeeName: input.employeeName,
-      owner: input.employeeName,
-      category: "น้ำ,ขนม",
-      countType: "weekly" as const,
-      dueDate: schedule.workDate,
-      expectedQuantity: 0,
-      actualQuantity: 0,
-      discrepancyStatus: "not_counted" as const,
-      source: "storehub" as const
-    }));
-}
-
 /**
  * A day counts against the Checklist category when the employee was scheduled AND clocked
  * in but no checklist was submitted. `submittedChecklistDays` comes from the real work
@@ -379,12 +315,11 @@ export function getPerformanceScoreRowsForRange(
   const srcClock = attendance?.clockEvents ?? [];
   const srcLeaves = attendance?.leaves ?? [];
   const srcAnnualSchedules = attendance?.annualSchedules ?? srcSchedules;
-  // Stock comes from the owner's entries at /admin/stock-check. Derive the GLOBAL coverage
-  // boundary (across all employees) so a "not counted" penalty is only ever raised up to the
-  // last day the owner actually reviewed — later days are un-reviewed, not un-counted
-  // (ticket ZDjzavu0t1fhNplxlORR, originally about un-exported CSV days).
+  // Stock comes entirely from the owner's entries at /admin/stock-check. A day with no
+  // entry is not scored: the KPI no longer derives a "not counted" penalty from the roster,
+  // because the owner now states that outcome explicitly (and deriving it as well charged
+  // the same miss twice).
   const allStockCounts = stockCheckRecordsToCounts(dailyStore.stockCheckRecords);
-  const stockCoverageEnd = stockDataCoverageEnd(allStockCounts);
   const serviceEventsFromRecords = customerServiceRecordsToEvents(dailyStore.serviceRecords.filter((record) => inPeriod(record.workDate, period)));
   const assignedWorksFromRecords = assignedWorkRecordsToWorks(dailyStore.assignedWorkRecords.filter((record) => inPeriod(record.workDate, period)), {
     teamAssigneeName: bangkaeTeamAssigneeName,
@@ -398,13 +333,6 @@ export function getPerformanceScoreRowsForRange(
       employeeName,
       schedules: employeePeriodSchedules,
       stockCounts: allStockCounts.filter((item) => item.employeeName === employeeName && inPeriod(item.dueDate, period))
-    });
-    const missingStockCounts = missingMorningStockCountRecords({
-      employeeName,
-      schedules: employeePeriodSchedules,
-      stockCounts: employeePeriodStockCounts,
-      leaveRecords: srcLeaves.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period)),
-      coverageEndDate: stockCoverageEnd
     });
     const derivedChecklistEvents = missingChecklistEventsFromAttendance({
       employeeName,
@@ -426,7 +354,7 @@ export function getPerformanceScoreRowsForRange(
         schedules: srcAnnualSchedules.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year)),
         records: srcLeaves.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year))
       },
-      stockCounts: [...employeePeriodStockCounts, ...missingStockCounts],
+      stockCounts: employeePeriodStockCounts,
       checklistEvents: derivedChecklistEvents,
       serviceEvents: serviceEventsFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.event),
       assignedWorks: assignedWorksFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.work)
