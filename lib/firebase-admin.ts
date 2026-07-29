@@ -1,6 +1,7 @@
 import "server-only";
 import { cert, getApp, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 // Server-side Firestore with the service account. Used for the work-record store so the
 // employee identity on every write comes from the session cookie (not the client) and so
@@ -8,6 +9,14 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 // Env: FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (Vercel).
 
 const APP_NAME = "sop-admin";
+
+// Same bucket the client uses; evidence uploads now go through the admin SDK so they
+// authorize off the SOP session cookie instead of a live Firebase Auth session (which
+// the 14-day session cookie routinely outlives — the cause of "ต้อง login Google ก่อน").
+const STORAGE_BUCKET =
+  process.env.FIREBASE_STORAGE_BUCKET ||
+  process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+  "up-level-guild.firebasestorage.app";
 
 export function hasAdminCredentials(): boolean {
   return Boolean(
@@ -26,7 +35,8 @@ function adminApp(): App {
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         // Vercel stores the key with literal \n sequences.
         privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n")
-      })
+      }),
+      storageBucket: STORAGE_BUCKET
     },
     APP_NAME
   );
@@ -35,4 +45,12 @@ function adminApp(): App {
 export function adminDb(): Firestore {
   if (!hasAdminCredentials()) throw new Error("Firebase admin credentials are not configured");
   return getFirestore(adminApp());
+}
+
+export const adminStorageBucket = STORAGE_BUCKET;
+
+/** Storage bucket via the service account — bypasses client Firebase Auth for uploads. */
+export function adminBucket() {
+  if (!hasAdminCredentials()) throw new Error("Firebase admin credentials are not configured");
+  return getStorage(adminApp()).bucket(STORAGE_BUCKET);
 }

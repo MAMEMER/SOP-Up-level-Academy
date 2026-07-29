@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../lib/firebase-client.ts";
+import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
 
-// Multi-photo evidence uploader (สูงสุด 3 รูป). อัปโหลดแต่ละรูปขึ้น Firebase Storage
-// (bucket + path scheme เดียวกับ EvidenceImageInput) แล้วเก็บ URL ทั้งหมดเป็น string
-// คั่นด้วยขึ้นบรรทัดใหม่ ผ่าน value/onChange ให้ parent บันทึกเป็น detail string เดียว
-// (ไม่ต้องแก้ฝั่ง server). ต้อง Google login, เช็ค image/ client-side, cap 5MB/รูป —
-// ตามข้อกำหนด evidence เดียวกับ EvidenceImageInput.
+// Multi-photo evidence uploader (สูงสุด 3 รูป). อัปโหลดแต่ละรูปผ่าน server route
+// /api/evidence-upload (authorize ด้วย SOP session cookie — ไม่พึ่ง Firebase Auth ฝั่ง
+// client) แล้วเก็บ URL ทั้งหมดเป็น string คั่นด้วยขึ้นบรรทัดใหม่ ผ่าน value/onChange ให้
+// parent บันทึกเป็น detail string เดียว (ไม่ต้องแก้ฝั่ง server). เช็ค image/ client-side,
+// cap 5MB/รูป — ตามข้อกำหนด evidence เดียวกับ EvidenceImageInput.
 const DEFAULT_MAX_PHOTOS = 3;
 
 export function EvidencePhotosInput({
@@ -59,17 +58,14 @@ export function EvidencePhotosInput({
           skipped = true;
           continue;
         }
-        const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `sop-evidence/${Date.now()}-${Math.floor(Math.random() * 1e6)}-${safe}`;
-        const snap = await uploadBytes(ref(storage, path), file, { contentType: file.type });
-        uploaded.push(await getDownloadURL(snap.ref));
+        uploaded.push(await uploadEvidenceImage(file));
       }
       if (uploaded.length) commit([...urls, ...uploaded]);
       if (fileList.length > remaining && !skipped) {
         setError(`แนบได้สูงสุด ${max} รูป`);
       }
-    } catch {
-      setError("อัปโหลดไม่สำเร็จ — ต้อง login Google ก่อน");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setUploading(false);
     }

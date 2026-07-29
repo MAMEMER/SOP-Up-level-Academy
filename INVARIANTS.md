@@ -46,10 +46,11 @@
 - **ควรทำเพิ่ม:** schema check + audit ว่าใคร upload version ไหน (ตอนนี้ยังไม่มี — จุดเสี่ยง).
 - **พังถ้าละเมิด:** CSV attendance ปลอม (ชื่อ/เวลามั่ว) หักเงินคนบริสุทธิ์.
 
-## 7. Evidence image attach — `components/EvidenceImageInput.tsx`
-- ต้อง Google login. เช็ค `image/` client-side. cap 5MB. path มี timestamp+random (กันเดา/ชน). **evidence URL immutable ใน record**.
-- **ห้ามหลวม:** ปลด image-type check / เพิ่ม size โดยไม่มี quota / ใช้ชื่อเดาได้ / ให้แก้ evidence ย้อนหลัง / Storage rule `allow write: if true`.
-- **พังถ้าละเมิด:** upload ไฟล์อันตราย, เดา URL หลักฐานคนอื่น, แก้หลักฐานหลังส่ง (เสีย audit).
+## 7. Evidence image attach — `components/EvidenceImageInput.tsx`, `components/EvidencePhotosInput.tsx`, `app/api/evidence-upload/route.ts`
+- Upload ผ่าน **server route `/api/evidence-upload`** (admin SDK + `requireUser()`) — **ไม่ใช้** client `uploadBytes`/Firebase Auth อีกต่อไป. เหตุผล: SOP session cookie อยู่ได้ 14 วัน แต่ Firebase Auth token ฝั่ง client หมดใน 1 ชม. → user login อยู่แต่ upload ไม่ได้ ("ต้อง login Google ก่อน"). Route auth ด้วย session cookie แทน.
+- เช็ค `image/` + cap 5MB **ทั้ง client และ server**. path มี timestamp+random. download token = UUID (เดา URL ไม่ได้). **evidence URL immutable ใน record**. Impersonate (view-as) = upload ไม่ได้ (read-only).
+- **ห้ามหลวม:** กลับไปใช้ client `uploadBytes` (พึ่ง Firebase Auth = บั๊กเดิม) / ปลด `requireUser()` ใน route / ปลด image-type/size check ฝั่ง server / ใช้ชื่อเดาได้ / ให้แก้ evidence ย้อนหลัง / เปิด Storage rule `allow write: if true`.
+- **พังถ้าละเมิด:** upload ไฟล์อันตราย, คนนอก POST รูปมั่ว, เดา URL หลักฐานคนอื่น, แก้หลักฐานหลังส่ง (เสีย audit), หรือบั๊ก "login แล้วยัง upload ไม่ได้" กลับมา.
 
 ## 8. Stock grace period — `lib/performance-score.ts` (L79-81)
 - `STOCK_DIFFERENCE_DEDUCTION_START = "2026-08-01"`. ก่อนวันนี้ **ไม่หัก** stock difference (StoreHub ไม่นิ่งช่วง July). หลังวันนี้ -2/loss.

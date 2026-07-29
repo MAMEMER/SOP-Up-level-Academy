@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../lib/firebase-client.ts";
+import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
 
-// Evidence input for the performance form: attach an image (uploaded to Firebase
-// Storage — the local JSON store doesn't persist on Vercel, so the image lives in
-// Storage and only its URL is saved) OR paste a link. Both feed one hidden input
-// (name = the field the server action reads), so nothing changes server-side.
+// Evidence input for the performance form: attach an image (uploaded via the server
+// route /api/evidence-upload, which authorizes off the SOP session cookie — the local
+// JSON store doesn't persist on Vercel, so the image lives in Storage and only its URL
+// is saved) OR paste a link. Both feed one hidden input (name = the field the server
+// action reads), so nothing changes server-side.
 export function EvidenceImageInput({ name }: { name: string }) {
   const [value, setValue] = useState(""); // final stored string: uploaded URL or pasted link
   const [uploading, setUploading] = useState(false);
@@ -26,13 +26,10 @@ export function EvidenceImageInput({ name }: { name: string }) {
     setError(null);
     setUploading(true);
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `sop-evidence/${Date.now()}-${Math.floor(Math.random() * 1e6)}-${safe}`;
-      const snap = await uploadBytes(ref(storage, path), file, { contentType: file.type });
-      const url = await getDownloadURL(snap.ref);
+      const url = await uploadEvidenceImage(file);
       setValue(url);
-    } catch {
-      setError("อัปโหลดไม่สำเร็จ — ต้อง login Google ก่อน");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setUploading(false);
     }
