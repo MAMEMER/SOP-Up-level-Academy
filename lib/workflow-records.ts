@@ -19,26 +19,30 @@ export type WorkflowDailyRecord = {
   adminUnlockedBy?: string;
 };
 
-export const workflowStorageKey = "up-level-workflow-records";
-export const workflowRecordingEnabled = false;
+/** Payload stored in one daily work-record document (see lib/work-records.ts). */
+export type WorkflowDayPayload = {
+  records: WorkflowDailyRecord[];
+  notes: Record<string, string>;
+  details: Record<string, string>;
+};
 
-export function canPersistWorkflowRecords() {
-  return workflowRecordingEnabled;
+export const emptyWorkflowDayPayload: WorkflowDayPayload = { records: [], notes: {}, details: {} };
+
+/** How far back the checklist reads history (on-time streaks look back 30 days). */
+export const WORKFLOW_HISTORY_DAYS = 35;
+
+/** Flattens the per-day documents returned by the work-record API into one record list. */
+export function recordsFromDayPayloads(payloads: Array<Partial<WorkflowDayPayload> | undefined>) {
+  return payloads
+    .flatMap((payload) => payload?.records || [])
+    .sort((left, right) =>
+      `${left.workDate}:${left.phaseId}`.localeCompare(`${right.workDate}:${right.phaseId}`)
+    );
 }
 
-export function readWorkflowRecordsFromStorage(storage: Pick<Storage, "getItem" | "removeItem">) {
-  if (!canPersistWorkflowRecords()) return [];
-
-  const stored = storage.getItem(workflowStorageKey);
-  if (!stored) return [];
-
-  try {
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? (parsed as WorkflowDailyRecord[]) : [];
-  } catch {
-    storage.removeItem(workflowStorageKey);
-    return [];
-  }
+/** Merges the string maps (notes / details) across days — their keys are date-scoped. */
+export function mergeDayMaps(maps: Array<Record<string, string> | undefined>) {
+  return Object.assign({}, ...maps.filter(Boolean)) as Record<string, string>;
 }
 
 export function formatWorkDate(date = new Date()) {
@@ -110,7 +114,8 @@ export function storeHoursForWorkDate(workDate: string) {
 }
 
 export function isFlexibleWorkflowPhase(phaseId: string) {
-  return phaseId === "stock-work" || phaseId === "daytime-work";
+  // Flexible = doable any time the store is open, so it never auto-misses on a window.
+  return phaseId === "stock-work" || phaseId === "daytime-work" || phaseId === "guild-chat-exp";
 }
 
 export function phaseScheduleForWorkDate(phaseId: string, workDate: string) {
@@ -173,20 +178,28 @@ function phaseCanAdvance(records: WorkflowDailyRecord[], workDate: string, phase
   );
 }
 
-export function isPhaseUnlocked(phaseId: string, workDate: string, records: WorkflowDailyRecord[]) {
-  if (phaseId === "open-store") return true;
-  if (phaseId === "stock-work") return phaseCanAdvance(records, workDate, "open-store");
-  if (phaseId === "daytime-work") {
-    return phaseCanAdvance(records, workDate, "open-store") && phaseCanAdvance(records, workDate, "stock-work");
-  }
-  if (phaseId === "close-store") {
-    return (
-      phaseCanAdvance(records, workDate, "open-store") &&
-      phaseCanAdvance(records, workDate, "stock-work") &&
-      phaseCanAdvance(records, workDate, "daytime-work")
-    );
-  }
-  return true;
+// The routine runs in order — a phase only opens once every phase before it is finished
+// (or was already missed, so the day isn't dead-ended).
+const workflowPhaseOrder = ["open-store", "guild-chat-exp", "stock-work", "daytime-work", "close-store"];
+
+/**
+ * `visiblePhaseIds` = the phases this person actually sees today (the checklist is
+ * shift-filtered). Records are per employee, so an s2 staffer has no s1 open-store record
+ * of their own — gating them on it would lock their whole day. Sequencing therefore only
+ * applies within the phases in front of them.
+ */
+export function isPhaseUnlocked(
+  phaseId: string,
+  workDate: string,
+  records: WorkflowDailyRecord[],
+  visiblePhaseIds?: string[]
+) {
+  const order = visiblePhaseIds
+    ? workflowPhaseOrder.filter((id) => visiblePhaseIds.includes(id))
+    : workflowPhaseOrder;
+  const index = order.indexOf(phaseId);
+  if (index <= 0) return true;
+  return order.slice(0, index).every((previousPhaseId) => phaseCanAdvance(records, workDate, previousPhaseId));
 }
 
 export function elapsedSeconds(startedAt?: string, submittedAt?: string) {

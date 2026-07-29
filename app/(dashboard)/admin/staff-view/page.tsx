@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { StaffReviewView } from "../../../../components/StaffReviewView.tsx";
+import { ViewAsSwitcher } from "../../../../components/ViewAsSwitcher.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { isPreviewMode } from "../../../../lib/preview-data.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
@@ -24,6 +25,11 @@ export default async function AdminStaffViewPage() {
           <p>เลือกพนักงาน + วัน เพื่อดูกะ · งานที่มอบหมาย · งานส่งต่อ · routine checklist ของเขา แบบรวดเดียว</p>
         </div>
       </section>
+      <ViewAsSwitcher
+        staff={staff
+          .filter((entry): entry is typeof entry & { email: string } => Boolean(entry.email))
+          .map((entry) => ({ email: entry.email, displayName: entry.displayName }))}
+      />
       <StaffReviewView branch="bangkae" staff={staff} defaultDate={formatWorkDate()} />
     </main>
   );

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { canPersistWorkflowRecords } from "../lib/workflow-records.ts";
+import { useMemo } from "react";
+import { useWorkRecordWindow } from "../lib/work-records-client.ts";
+import { weeklyScopeKey } from "../lib/work-records.ts";
+import { SaveIndicator } from "./SaveIndicator.tsx";
 import {
   discrepancyStatusOptions,
   monthlyStockSingleManualHref,
@@ -15,9 +17,22 @@ import {
 } from "../lib/monthly-stock-single-workflow.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
-const monthlyCheckedStorageKey = "up-level-monthly-single-checked";
-const monthlyDetailStorageKey = "up-level-monthly-single-details";
-const monthlyStatusStorageKey = "up-level-monthly-single-status";
+// Shared branch task like the weekly count — scoped by ISO week (the completion scope of
+// this checklist), stored once for the team rather than per person.
+type MonthlySinglePayload = {
+  checked: Record<string, boolean>;
+  details: Record<string, string>;
+  status: string;
+  discrepancyStatus: string;
+  submittedAt?: string;
+};
+
+const emptyMonthlySinglePayload: MonthlySinglePayload = {
+  checked: {},
+  details: {},
+  status: "",
+  discrepancyStatus: ""
+};
 
 // รหัสสัปดาห์แบบ ISO (เช่น 2026-W30) — Completion scope ของงานนี้เป็นแบบ weekly
 function formatWorkWeek(date = new Date()) {
@@ -37,19 +52,6 @@ function itemKey(workScope: string, index: number) {
 
 function detailKey(workScope: string, key: string) {
   return `${workScope}:${key}`;
-}
-
-function readStore(storageKey: string): Record<string, string | boolean> {
-  if (!canPersistWorkflowRecords()) return {};
-  const stored = window.localStorage.getItem(storageKey);
-  if (!stored) return {};
-  try {
-    const parsed = JSON.parse(stored);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    window.localStorage.removeItem(storageKey);
-    return {};
-  }
 }
 
 function MonthlyStockSingleTaskDetails({
@@ -367,29 +369,27 @@ function MonthlyStockSingleTaskDetails({
 }
 
 export function MonthlyStockSingleChecklist({
-  phase = monthlyStockSinglePhase
+  phase = monthlyStockSinglePhase,
+  readOnly = false
 }: {
   phase?: MonthlyStockSinglePhase;
+  readOnly?: boolean;
 }) {
   const workScope = formatWorkWeek();
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [details, setDetails] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState<string>("");
-  const [discrepancyStatus, setDiscrepancyStatus] = useState<string>("");
-  const trialMode = !canPersistWorkflowRecords();
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
+  const { data, loaded, status: saveStatus, update } = useWorkRecordWindow<MonthlySinglePayload>({
+    scope: "monthly",
+    scopeKey: weeklyScopeKey(workScope),
+    owner: "team",
+    readOnly,
+    empty: emptyMonthlySinglePayload
+  });
 
-  useEffect(() => {
-    setChecked(readStore(monthlyCheckedStorageKey) as Record<string, boolean>);
-    setDetails(readStore(monthlyDetailStorageKey) as Record<string, string>);
-    const storedStatus = readStore(monthlyStatusStorageKey) as Record<string, string>;
-    if (storedStatus[detailKey(workScope, "stocktake-status")]) {
-      setStatus(storedStatus[detailKey(workScope, "stocktake-status")]);
-    }
-    if (storedStatus[detailKey(workScope, "discrepancy-status")]) {
-      setDiscrepancyStatus(storedStatus[detailKey(workScope, "discrepancy-status")]);
-    }
-  }, [workScope]);
+  const checked = data.checked || {};
+  const details = data.details || {};
+  const status = data.status || "";
+  const discrepancyStatus = data.discrepancyStatus || "";
+  const locked = readOnly || !loaded;
 
   const total = phase.checklist.length;
   const completed = useMemo(
@@ -409,59 +409,38 @@ export function MonthlyStockSingleChecklist({
           (details[detailKey(workScope, "minus-list")] || "").trim() ||
           (details[detailKey(workScope, "reason-review")] || "").trim()
       ));
-  const canSubmit = completed === total && statusSubmittable && discrepancyResolved;
-
-  function persistStatus(nextStatus: string, nextDiscrepancy: string) {
-    if (!canPersistWorkflowRecords()) return;
-    window.localStorage.setItem(
-      monthlyStatusStorageKey,
-      JSON.stringify({
-        [detailKey(workScope, "stocktake-status")]: nextStatus,
-        [detailKey(workScope, "discrepancy-status")]: nextDiscrepancy
-      })
-    );
-  }
+  const canSubmit = !locked && completed === total && statusSubmittable && discrepancyResolved;
 
   function toggleTask(index: number) {
-    setChecked((current) => {
-      const next = { ...current, [itemKey(workScope, index)]: !current[itemKey(workScope, index)] };
-      if (canPersistWorkflowRecords()) {
-        window.localStorage.setItem(monthlyCheckedStorageKey, JSON.stringify(next));
-      }
-      return next;
-    });
+    if (locked) return;
+    const key = itemKey(workScope, index);
+    update((previous) => ({
+      ...previous,
+      checked: { ...(previous.checked || {}), [key]: !previous.checked?.[key] }
+    }));
   }
 
   function updateDetail(key: string, value: string) {
-    setDetails((current) => {
-      const next = { ...current, [detailKey(workScope, key)]: value };
-      if (canPersistWorkflowRecords()) {
-        window.localStorage.setItem(monthlyDetailStorageKey, JSON.stringify(next));
-      }
-      return next;
-    });
+    if (locked) return;
+    update((previous) => ({
+      ...previous,
+      details: { ...(previous.details || {}), [detailKey(workScope, key)]: value }
+    }));
   }
 
   function updateStatus(value: string) {
-    setStatus(value);
-    persistStatus(value, discrepancyStatus);
+    if (locked) return;
+    update((previous) => ({ ...previous, status: value }));
   }
 
   function updateDiscrepancyStatus(value: string) {
-    setDiscrepancyStatus(value);
-    persistStatus(status, value);
-  }
-
-  function saveProgress() {
-    if (!canPersistWorkflowRecords()) return;
-    window.localStorage.setItem(monthlyCheckedStorageKey, JSON.stringify(checked));
-    window.localStorage.setItem(monthlyDetailStorageKey, JSON.stringify(details));
-    persistStatus(status, discrepancyStatus);
+    if (locked) return;
+    update((previous) => ({ ...previous, discrepancyStatus: value }));
   }
 
   function submitWork() {
     if (!canSubmit) return;
-    saveProgress();
+    update((previous) => ({ ...previous, submittedAt: new Date().toISOString() }));
     // checklist นับสต๊อกรายเดือนครบ 100% แล้ว → กลับหน้า Dashboard
     goToDashboard();
   }
@@ -469,10 +448,10 @@ export function MonthlyStockSingleChecklist({
   return (
     <section className="workflow-panel">
       <ChecklistCompleteOverlay show={redirecting} />
-      {trialMode ? (
+      {readOnly ? (
         <div className="trial-banner">
-          <strong>โหมดทดลองใช้งาน</strong>
-          <span>ทดลองติ๊กและกรอกได้ ข้อมูลจะยังไม่บันทึกเข้า review/dashboard จนกว่าจะเปิดใช้งานจริง</span>
+          <strong>มุมมองพนักงาน (อ่านอย่างเดียว)</strong>
+          <span>ดูข้อมูลจริงได้ แต่แก้ไขไม่ได้</span>
         </div>
       ) : null}
       <div className="runner-status">
@@ -480,6 +459,7 @@ export function MonthlyStockSingleChecklist({
           <span>ความคืบหน้างานประจำเดือน</span>
           <strong>{progress}%</strong>
         </div>
+        <SaveIndicator status={saveStatus} loaded={loaded} />
       </div>
       <div className="runner-progress" aria-label={`ความคืบหน้า ${progress}%`}>
         <span style={{ width: `${progress}%` }} />
@@ -509,6 +489,7 @@ export function MonthlyStockSingleChecklist({
                     <input
                       type="checkbox"
                       checked={Boolean(checked[key])}
+                      disabled={locked}
                       onChange={() => toggleTask(index)}
                     />
                     <span>{item}</span>
@@ -540,13 +521,12 @@ export function MonthlyStockSingleChecklist({
           ) : null}
 
           <div className="workflow-record-actions">
-            <button type="button" className="soft-button" onClick={saveProgress}>
-              บันทึก
-            </button>
             <button type="button" className="green-button" onClick={submitWork} disabled={!canSubmit}>
               ส่งงาน
             </button>
-            <strong className="record-status">{completed}/{total}</strong>
+            <strong className={data.submittedAt ? "record-status submitted" : "record-status"}>
+              {data.submittedAt ? "ส่งตรวจแล้ว · " : ""}{completed}/{total}
+            </strong>
           </div>
         </section>
       </div>

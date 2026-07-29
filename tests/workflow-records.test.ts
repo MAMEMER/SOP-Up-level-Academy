@@ -3,18 +3,18 @@ import { describe, it } from "node:test";
 import {
   canEditWorkflowRecord,
   canAdminUnlockWorkflowRecord,
-  canPersistWorkflowRecords,
   formatWorkDate,
   isPhaseUnlocked,
   isPhasePastDue,
   isWithinWorkflowWorkHours,
   isWorkflowRecordOnTime,
+  mergeDayMaps,
   phaseScheduleForWorkDate,
+  recordsFromDayPayloads,
   shouldAutoMissWorkflowRecord,
   summarizeMonthlyRecords,
   upsertWorkflowRecord,
   workflowVisualStatus,
-  workflowRecordingEnabled,
   type WorkflowDailyRecord
 } from "../lib/workflow-records.ts";
 
@@ -58,9 +58,24 @@ describe("workflow daily records", () => {
     assert.equal(canEditWorkflowRecord({ status: "missed" } as WorkflowDailyRecord, { adminOverride: true }), true);
   });
 
-  it("keeps workflow records in trial mode until recording is enabled", () => {
-    assert.equal(workflowRecordingEnabled, false);
-    assert.equal(canPersistWorkflowRecords(), false);
+  it("flattens per-day documents into one record list", () => {
+    const merged = recordsFromDayPayloads([
+      { records: [{ workDate: "2026-07-04", phaseId: "close-store", phaseTitle: "ปิดร้าน", completed: 5, total: 5, status: "submitted", recordedAt: "x" }] },
+      undefined,
+      { records: [{ workDate: "2026-07-03", phaseId: "open-store", phaseTitle: "เปิดร้าน", completed: 7, total: 7, status: "submitted", recordedAt: "x" }] }
+    ]);
+
+    assert.deepEqual(merged.map((record) => `${record.workDate}:${record.phaseId}`), [
+      "2026-07-03:open-store",
+      "2026-07-04:close-store"
+    ]);
+  });
+
+  it("merges date-scoped note and detail maps across days", () => {
+    assert.deepEqual(mergeDayMaps([{ "2026-07-03:a": "old" }, undefined, { "2026-07-04:a": "new" }]), {
+      "2026-07-03:a": "old",
+      "2026-07-04:a": "new"
+    });
   });
 
   it("lets admins unlock missed records without letting staff edit them", () => {
@@ -179,6 +194,15 @@ describe("workflow daily records", () => {
         total: 7,
         status: "submitted",
         recordedAt: "2026-07-04T09:00:00Z"
+      },
+      {
+        workDate: "2026-07-04",
+        phaseId: "guild-chat-exp",
+        phaseTitle: "จัดการแชทและ Exp ค้าง",
+        completed: 2,
+        total: 2,
+        status: "submitted",
+        recordedAt: "2026-07-04T09:20:00Z"
       }
     ];
 
@@ -202,6 +226,16 @@ describe("workflow daily records", () => {
     assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", stockDone), true);
   });
 
+  it("sequences only within the phases the shift actually sees", () => {
+    // An s2 staffer never gets open-store, so their own records can't contain it. Gating
+    // on it would leave their whole day locked.
+    const visible = ["stock-work", "daytime-work", "close-store"];
+
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", [], visible), true);
+    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", [], visible), false);
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", []), false);
+  });
+
   it("unlocks the next phase when the prior phase is already missed", () => {
     const missedOpen: WorkflowDailyRecord[] = [
       {
@@ -210,6 +244,15 @@ describe("workflow daily records", () => {
         phaseTitle: "เปิดร้าน",
         completed: 0,
         total: 7,
+        status: "missed",
+        recordedAt: "2026-07-04T02:31:00.000Z"
+      },
+      {
+        workDate: "2026-07-04",
+        phaseId: "guild-chat-exp",
+        phaseTitle: "จัดการแชทและ Exp ค้าง",
+        completed: 0,
+        total: 2,
         status: "missed",
         recordedAt: "2026-07-04T02:31:00.000Z"
       }

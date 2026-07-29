@@ -6,16 +6,8 @@ import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-wor
 import { weeklyStockSleevePhase } from "../lib/weekly-stock-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
-import {
-  canPersistWorkflowRecords,
-  formatWorkDate,
-  phaseScheduleForWorkDate,
-  readWorkflowRecordsFromStorage,
-  upsertWorkflowRecord,
-  workflowStorageKey,
-  workflowVisualStatus,
-  type WorkflowDailyRecord
-} from "../lib/workflow-records.ts";
+import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
+import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 import {
   bangkokMonthKey,
   monthlyStockTasks,
@@ -26,7 +18,7 @@ import {
   monthlyTasksSubmitHref,
   type MonthlyTaskStatus
 } from "../lib/monthly-event-tasks.ts";
-import { readMonthlyEventStates } from "../lib/monthly-event-store.ts";
+import { fetchMonthlyEventPayload } from "../lib/monthly-event-store.ts";
 import {
   isWeeklyEventActiveOn,
   weeklyEventCompleted,
@@ -74,7 +66,7 @@ export function DashboardTaskSections({
   workDate?: string;
   canManageAssignedWork?: boolean;
 }) {
-  const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
+  const { records } = useWorkflowRecords();
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, MonthlyTaskStatus>>({});
   const [monthLabel, setMonthLabel] = useState<string>("");
   const [weeklyTicks, setWeeklyTicks] = useState<Record<string, boolean>>({});
@@ -83,46 +75,25 @@ export function DashboardTaskSections({
   const stockPhase = phases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
 
-  useEffect(() => {
-    const storedRecords = readWorkflowRecordsFromStorage(window.localStorage);
-    const now = new Date();
-    const recordsWithMissed = phases.reduce((current, phase) => {
-      const existing = current.find((item) => item.workDate === workDate && item.phaseId === phase.id);
-      if (existing?.status === "submitted" || existing?.status === "missed") return current;
-
-      const schedule = phaseScheduleForWorkDate(phase.id, workDate);
-      if (Date.parse(schedule.dueAt) >= now.getTime()) return current;
-
-      return upsertWorkflowRecord(current, {
-        workDate,
-        phaseId: phase.id,
-        phaseTitle: phase.title,
-        completed: existing?.completed || 0,
-        total: phase.checklist.length,
-        status: "missed",
-        recordedAt: now.toISOString(),
-        startedAt: existing?.startedAt,
-        dueAt: schedule.dueAt,
-        scheduleStartAt: schedule.startAt,
-        scheduleEndAt: schedule.endAt,
-        checkedKeys: existing?.checkedKeys || []
-      });
-    }, storedRecords);
-
-    setRecords(recordsWithMissed);
-    if (canPersistWorkflowRecords() && recordsWithMissed !== storedRecords) {
-      window.localStorage.setItem(workflowStorageKey, JSON.stringify(recordsWithMissed));
-    }
-  }, [phases, workDate]);
-
   // งานประจำเดือน: คำนวณสถานะฝั่ง client เท่านั้น (กัน hydration mismatch จาก new Date())
+  // สถานะมาจาก server record เดียวกับหน้า /monthly-tasks
   useEffect(() => {
+    let alive = true;
     const now = new Date();
-    const occurrences = monthlyTaskOccurrences(bangkokMonthKey(now), readMonthlyEventStates(), undefined, now);
-    const statusByTask: Record<string, MonthlyTaskStatus> = {};
-    for (const occurrence of occurrences) statusByTask[occurrence.taskId] = occurrence.status;
-    setMonthlyStatus(statusByTask);
-    setMonthLabel(occurrences[0]?.monthLabel ?? "");
+    const monthKey = bangkokMonthKey(now);
+    fetchMonthlyEventPayload(monthKey)
+      .then((payload) => {
+        if (!alive) return;
+        const occurrences = monthlyTaskOccurrences(monthKey, payload.states, undefined, now);
+        const statusByTask: Record<string, MonthlyTaskStatus> = {};
+        for (const occurrence of occurrences) statusByTask[occurrence.taskId] = occurrence.status;
+        setMonthlyStatus(statusByTask);
+        setMonthLabel(occurrences[0]?.monthLabel ?? "");
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Weekly event checklist: อ่านความคืบหน้า (ติ๊กกี่ข้อ) ของสัปดาห์นี้จาก localStorage

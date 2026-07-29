@@ -1,47 +1,39 @@
-// ที่เก็บสถานะงานประจำเดือน (Monthly tasks) ฝั่ง client
-// ใช้ localStorage ร่วมกันระหว่าง Dashboard กับหน้า checklist /monthly-tasks
-// ปัจจุบันระบบยังอยู่โหมดทดลอง (canPersistWorkflowRecords = false) → อ่านได้ว่าง (ทุกงาน = ยังไม่เริ่ม)
-// เมื่อเปิดใช้งานจริงจะบันทึกลง localStorage และซิงก์ทั้งสองหน้า
+// ที่เก็บสถานะงานประจำเดือน (Monthly tasks) — ใช้ร่วมกันระหว่าง Dashboard กับหน้า /monthly-tasks
+//
+// เดิมเก็บใน localStorage และถูกปิดด้วย canPersistWorkflowRecords → กดแล้วไม่บันทึกจริง
+// ตอนนี้เก็บบน server ผ่าน /api/work-records (scope monthly, owner team) เพราะเป็นงานที่
+// ทั้งทีมช่วยกันทำในรอบเดือน และเจ้าของร้านต้องเห็นสถานะเดียวกับพนักงาน
 
-import { canPersistWorkflowRecords } from "./workflow-records.ts";
+"use client";
+
 import type { MonthlyTaskState } from "./monthly-event-tasks.ts";
+import { fetchWorkRecordRange, saveWorkRecord } from "./work-records-client.ts";
+import { monthlyScopeKey } from "./work-records.ts";
 
-export const monthlyEventStateStorageKey = "up-level-monthly-event-state";
-export const monthlyEventEvidenceStorageKey = "up-level-monthly-event-evidence";
+export type MonthlyEventPayload = {
+  states: Record<string, MonthlyTaskState>;
+  evidence: Record<string, string>;
+};
 
 const validStates: MonthlyTaskState[] = ["not_started", "in_progress", "submitted", "done"];
 
-function safeParse(raw: string | null): Record<string, string> {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
+/** All monthly-task state lives in one team document per calendar month. */
+export function monthlyEventScopeKey(monthKey: string) {
+  return monthlyScopeKey(monthKey);
+}
+
+export async function fetchMonthlyEventPayload(monthKey: string): Promise<MonthlyEventPayload> {
+  const scopeKey = monthlyEventScopeKey(monthKey);
+  const result = await fetchWorkRecordRange("monthly", scopeKey, scopeKey, { owner: "team" });
+  const data = (result.records.find((record) => record.scopeKey === scopeKey)?.data || {}) as Partial<MonthlyEventPayload>;
+
+  const states: Record<string, MonthlyTaskState> = {};
+  for (const [key, value] of Object.entries(data.states || {})) {
+    if (validStates.includes(value as MonthlyTaskState)) states[key] = value as MonthlyTaskState;
   }
+  return { states, evidence: data.evidence || {} };
 }
 
-export function readMonthlyEventStates(): Record<string, MonthlyTaskState> {
-  if (typeof window === "undefined" || !canPersistWorkflowRecords()) return {};
-  const map = safeParse(window.localStorage.getItem(monthlyEventStateStorageKey));
-  const result: Record<string, MonthlyTaskState> = {};
-  for (const [key, value] of Object.entries(map)) {
-    if (validStates.includes(value as MonthlyTaskState)) result[key] = value as MonthlyTaskState;
-  }
-  return result;
-}
-
-export function readMonthlyEventEvidence(): Record<string, string> {
-  if (typeof window === "undefined" || !canPersistWorkflowRecords()) return {};
-  return safeParse(window.localStorage.getItem(monthlyEventEvidenceStorageKey));
-}
-
-export function persistMonthlyEventStates(states: Record<string, MonthlyTaskState>) {
-  if (typeof window === "undefined" || !canPersistWorkflowRecords()) return;
-  window.localStorage.setItem(monthlyEventStateStorageKey, JSON.stringify(states));
-}
-
-export function persistMonthlyEventEvidence(evidence: Record<string, string>) {
-  if (typeof window === "undefined" || !canPersistWorkflowRecords()) return;
-  window.localStorage.setItem(monthlyEventEvidenceStorageKey, JSON.stringify(evidence));
+export async function saveMonthlyEventPayload(monthKey: string, payload: MonthlyEventPayload): Promise<void> {
+  await saveWorkRecord("monthly", monthlyEventScopeKey(monthKey), payload, "team");
 }

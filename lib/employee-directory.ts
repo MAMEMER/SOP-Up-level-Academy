@@ -45,6 +45,24 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
     employmentType: "part_time",
     aliases: ["leo", "up leo"],
     branch: "bangkae"
+  },
+  {
+    code: "Wipop",
+    displayName: "Wipop",
+    email: "wipop.tho@gmail.com",
+    // TODO ยืนยันกับเจ้าของร้าน: full_time หรือ part_time (มีผลกับสูตรหักเงินเดือน)
+    employmentType: "part_time",
+    aliases: ["wipop"],
+    branch: "bangkae"
+  },
+  {
+    code: "Waranon",
+    displayName: "Waranon",
+    email: "waranon4work@gmail.com",
+    // TODO ยืนยันกับเจ้าของร้าน: full_time หรือ part_time (มีผลกับสูตรหักเงินเดือน)
+    employmentType: "part_time",
+    aliases: ["waranon"],
+    branch: "bangkae"
   }
 ];
 

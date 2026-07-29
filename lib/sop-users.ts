@@ -18,7 +18,9 @@ export const sopUsers: SopUser[] = [
   { email: "namenrw@gmail.com", name: "Namen RW", role: "admin", departmentId: "admin" },
   { email: "boomboom08755@gmail.com", name: "บูม", role: "employee", departmentId: "front-store" },
   { email: "phooreephat.k@gmail.com", name: "ไอซ์", role: "employee", departmentId: "front-store" },
-  { email: "nuslove2560@gmail.com", name: "ลีโอ", role: "employee", departmentId: "front-store" }
+  { email: "nuslove2560@gmail.com", name: "ลีโอ", role: "employee", departmentId: "front-store" },
+  { email: "wipop.tho@gmail.com", name: "Wipop", role: "employee", departmentId: "front-store" },
+  { email: "waranon4work@gmail.com", name: "Waranon", role: "employee", departmentId: "front-store" }
 ];
 
 export function sopUserForEmail(email: string | null | undefined): SopUser | undefined {

@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   elapsedSeconds,
   isWorkflowRecordOnTime,
-  readWorkflowRecordsFromStorage,
   summarizeMonthlyRecords,
-  workflowVisualStatus,
-  type WorkflowDailyRecord
+  workflowVisualStatus
 } from "../lib/workflow-records.ts";
+import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 
 const monthlyLabel = {
   white: "ยังไม่เริ่ม",
@@ -19,12 +17,8 @@ const monthlyLabel = {
 };
 
 export function MonthlySummaryMonitor() {
-  const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
+  const { records } = useWorkflowRecords();
   const monthKey = new Date().toISOString().slice(0, 7);
-
-  useEffect(() => {
-    setRecords(readWorkflowRecordsFromStorage(window.localStorage));
-  }, []);
 
   const summary = summarizeMonthlyRecords(records, monthKey);
   const reviewRecords = records.filter(

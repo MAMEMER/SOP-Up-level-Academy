@@ -8,7 +8,7 @@ coverage/
 dist/
 .wrangler/
 
-# uploaded performance CSVs (employee data — keep out of git)
-.data/uploads/
+# uploaded performance CSVs + local-dev work-record store (employee data — keep out of git)
+.data/
 .vercel
 tsconfig.tsbuildinfo

@@ -28,6 +28,7 @@ export default async function ChecklistPage() {
         staffCode={staffCode}
         branch={branch}
         workDate={workDate}
+        readOnly={user.isImpersonating}
       />
     </main>
   );

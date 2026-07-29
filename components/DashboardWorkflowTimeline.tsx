@@ -1,52 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { WorkflowPhase } from "../lib/card-store-workflow.ts";
-import {
-  formatWorkDate,
-  phaseScheduleForWorkDate,
-  readWorkflowRecordsFromStorage,
-  upsertWorkflowRecord,
-  workflowStorageKey,
-  workflowVisualStatus,
-  type WorkflowDailyRecord
-} from "../lib/workflow-records.ts";
+import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
+import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 
+// Read-only tile strip. Past-due phases already read as "red" from workflowVisualStatus,
+// so the timeline no longer writes "missed" records itself — the checklist owns writes.
 export function DashboardWorkflowTimeline({ phases }: { phases: WorkflowPhase[] }) {
-  const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
+  const { records } = useWorkflowRecords();
   const workDate = formatWorkDate();
-
-  useEffect(() => {
-    const storedRecords = readWorkflowRecordsFromStorage(window.localStorage);
-    const now = new Date();
-    const recordsWithMissed = phases.reduce((current, phase) => {
-      const existing = current.find((item) => item.workDate === workDate && item.phaseId === phase.id);
-      if (existing?.status === "submitted" || existing?.status === "missed") return current;
-
-      const schedule = phaseScheduleForWorkDate(phase.id, workDate);
-      if (Date.parse(schedule.dueAt) >= now.getTime()) return current;
-
-      return upsertWorkflowRecord(current, {
-        workDate,
-        phaseId: phase.id,
-        phaseTitle: phase.title,
-        completed: existing?.completed || 0,
-        total: phase.checklist.length,
-        status: "missed",
-        recordedAt: now.toISOString(),
-        startedAt: existing?.startedAt,
-        dueAt: schedule.dueAt,
-        scheduleStartAt: schedule.startAt,
-        scheduleEndAt: schedule.endAt,
-        checkedKeys: existing?.checkedKeys || []
-      });
-    }, storedRecords);
-
-    setRecords(recordsWithMissed);
-    if (recordsWithMissed !== storedRecords) {
-      window.localStorage.setItem(workflowStorageKey, JSON.stringify(recordsWithMissed));
-    }
-  }, [phases, workDate]);
 
   return (
     <section className="workflow-timeline">

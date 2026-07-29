@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { canPersistWorkflowRecords } from "../lib/workflow-records.ts";
 import {
   bangkokMonthKey,
   monthlyCategoryLabel,
@@ -13,12 +12,7 @@ import {
   type MonthlyTaskOccurrence,
   type MonthlyTaskState
 } from "../lib/monthly-event-tasks.ts";
-import {
-  persistMonthlyEventEvidence,
-  persistMonthlyEventStates,
-  readMonthlyEventEvidence,
-  readMonthlyEventStates
-} from "../lib/monthly-event-store.ts";
+import { fetchMonthlyEventPayload, saveMonthlyEventPayload } from "../lib/monthly-event-store.ts";
 
 // สถานะที่ staff บันทึกได้เอง (เจ้าของร้านเพิ่ม "เสร็จสิ้น" ได้หลังตรวจงาน)
 const staffStates: { value: MonthlyTaskState; label: string }[] = [
@@ -36,17 +30,26 @@ export function MonthlyEventChecklist({ canManage = false }: { canManage?: boole
   const [states, setStates] = useState<Record<string, MonthlyTaskState>>({});
   const [evidence, setEvidence] = useState<Record<string, string>>({});
   const [monthLabel, setMonthLabel] = useState<string>("");
-  const trialMode = !canPersistWorkflowRecords();
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let alive = true;
     const now = new Date();
     const monthKey = bangkokMonthKey(now);
-    const storedStates = readMonthlyEventStates();
-    setStates(storedStates);
-    setEvidence(readMonthlyEventEvidence());
-    const list = monthlyTaskOccurrences(monthKey, storedStates, undefined, now);
-    setOccurrences(list);
-    setMonthLabel(list[0]?.monthLabel ?? "");
+    fetchMonthlyEventPayload(monthKey)
+      .then((payload) => {
+        if (!alive) return;
+        setStates(payload.states);
+        setEvidence(payload.evidence);
+        const list = monthlyTaskOccurrences(monthKey, payload.states, undefined, now);
+        setOccurrences(list);
+        setMonthLabel(list[0]?.monthLabel ?? "");
+      })
+      .catch(() => undefined)
+      .finally(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const total = occurrences.length;
@@ -64,21 +67,23 @@ export function MonthlyEventChecklist({ canManage = false }: { canManage?: boole
     setOccurrences(monthlyTaskOccurrences(monthKey, nextStates, undefined, now));
   }
 
+  function persist(nextStates: Record<string, MonthlyTaskState>, nextEvidence: Record<string, string>) {
+    void saveMonthlyEventPayload(bangkokMonthKey(new Date()), { states: nextStates, evidence: nextEvidence });
+  }
+
   function setState(key: string, value: MonthlyTaskState) {
-    setStates((current) => {
-      const next = { ...current, [key]: value };
-      persistMonthlyEventStates(next);
-      recompute(next);
-      return next;
-    });
+    if (!loaded) return;
+    const next = { ...states, [key]: value };
+    setStates(next);
+    persist(next, evidence);
+    recompute(next);
   }
 
   function updateEvidence(key: string, value: string) {
-    setEvidence((current) => {
-      const next = { ...current, [key]: value };
-      persistMonthlyEventEvidence(next);
-      return next;
-    });
+    if (!loaded) return;
+    const next = { ...evidence, [key]: value };
+    setEvidence(next);
+    persist(states, next);
   }
 
   // จัดกลุ่มตามหมวด (event ก่อน แล้ว stock) เพื่อให้อ่านง่ายและ anchor #taskId ทำงาน
@@ -118,13 +123,6 @@ export function MonthlyEventChecklist({ canManage = false }: { canManage?: boole
 
   return (
     <section className="workflow-panel">
-      {trialMode ? (
-        <div className="trial-banner">
-          <strong>โหมดทดลองใช้งาน</strong>
-          <span>ทดลองอัปเดตสถานะและแนบหลักฐานได้ ข้อมูลจะยังไม่บันทึกเข้า review/dashboard จนกว่าจะเปิดใช้งานจริง</span>
-        </div>
-      ) : null}
-
       {canManage ? (
         <div className="trial-banner">
           <strong>โหมดเจ้าของร้าน</strong>

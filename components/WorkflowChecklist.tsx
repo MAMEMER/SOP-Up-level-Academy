@@ -1,25 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { workflowManualHref, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import {
   canAdminUnlockWorkflowRecord,
   canEditWorkflowRecord,
+  emptyWorkflowDayPayload,
   formatWorkDate,
   isFlexibleWorkflowPhase,
   isPhaseUnlocked,
   isPhasePastDue,
   isWithinWorkflowWorkHours,
+  mergeDayMaps,
   phaseScheduleForWorkDate,
-  readWorkflowRecordsFromStorage,
+  recordsFromDayPayloads,
   shouldAutoMissWorkflowRecord,
   upsertWorkflowRecord,
-  canPersistWorkflowRecords,
-  workflowStorageKey,
+  WORKFLOW_HISTORY_DAYS,
   type WorkflowDailyRecord,
+  type WorkflowDayPayload,
   type WorkflowRecordStatus
 } from "../lib/workflow-records.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
+import { useWorkRecordWindow } from "../lib/work-records-client.ts";
+import { SaveIndicator } from "./SaveIndicator.tsx";
+import { dailyScopeKey, shiftWorkDate } from "../lib/work-records.ts";
 
 function itemKey(phaseId: string, index: number) {
   return `${phaseId}:${index}`;
@@ -36,8 +41,6 @@ function completedCountForPhase(phase: WorkflowPhase, checkedMap: Record<string,
   return phase.checklist.filter((_, index) => checkedMap[itemKey(phase.id, index)]).length;
 }
 
-const workflowNoteStorageKey = "up-level-workflow-notes";
-const workflowDetailStorageKey = "up-level-workflow-details";
 const stockRoomSheetUrl = "https://docs.google.com/spreadsheets/d/1hZcCPfbjEsKTVnLxSrb75HnPdv8ZcGQyvaB5BEa5Vyk/edit?gid=0#gid=0";
 const supplyNeedsUrl = "https://uplevel.storehubhq.com/stocks/supplyNeeds/v2/web";
 
@@ -55,30 +58,24 @@ function previousWorkDateKey(workDate: string) {
   return date.toISOString().slice(0, 10);
 }
 
-function readWorkflowNotes() {
-  if (!canPersistWorkflowRecords()) return {};
-  const stored = window.localStorage.getItem(workflowNoteStorageKey);
-  if (!stored) return {};
-  try {
-    const parsed = JSON.parse(stored);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
-  } catch {
-    window.localStorage.removeItem(workflowNoteStorageKey);
-    return {};
-  }
-}
+const guildAdminUrl = "https://guild.uplevelguild.com/admin";
 
-function readWorkflowDetails() {
-  if (!canPersistWorkflowRecords()) return {};
-  const stored = window.localStorage.getItem(workflowDetailStorageKey);
-  if (!stored) return {};
-  try {
-    const parsed = JSON.parse(stored);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
-  } catch {
-    window.localStorage.removeItem(workflowDetailStorageKey);
-    return {};
-  }
+function GuildChatExpTaskDetails({ index }: { index: number }) {
+  return (
+    <div className="detail-panel">
+      <div className="detail-panel-head">
+        <strong>{index === 0 ? "แชทค้าง" : "Exp / เควสต์ค้าง"}</strong>
+        <small>
+          {index === 0
+            ? "ตอบแชทลูกค้าที่ค้างจากเมื่อวานให้หมดก่อนเริ่มงานอื่น"
+            : "อนุมัติคำขอ Exp และเควสต์ที่รออยู่ อย่าปล่อยค้างข้ามวัน"}
+        </small>
+      </div>
+      <a href={guildAdminUrl} target="_blank" rel="noreferrer" className="detail-action-link">
+        เปิดหน้าแอดมินเว็บกิลด์
+      </a>
+    </div>
+  );
 }
 
 function OpenStoreTaskDetails({
@@ -717,145 +714,129 @@ function StockTaskDetails({
 export function WorkflowChecklist({
   phases,
   userEmail,
-  userRole
+  userRole,
+  readOnly = false
 }: {
   phases: WorkflowPhase[];
   userEmail: string;
   userRole: "employee" | "leader" | "admin";
+  /** Admin previewing another account — render everything, save nothing. */
+  readOnly?: boolean;
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [details, setDetails] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => new Date());
   const checklistPhases = useMemo(() => phases.filter((phase) => phase.checklist.length > 0), [phases]);
+  const visiblePhaseIds = useMemo(() => checklistPhases.map((phase) => phase.id), [checklistPhases]);
   const workDate = formatWorkDate();
+  const scopeKey = dailyScopeKey(workDate);
+  const fromScopeKey = dailyScopeKey(shiftWorkDate(workDate, -WORKFLOW_HISTORY_DAYS));
+
+  // Server-persisted day record: today's is writable, the previous days are read for
+  // on-time streaks and the "ยอดปิดร้านเมื่อวาน" lookup.
+  const { data, history, loaded, status, update } = useWorkRecordWindow<WorkflowDayPayload>({
+    scope: "daily",
+    scopeKey,
+    fromScopeKey,
+    toScopeKey: scopeKey,
+    readOnly,
+    empty: emptyWorkflowDayPayload
+  });
+
+  const previousDays = useMemo(
+    () => history.filter((doc) => doc.scopeKey !== scopeKey).map((doc) => doc.data as Partial<WorkflowDayPayload>),
+    [history, scopeKey]
+  );
+  const todayRecords = useMemo(() => data.records || [], [data.records]);
+  const records = useMemo(
+    () => recordsFromDayPayloads([...previousDays, { records: todayRecords }]),
+    [previousDays, todayRecords]
+  );
+  const notes = useMemo(
+    () => mergeDayMaps([...previousDays.map((day) => day.notes), data.notes]),
+    [previousDays, data.notes]
+  );
+  const details = useMemo(
+    () => mergeDayMaps([...previousDays.map((day) => day.details), data.details]),
+    [previousDays, data.details]
+  );
+
   const total = useMemo(() => checklistPhases.reduce((sum, phase) => sum + phase.checklist.length, 0), [checklistPhases]);
   const completed = checklistPhases.reduce((sum, phase) => sum + completedCountForPhase(phase, checked), 0);
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
   const isAdmin = userRole === "admin";
-  const trialMode = !canPersistWorkflowRecords();
   const withinWorkHours = isWithinWorkflowWorkHours(now);
+  const locked = readOnly || !loaded;
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
 
-  useEffect(() => {
-    const currentTime = new Date();
-    const storedRecords = readWorkflowRecordsFromStorage(window.localStorage);
-    if (storedRecords.length > 0) {
-      const recordsWithMissed = checklistPhases.reduce((current, phase) => {
-        const existing = current.find((record) => record.workDate === workDate && record.phaseId === phase.id);
-        if (!shouldAutoMissWorkflowRecord(existing, phase.id, workDate, currentTime)) return current;
+  function updateRecords(next: WorkflowDailyRecord[]) {
+    update((previous) => ({ ...previous, records: next }));
+  }
 
-        const schedule = phaseScheduleForWorkDate(phase.id, workDate);
-        return upsertWorkflowRecord(current, {
-          workDate,
-          phaseId: phase.id,
-          phaseTitle: phase.title,
-          completed: existing?.completed || 0,
-          total: phase.checklist.length,
-          status: "missed",
-          recordedAt: currentTime.toISOString(),
-          startedAt: existing?.startedAt,
-          dueAt: schedule.dueAt,
-          scheduleStartAt: schedule.startAt,
-          scheduleEndAt: schedule.endAt,
-          checkedKeys: existing?.checkedKeys || []
-        });
-      }, storedRecords);
-      const restoredChecked = Object.fromEntries(
-        recordsWithMissed
+  // Hydrate today's ticks ONCE, when the record first loads. Re-running this on every
+  // record change would fight the user: each tick writes a record, which would bounce the
+  // checkbox back to the server copy mid-interaction.
+  const hydratedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!loaded || hydratedFor.current === workDate) return;
+    hydratedFor.current = workDate;
+    setChecked(
+      Object.fromEntries(
+        todayRecords
           .filter((record) => record.workDate === workDate)
           .flatMap((record) => (record.checkedKeys || []).map((key) => [key, true]))
-      );
-      setRecords(recordsWithMissed);
-      setChecked(restoredChecked);
-      if (canPersistWorkflowRecords() && recordsWithMissed !== storedRecords) {
-        window.localStorage.setItem(workflowStorageKey, JSON.stringify(recordsWithMissed));
-      }
-    } else {
-      const missedRecords = checklistPhases.reduce((current, phase) => {
-        if (!shouldAutoMissWorkflowRecord(undefined, phase.id, workDate, currentTime)) return current;
-        const schedule = phaseScheduleForWorkDate(phase.id, workDate);
-        return upsertWorkflowRecord(current, {
-          workDate,
-          phaseId: phase.id,
-          phaseTitle: phase.title,
-          completed: 0,
-          total: phase.checklist.length,
-          status: "missed",
-          recordedAt: currentTime.toISOString(),
-          dueAt: schedule.dueAt,
-          scheduleStartAt: schedule.startAt,
-          scheduleEndAt: schedule.endAt,
-          checkedKeys: []
-        });
-      }, [] as WorkflowDailyRecord[]);
+      )
+    );
+  }, [loaded, todayRecords, workDate]);
 
-      if (missedRecords.length > 0) {
-        setRecords(missedRecords);
-        if (canPersistWorkflowRecords()) {
-          window.localStorage.setItem(workflowStorageKey, JSON.stringify(missedRecords));
-        }
-      }
-    }
-  }, [checklistPhases, workDate]);
-
+  // The POS-login detail always mirrors the signed-in email.
   useEffect(() => {
-    setNotes(readWorkflowNotes());
-    setDetails(readWorkflowDetails());
-  }, []);
-
-  useEffect(() => {
-    setDetails((current) => {
-      const key = detailKey(workDate, "pos-login");
-      if (current[key] === userEmail) return current;
-      const next = { ...current, [key]: userEmail };
-      if (canPersistWorkflowRecords()) {
-        window.localStorage.setItem(workflowDetailStorageKey, JSON.stringify(next));
-      }
-      return next;
-    });
-  }, [userEmail, workDate]);
+    if (!loaded || readOnly) return;
+    const key = detailKey(workDate, "pos-login");
+    if (data.details?.[key] === userEmail) return;
+    update((previous) => ({
+      ...previous,
+      details: { ...(previous.details || {}), [key]: userEmail }
+    }));
+  }, [loaded, readOnly, userEmail, workDate, data.details, update]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 30000);
     return () => window.clearInterval(interval);
   }, []);
 
+  // A phase whose window closed without a submission is recorded as "missed" — that's the
+  // signal the KPI checklist category deducts from, so it has to be written, not derived.
   useEffect(() => {
-    setRecords((current) => {
-      const next = checklistPhases.reduce((recordsSoFar, phase) => {
-        const existing = recordsSoFar.find((record) => record.workDate === workDate && record.phaseId === phase.id);
-        if (!shouldAutoMissWorkflowRecord(existing, phase.id, workDate, now)) return recordsSoFar;
+    if (!loaded || readOnly) return;
+    const next = checklistPhases.reduce((current, phase) => {
+      const existing = current.find((record) => record.workDate === workDate && record.phaseId === phase.id);
+      if (!shouldAutoMissWorkflowRecord(existing, phase.id, workDate, now)) return current;
 
-        const schedule = phaseScheduleForWorkDate(phase.id, workDate);
-        return upsertWorkflowRecord(recordsSoFar, {
-          workDate,
-          phaseId: phase.id,
-          phaseTitle: phase.title,
-          completed: existing?.completed || 0,
-          total: phase.checklist.length,
-          status: "missed",
-          recordedAt: now.toISOString(),
-          startedAt: existing?.startedAt,
-          dueAt: schedule.dueAt,
-          scheduleStartAt: schedule.startAt,
-          scheduleEndAt: schedule.endAt,
-          checkedKeys: existing?.checkedKeys || []
-        });
-      }, current);
+      const schedule = phaseScheduleForWorkDate(phase.id, workDate);
+      return upsertWorkflowRecord(current, {
+        workDate,
+        phaseId: phase.id,
+        phaseTitle: phase.title,
+        completed: existing?.completed || 0,
+        total: phase.checklist.length,
+        status: "missed",
+        recordedAt: now.toISOString(),
+        startedAt: existing?.startedAt,
+        dueAt: schedule.dueAt,
+        scheduleStartAt: schedule.startAt,
+        scheduleEndAt: schedule.endAt,
+        checkedKeys: existing?.checkedKeys || []
+      });
+    }, todayRecords);
 
-      if (next !== current) {
-        if (canPersistWorkflowRecords()) {
-          window.localStorage.setItem(workflowStorageKey, JSON.stringify(next));
-        }
-      }
-      return next;
-    });
-  }, [checklistPhases, now, workDate]);
+    if (next !== todayRecords) updateRecords(next);
+    // updateRecords is stable via update(); listing it would re-run on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklistPhases, loaded, now, readOnly, todayRecords, workDate]);
 
-  function persistPhaseRecord(phase: WorkflowPhase, status: WorkflowRecordStatus, checkedMap: Record<string, boolean>) {
-    const existing = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
+  function persistPhaseRecord(phase: WorkflowPhase, recordStatus: WorkflowRecordStatus, checkedMap: Record<string, boolean>) {
+    if (locked) return;
+    const existing = todayRecords.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours()) return;
     if (!canEditWorkflowRecord(existing, { adminOverride: isAdmin })) return;
     if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
@@ -866,33 +847,31 @@ export function WorkflowChecklist({
       return !noOrderKey || key === noOrderKey || !checkedMap[noOrderKey];
     });
     const phaseCompleted = completedCountForPhase(phase, checkedMap);
-    if (status === "submitted" && phaseCompleted < phase.checklist.length) return;
+    if (recordStatus === "submitted" && phaseCompleted < phase.checklist.length) return;
 
-    const now = new Date().toISOString();
+    const recordedAt = new Date().toISOString();
     const schedule = phaseScheduleForWorkDate(phase.id, workDate);
-    const next = upsertWorkflowRecord(records, {
+    const next = upsertWorkflowRecord(todayRecords, {
       workDate,
       phaseId: phase.id,
       phaseTitle: phase.title,
       completed: phaseCompleted,
       total: phase.checklist.length,
-      status,
-      recordedAt: now,
-      startedAt: existing?.startedAt || now,
+      status: recordStatus,
+      recordedAt,
+      startedAt: existing?.startedAt || recordedAt,
       dueAt: schedule.dueAt,
       scheduleStartAt: schedule.startAt,
       scheduleEndAt: schedule.endAt,
       checkedKeys,
-      submittedAt: status === "submitted" ? now : undefined,
+      submittedAt: recordStatus === "submitted" ? recordedAt : undefined,
       adminUnlockedAt: existing?.adminUnlockedAt,
       adminUnlockedBy: existing?.adminUnlockedBy
     });
-    setRecords(next);
-    if (canPersistWorkflowRecords()) {
-      window.localStorage.setItem(workflowStorageKey, JSON.stringify(next));
-    }
+    updateRecords(next);
+
     // เมื่อกดส่งงานแล้วทุก phase ของ checklist วันนี้ถูกส่งครบ 100% → กลับหน้า Dashboard อัตโนมัติ
-    if (status === "submitted") {
+    if (recordStatus === "submitted") {
       const allSubmitted =
         checklistPhases.length > 0 &&
         checklistPhases.every(
@@ -904,50 +883,49 @@ export function WorkflowChecklist({
     }
   }
 
-  function recordPhase(phase: WorkflowPhase, status: WorkflowRecordStatus) {
-    persistPhaseRecord(phase, status, checked);
+  function recordPhase(phase: WorkflowPhase, recordStatus: WorkflowRecordStatus) {
+    persistPhaseRecord(phase, recordStatus, checked);
   }
 
   function toggleTask(phase: WorkflowPhase, key: string) {
-    const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
+    if (locked) return;
+    const record = todayRecords.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
     if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
-    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records)) return;
-    setChecked((current) => {
-      const next = { ...current, [key]: !current[key] };
-      const noOrderKey = noOrderKeyForPhase(phase);
-      if (noOrderKey && key === noOrderKey && next[key]) {
-        phase.checklist.forEach((_, index) => {
-          const currentKey = itemKey(phase.id, index);
-          if (currentKey !== noOrderKey) next[currentKey] = false;
-        });
-      }
-      if (noOrderKey && key !== noOrderKey && next[key]) {
-        next[noOrderKey] = false;
-      }
-      if (!record) persistPhaseRecord(phase, "saved", next);
-      return next;
-    });
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
+
+    const next = { ...checked, [key]: !checked[key] };
+    const noOrderKey = noOrderKeyForPhase(phase);
+    if (noOrderKey && key === noOrderKey && next[key]) {
+      phase.checklist.forEach((_, index) => {
+        const currentKey = itemKey(phase.id, index);
+        if (currentKey !== noOrderKey) next[currentKey] = false;
+      });
+    }
+    if (noOrderKey && key !== noOrderKey && next[key]) {
+      next[noOrderKey] = false;
+    }
+
+    setChecked(next);
+    // Every tick is written, not just the first one — a half-finished phase that the staff
+    // member never submits still has to survive a refresh.
+    persistPhaseRecord(phase, record?.status === "submitted" ? "submitted" : "saved", next);
   }
 
   function updateNote(phaseId: string, value: string) {
-    setNotes((current) => {
-      const next = { ...current, [noteKey(workDate, phaseId)]: value };
-      if (canPersistWorkflowRecords()) {
-        window.localStorage.setItem(workflowNoteStorageKey, JSON.stringify(next));
-      }
-      return next;
-    });
+    if (locked) return;
+    update((previous) => ({
+      ...previous,
+      notes: { ...(previous.notes || {}), [noteKey(workDate, phaseId)]: value }
+    }));
   }
 
   function updateDetail(key: string, value: string) {
-    setDetails((current) => {
-      const next = { ...current, [detailKey(workDate, key)]: value };
-      if (canPersistWorkflowRecords()) {
-        window.localStorage.setItem(workflowDetailStorageKey, JSON.stringify(next));
-      }
-      return next;
-    });
+    if (locked) return;
+    update((previous) => ({
+      ...previous,
+      details: { ...(previous.details || {}), [detailKey(workDate, key)]: value }
+    }));
   }
 
   // "ไม่มีออเดอร์" สำหรับกะปิดร้าน: ข้ามเฉพาะข้อแพ็คออเดอร์ (ข้อแรก) โดยไม่ข้ามทั้ง phase
@@ -956,7 +934,7 @@ export function WorkflowChecklist({
     const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
     if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
-    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records)) return;
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
 
     updateDetail("closing-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
     if (isNoOrder) {
@@ -978,7 +956,7 @@ export function WorkflowChecklist({
     const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
     if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
-    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records)) return;
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
 
     updateDetail("shipping-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
     if (isNoOrder) {
@@ -998,37 +976,35 @@ export function WorkflowChecklist({
   }
 
   function unlockPhaseForAdmin(phase: WorkflowPhase) {
-    if (!isAdmin) return;
-    const existing = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
+    if (!isAdmin || locked) return;
+    const existing = todayRecords.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!canAdminUnlockWorkflowRecord(existing, phase.id, workDate, now)) return;
 
     const unlockedAt = new Date().toISOString();
     const schedule = phaseScheduleForWorkDate(phase.id, workDate);
     const checkedKeys = existing?.checkedKeys || [];
-    const next = upsertWorkflowRecord(records, {
-      workDate,
-      phaseId: phase.id,
-      phaseTitle: phase.title,
-      completed: existing?.completed || 0,
-      total: phase.checklist.length,
-      status: "saved",
-      recordedAt: unlockedAt,
-      startedAt: existing?.startedAt || unlockedAt,
-      dueAt: schedule.dueAt,
-      scheduleStartAt: schedule.startAt,
-      scheduleEndAt: schedule.endAt,
-      checkedKeys,
-      adminUnlockedAt: unlockedAt,
-      adminUnlockedBy: userEmail
-    });
-    setRecords(next);
+    updateRecords(
+      upsertWorkflowRecord(todayRecords, {
+        workDate,
+        phaseId: phase.id,
+        phaseTitle: phase.title,
+        completed: existing?.completed || 0,
+        total: phase.checklist.length,
+        status: "saved",
+        recordedAt: unlockedAt,
+        startedAt: existing?.startedAt || unlockedAt,
+        dueAt: schedule.dueAt,
+        scheduleStartAt: schedule.startAt,
+        scheduleEndAt: schedule.endAt,
+        checkedKeys,
+        adminUnlockedAt: unlockedAt,
+        adminUnlockedBy: userEmail
+      })
+    );
     setChecked((current) => ({
       ...current,
       ...Object.fromEntries(checkedKeys.map((key) => [key, true]))
     }));
-    if (canPersistWorkflowRecords()) {
-      window.localStorage.setItem(workflowStorageKey, JSON.stringify(next));
-    }
   }
 
   function stockReorderListMissing(phase: WorkflowPhase) {
@@ -1053,10 +1029,10 @@ export function WorkflowChecklist({
   return (
     <section className="workflow-panel">
       <ChecklistCompleteOverlay show={redirecting} />
-      {trialMode ? (
+      {readOnly ? (
         <div className="trial-banner">
-          <strong>โหมดทดลองใช้งาน</strong>
-          <span>ทดลองติ๊กและแก้ไขได้ ข้อมูลจะยังไม่บันทึกเข้า review/dashboard จนกว่าจะเปิดใช้งานจริง</span>
+          <strong>มุมมองพนักงาน (อ่านอย่างเดียว)</strong>
+          <span>กำลังดูข้อมูลจริงของพนักงานคนนี้ ติ๊กหรือส่งงานไม่ได้ เพื่อไม่ให้กระทบคะแนนของเขา</span>
         </div>
       ) : null}
       {!withinWorkHours ? (
@@ -1070,6 +1046,7 @@ export function WorkflowChecklist({
           <span>ความคืบหน้าทั้งวัน</span>
           <strong>{progress}%</strong>
         </div>
+        <SaveIndicator status={status} loaded={loaded} />
       </div>
       <div className="runner-progress" aria-label={`ความคืบหน้า ${progress}%`}>
         <span style={{ width: `${progress}%` }} />
@@ -1080,11 +1057,11 @@ export function WorkflowChecklist({
           const done = completedCountForPhase(phase, checked);
           const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
           const isSubmitted = record?.status === "submitted";
-          const unlocked = isPhaseUnlocked(phase.id, workDate, records);
+          const unlocked = isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds);
           const isExpired = !isSubmitted && isPhasePastDue(phase.id, workDate, now);
           const adminUnlocked = Boolean(record?.adminUnlockedAt);
           const flexible = isFlexibleWorkflowPhase(phase.id);
-          const canEdit = withinWorkHours && canEditWorkflowRecord(record, { adminOverride: isAdmin }) && unlocked && (isAdmin || flexible || !isExpired);
+          const canEdit = !locked && withinWorkHours && canEditWorkflowRecord(record, { adminOverride: isAdmin }) && unlocked && (isAdmin || flexible || !isExpired);
           const missingStockReorderList = stockReorderListMissing(phase);
           const missingStockTakeStatus = missingStockTakeApproval(phase);
           const missingHandoff = missingHandoffSummary(phase);
@@ -1098,7 +1075,7 @@ export function WorkflowChecklist({
             !missingStockReorderList &&
             !missingStockTakeStatus &&
             !missingHandoff;
-          const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now) && !adminUnlocked && !trialMode;
+          const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now) && !adminUnlocked && !locked;
           const schedule = phaseScheduleForWorkDate(phase.id, workDate);
           return (
             <section key={phase.id} id={phase.id} className={`training-card phase-${phase.category}`}>
@@ -1139,6 +1116,7 @@ export function WorkflowChecklist({
                     daytimeNoOrderActive;
                   const hasDetail =
                     phase.id === "open-store" ||
+                    phase.id === "guild-chat-exp" ||
                     phase.id === "stock-work" ||
                     (phase.id === "daytime-work" && index <= 2) ||
                     (phase.id === "close-store" && index <= 4);
@@ -1167,6 +1145,7 @@ export function WorkflowChecklist({
                               updateDetail={updateDetail}
                             />
                           ) : null}
+                          {phase.id === "guild-chat-exp" ? <GuildChatExpTaskDetails index={index} /> : null}
                           {phase.id === "stock-work" ? (
                             <StockTaskDetails
                               index={index}

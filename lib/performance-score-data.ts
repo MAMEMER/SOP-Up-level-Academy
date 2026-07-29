@@ -1,5 +1,6 @@
 import {
   calculateEmployeePerformanceScore,
+  CHECKLIST_DEDUCTION_START,
   type ChecklistEvent,
   type ClockEvent,
   type EmployeePerformanceScore,
@@ -418,24 +419,38 @@ export function missingMorningStockCountRecords(input: {
     }));
 }
 
-const missingChecklistDays = [
-  { employeeName: "ICE", workDate: "2026-07-02" },
-  { employeeName: "ICE", workDate: "2026-07-03" },
-  { employeeName: "Leo", workDate: "2026-07-03" },
-  { employeeName: "Leo", workDate: "2026-07-04" }
-];
-
+/**
+ * A day counts against the Checklist category when the employee was scheduled AND clocked
+ * in but no checklist was submitted. `submittedChecklistDays` comes from the real work
+ * records (lib/checklist-kpi.ts); `missingChecklistDays` stays supported for callers that
+ * already know the missing days directly (and for the tests).
+ */
 export function missingChecklistEventsFromAttendance(input: {
   employeeName: string;
   period: PerformanceReviewPeriod;
   schedules: ShiftSchedule[];
   clockEvents: ClockEvent[];
-  missingChecklistDays: { employeeName: string; workDate: string }[];
+  missingChecklistDays?: { employeeName: string; workDate: string }[];
+  submittedChecklistDays?: { employeeName: string; workDate: string }[];
 }): ChecklistEvent[] {
   const scheduledDays = new Set(input.schedules.map((schedule) => `${schedule.employeeName}:${schedule.workDate}`));
   const clockedInDays = new Set(input.clockEvents.map((clock) => `${clock.employeeName}:${clock.workDate}`));
-  const dates = input.missingChecklistDays
+
+  const candidates =
+    input.missingChecklistDays ??
+    (() => {
+      const submitted = new Set(
+        (input.submittedChecklistDays || []).map((day) => `${day.employeeName}:${day.workDate}`)
+      );
+      return input.schedules
+        .filter((schedule) => !submitted.has(`${schedule.employeeName}:${schedule.workDate}`))
+        .map((schedule) => ({ employeeName: schedule.employeeName, workDate: schedule.workDate }));
+    })();
+
+  const dates = candidates
     .filter((day) => day.employeeName === input.employeeName && inPeriod(day.workDate, input.period))
+    // Nothing before go-live: those days have no records to be missing from.
+    .filter((day) => (input.missingChecklistDays ? true : day.workDate >= CHECKLIST_DEDUCTION_START))
     .filter((day) => scheduledDays.has(`${day.employeeName}:${day.workDate}`))
     .filter((day) => clockedInDays.has(`${day.employeeName}:${day.workDate}`))
     .map((day) => day.workDate)
@@ -473,16 +488,18 @@ export type AttendanceSource = {
 export function getPerformanceScoreRows(
   periodId: PerformanceReviewPeriod["id"],
   dailyStore: PerformanceDailyStore,
-  attendance?: AttendanceSource
+  attendance?: AttendanceSource,
+  submittedChecklistDays: { employeeName: string; workDate: string }[] = []
 ): EmployeePerformanceScore[] {
   const period = performanceReviewPeriods.find((item) => item.id === periodId) || performanceReviewPeriods[0];
-  return getPerformanceScoreRowsForRange(period, dailyStore, attendance);
+  return getPerformanceScoreRowsForRange(period, dailyStore, attendance, submittedChecklistDays);
 }
 
 export function getPerformanceScoreRowsForRange(
   period: PerformanceReviewPeriod,
   dailyStore: PerformanceDailyStore,
-  attendance?: AttendanceSource
+  attendance?: AttendanceSource,
+  submittedChecklistDays: { employeeName: string; workDate: string }[] = []
 ): EmployeePerformanceScore[] {
   const year = period.startDate.slice(0, 4);
   const srcSchedules = attendance?.schedules ?? schedules;
@@ -520,7 +537,7 @@ export function getPerformanceScoreRowsForRange(
       period,
       schedules: employeePeriodSchedules,
       clockEvents: employeePeriodClockEvents,
-      missingChecklistDays
+      submittedChecklistDays
     });
     return calculateEmployeePerformanceScore({
       employeeName,

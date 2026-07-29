@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { canPersistWorkflowRecords } from "../lib/workflow-records.ts";
+import { useMemo } from "react";
+import { useWorkRecordWindow } from "../lib/work-records-client.ts";
+import { weeklyScopeKey } from "../lib/work-records.ts";
+import { SaveIndicator } from "./SaveIndicator.tsx";
 import {
   stockRoomSheetUrl,
   stocktakeStatusOptions,
@@ -13,9 +15,17 @@ import {
 } from "../lib/weekly-stock-workflow.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 
-const weeklyCheckedStorageKey = "up-level-weekly-stock-checked";
-const weeklyDetailStorageKey = "up-level-weekly-stock-details";
-const weeklyStatusStorageKey = "up-level-weekly-stock-status";
+// Weekly stock is a shared branch task ("ทั้งทีมช่วยกันทำให้ครบในรอบ"), so it is stored
+// once per branch per ISO week rather than per person.
+type WeeklyStockPayload = {
+  checked: Record<string, boolean>;
+  details: Record<string, string>;
+  status: string;
+  submittedAt?: string;
+  submittedBy?: string;
+};
+
+const emptyWeeklyPayload: WeeklyStockPayload = { checked: {}, details: {}, status: "" };
 
 // รหัสสัปดาห์แบบ ISO (เช่น 2026-W30) ใช้เป็น scope ของงานประจำสัปดาห์
 function formatWorkWeek(date = new Date()) {
@@ -35,19 +45,6 @@ function itemKey(workWeek: string, index: number) {
 
 function detailKey(workWeek: string, key: string) {
   return `${workWeek}:${key}`;
-}
-
-function readStore(storageKey: string): Record<string, string | boolean> {
-  if (!canPersistWorkflowRecords()) return {};
-  const stored = window.localStorage.getItem(storageKey);
-  if (!stored) return {};
-  try {
-    const parsed = JSON.parse(stored);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    window.localStorage.removeItem(storageKey);
-    return {};
-  }
 }
 
 function WeeklyStockTaskDetails({
@@ -177,25 +174,26 @@ function WeeklyStockTaskDetails({
 }
 
 export function WeeklyStockChecklist({
-  phase = weeklyStockSleevePhase
+  phase = weeklyStockSleevePhase,
+  readOnly = false
 }: {
   phase?: WeeklyStockPhase;
+  readOnly?: boolean;
 }) {
   const workWeek = formatWorkWeek();
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [details, setDetails] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState<string>("");
-  const trialMode = !canPersistWorkflowRecords();
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
+  const { data, loaded, status: saveStatus, update } = useWorkRecordWindow<WeeklyStockPayload>({
+    scope: "weekly",
+    scopeKey: weeklyScopeKey(workWeek),
+    owner: "team",
+    readOnly,
+    empty: emptyWeeklyPayload
+  });
 
-  useEffect(() => {
-    setChecked(readStore(weeklyCheckedStorageKey) as Record<string, boolean>);
-    setDetails(readStore(weeklyDetailStorageKey) as Record<string, string>);
-    const storedStatus = readStore(weeklyStatusStorageKey) as Record<string, string>;
-    if (storedStatus[detailKey(workWeek, "stocktake-status")]) {
-      setStatus(storedStatus[detailKey(workWeek, "stocktake-status")]);
-    }
-  }, [workWeek]);
+  const checked = data.checked || {};
+  const details = data.details || {};
+  const status = data.status || "";
+  const locked = readOnly || !loaded;
 
   const total = phase.checklist.length;
   const completed = useMemo(
@@ -206,49 +204,33 @@ export function WeeklyStockChecklist({
   const statusSubmittable = submittableStocktakeStatuses.includes(
     status as (typeof submittableStocktakeStatuses)[number]
   );
-  const canSubmit = completed === total && statusSubmittable;
+  const canSubmit = !locked && completed === total && statusSubmittable;
 
   function toggleTask(index: number) {
-    setChecked((current) => {
-      const next = { ...current, [itemKey(workWeek, index)]: !current[itemKey(workWeek, index)] };
-      if (canPersistWorkflowRecords()) {
-        window.localStorage.setItem(weeklyCheckedStorageKey, JSON.stringify(next));
-      }
-      return next;
-    });
+    if (locked) return;
+    const key = itemKey(workWeek, index);
+    update((previous) => ({
+      ...previous,
+      checked: { ...(previous.checked || {}), [key]: !previous.checked?.[key] }
+    }));
   }
 
   function updateDetail(key: string, value: string) {
-    setDetails((current) => {
-      const next = { ...current, [detailKey(workWeek, key)]: value };
-      if (canPersistWorkflowRecords()) {
-        window.localStorage.setItem(weeklyDetailStorageKey, JSON.stringify(next));
-      }
-      return next;
-    });
+    if (locked) return;
+    update((previous) => ({
+      ...previous,
+      details: { ...(previous.details || {}), [detailKey(workWeek, key)]: value }
+    }));
   }
 
   function updateStatus(value: string) {
-    setStatus(value);
-    if (canPersistWorkflowRecords()) {
-      const next = { [detailKey(workWeek, "stocktake-status")]: value };
-      window.localStorage.setItem(weeklyStatusStorageKey, JSON.stringify(next));
-    }
-  }
-
-  function saveProgress() {
-    if (!canPersistWorkflowRecords()) return;
-    window.localStorage.setItem(weeklyCheckedStorageKey, JSON.stringify(checked));
-    window.localStorage.setItem(weeklyDetailStorageKey, JSON.stringify(details));
-    window.localStorage.setItem(
-      weeklyStatusStorageKey,
-      JSON.stringify({ [detailKey(workWeek, "stocktake-status")]: status })
-    );
+    if (locked) return;
+    update((previous) => ({ ...previous, status: value }));
   }
 
   function submitWork() {
     if (!canSubmit) return;
-    saveProgress();
+    update((previous) => ({ ...previous, submittedAt: new Date().toISOString() }));
     // checklist สต๊อกรายสัปดาห์ครบ 100% แล้ว → กลับหน้า Dashboard
     goToDashboard();
   }
@@ -256,10 +238,10 @@ export function WeeklyStockChecklist({
   return (
     <section className="workflow-panel">
       <ChecklistCompleteOverlay show={redirecting} />
-      {trialMode ? (
+      {readOnly ? (
         <div className="trial-banner">
-          <strong>โหมดทดลองใช้งาน</strong>
-          <span>ทดลองติ๊กและกรอกได้ ข้อมูลจะยังไม่บันทึกเข้า review/dashboard จนกว่าจะเปิดใช้งานจริง</span>
+          <strong>มุมมองพนักงาน (อ่านอย่างเดียว)</strong>
+          <span>ดูข้อมูลจริงได้ แต่แก้ไขไม่ได้</span>
         </div>
       ) : null}
       <div className="runner-status">
@@ -267,6 +249,7 @@ export function WeeklyStockChecklist({
           <span>ความคืบหน้างานประจำสัปดาห์</span>
           <strong>{progress}%</strong>
         </div>
+        <SaveIndicator status={saveStatus} loaded={loaded} />
       </div>
       <div className="runner-progress" aria-label={`ความคืบหน้า ${progress}%`}>
         <span style={{ width: `${progress}%` }} />
@@ -296,6 +279,7 @@ export function WeeklyStockChecklist({
                     <input
                       type="checkbox"
                       checked={Boolean(checked[key])}
+                      disabled={locked}
                       onChange={() => toggleTask(index)}
                     />
                     <span>{item}</span>
@@ -320,13 +304,12 @@ export function WeeklyStockChecklist({
           ) : null}
 
           <div className="workflow-record-actions">
-            <button type="button" className="soft-button" onClick={saveProgress}>
-              บันทึก
-            </button>
             <button type="button" className="green-button" onClick={submitWork} disabled={!canSubmit}>
               ส่งงาน
             </button>
-            <strong className="record-status">{completed}/{total}</strong>
+            <strong className={data.submittedAt ? "record-status submitted" : "record-status"}>
+              {data.submittedAt ? "ส่งตรวจแล้ว · " : ""}{completed}/{total}
+            </strong>
           </div>
         </section>
       </div>

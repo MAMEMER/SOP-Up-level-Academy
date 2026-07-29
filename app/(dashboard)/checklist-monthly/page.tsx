@@ -3,7 +3,7 @@ import { MonthlyStockSingleChecklist } from "../../../components/MonthlyStockSin
 import { requireUser } from "../../../lib/auth.ts";
 
 export default async function ChecklistMonthlyPage() {
-  await requireUser();
+  const user = await requireUser();
 
   return (
     <main className="page">
@@ -15,7 +15,7 @@ export default async function ChecklistMonthlyPage() {
           <p>นับ Single card ประจำเดือนแยกตามเกมและพื้นที่จัดเก็บ ให้พนักงานนับจริงเทียบระบบ StoreHub แล้วสรุปยอด +/- โดยห้ามปรับยอดในระบบก่อนหัวหน้าอนุมัติ</p>
         </div>
       </section>
-      <MonthlyStockSingleChecklist />
+      <MonthlyStockSingleChecklist readOnly={user.isImpersonating} />
     </main>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { WorkflowPhase } from "../lib/card-store-workflow.ts";
-import { formatWorkDate, readWorkflowRecordsFromStorage, workflowVisualStatus, type WorkflowDailyRecord } from "../lib/workflow-records.ts";
+import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
+import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 
 const statusText = {
   white: "ยังไม่เริ่ม",
@@ -13,12 +13,8 @@ const statusText = {
 };
 
 export function DashboardChecklistStatus({ phases }: { phases: WorkflowPhase[] }) {
-  const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
+  const { records } = useWorkflowRecords();
   const workDate = formatWorkDate();
-
-  useEffect(() => {
-    setRecords(readWorkflowRecordsFromStorage(window.localStorage));
-  }, []);
 
   return (
     <div className="hero-metrics checklist-status-cards">

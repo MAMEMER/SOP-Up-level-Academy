@@ -3807,8 +3807,7 @@ a {
 
 }
 
-/* ============================================================
-   Up Level Guild design system (official — up-level-pkm-deck)
+/* =====================================================   Up Level Guild design system (official — up-level-pkm-deck)
    Light warm-pastel · Mitr · frosted soft-card · btn-cute · tilt
    Appended last = overrides the legacy styles above.
    ============================================================ */
@@ -4722,3 +4721,45 @@ main .page > section, main > section { margin-top: 16px !important; }
 
 .staff-score-leave-records > div { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; }
 .staff-score-leave-records span { font-size: 13px; color: var(--color-ink-soft); }
+=======
+/* ── server-persisted records: save state + owner "view as" mode ───────────── */
+
+.save-indicator {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+.save-indicator.saving { background: #fff7cc; color: #7c2d12; }
+.save-indicator.saved { background: #dcfce7; color: #14532d; }
+.save-indicator.error { background: #fee2e2; color: #7f1d1d; }
+.save-indicator.loading { opacity: 0.7; }
+
+.runner-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* Impersonation must be impossible to miss — an owner should never think a staff
+   account is their own session. */
+.impersonation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 2px solid #6a5acd;
+  border-radius: 12px;
+  background: #efeaff;
+  color: #2e2266;
+}
+.impersonation-bar strong { font-size: 15px; }
+.impersonation-bar span { font-size: 12px; color: #4c3f8f; flex: 1; min-width: 200px; }
+.app-shell.is-impersonating .workspace { box-shadow: inset 0 0 0 3px rgba(106, 90, 205, 0.5); }
+
+.view-as-list { display: flex; flex-wrap: wrap; gap: 10px; }
+
+@media (max-width: 720px) {
+  .impersonation-bar { flex-direction: column; align-items: flex-start; }
+}
