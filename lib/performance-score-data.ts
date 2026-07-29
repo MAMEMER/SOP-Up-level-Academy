@@ -41,7 +41,7 @@ export type PerformanceSourceDetail = {
   key: string;
   title: string;
   sourcePath: string;
-  sourceType: "google-sheet" | "storehub-csv" | "manual-input";
+  sourceType: "google-sheet" | "storehub-csv" | "manual-input" | "live-planner";
   currentRange: string;
   whatToCheck: string[];
 };
@@ -124,7 +124,7 @@ export function performanceReviewPeriods(): PerformanceReviewPeriod[] {
 }
 
 export const performanceSourceStatuses: PerformanceSourceStatus[] = [
-  { key: "schedule", label: "Google Sheet ตารางกะ", status: "import-ready", detail: "อิงโครงสร้างจริงจาก Sheet ตารางการทำงาน Uplevel (บางแค)" },
+  { key: "schedule", label: "ตารางกะบนเว็บ", status: "live", detail: "อ่านจากตารางกะที่วางไว้ในหน้า ตารางกะ (schedule_shifts) — มิ.ย. 2026 นำเข้าจาก Sheet ครั้งเดียว" },
   { key: "attendance", label: "StoreHub clock-in", status: "import-ready", detail: "อ่านไฟล์ Timesheets CSV ล่าสุดจากโฟลเดอร์ข้อมูล performance รายเดือน" },
   { key: "stock", label: "StoreHub stock count", status: "import-ready", detail: "อ่านจาก StoreHub Stock Take CSV export และช่อง Difference" },
   { key: "checklist", label: "Checklist", status: "import-ready", detail: "อิงจาก Google Sheet uplevel_daily_checklist tab Form Responses 1" }
@@ -133,11 +133,11 @@ export const performanceSourceStatuses: PerformanceSourceStatus[] = [
 export const performanceSourceDetails: PerformanceSourceDetail[] = [
   {
     key: "schedule",
-    title: "Google Sheet ตารางกะ",
-    sourcePath: "https://docs.google.com/spreadsheets/d/1C9iMNfU8PYGoAaUN68M39ihJSOW4ZcYinzYDHBgyDWw/edit",
-    sourceType: "google-sheet",
-    currentRange: "JUN26. และ JUL26 แถวชื่อพนักงาน + แถวแก้ไข/หมายเหตุ",
-    whatToCheck: ["เวลาเข้ากะรายวัน", "OFF", "บรรทัดแก้ไขใช้เป็นข้อมูลล่าสุด", "ลาป่วย/ลากิจในแถวหมายเหตุ", "ยอดวันลาทั้งปีนับเฉพาะวันที่มีกะ"]
+    title: "ตารางกะบนเว็บ",
+    sourcePath: "/admin/schedule",
+    sourceType: "live-planner",
+    currentRange: "schedule_shifts — ทุกเดือนที่วางกะไว้ (มิ.ย. 2026 นำเข้าจาก Sheet ครั้งเดียว)",
+    whatToCheck: ["เวลาเข้ากะรายวัน", "OFF", "ลาป่วย/ลากิจ", "วันที่สลับกะ", "ยอดวันลาทั้งปีนับเฉพาะวันที่มีกะ"]
   },
   {
     key: "attendance",
@@ -222,158 +222,6 @@ function normalizeShiftStart(value: string) {
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return undefined;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
-
-const sheetScheduleRows: SheetScheduleRow[] = [
-  {
-    employeeName: "ICE",
-    month: "2026-06",
-    shifts: {
-      16: "11:00",
-      17: "11:00",
-      18: "13:30",
-      19: "11:00",
-      20: "OFF",
-      21: "OFF",
-      22: "13:30",
-      23: "13:30",
-      24: "13:30",
-      25: "13:30",
-      26: "13:30",
-      27: "09:00",
-      28: "OFF",
-      29: "11:00",
-      30: "13:30"
-    }
-  },
-  {
-    employeeName: "Boom",
-    month: "2026-06",
-    shifts: {
-      16: "OFF",
-      17: "OFF",
-      18: "OFF",
-      19: "13:30",
-      20: "09:00",
-      21: "09:00",
-      22: "11:00",
-      23: "OFF",
-      24: "OFF",
-      25: "11:00",
-      26: "11:00",
-      27: "11:00",
-      28: "09:00",
-      29: "13:00",
-      30: "OFF"
-    }
-  },
-  {
-    employeeName: "Leo",
-    month: "2026-06",
-    shifts: {
-      16: "13:30",
-      17: "13:30",
-      18: "OFF",
-      19: "OFF",
-      20: "11:30",
-      21: "OFF",
-      22: "OFF",
-      23: "11:00",
-      24: "11:00",
-      25: "OFF",
-      26: "OFF",
-      27: "09:00",
-      28: "OFF",
-      29: "13:00",
-      30: "11:00"
-    }
-  },
-  {
-    employeeName: "ICE",
-    month: "2026-07",
-    shifts: { 1: "13:00", 2: "13:00", 3: "11:00", 4: "OFF", 5: "OFF", 6: "13:00", 7: "11:00", 8: "13:00", 9: "13:30" },
-    editShifts: { 7: "f", 9: "f" }
-  },
-  {
-    employeeName: "Boom",
-    month: "2026-07",
-    shifts: { 1: "OFF", 2: "11:00", 3: "11:00", 4: "09:00", 5: "09:00", 6: "13:00", 7: "OFF", 8: "OFF", 9: "11:00" },
-    editShifts: { 3: "ลาป่วย", 4: "ลาป่วย", 5: "ลาป่วย", 6: "ลาป่วย", 8: "11" }
-  },
-  {
-    employeeName: "Leo",
-    month: "2026-07",
-    shifts: { 1: "11:00", 2: "OFF", 3: "13:30", 4: "11:00", 5: "OFF", 6: "OFF", 7: "13:30", 8: "11:00", 9: "OFF" }
-  }
-];
-
-function addHours(isoDateTime: string, hours: number) {
-  return new Date(Date.parse(isoDateTime) + hours * 60 * 60 * 1000).toISOString();
-}
-
-function buildSchedules(rows: SheetScheduleRow[]): ShiftSchedule[] {
-  return applyScheduleEditRows(rows).flatMap((row) =>
-    Object.entries(row.shifts)
-      .filter(([, shift]) => shift !== "OFF" && !leaveTypeFromScheduleValue(shift))
-      .flatMap(([day, shift]) => {
-        const normalizedShiftStart = normalizeShiftStart(shift);
-        if (!normalizedShiftStart) return [];
-        const workDate = `${row.month}-${day.padStart(2, "0")}`;
-        const scheduledStart = `${workDate}T${normalizedShiftStart}:00+07:00`;
-        return [{
-          employeeName: row.employeeName,
-          workDate,
-          scheduledStart,
-          scheduledEnd: addHours(scheduledStart, 9),
-          shiftLabel: `${row.month.toUpperCase()} sheet ${normalizedShiftStart}`,
-          source: "google-sheet" as const
-        }];
-      })
-  );
-}
-
-const schedules = buildSchedules(sheetScheduleRows);
-const leaveEligibleSchedules = buildSchedules(sheetScheduleRows.map((row) => ({ ...row, editShifts: undefined })));
-
-type SheetLeaveRow = {
-  employeeName: string;
-  month: "2026-06" | "2026-07";
-  leaves: Record<number, "sick" | "personal">;
-};
-
-const sheetLeaveRows: SheetLeaveRow[] = [
-  {
-    employeeName: "Boom",
-    month: "2026-06",
-    leaves: { 24: "sick", 25: "sick", 26: "sick", 27: "sick", 28: "sick", 29: "sick", 30: "sick" }
-  },
-];
-
-function buildLeaveRecords(rows: SheetLeaveRow[]): LeaveRecord[] {
-  const explicitLeaveRecords = rows.flatMap((row) =>
-    Object.entries(row.leaves).map(([day, type]) => ({
-      employeeName: row.employeeName,
-      workDate: `${row.month}-${day.padStart(2, "0")}`,
-      type,
-      source: "google-sheet" as const
-    }))
-  );
-  const scheduleLeaveRecords = applyScheduleEditRows(sheetScheduleRows).flatMap((row) =>
-    Object.entries(row.shifts).flatMap(([day, shift]) => {
-      const type = leaveTypeFromScheduleValue(shift);
-      if (!type) return [];
-      return [{
-        employeeName: row.employeeName,
-        workDate: `${row.month}-${day.padStart(2, "0")}`,
-        type,
-        source: "google-sheet" as const
-      }];
-    })
-  );
-  const leaveByDay = new Map([...explicitLeaveRecords, ...scheduleLeaveRecords].map((record) => [`${record.employeeName}:${record.workDate}`, record]));
-  return [...leaveByDay.values()];
-}
-
-const leaveRecords = buildLeaveRecords(sheetLeaveRows);
 
 function getClockEventsFromExport() {
   const sourceFiles = readPerformanceSourceFiles();
@@ -543,10 +391,12 @@ export function getPerformanceScoreRowsForRange(
   submittedChecklistDays: { employeeName: string; workDate: string }[] = []
 ): EmployeePerformanceScore[] {
   const year = period.startDate.slice(0, 4);
-  const srcSchedules = attendance?.schedules ?? schedules;
+  // Shifts and leave come from the live planner (schedule_shifts / schedule_actual) only.
+  // June 2026 predates the planner and was backfilled into it — see lib/june-2026-backfill.ts.
+  const srcSchedules = attendance?.schedules ?? [];
   const srcClock = attendance?.clockEvents ?? getClockEventsFromExport();
-  const srcLeaves = attendance?.leaves ?? leaveRecords;
-  const srcAnnualSchedules = attendance?.annualSchedules ?? attendance?.schedules ?? leaveEligibleSchedules;
+  const srcLeaves = attendance?.leaves ?? [];
+  const srcAnnualSchedules = attendance?.annualSchedules ?? srcSchedules;
   // Load the stocktake export ONCE and derive the GLOBAL coverage boundary (across all
   // employees) so a "not counted" penalty is only ever raised for days the CSV actually
   // spans. Days beyond it are un-exported, not un-counted (ticket ZDjzavu0t1fhNplxlORR).

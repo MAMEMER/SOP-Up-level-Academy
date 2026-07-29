@@ -40,6 +40,7 @@ import {
 import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "../lib/storehub-stocktake-export.ts";
 import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "../lib/storehub-timesheet-export.ts";
 import { resolveMonthlyPerformanceSourceFiles } from "../lib/performance-source-files.ts";
+import { boomSickLeaveAttendance } from "./fixtures/boom-sick-leave.ts";
 
 const EMPTY_DAILY_STORE = { serviceRecords: [], assignedWorkRecords: [] };
 
@@ -850,41 +851,6 @@ describe("performance score engine", () => {
     assert.equal(result.salaryDeduction.amount, 0);
   });
 
-  // re-verify on data machine: depends on StoreHub Timesheets/Stock_Take CSVs (not in repo) AND the
-  // expected totals shifted with the 21 Jul 2026 KPI change (checklist -5/day, assigned cumulative,
-  // July stock +/- grace). Re-enable and refresh the numbers below where the CSV exports live.
-  it.skip("calculates score rows from verified source data without score fixtures", () => {
-    const period = performanceReviewPeriods().find((item) => item.id === "month-to-date");
-    assert.ok(period);
-
-    const rows = getPerformanceScoreRows(period.id, EMPTY_DAILY_STORE);
-    const ice = rows.find((row) => row.employeeName === "ICE");
-    const boom = rows.find((row) => row.employeeName === "Boom");
-    const leo = rows.find((row) => row.employeeName === "Leo");
-
-    assert.ok(ice);
-    assert.ok(boom);
-    assert.ok(leo);
-    assert.equal(rows.length, 3);
-    assert.equal(ice.totalScore, 46);
-    assert.equal(ice.incentive.percent, 0);
-    assert.equal(ice.categories.attendance.score, 12);
-    assert.equal(ice.categories.stock.score, 14);
-    assert.equal(ice.categories.stock.deductions[0].reason, "stock_difference");
-    assert.equal(ice.categories.checklist.score, 0);
-    assert.equal(ice.categories.checklist.deductions[0].detail, "มีกะและ clock-in แต่ไม่มีข้อมูล Google Form checklist x 2 วัน (2026-07-02, 2026-07-03)");
-    assert.equal(ice.categories.attendance.deductions[0].detail, "ICE late 58 minutes on 2026-07-01");
-    assert.equal(ice.categories.assignedWork.score, 0);
-    assert.equal(ice.categories.customerService.score, 20);
-    assert.equal(boom.totalScore, 74);
-    assert.equal(boom.categories.customerService.score, 20);
-    assert.equal(boom.categories.assignedWork.score, 20);
-    assert.equal(leo.categories.checklist.score, 0);
-    assert.equal(leo.categories.checklist.deductions[0].detail, "มีกะและ clock-in แต่ไม่มีข้อมูล Google Form checklist x 2 วัน (2026-07-03, 2026-07-04)");
-    assert.equal(ice.flags.includes("coaching_required"), true);
-    assert.equal(boom.categories.checklist.score, 20);
-  });
-
   it("does not deduct previous half-month checklist without verified missing checklist data", () => {
     const rows = getPerformanceScoreRows("previous-half-month", EMPTY_DAILY_STORE);
     const ice = rows.find((row) => row.employeeName === "ICE");
@@ -894,19 +860,12 @@ describe("performance score engine", () => {
     assert.equal(ice.categories.checklist.deductions.length, 0);
   });
 
-  // re-verify on data machine: attendance detail depends on StoreHub Timesheets CSV (not in repo).
-  it.skip("calculates score rows for a custom date range", () => {
-    const rows = getPerformanceScoreRowsForRange({ id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-03" }, EMPTY_DAILY_STORE);
-    const ice = rows.find((row) => row.employeeName === "ICE");
-
-    assert.ok(ice);
-    assert.equal(ice.categories.attendance.score, 14);
-    assert.equal(ice.categories.attendance.deductions.length, 3);
-    assert.equal(ice.categories.attendance.deductions[0].detail, "ICE late 58 minutes on 2026-07-01");
-  });
-
   it("summarizes Boom annual sick leave only on scheduled work days", () => {
-    const julyRows = getPerformanceScoreRowsForRange({ id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-03" }, EMPTY_DAILY_STORE);
+    const julyRows = getPerformanceScoreRowsForRange(
+      { id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-07-03" },
+      EMPTY_DAILY_STORE,
+      boomSickLeaveAttendance
+    );
     const julyBoom = julyRows.find((row) => row.employeeName === "Boom");
     assert.ok(julyBoom);
     assert.equal(julyBoom.leaveSummary.sickUsed, 9);
@@ -915,7 +874,8 @@ describe("performance score engine", () => {
       ["2026-06-25", "2026-06-26", "2026-06-27", "2026-06-28", "2026-06-29", "2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06"]
     );
 
-    const previousRows = getPerformanceScoreRows("previous-half-month", EMPTY_DAILY_STORE);
+    // the allowance is annual, so the same 9 days show whichever window is selected
+    const previousRows = getPerformanceScoreRows("previous-half-month", EMPTY_DAILY_STORE, boomSickLeaveAttendance);
     const previousBoom = previousRows.find((row) => row.employeeName === "Boom");
     assert.ok(previousBoom);
     assert.equal(previousBoom.leaveSummary.sickUsed, 9);
@@ -973,8 +933,9 @@ describe("performance score engine", () => {
       assert.ok(detail.whatToCheck.length > 0);
     });
 
-    assert.equal(getPerformanceSourceDetail("schedule")?.sourcePath.includes("docs.google.com/spreadsheets"), true);
-    assert.equal(getPerformanceSourceDetail("schedule")?.whatToCheck.includes("บรรทัดแก้ไขใช้เป็นข้อมูลล่าสุด"), true);
+    // shifts come from the on-site planner now, not a Google Sheet
+    assert.equal(getPerformanceSourceDetail("schedule")?.sourcePath, "/admin/schedule");
+    assert.equal(performanceSourceStatuses.find((source) => source.key === "schedule")?.status, "live");
     assert.equal(getPerformanceSourceDetail("attendance")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
     assert.equal(getPerformanceSourceDetail("stock")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
     assert.equal(getPerformanceSourceDetail("checklist")?.sourcePath.includes("1Ona5H3hBsJywLtRC8FLqyjj7MJTdhwGjhTW3G1X8Fe8"), true);
