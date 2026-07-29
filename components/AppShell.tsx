@@ -17,6 +17,7 @@ const mainLinks = [
 const staffLinks = mainLinks;
 
 const adminLinks = [
+  { href: "/admin", label: "หน้ารวมแอดมิน" },
   { href: "/admin/schedule", label: "ตารางกะ" },
   { href: "/admin/assign", label: "มอบหมายงาน" },
   { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
