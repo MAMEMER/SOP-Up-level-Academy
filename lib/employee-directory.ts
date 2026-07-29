@@ -23,7 +23,7 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
     code: "ICE",
     displayName: "ICE",
     email: "phooreephat.k@gmail.com",
-    employmentType: "full_time",
+    employmentType: "part_time",
     // Only ICE's own accounts. Do NOT alias "academy"/"ungkanawin" here — "Uplevel
     // Academy" is the STORE account (uplevel.ad) and "Narawit Ungkanawin" is a separate
     // person; mapping them to ICE polluted ICE's clock-in with store-account logins.
@@ -50,7 +50,6 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
     code: "Wipop",
     displayName: "Wipop",
     email: "wipop.tho@gmail.com",
-    // TODO ยืนยันกับเจ้าของร้าน: full_time หรือ part_time (มีผลกับสูตรหักเงินเดือน)
     employmentType: "part_time",
     aliases: ["wipop"],
     branch: "bangkae"
@@ -59,7 +58,6 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
     code: "Waranon",
     displayName: "Waranon",
     email: "waranon4work@gmail.com",
-    // TODO ยืนยันกับเจ้าของร้าน: full_time หรือ part_time (มีผลกับสูตรหักเงินเดือน)
     employmentType: "part_time",
     aliases: ["waranon"],
     branch: "bangkae"
