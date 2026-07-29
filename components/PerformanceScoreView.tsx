@@ -8,6 +8,8 @@ import {
   getPerformanceSummary,
   getPerformanceSourceDetail,
   performanceSourceStatuses,
+  currentReviewPeriod,
+  previousHalfMonthPeriod,
   type PerformanceReviewPeriod
 } from "../lib/performance-score-data.ts";
 import {
@@ -20,6 +22,7 @@ import {
 import { readPerformanceSourceFiles, savePerformanceSourceFilePath, saveUploadedPerformanceCsv } from "../lib/performance-source-files.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
 import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
+import { employeeDirectory } from "../lib/employee-directory.ts";
 
 type PageProps = {
   searchParams?: Promise<{ period?: string; startDate?: string; endDate?: string; source?: string; inputStatus?: string }>;
@@ -44,6 +47,9 @@ function isDateValue(value: string | undefined) {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
+/** Staff pickers follow the directory, so a new hire shows up without touching this file. */
+const staffNames = employeeDirectory.map((entry) => entry.displayName);
+
 function resolvePeriod(params: { period?: string; startDate?: string; endDate?: string }): PerformanceReviewPeriod {
   if (isDateValue(params.startDate) && isDateValue(params.endDate)) {
     const startDate = params.startDate!;
@@ -55,10 +61,9 @@ function resolvePeriod(params: { period?: string; startDate?: string; endDate?: 
       endDate: startDate <= endDate ? endDate : startDate
     };
   }
-  if (params.period === "previous-half-month") {
-    return { id: "previous-half-month", label: "ครึ่งเดือนที่แล้ว", startDate: "2026-06-16", endDate: "2026-06-30" };
-  }
-  return { id: "july-to-date", label: "1 ก.ค. 2026 ถึงปัจจุบัน", startDate: "2026-07-01", endDate: "2026-07-09" };
+  if (params.period === "previous-half-month") return previousHalfMonthPeriod();
+  // default = เดือนนี้ถึงวันนี้ (was a frozen 2026-07-01 → 2026-07-09 literal)
+  return currentReviewPeriod();
 }
 
 function statusLabel(status: string) {
@@ -359,10 +364,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label>
               พนักงาน
-              <select name="employeeName" defaultValue="ICE">
-                <option value="ICE">ICE</option>
-                <option value="Boom">Boom</option>
-                <option value="Leo">Leo</option>
+              <select name="employeeName" defaultValue={staffNames[0]}>
+                {staffNames.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </label>
             <label>
@@ -419,10 +422,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label>
               พนักงาน
-              <select name="employeeName" defaultValue="ICE">
-                <option value="ICE">ICE</option>
-                <option value="Boom">Boom</option>
-                <option value="Leo">Leo</option>
+              <select name="employeeName" defaultValue={staffNames[0]}>
+                {staffNames.map((name) => <option key={name} value={name}>{name}</option>)}
                 <option value="ทีม บางแค">ทีม บางแค</option>
               </select>
             </label>

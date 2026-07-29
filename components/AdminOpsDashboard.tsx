@@ -228,6 +228,14 @@ export function AdminOpsDashboard({ isOwner = false }: { isOwner?: boolean }) {
 
   return (
     <main className="admin-ops">
+      {/* Everything on this page except สินค้าคงคลัง / High Value Cards is still the
+          demo fixture from lib/admin-dashboard-data.ts — say so, so nobody reads
+          these numbers as today's real store performance. */}
+      <p className="demo-data-banner">
+        หน้านี้ยังเป็น <strong>ตัวอย่างหน้าตา (demo)</strong> — ตัวเลข task / ปัญหา / ออเดอร์ และชื่อพนักงาน
+        ยังไม่ใช่ของจริง (เฉพาะสินค้าคงคลังกับ High Value Cards ที่ดึงจาก StoreHub จริง).
+        ดูข้อมูลจริงได้ที่ <a href="/manager-review">ตรวจงาน</a> · <a href="/admin/performance-score">คะแนนพนักงาน</a> · <a href="/monthly-summary">สรุปรายเดือน</a>
+      </p>
       <div className="admin-owner-shell">
         <aside className="admin-owner-sidebar">
           <div className="admin-owner-brand"><span>U</span><strong>UPMAN Owner</strong></div>

@@ -4,9 +4,11 @@ import { storehubStocktakesUrl, weeklyStockSleevePhase } from "../../../lib/week
 import { monthlyStockSinglePhase } from "../../../lib/monthly-stock-single-workflow.ts";
 import { seatingTableRules, weeklyEvents } from "../../../lib/weekly-event-tasks.ts";
 
+// Photos + evidence notes per phase. Phases without a photo (e.g. งานบนเว็บกิลด์)
+// simply omit `src` — the manual still renders steps, evidence and cautions.
 const manualMedia: Record<string, {
-  src: string;
-  alt: string;
+  src?: string;
+  alt?: string;
   evidence: string[];
   photoGuide?: string[];
   proofExamples?: Array<{ src: string; alt: string; caption: string }>;
@@ -31,6 +33,12 @@ const manualMedia: Record<string, {
         alt: "ตัวอย่างการส่งงานเปิดร้านในกลุ่ม LINE Admin",
         caption: "ตัวอย่างการส่งงานเปิดร้านในกลุ่ม LINE Admin · กดดูรูปตัวอย่างเต็ม"
       }
+    ]
+  },
+  "guild-chat-exp": {
+    evidence: [
+      "แคปหน้าจอกล่องแชทที่ตอบครบแล้ว",
+      "แคปหน้า /admin ของเว็บกิลด์ หลังอนุมัติ Exp / เควสต์ค้างหมด"
     ]
   },
   "stock-work": {
@@ -82,7 +90,8 @@ export default function TrainingPage() {
 
       <div className="wi-manual-list">
         {cardStoreWorkflow.map((phase, phaseIndex) => {
-          const media = manualMedia[phase.id];
+          // fall back to an empty entry so adding a new phase can never 500 this page
+          const media = manualMedia[phase.id] || { evidence: [] };
           return (
           <article key={phase.id} id={phase.id} className={`training-card wi-manual phase-${phase.category}`}>
             <div className="workflow-card-head">
@@ -94,12 +103,14 @@ export default function TrainingPage() {
             </div>
 
             <div className="wi-manual-body">
-              <figure className="wi-figure">
-                <a className="wi-image-link" href={media.src} target="_blank" rel="noreferrer">
-                  <img src={media.src} alt={media.alt} />
-                </a>
-                <figcaption>{media.alt} · กดดูรูปตัวอย่างเต็ม</figcaption>
-              </figure>
+              {media.src ? (
+                <figure className="wi-figure">
+                  <a className="wi-image-link" href={media.src} target="_blank" rel="noreferrer">
+                    <img src={media.src} alt={media.alt} />
+                  </a>
+                  <figcaption>{media.alt} · กดดูรูปตัวอย่างเต็ม</figcaption>
+                </figure>
+              ) : null}
 
               {media.proofExamples?.map((example) => (
                 <figure key={example.src} className="wi-figure">

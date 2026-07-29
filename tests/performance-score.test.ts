@@ -853,7 +853,7 @@ describe("performance score engine", () => {
   // expected totals shifted with the 21 Jul 2026 KPI change (checklist -5/day, assigned cumulative,
   // July stock +/- grace). Re-enable and refresh the numbers below where the CSV exports live.
   it.skip("calculates score rows from verified source data without score fixtures", () => {
-    const period = performanceReviewPeriods.find((item) => item.id === "july-to-date");
+    const period = performanceReviewPeriods().find((item) => item.id === "month-to-date");
     assert.ok(period);
 
     const rows = getPerformanceScoreRows(period.id, EMPTY_DAILY_STORE);

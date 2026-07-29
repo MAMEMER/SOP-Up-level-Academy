@@ -22,7 +22,7 @@ import { branchFor, employeeCodes, employmentTypeFor } from "./employee-director
 import { branchConfig, isSlowMorningCount } from "./store-config.ts";
 
 export type PerformanceReviewPeriod = {
-  id: "previous-half-month" | "july-to-date" | "custom";
+  id: "previous-half-month" | "month-to-date" | "custom";
   label: string;
   startDate: string;
   endDate: string;
@@ -68,20 +68,60 @@ function annotateSlowMorningCounts(input: {
 }
 const bangkaeTeamAssigneeName = "ทีม บางแค";
 
-export const performanceReviewPeriods: PerformanceReviewPeriod[] = [
-  {
-    id: "previous-half-month",
-    label: "ครึ่งเดือนที่แล้ว",
-    startDate: "2026-06-16",
-    endDate: "2026-06-30"
-  },
-  {
-    id: "july-to-date",
-    label: "1 ก.ค. 2026 ถึงปัจจุบัน",
-    startDate: "2026-07-01",
-    endDate: "2026-07-09"
-  }
+const thaiMonthNames = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
 ];
+
+/** today in Asia/Bangkok as YYYY-MM-DD — the store's day, not the server's */
+export function bangkokToday(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+  return parts;
+}
+
+/**
+ * Default KPI window = 1st of the current month → today.
+ * This used to be a frozen "2026-07-01 → 2026-07-09" literal, which meant every
+ * score on the site silently stopped counting after 9 July.
+ */
+export function currentReviewPeriod(today = bangkokToday()): PerformanceReviewPeriod {
+  const month = Number(today.slice(5, 7));
+  return {
+    id: "month-to-date",
+    label: `1 ${thaiMonthNames[month - 1]} ${today.slice(0, 4)} ถึงปัจจุบัน`,
+    startDate: `${today.slice(0, 8)}01`,
+    endDate: today
+  };
+}
+
+/**
+ * Payroll runs half-monthly: past the 15th, "ครึ่งเดือนที่แล้ว" is the 1st–15th of
+ * this month; on or before the 15th it is the 16th–end of last month.
+ */
+export function previousHalfMonthPeriod(today = bangkokToday()): PerformanceReviewPeriod {
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const day = Number(today.slice(8, 10));
+  if (day > 15) {
+    const prefix = today.slice(0, 8);
+    return { id: "previous-half-month", label: "ครึ่งเดือนที่แล้ว", startDate: `${prefix}01`, endDate: `${prefix}15` };
+  }
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prefix = `${prevYear}-${String(prevMonth).padStart(2, "0")}-`;
+  const lastDay = new Date(Date.UTC(prevYear, prevMonth, 0)).getUTCDate();
+  return { id: "previous-half-month", label: "ครึ่งเดือนที่แล้ว", startDate: `${prefix}16`, endDate: `${prefix}${lastDay}` };
+}
+
+/** computed per call — a module-level const would freeze on the day the server booted */
+export function performanceReviewPeriods(): PerformanceReviewPeriod[] {
+  return [previousHalfMonthPeriod(), currentReviewPeriod()];
+}
 
 export const performanceSourceStatuses: PerformanceSourceStatus[] = [
   { key: "schedule", label: "Google Sheet ตารางกะ", status: "import-ready", detail: "อิงโครงสร้างจริงจาก Sheet ตารางการทำงาน Uplevel (บางแค)" },
@@ -491,7 +531,8 @@ export function getPerformanceScoreRows(
   attendance?: AttendanceSource,
   submittedChecklistDays: { employeeName: string; workDate: string }[] = []
 ): EmployeePerformanceScore[] {
-  const period = performanceReviewPeriods.find((item) => item.id === periodId) || performanceReviewPeriods[0];
+  const periods = performanceReviewPeriods();
+  const period = periods.find((item) => item.id === periodId) || periods[0];
   return getPerformanceScoreRowsForRange(period, dailyStore, attendance, submittedChecklistDays);
 }
 

@@ -7,7 +7,7 @@ import {
   employeeCodes,
   employeeDirectory
 } from "../../../lib/employee-directory.ts";
-import { getPerformanceScoreRows } from "../../../lib/performance-score-data.ts";
+import { currentReviewPeriod, getPerformanceScoreRows } from "../../../lib/performance-score-data.ts";
 import { fetchAttendanceSource } from "../../../lib/planner-kpi.ts";
 import { assignedWorkRecordsForDate, fetchPerformanceDailyStore } from "../../../lib/performance-service-records.ts";
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../../lib/assigned-work-feed.ts";
@@ -20,8 +20,8 @@ import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
 
-const PERIOD_ID = "july-to-date" as const;
-const PERIOD_LABEL = "1 ก.ค. 2026 ถึงปัจจุบัน";
+// KPI window follows the calendar: 1st of this month → today (Asia/Bangkok)
+const reviewPeriod = () => currentReviewPeriod();
 
 type PageProps = {
   searchParams?: Promise<{ staff?: string }>;
@@ -67,7 +67,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
     fetchAssignedWorkFeed(branch, workDate)
   ]);
 
-  const rows = getPerformanceScoreRows(PERIOD_ID, dailyStore, attendance);
+  const rows = getPerformanceScoreRows(reviewPeriod().id, dailyStore, attendance);
   const row = rows.find((item) => item.employeeName === selectedCode);
 
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
@@ -104,7 +104,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
         </form>
       ) : null}
 
-      {row ? <StaffScoreCard row={row} periodLabel={PERIOD_LABEL} /> : null}
+      {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
 
       <MyShiftToday staffCode={selectedCode} branch={branch} workDate={workDate} />
 
