@@ -2,7 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "../../../../lib/auth.ts";
-import { employeeDirectory } from "../../../../lib/employee-directory.ts";
+import { displayNameFor, employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 import { EvidenceImageInput } from "../../../../components/EvidenceImageInput.tsx";
 import { deleteStockCheckRecord, fetchStockCheckRecords, saveStockCheckRecord } from "../../../../lib/stock-check-store.ts";
@@ -105,7 +105,8 @@ export default async function AdminStockCheckPage({ searchParams }: PageProps) {
   const all = await fetchStockCheckRecords();
   const today = stockCheckRecordsForDate(all, workDate);
   const recent = all.filter((record) => record.workDate !== workDate).slice(-12).reverse();
-  const staff = employeeDirectory.map((entry) => entry.displayName);
+  // value = staff code (what the KPI matches on), label = the name shown everywhere else
+  const staff = employeeDirectory.map((entry) => ({ code: entry.code, label: entry.displayName }));
 
   return (
     <main className="page">
@@ -140,8 +141,8 @@ export default async function AdminStockCheckPage({ searchParams }: PageProps) {
           <input type="hidden" name="workDate" value={workDate} />
           <label>
             พนักงานที่รับผิดชอบ
-            <select name="employeeName" defaultValue={staff[0]}>
-              {staff.map((name) => <option key={name} value={name}>{name}</option>)}
+            <select name="employeeName" defaultValue={staff[0]?.code}>
+              {staff.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
             </select>
           </label>
           <label>
@@ -190,7 +191,7 @@ export default async function AdminStockCheckPage({ searchParams }: PageProps) {
             {today.map((record) => (
               <div key={record.id} className="stock-check-row">
                 <div>
-                  <strong>{record.employeeName} · {record.category}</strong>
+                  <strong>{displayNameFor(record.employeeName)} · {record.category}</strong>
                   <small>
                     {stockCountTypeOptions.find((option) => option.value === record.countType)?.label}
                     {record.slowCount ? " · นับช้า" : ""}
@@ -227,7 +228,7 @@ export default async function AdminStockCheckPage({ searchParams }: PageProps) {
           <ul className="owner-ops__list">
             {recent.map((record) => (
               <li key={record.id}>
-                <strong>{record.workDate} · {record.employeeName} · {record.category}</strong>
+                <strong>{record.workDate} · {displayNameFor(record.employeeName)} · {record.category}</strong>
                 <small>{resultLabel[record.result]}{record.note ? ` · ${record.note}` : ""}</small>
               </li>
             ))}

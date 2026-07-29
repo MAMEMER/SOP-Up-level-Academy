@@ -49,12 +49,17 @@ function isDateValue(value: string | undefined) {
 /**
  * Staff pickers follow the directory managed at /admin/staff.
  *
+ * The option VALUE is the staff code, because that is what the scoring engine matches on
+ * (`employees = employeeCodes`). Submitting the display name instead silently dropped the
+ * record for anyone whose name differs from their code — it only appeared to work while
+ * every code happened to equal its display name.
+ *
  * Read per render, not once at module load: the directory is hydrated from Firestore by
- * requireUser(), so a module-level const froze whatever the list was when the server
+ * requireUser(), so a module-level const froze whatever the roster was when the server
  * booted — renaming someone left the old name in these dropdowns until a redeploy.
  */
-function staffNames() {
-  return employeeDirectory.map((entry) => entry.displayName);
+function staffOptions() {
+  return employeeDirectory.map((entry) => ({ code: entry.code, label: entry.displayName }));
 }
 
 function resolvePeriod(params: { period?: string; startDate?: string; endDate?: string }): PerformanceReviewPeriod {
@@ -308,8 +313,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label>
               พนักงาน
-              <select name="employeeName" defaultValue={staffNames()[0]}>
-                {staffNames().map((name) => <option key={name} value={name}>{name}</option>)}
+              <select name="employeeName" defaultValue={staffOptions()[0]?.code}>
+                {staffOptions().map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
               </select>
             </label>
             <label>
@@ -366,8 +371,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label>
               พนักงาน
-              <select name="employeeName" defaultValue={staffNames()[0]}>
-                {staffNames().map((name) => <option key={name} value={name}>{name}</option>)}
+              <select name="employeeName" defaultValue={staffOptions()[0]?.code}>
+                {staffOptions().map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
                 <option value="ทีม บางแค">ทีม บางแค</option>
               </select>
             </label>
