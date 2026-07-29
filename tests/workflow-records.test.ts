@@ -207,33 +207,33 @@ describe("workflow daily records", () => {
     ];
 
     assert.equal(isPhaseUnlocked("open-store", "2026-07-04", []), true);
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", records), true);
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", records), false);
+    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", records), true);
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", records), false);
     assert.equal(isPhaseUnlocked("close-store", "2026-07-04", records), false);
 
-    const stockDone = [
+    const daytimeDone = [
       ...records,
       {
         workDate: "2026-07-04",
-        phaseId: "stock-work",
-        phaseTitle: "Stock",
+        phaseId: "daytime-work",
+        phaseTitle: "จัดส่งสินค้า",
         completed: 4,
         total: 4,
         status: "submitted",
         recordedAt: "2026-07-04T10:00:00Z"
       } satisfies WorkflowDailyRecord
     ];
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", stockDone), true);
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", daytimeDone), true);
   });
 
   it("sequences only within the phases the shift actually sees", () => {
     // An s2 staffer never gets open-store, so their own records can't contain it. Gating
     // on it would leave their whole day locked.
-    const visible = ["stock-work", "daytime-work", "close-store"];
+    const visible = ["daytime-work", "stock-work", "close-store"];
 
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", [], visible), true);
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", [], visible), false);
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", []), false);
+    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", [], visible), true);
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", [], visible), false);
+    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", []), false);
   });
 
   it("unlocks the next phase when the prior phase is already missed", () => {
@@ -258,22 +258,22 @@ describe("workflow daily records", () => {
       }
     ];
 
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", missedOpen), true);
+    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", missedOpen), true);
 
-    const missedStock = [
+    const missedDaytime = [
       ...missedOpen,
       {
         workDate: "2026-07-04",
-        phaseId: "stock-work",
-        phaseTitle: "Stock",
+        phaseId: "daytime-work",
+        phaseTitle: "จัดส่งสินค้า",
         completed: 0,
-        total: 5,
+        total: 4,
         status: "missed",
         recordedAt: "2026-07-04T12:31:00.000Z"
       } satisfies WorkflowDailyRecord
     ];
 
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", missedStock), true);
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", missedDaytime), true);
   });
 
   it("marks submitted phase records on time when submitted before the schedule end", () => {

@@ -180,7 +180,7 @@ function phaseCanAdvance(records: WorkflowDailyRecord[], workDate: string, phase
 
 // The routine runs in order — a phase only opens once every phase before it is finished
 // (or was already missed, so the day isn't dead-ended).
-const workflowPhaseOrder = ["open-store", "guild-chat-exp", "stock-work", "daytime-work", "close-store"];
+const workflowPhaseOrder = ["open-store", "guild-chat-exp", "daytime-work", "stock-work", "close-store"];
 
 /**
  * `visiblePhaseIds` = the phases this person actually sees today (the checklist is

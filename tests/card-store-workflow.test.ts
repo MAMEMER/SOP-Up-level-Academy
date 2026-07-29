@@ -7,10 +7,16 @@ describe("card store workflow content", () => {
     assert.deepEqual(cardStoreWorkflow.map((phase) => phase.title), [
       "เปิดร้าน",
       "จัดการแชทและ Exp ค้าง",
-      "Stock",
       "จัดส่งสินค้า",
+      "Stock",
       "ปิดร้าน"
     ]);
+  });
+
+  it("orders จัดส่งสินค้า before Stock so shift 2 ships before counting stock ahead of closing", () => {
+    const order = cardStoreWorkflow.map((phase) => phase.id);
+    assert.ok(order.indexOf("daytime-work") < order.indexOf("stock-work"));
+    assert.ok(order.indexOf("stock-work") < order.indexOf("close-store"));
   });
 
   it("separates stock from daytime shipping work", () => {
@@ -72,8 +78,8 @@ describe("card store workflow content", () => {
       [
         ["เปิดร้าน", "/training#open-store"],
         ["จัดการแชทและ Exp ค้าง", "/training#guild-chat-exp"],
-        ["Stock", "/training#stock-work"],
         ["จัดส่งสินค้า", "/training#daytime-work"],
+        ["Stock", "/training#stock-work"],
         ["ปิดร้าน", "/training#close-store"]
       ]
     );
