@@ -20,7 +20,7 @@ import {
 } from "../lib/performance-service-records.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
 import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
-import { employeeDirectory } from "../lib/employee-directory.ts";
+import { displayNameFor, employeeDirectory } from "../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../lib/performance-daily-store.ts";
 
 type PageProps = {
@@ -46,8 +46,16 @@ function isDateValue(value: string | undefined) {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
-/** Staff pickers follow the directory, so a new hire shows up without touching this file. */
-const staffNames = employeeDirectory.map((entry) => entry.displayName);
+/**
+ * Staff pickers follow the directory managed at /admin/staff.
+ *
+ * Read per render, not once at module load: the directory is hydrated from Firestore by
+ * requireUser(), so a module-level const froze whatever the list was when the server
+ * booted — renaming someone left the old name in these dropdowns until a redeploy.
+ */
+function staffNames() {
+  return employeeDirectory.map((entry) => entry.displayName);
+}
 
 function resolvePeriod(params: { period?: string; startDate?: string; endDate?: string }): PerformanceReviewPeriod {
   if (isDateValue(params.startDate) && isDateValue(params.endDate)) {
@@ -300,8 +308,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label>
               พนักงาน
-              <select name="employeeName" defaultValue={staffNames[0]}>
-                {staffNames.map((name) => <option key={name} value={name}>{name}</option>)}
+              <select name="employeeName" defaultValue={staffNames()[0]}>
+                {staffNames().map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </label>
             <label>
@@ -358,8 +366,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             </label>
             <label>
               พนักงาน
-              <select name="employeeName" defaultValue={staffNames[0]}>
-                {staffNames.map((name) => <option key={name} value={name}>{name}</option>)}
+              <select name="employeeName" defaultValue={staffNames()[0]}>
+                {staffNames().map((name) => <option key={name} value={name}>{name}</option>)}
                 <option value="ทีม บางแค">ทีม บางแค</option>
               </select>
             </label>
@@ -411,7 +419,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
         {rows.map((row) => (
           <article key={row.employeeName} className="performance-score-row">
             <div>
-              <strong>{row.employeeName}</strong>
+              {/* rows are keyed by staff code; show the name the rest of the site shows */}
+              <strong>{displayNameFor(row.employeeName)}</strong>
               <small>{row.deductions.length} deduction event(s)</small>
             </div>
             <div>
