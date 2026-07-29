@@ -140,6 +140,12 @@ export type EmployeePerformanceInput = {
 export type EmployeePerformanceScore = {
   employeeName: string;
   totalScore: number;
+  /**
+   * false when this person has no scheduled day in the window at all (new hire, or
+   * a month they did not work). Without it they score a clean 100/100 and land in
+   * the top incentive tier for a period they were never on the roster.
+   */
+  hasData: boolean;
   incentive: IncentiveTier;
   categories: {
     attendance: ScoreResult;
@@ -494,9 +500,12 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
     ...(incentive.requiresCoaching ? ["coaching_required"] : [])
   ];
 
+  const hasData = (input.daysWorked ?? 0) > 0 || input.attendance.clockEvents.length > 0;
+
   return {
     employeeName: input.employeeName,
     totalScore,
+    hasData,
     incentive,
     categories,
     deductions: [

@@ -20,6 +20,7 @@ import {
   getPerformanceScoreRows,
   getPerformanceScoreRowsForRange,
   getPerformanceSourceDetail,
+  getPerformanceSummary,
   leaveTypeFromScheduleValue,
   missingChecklistEventsFromAttendance,
   missingMorningStockCountRecords,
@@ -1132,5 +1133,61 @@ describe("performance score engine", () => {
     assert.equal(events[0].clockIn, "2026-07-01T13:58:00+07:00");
     assert.equal(events[1].employeeName, "Boom");
     assert.equal(events[1].clockIn, "2026-07-06T15:41:00+07:00");
+  });
+});
+
+describe("employees with no shifts in the window", () => {
+  it("marks a new hire as having no data instead of a perfect score", () => {
+    const row = calculateEmployeePerformanceScore({
+      employeeName: "Waranon",
+      employmentType: "part_time",
+      daysWorked: 0,
+      attendance: { schedules: [], clockEvents: [], leaveRecords: [] },
+      annualLeave: { schedules: [], records: [] },
+      stockCounts: [],
+      checklistEvents: [],
+      serviceEvents: [],
+      assignedWorks: []
+    });
+
+    assert.equal(row.totalScore, 100);
+    assert.equal(row.hasData, false);
+  });
+
+  it("keeps no-data rows out of the team average", () => {
+    const worked = calculateEmployeePerformanceScore({
+      employeeName: "ICE",
+      employmentType: "part_time",
+      daysWorked: 4,
+      attendance: {
+        schedules: [
+          { ...schedule, workDate: "2026-07-20", scheduledStart: "2026-07-20T11:00:00+07:00", scheduledEnd: "2026-07-20T20:00:00+07:00" },
+          { ...schedule, workDate: "2026-07-21", scheduledStart: "2026-07-21T11:00:00+07:00", scheduledEnd: "2026-07-21T20:00:00+07:00" },
+          { ...schedule, workDate: "2026-07-22", scheduledStart: "2026-07-22T11:00:00+07:00", scheduledEnd: "2026-07-22T20:00:00+07:00" },
+          { ...schedule, workDate: "2026-07-23", scheduledStart: "2026-07-23T11:00:00+07:00", scheduledEnd: "2026-07-23T20:00:00+07:00" }
+        ],
+        clockEvents: [],
+        leaveRecords: []
+      },
+      annualLeave: { schedules: [], records: [] },
+      stockCounts: [],
+      checklistEvents: [],
+      serviceEvents: [],
+      assignedWorks: []
+    });
+    const newHire = calculateEmployeePerformanceScore({
+      employeeName: "Waranon",
+      employmentType: "part_time",
+      daysWorked: 0,
+      attendance: { schedules: [], clockEvents: [], leaveRecords: [] },
+      annualLeave: { schedules: [], records: [] },
+      stockCounts: [],
+      checklistEvents: [],
+      serviceEvents: [],
+      assignedWorks: []
+    });
+
+    assert.equal(worked.hasData, true);
+    assert.equal(getPerformanceSummary([worked, newHire]).teamAverage, worked.totalScore);
   });
 });

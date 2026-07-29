@@ -479,12 +479,12 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               <small>{row.deductions.length} deduction event(s)</small>
             </div>
             <div>
-              <strong>{row.totalScore}/100</strong>
-              <small>{row.incentive.label}</small>
+              <strong>{row.hasData ? `${row.totalScore}/100` : "—"}</strong>
+              <small>{row.hasData ? row.incentive.label : "ไม่มีข้อมูลรอบนี้"}</small>
             </div>
             <div>
-              <strong>{row.incentive.percent}%</strong>
-              <small>{row.incentive.requiresCoaching ? "ต้องประเมินรายสัปดาห์" : "ผ่านเกณฑ์รอบนี้"}</small>
+              <strong>{row.hasData ? `${row.incentive.percent}%` : "—"}</strong>
+              <small>{!row.hasData ? "ยังไม่มีกะในรอบนี้" : row.incentive.requiresCoaching ? "ต้องประเมินรายสัปดาห์" : "ผ่านเกณฑ์รอบนี้"}</small>
               {isOwner && row.salaryDeduction.amount > 0 ? (
                 <small className="score-badge score-badge-red" title={row.salaryDeduction.basis}>
                   หักเงิน {row.salaryDeduction.amount.toLocaleString("th-TH")} บาท (ขาด {row.salaryDeduction.pointsShort} คะแนน)

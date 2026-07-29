@@ -29,14 +29,14 @@ export function StaffScoreCard({ row, periodLabel }: { row: EmployeePerformanceS
 
       <div className="staff-score-hero">
         <div className="staff-score-total">
-          <strong>{row.totalScore}</strong>
+          <strong>{row.hasData ? row.totalScore : "—"}</strong>
           <span>/100 คะแนน</span>
         </div>
         <div className="staff-score-incentive">
           <span>Incentive</span>
-          <strong>{row.incentive.percent}%</strong>
-          <em>{row.incentive.label}</em>
-          <small>{row.incentive.requiresCoaching ? "ต้องประเมินรายสัปดาห์" : "ผ่านเกณฑ์รอบนี้"}</small>
+          <strong>{row.hasData ? `${row.incentive.percent}%` : "—"}</strong>
+          <em>{row.hasData ? row.incentive.label : "ไม่มีข้อมูลรอบนี้"}</em>
+          <small>{!row.hasData ? "ยังไม่มีกะในรอบนี้ — คะแนนจะเริ่มนับเมื่อขึ้นตารางกะ" : row.incentive.requiresCoaching ? "ต้องประเมินรายสัปดาห์" : "ผ่านเกณฑ์รอบนี้"}</small>
         </div>
       </div>
 

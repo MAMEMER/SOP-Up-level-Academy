@@ -602,10 +602,13 @@ export function getPerformanceScoreRowsForRange(
 }
 
 export function getPerformanceSummary(rows: EmployeePerformanceScore[]) {
-  const teamAverage = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.totalScore, 0) / rows.length) : 0;
+  // people with no shift in the window would each contribute a free 100 and pull the
+  // team average up — count only rows that actually have data behind them
+  const scored = rows.filter((row) => row.hasData);
+  const teamAverage = scored.length ? Math.round(scored.reduce((sum, row) => sum + row.totalScore, 0) / scored.length) : 0;
   return {
     teamAverage,
-    belowSixty: rows.filter((row) => row.totalScore < 60).length,
+    belowSixty: scored.filter((row) => row.totalScore < 60).length,
     unresolvedStockIssues: rows.filter((row) => row.deductions.some((deduction) => deduction.reason === "stock_difference" || deduction.reason === "stock_not_counted")).length,
     missingClockIns: rows.reduce(
       (sum, row) => sum + row.deductions.filter((deduction) => deduction.reason === "late_over_30_minutes_or_missing_clock_in").length,
