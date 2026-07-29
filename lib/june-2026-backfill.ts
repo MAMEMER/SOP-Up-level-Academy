@@ -12,9 +12,13 @@ import type { ShiftAssignment } from "./shift-schedule.ts";
 //   13 → บ่าย 13:30–22:30  (s2, closing)
 //   blank → OFF
 //
-// Only 13–30 June is imported. Days 1–12 are all coded "15", which matches neither shift
-// row in the Sheet, so importing them would be a guess — they need a decision from the
-// owner before they can be scored.
+// Only 13–30 June is imported. Days 1–12 are coded "15" — a 15:00 start, from before the
+// store hours were changed. They are deliberately left out: StoreHub has no clock-in at
+// all before 12 June, so importing those shifts would score roughly nine no-shows per
+// person for a gap in the timesheet export rather than for anything that happened.
+//
+// June is reference only. Scoring starts for real from July onward (see also
+// CHECKLIST_DEDUCTION_START in performance-score.ts).
 
 export const JUNE_2026_MONTH = "2026-06";
 export const JUNE_2026_BRANCH = "bangkae";
