@@ -99,3 +99,19 @@ export function sanitizeStaffRecord(input: Partial<StaffRecord> & { email: strin
     active: input.active !== false
   };
 }
+
+/** shortest alias that is still specific enough to identify one person in StoreHub */
+const MIN_AUTO_ALIAS_LENGTH = 3;
+
+/**
+ * StoreHub names are matched by substring, so the code is added as a fallback alias only
+ * when it is long enough to be distinctive. A one- or two-character code (staff "P") would
+ * otherwise match nearly every name on the timesheet and claim other people's clock-ins.
+ * Short codes rely on the explicit StoreHub names entered at /admin/staff.
+ */
+export function storeHubAliases(record: StaffRecord): string[] {
+  const explicit = record.aliases.filter(Boolean);
+  const code = record.code.toLowerCase();
+  const useCode = code.length >= MIN_AUTO_ALIAS_LENGTH || explicit.length === 0;
+  return [...new Set(useCode ? [code, ...explicit] : explicit)].filter(Boolean);
+}

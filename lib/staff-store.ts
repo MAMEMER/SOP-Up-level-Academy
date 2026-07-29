@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { replaceSopUsers, type SopUser } from "./sop-users.ts";
 import { replaceEmployeeDirectory, type EmployeeDirectoryEntry } from "./employee-directory.ts";
-import { nextEmployeeId, normalizeEmail, sanitizeStaffRecord, seedStaffRecords, type StaffRecord } from "./staff-records.ts";
+import { nextEmployeeId, normalizeEmail, sanitizeStaffRecord, seedStaffRecords, storeHubAliases, type StaffRecord } from "./staff-records.ts";
 
 export { normalizeEmail, seedStaffRecords, type StaffRecord } from "./staff-records.ts";
 
@@ -92,8 +92,7 @@ function toDirectoryEntry(record: StaffRecord): EmployeeDirectoryEntry {
     displayName: record.displayName,
     email: record.email,
     employmentType: record.employmentType,
-    // always match on the code itself so a roster entry can never resolve to nothing
-    aliases: [...new Set([record.code.toLowerCase(), ...record.aliases])].filter(Boolean),
+    aliases: storeHubAliases(record),
     branch: record.branch
   };
 }

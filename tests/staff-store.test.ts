@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { nextEmployeeId, sanitizeStaffRecord, seedStaffRecords } from "../lib/staff-records.ts";
+import { nextEmployeeId, sanitizeStaffRecord, seedStaffRecords, storeHubAliases } from "../lib/staff-records.ts";
 import { seedSopUsers } from "../lib/sop-users.ts";
 import { seedEmployeeDirectory } from "../lib/employee-directory.ts";
 
@@ -60,5 +60,31 @@ describe("staff numbers", () => {
 
   it("stores the number upper-cased so up-001 and UP-001 are the same reference", () => {
     assert.equal(sanitizeStaffRecord({ email: "a@b.com", employeeId: " up-007 " }).employeeId, "UP-007");
+  });
+});
+
+describe("StoreHub name matching", () => {
+  const staff = (code: string, aliases: string[]) =>
+    sanitizeStaffRecord({ email: "s@x.com", name: code, code, aliases, onRoster: true });
+
+  it("keeps a short code out of the StoreHub aliases", () => {
+    // "p" as a substring matches almost any timesheet name — it would steal clock-ins
+    const entry = staff("P", ["พี"]);
+    const aliases = storeHubAliases(entry);
+
+    assert.deepEqual(aliases, ["พี"]);
+  });
+
+  it("adds a distinctive code as a fallback alias", () => {
+    assert.deepEqual(storeHubAliases(staff("Boom", ["boom dog"])), ["boom", "boom dog"]);
+  });
+
+  it("falls back to even a short code when no StoreHub name was given", () => {
+    // better to match narrowly than not at all
+    assert.deepEqual(storeHubAliases(staff("P", [])), ["p"]);
+  });
+
+  it("does not repeat the code when it was also typed as a StoreHub name", () => {
+    assert.deepEqual(storeHubAliases(staff("Leo", ["leo"])), ["leo"]);
   });
 });
