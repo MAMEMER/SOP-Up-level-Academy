@@ -81,7 +81,7 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     safe(() => listRecordsForScopeKey(monthlyScopeKey(monthKey)), [] as WorkRecordDoc[]),
     safe(() => fetchAssignmentsForDate(branch, workDate), [] as WorkAssignment[]),
     safe(() => fetchOpenHandoffs(branch), [] as WorkHandoff[]),
-    safe(() => fetchPerformanceDailyStore(), { serviceRecords: [], assignedWorkRecords: [] })
+    safe(() => fetchPerformanceDailyStore(), { serviceRecords: [], assignedWorkRecords: [], stockCheckRecords: [] })
   ]);
 
   const staff: StaffDaySummary[] = dayDocs

@@ -9,16 +9,13 @@ import {
   type ShiftSchedule,
   type StockCountRecord
 } from "./performance-score.ts";
-import { existsSync, readFileSync } from "node:fs";
 import {
   assignedWorkRecordsToWorks,
   customerServiceRecordsToEvents,
   type PerformanceDailyStore
 } from "./performance-service-records.ts";
-import { monthlyPerformanceSourceFolder, readPerformanceSourceFiles } from "./performance-source-files.ts";
-import { mapStoreHubStockTakeRowsToCounts, parseStoreHubStockTakeCsv } from "./storehub-stocktake-export.ts";
-import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "./storehub-timesheet-export.ts";
 import { branchFor, employeeCodes, employmentTypeFor } from "./employee-directory.ts";
+import { stockCheckRecordsToCounts } from "./stock-check-records.ts";
 import { branchConfig, isSlowMorningCount } from "./store-config.ts";
 
 export type PerformanceReviewPeriod = {
@@ -41,7 +38,7 @@ export type PerformanceSourceDetail = {
   key: string;
   title: string;
   sourcePath: string;
-  sourceType: "google-sheet" | "storehub-csv" | "manual-input" | "live-planner";
+  sourceType: "google-sheet" | "manual-input" | "live-planner";
   currentRange: string;
   whatToCheck: string[];
 };
@@ -125,8 +122,8 @@ export function performanceReviewPeriods(): PerformanceReviewPeriod[] {
 
 export const performanceSourceStatuses: PerformanceSourceStatus[] = [
   { key: "schedule", label: "ตารางกะบนเว็บ", status: "live", detail: "อ่านจากตารางกะที่วางไว้ในหน้า ตารางกะ (schedule_shifts) — มิ.ย. 2026 นำเข้าจาก Sheet ครั้งเดียว" },
-  { key: "attendance", label: "StoreHub clock-in", status: "import-ready", detail: "อ่านไฟล์ Timesheets CSV ล่าสุดจากโฟลเดอร์ข้อมูล performance รายเดือน" },
-  { key: "stock", label: "StoreHub stock count", status: "import-ready", detail: "อ่านจาก StoreHub Stock Take CSV export และช่อง Difference" },
+  { key: "attendance", label: "StoreHub clock-in", status: "live", detail: "ดึงจาก StoreHub Timesheets ผ่านปุ่มในหน้าตารางกะ (schedule_actual)" },
+  { key: "stock", label: "ผลนับ stock", status: "manual", detail: "เจ้าของร้านกรอกผลการนับในหน้า ลงคะแนน Stock พร้อมแนบรูปจาก StoreHub" },
   { key: "checklist", label: "Checklist", status: "import-ready", detail: "อิงจาก Google Sheet uplevel_daily_checklist tab Form Responses 1" }
 ];
 
@@ -142,18 +139,18 @@ export const performanceSourceDetails: PerformanceSourceDetail[] = [
   {
     key: "attendance",
     title: "StoreHub clock-in",
-    sourcePath: monthlyPerformanceSourceFolder,
-    sourceType: "storehub-csv",
-    currentRange: "ไฟล์ Timesheets_*.csv ล่าสุดตามเวลาที่ลงไฟล์",
-    whatToCheck: ["ชื่อพนักงาน", "Time In แรกของวัน", "เทียบกับเวลาเข้ากะใน Google Sheet", "late/missing clock-in deductions"]
+    sourcePath: "/admin/schedule",
+    sourceType: "live-planner",
+    currentRange: "schedule_actual — กดปุ่ม \"ดึง clock-in StoreHub\" ในหน้าตารางกะเพื่ออัปเดตเดือนนั้น",
+    whatToCheck: ["ชื่อพนักงานตรงกับที่ตั้งไว้ในหน้าจัดการพนักงาน", "Time In แรกของวัน", "เทียบกับเวลาเข้ากะ", "วันที่ไม่มี clock-in"]
   },
   {
     key: "stock",
-    title: "StoreHub stock count",
-    sourcePath: monthlyPerformanceSourceFolder,
-    sourceType: "storehub-csv",
-    currentRange: "ไฟล์ Stock_Take_*.csv ล่าสุดตามเวลาที่ลงไฟล์",
-    whatToCheck: ["Start Time", "Completed Time", "Status", "Started By / Completed By", "Expected Qty", "Counted Qty", "Difference"]
+    title: "ผลนับ stock",
+    sourcePath: "/admin/stock-check",
+    sourceType: "manual-input",
+    currentRange: "sop_stock_checks — ทุกวันที่เจ้าของกรอกผลการนับไว้",
+    whatToCheck: ["ใครรับผิดชอบวันนั้น", "ตรง / ไม่ตรง / ไม่ได้นับ", "นับช้าเกินกรอบ 4 ชม.", "รูปแคปหน้าจอ StoreHub"]
   },
   {
     key: "checklist",
@@ -221,21 +218,6 @@ function normalizeShiftStart(value: string) {
   const minute = Number(match[2] || "0");
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return undefined;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-function getClockEventsFromExport() {
-  const sourceFiles = readPerformanceSourceFiles();
-  if (!existsSync(sourceFiles.attendanceCsvPath)) return [];
-  const csvText = readFileSync(sourceFiles.attendanceCsvPath, "utf8");
-  return firstClockInByEmployeeDate(parseStoreHubTimesheetCsv(csvText));
-}
-
-function getStockCountsFromExport() {
-  const sourceFiles = readPerformanceSourceFiles();
-  if (!existsSync(sourceFiles.stockCsvPath)) return [];
-  const csvText = readFileSync(sourceFiles.stockCsvPath, "utf8");
-  const rows = parseStoreHubStockTakeCsv(csvText);
-  return mapStoreHubStockTakeRowsToCounts(rows);
 }
 
 function isMorningShift(schedule: ShiftSchedule) {
@@ -394,13 +376,14 @@ export function getPerformanceScoreRowsForRange(
   // Shifts and leave come from the live planner (schedule_shifts / schedule_actual) only.
   // June 2026 predates the planner and was backfilled into it — see lib/june-2026-backfill.ts.
   const srcSchedules = attendance?.schedules ?? [];
-  const srcClock = attendance?.clockEvents ?? getClockEventsFromExport();
+  const srcClock = attendance?.clockEvents ?? [];
   const srcLeaves = attendance?.leaves ?? [];
   const srcAnnualSchedules = attendance?.annualSchedules ?? srcSchedules;
-  // Load the stocktake export ONCE and derive the GLOBAL coverage boundary (across all
-  // employees) so a "not counted" penalty is only ever raised for days the CSV actually
-  // spans. Days beyond it are un-exported, not un-counted (ticket ZDjzavu0t1fhNplxlORR).
-  const allStockCounts = getStockCountsFromExport();
+  // Stock comes from the owner's entries at /admin/stock-check. Derive the GLOBAL coverage
+  // boundary (across all employees) so a "not counted" penalty is only ever raised up to the
+  // last day the owner actually reviewed — later days are un-reviewed, not un-counted
+  // (ticket ZDjzavu0t1fhNplxlORR, originally about un-exported CSV days).
+  const allStockCounts = stockCheckRecordsToCounts(dailyStore.stockCheckRecords);
   const stockCoverageEnd = stockDataCoverageEnd(allStockCounts);
   const serviceEventsFromRecords = customerServiceRecordsToEvents(dailyStore.serviceRecords.filter((record) => inPeriod(record.workDate, period)));
   const assignedWorksFromRecords = assignedWorkRecordsToWorks(dailyStore.assignedWorkRecords.filter((record) => inPeriod(record.workDate, period)), {

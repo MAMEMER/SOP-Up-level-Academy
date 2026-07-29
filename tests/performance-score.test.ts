@@ -42,7 +42,7 @@ import { firstClockInByEmployeeDate, parseStoreHubTimesheetCsv } from "../lib/st
 import { resolveMonthlyPerformanceSourceFiles } from "../lib/performance-source-files.ts";
 import { boomSickLeaveAttendance } from "./fixtures/boom-sick-leave.ts";
 
-const EMPTY_DAILY_STORE = { serviceRecords: [], assignedWorkRecords: [] };
+const EMPTY_DAILY_STORE = { serviceRecords: [], assignedWorkRecords: [], stockCheckRecords: [] };
 
 const schedule = {
   employeeName: "ICE",
@@ -936,8 +936,10 @@ describe("performance score engine", () => {
     // shifts come from the on-site planner now, not a Google Sheet
     assert.equal(getPerformanceSourceDetail("schedule")?.sourcePath, "/admin/schedule");
     assert.equal(performanceSourceStatuses.find((source) => source.key === "schedule")?.status, "live");
-    assert.equal(getPerformanceSourceDetail("attendance")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
-    assert.equal(getPerformanceSourceDetail("stock")?.sourcePath.includes("ข้อมูล performance รายเดือน"), true);
+    // clock-in comes from the planner sync, stock from the owner's entries — no CSV paths
+    assert.equal(getPerformanceSourceDetail("attendance")?.sourcePath, "/admin/schedule");
+    assert.equal(getPerformanceSourceDetail("stock")?.sourcePath, "/admin/stock-check");
+    assert.equal(performanceSourceStatuses.find((source) => source.key === "stock")?.status, "manual");
     assert.equal(getPerformanceSourceDetail("checklist")?.sourcePath.includes("1Ona5H3hBsJywLtRC8FLqyjj7MJTdhwGjhTW3G1X8Fe8"), true);
     assert.equal(performanceSourceStatuses.find((source) => source.key === "checklist")?.status, "import-ready");
     assert.equal(performanceSourceStatuses.some((source) => source.key === "service" || source.key === "assigned"), false);
@@ -1006,9 +1008,9 @@ describe("performance score engine", () => {
     assert.equal(source.includes("name=\"assignedDate\""), true);
     assert.equal(source.includes("name=\"assignedStatus\""), true);
     assert.equal(source.includes("value=\"ทีม บางแค\""), true);
-    assert.equal(source.includes("ไฟล์ CSV ที่ใช้วิเคราะห์"), true);
-    assert.equal(source.includes("sourceCsvPath(source.key, sourceFiles)"), true);
-    assert.equal(source.includes("saveCsvSourcePathAction"), true);
+    // the CSV upload/path forms are gone: they wrote to a filesystem Vercel wipes
+    assert.equal(source.includes("ไฟล์ CSV ที่ใช้วิเคราะห์"), false);
+    assert.equal(source.includes("saveCsvSourcePathAction"), false);
     assert.equal(source.includes("บันทึกเหตุการณ์"), true);
   });
 

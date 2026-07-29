@@ -1,6 +1,7 @@
 import { effectiveAssignedWorkStatus } from "./assigned-work-status.ts";
 import type { AssignedWork, ServiceEvent } from "./performance-score.ts";
 import { restListCollection, restUpsertDoc } from "./firestore-rest.ts";
+import { fetchStockCheckRecords, type StockCheckRecord } from "./stock-check-records.ts";
 
 const SERVICE_COLLECTION = "sop_service_records";
 const ASSIGNED_COLLECTION = "sop_assigned_records";
@@ -41,6 +42,8 @@ export type AssignedWorkRecordInput = Omit<AssignedWorkRecord, "id" | "recordedA
 export type PerformanceDailyStore = {
   serviceRecords: CustomerServiceRecord[];
   assignedWorkRecords: AssignedWorkRecord[];
+  /** owner-entered stock checks — the input for the Stock KPI category */
+  stockCheckRecords: StockCheckRecord[];
 };
 
 function recordId(prefix: string, input: { workDate: string; employeeName: string }, recordedAt: string) {
@@ -152,11 +155,12 @@ export function updateAssignedWorkRecords(
 // Records now persist in Firestore (sop_service_records / sop_assigned_records) so
 // they survive Vercel cold starts — the old local-JSON store was ephemeral there.
 export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStore> {
-  const [serviceRecords, assignedWorkRecords] = await Promise.all([
+  const [serviceRecords, assignedWorkRecords, stockCheckRecords] = await Promise.all([
     restListCollection<CustomerServiceRecord>(SERVICE_COLLECTION),
-    restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION)
+    restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION),
+    fetchStockCheckRecords()
   ]);
-  return { serviceRecords, assignedWorkRecords };
+  return { serviceRecords, assignedWorkRecords, stockCheckRecords };
 }
 
 export async function saveCustomerServiceRecord(input: CustomerServiceRecordInput) {

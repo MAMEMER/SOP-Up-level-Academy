@@ -91,3 +91,10 @@ export async function restUpsertDoc(collection: string, docId: string, data: Rec
   });
   if (!res.ok) throw new Error(`Firestore upsert failed: ${res.status}`);
 }
+
+/** Removes a document. Used by the manual KPI inputs so a mis-typed record can be undone. */
+export async function restDeleteDoc(collection: string, docId: string): Promise<void> {
+  const url = `${BASE}/${collection}/${encodeURIComponent(docId)}?key=${API_KEY}`;
+  const res = await fetch(url, { method: "DELETE", cache: "no-store" });
+  if (!res.ok && res.status !== 404) throw new Error(`Firestore delete failed: ${res.status}`);
+}
