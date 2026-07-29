@@ -3,7 +3,7 @@ import { WeeklyStockChecklist } from "../../../components/WeeklyStockChecklist.t
 import { requireUser } from "../../../lib/auth.ts";
 
 export default async function ChecklistWeeklyPage() {
-  await requireUser();
+  const user = await requireUser();
 
   return (
     <main className="page">
@@ -15,7 +15,7 @@ export default async function ChecklistWeeklyPage() {
           <p>นับ Stock อุปกรณ์ / Sleeve ประจำสัปดาห์ ตรวจของจริงหน้าร้านและห้อง Stock แล้วสรุปของที่ตรงและไม่ตรง</p>
         </div>
       </section>
-      <WeeklyStockChecklist />
+      <WeeklyStockChecklist readOnly={user.isImpersonating} />
     </main>
   );
 }

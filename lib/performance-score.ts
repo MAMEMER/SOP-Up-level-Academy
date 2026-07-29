@@ -80,6 +80,11 @@ export type StockCountRecord = {
 // stock +/- (loss) deductions only start counting from this date onward.
 export const STOCK_DIFFERENCE_DEDUCTION_START = "2026-08-01";
 
+// The checklist only started recording to the server on this date. Days before it have no
+// records at all, so counting them as "missing_day" would wipe every score (and, via the
+// salary rule, deduct real money) for work that was done but never captured.
+export const CHECKLIST_DEDUCTION_START = "2026-08-01";
+
 export type ChecklistEvent = {
   type: "missing_day" | "missing_important" | "backfilled" | "false_record";
   count: number;

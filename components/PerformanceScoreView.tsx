@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { fetchSubmittedChecklistDays } from "../lib/checklist-kpi.ts";
 import {
   getPerformanceScoreRowsForRange,
   getPerformanceScoreRows,
@@ -219,7 +220,11 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const activePeriod = resolvePeriod(params);
   const dailyStore = await fetchPerformanceDailyStore();
   const attendance = await fetchAttendanceSource("bangkae");
-  const rows = activePeriod.id === "custom" ? getPerformanceScoreRowsForRange(activePeriod, dailyStore, attendance) : getPerformanceScoreRows(activePeriod.id, dailyStore, attendance);
+  const submittedChecklistDays = await fetchSubmittedChecklistDays("bangkae", activePeriod.startDate, activePeriod.endDate);
+  const rows =
+    activePeriod.id === "custom"
+      ? getPerformanceScoreRowsForRange(activePeriod, dailyStore, attendance, submittedChecklistDays)
+      : getPerformanceScoreRows(activePeriod.id, dailyStore, attendance, submittedChecklistDays);
   const summary = getPerformanceSummary(rows);
   const activeSourceDetail = getPerformanceSourceDetail(params.source || "");
   const redirectTo = `${basePath}?startDate=${activePeriod.startDate}&endDate=${activePeriod.endDate}${params.source ? `&source=${params.source}` : ""}`;

@@ -387,6 +387,28 @@ describe("performance score engine", () => {
     assert.deepEqual(events[0].dates, ["2026-07-02", "2026-07-03"]);
   });
 
+  it("derives missing checklist days from the submitted records, only from go-live onward", () => {
+    const events = missingChecklistEventsFromAttendance({
+      employeeName: "ICE",
+      period: { id: "custom", label: "custom", startDate: "2026-07-01", endDate: "2026-08-31" },
+      schedules: [
+        { ...schedule, workDate: "2026-07-31", scheduledStart: "2026-07-31T11:00:00+07:00" },
+        { ...schedule, workDate: "2026-08-02", scheduledStart: "2026-08-02T11:00:00+07:00" },
+        { ...schedule, workDate: "2026-08-03", scheduledStart: "2026-08-03T11:00:00+07:00" }
+      ],
+      clockEvents: [
+        { employeeName: "ICE", workDate: "2026-07-31", clockIn: "2026-07-31T11:00:00+07:00", source: "storehub" },
+        { employeeName: "ICE", workDate: "2026-08-02", clockIn: "2026-08-02T11:00:00+07:00", source: "storehub" },
+        { employeeName: "ICE", workDate: "2026-08-03", clockIn: "2026-08-03T11:00:00+07:00", source: "storehub" }
+      ],
+      // Submitted on the 2nd only. The 31 Jul gap predates CHECKLIST_DEDUCTION_START, so
+      // only 3 Aug counts.
+      submittedChecklistDays: [{ employeeName: "ICE", workDate: "2026-08-02" }]
+    });
+
+    assert.deepEqual(events, [{ type: "missing_day", count: 1, dates: ["2026-08-03"], source: "google-sheet" }]);
+  });
+
   it("derives missing morning stock count records for morning shifts without a count in the same shift window", () => {
     const records = missingMorningStockCountRecords({
       employeeName: "Leo",

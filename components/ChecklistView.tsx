@@ -23,7 +23,8 @@ export function ChecklistView({
   userRole,
   staffCode,
   branch,
-  workDate
+  workDate,
+  readOnly = false
 }: {
   phases: WorkflowPhase[];
   userEmail: string;
@@ -31,6 +32,8 @@ export function ChecklistView({
   staffCode: string | null;
   branch: string;
   workDate: string;
+  /** Admin previewing this account — render the real data, block every write. */
+  readOnly?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("daily");
   const [shift, setShift] = useState<ShiftCode | null>(null);
@@ -86,10 +89,10 @@ export function ChecklistView({
           {staffCode && shiftLoaded && !shift ? (
             <p className="checklist-view__note">วันนี้คุณไม่ได้ลงกะ — แสดง checklist ทั้งหมดไว้อ้างอิง</p>
           ) : null}
-          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} />
+          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} readOnly={readOnly} />
         </>
       ) : (
-        <SharedPeriodicChecklist period={tab} branch={branch} workDate={workDate} staffCode={staffCode ?? "-"} />
+        <SharedPeriodicChecklist period={tab} branch={branch} workDate={workDate} staffCode={staffCode ?? "-"} readOnly={readOnly} />
       )}
     </div>
   );

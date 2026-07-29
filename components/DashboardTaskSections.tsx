@@ -1,20 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import { weeklyStockSleevePhase } from "../lib/weekly-stock-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
-import {
-  canPersistWorkflowRecords,
-  formatWorkDate,
-  phaseScheduleForWorkDate,
-  readWorkflowRecordsFromStorage,
-  upsertWorkflowRecord,
-  workflowStorageKey,
-  workflowVisualStatus,
-  type WorkflowDailyRecord
-} from "../lib/workflow-records.ts";
+import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
+import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 
 const statusText = {
   white: "ยังไม่เริ่ม",
@@ -69,42 +60,10 @@ export function DashboardTaskSections({
   workDate?: string;
   canManageAssignedWork?: boolean;
 }) {
-  const [records, setRecords] = useState<WorkflowDailyRecord[]>([]);
+  const { records } = useWorkflowRecords();
   const workDate = currentWorkDate || formatWorkDate();
   const stockPhase = phases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
-
-  useEffect(() => {
-    const storedRecords = readWorkflowRecordsFromStorage(window.localStorage);
-    const now = new Date();
-    const recordsWithMissed = phases.reduce((current, phase) => {
-      const existing = current.find((item) => item.workDate === workDate && item.phaseId === phase.id);
-      if (existing?.status === "submitted" || existing?.status === "missed") return current;
-
-      const schedule = phaseScheduleForWorkDate(phase.id, workDate);
-      if (Date.parse(schedule.dueAt) >= now.getTime()) return current;
-
-      return upsertWorkflowRecord(current, {
-        workDate,
-        phaseId: phase.id,
-        phaseTitle: phase.title,
-        completed: existing?.completed || 0,
-        total: phase.checklist.length,
-        status: "missed",
-        recordedAt: now.toISOString(),
-        startedAt: existing?.startedAt,
-        dueAt: schedule.dueAt,
-        scheduleStartAt: schedule.startAt,
-        scheduleEndAt: schedule.endAt,
-        checkedKeys: existing?.checkedKeys || []
-      });
-    }, storedRecords);
-
-    setRecords(recordsWithMissed);
-    if (canPersistWorkflowRecords() && recordsWithMissed !== storedRecords) {
-      window.localStorage.setItem(workflowStorageKey, JSON.stringify(recordsWithMissed));
-    }
-  }, [phases, workDate]);
 
   return (
     <section className="task-sections">

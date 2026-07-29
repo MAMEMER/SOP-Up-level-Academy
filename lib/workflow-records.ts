@@ -19,26 +19,30 @@ export type WorkflowDailyRecord = {
   adminUnlockedBy?: string;
 };
 
-export const workflowStorageKey = "up-level-workflow-records";
-export const workflowRecordingEnabled = false;
+/** Payload stored in one daily work-record document (see lib/work-records.ts). */
+export type WorkflowDayPayload = {
+  records: WorkflowDailyRecord[];
+  notes: Record<string, string>;
+  details: Record<string, string>;
+};
 
-export function canPersistWorkflowRecords() {
-  return workflowRecordingEnabled;
+export const emptyWorkflowDayPayload: WorkflowDayPayload = { records: [], notes: {}, details: {} };
+
+/** How far back the checklist reads history (on-time streaks look back 30 days). */
+export const WORKFLOW_HISTORY_DAYS = 35;
+
+/** Flattens the per-day documents returned by the work-record API into one record list. */
+export function recordsFromDayPayloads(payloads: Array<Partial<WorkflowDayPayload> | undefined>) {
+  return payloads
+    .flatMap((payload) => payload?.records || [])
+    .sort((left, right) =>
+      `${left.workDate}:${left.phaseId}`.localeCompare(`${right.workDate}:${right.phaseId}`)
+    );
 }
 
-export function readWorkflowRecordsFromStorage(storage: Pick<Storage, "getItem" | "removeItem">) {
-  if (!canPersistWorkflowRecords()) return [];
-
-  const stored = storage.getItem(workflowStorageKey);
-  if (!stored) return [];
-
-  try {
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? (parsed as WorkflowDailyRecord[]) : [];
-  } catch {
-    storage.removeItem(workflowStorageKey);
-    return [];
-  }
+/** Merges the string maps (notes / details) across days — their keys are date-scoped. */
+export function mergeDayMaps(maps: Array<Record<string, string> | undefined>) {
+  return Object.assign({}, ...maps.filter(Boolean)) as Record<string, string>;
 }
 
 export function formatWorkDate(date = new Date()) {

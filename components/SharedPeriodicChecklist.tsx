@@ -9,13 +9,16 @@ export function SharedPeriodicChecklist({
   period,
   branch,
   workDate,
-  staffCode
+  staffCode,
+  readOnly = false
 }: {
   period: "weekly" | "monthly";
   branch: string;
   workDate: string;
   /** who is ticking — falls back to "-" for admins not in the directory */
   staffCode: string;
+  /** Admin previewing this account — read the shared ticks, never write them. */
+  readOnly?: boolean;
 }) {
   const periodKey = periodKeyFor(period, workDate);
   const tasks = tasksFor(period);
@@ -35,6 +38,7 @@ export function SharedPeriodicChecklist({
   }, [branch, period, periodKey]);
 
   async function toggle(taskId: string) {
+    if (readOnly) return;
     const ticked = !ticks[taskId];
     const optimistic = { ...ticks };
     if (ticked) optimistic[taskId] = { by: staffCode, at: "…" };
@@ -72,7 +76,7 @@ export function SharedPeriodicChecklist({
           const tick = ticks[task.id];
           return (
             <li key={task.id} className={tick ? "shared-checklist__item shared-checklist__item--done" : "shared-checklist__item"}>
-              <button type="button" onClick={() => toggle(task.id)} aria-pressed={!!tick} disabled={loading}>
+              <button type="button" onClick={() => toggle(task.id)} aria-pressed={!!tick} disabled={loading || readOnly}>
                 {tick ? "●" : "○"}
               </button>
               <span>

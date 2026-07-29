@@ -3,18 +3,18 @@ import { describe, it } from "node:test";
 import {
   canEditWorkflowRecord,
   canAdminUnlockWorkflowRecord,
-  canPersistWorkflowRecords,
   formatWorkDate,
   isPhaseUnlocked,
   isPhasePastDue,
   isWithinWorkflowWorkHours,
   isWorkflowRecordOnTime,
+  mergeDayMaps,
   phaseScheduleForWorkDate,
+  recordsFromDayPayloads,
   shouldAutoMissWorkflowRecord,
   summarizeMonthlyRecords,
   upsertWorkflowRecord,
   workflowVisualStatus,
-  workflowRecordingEnabled,
   type WorkflowDailyRecord
 } from "../lib/workflow-records.ts";
 
@@ -58,9 +58,24 @@ describe("workflow daily records", () => {
     assert.equal(canEditWorkflowRecord({ status: "missed" } as WorkflowDailyRecord, { adminOverride: true }), true);
   });
 
-  it("keeps workflow records in trial mode until recording is enabled", () => {
-    assert.equal(workflowRecordingEnabled, false);
-    assert.equal(canPersistWorkflowRecords(), false);
+  it("flattens per-day documents into one record list", () => {
+    const merged = recordsFromDayPayloads([
+      { records: [{ workDate: "2026-07-04", phaseId: "close-store", phaseTitle: "ปิดร้าน", completed: 5, total: 5, status: "submitted", recordedAt: "x" }] },
+      undefined,
+      { records: [{ workDate: "2026-07-03", phaseId: "open-store", phaseTitle: "เปิดร้าน", completed: 7, total: 7, status: "submitted", recordedAt: "x" }] }
+    ]);
+
+    assert.deepEqual(merged.map((record) => `${record.workDate}:${record.phaseId}`), [
+      "2026-07-03:open-store",
+      "2026-07-04:close-store"
+    ]);
+  });
+
+  it("merges date-scoped note and detail maps across days", () => {
+    assert.deepEqual(mergeDayMaps([{ "2026-07-03:a": "old" }, undefined, { "2026-07-04:a": "new" }]), {
+      "2026-07-03:a": "old",
+      "2026-07-04:a": "new"
+    });
   });
 
   it("lets admins unlock missed records without letting staff edit them", () => {
