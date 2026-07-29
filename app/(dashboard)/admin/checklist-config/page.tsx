@@ -3,7 +3,6 @@ import Link from "next/link";
 import { DailyChecklistEditor } from "../../../../components/DailyChecklistEditor.tsx";
 import { cardStoreWorkflow } from "../../../../lib/card-store-workflow.ts";
 import { requireUser } from "../../../../lib/auth.ts";
-import { isPreviewMode } from "../../../../lib/preview-data.ts";
 
 export default async function AdminChecklistConfigPage() {
   const user = await requireUser();

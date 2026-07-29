@@ -4764,15 +4764,110 @@ main .page > section, main > section { margin-top: 16px !important; }
   .impersonation-bar { flex-direction: column; align-items: flex-start; }
 }
 
-/* honest-labelling for screens that still render demo fixtures */
-.demo-data-banner {
-  margin: 0 0 14px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid #fcd34d;
-  background: #fffbeb;
-  color: #78350f;
-  font-size: 14px;
-  line-height: 1.6;
+
+
+/* ── /admin/staff — manage sign-in accounts + the shift roster ─────────────── */
+
+.staff-manager { display: flex; flex-direction: column; gap: 22px; }
+.staff-manager section { display: flex; flex-direction: column; gap: 14px; }
+
+.staff-card {
+  border: 1px solid rgba(45,49,66,0.12);
+  border-radius: 14px;
+  background: #fff;
+  padding: 18px 20px;
 }
-.demo-data-banner a { color: #92400e; font-weight: 600; }
+.staff-card--new { border-style: dashed; border-color: var(--color-accent, #4f46e5); background: #fbfbff; }
+
+.staff-form__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.staff-form__head strong { font-size: 16px; display: block; }
+.staff-form__head small { color: var(--color-ink-soft); font-size: 13px; }
+
+.staff-form__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 18px; }
+.staff-form__grid label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--color-ink-soft); }
+.staff-form__grid label.wide { grid-column: 1 / -1; }
+.staff-form__grid input[type="text"],
+.staff-form__grid input[type="email"],
+.staff-form__grid input:not([type]),
+.staff-form__grid select {
+  padding: 9px 11px;
+  border: 1px solid rgba(45,49,66,0.18);
+  border-radius: 9px;
+  font-size: 14px;
+  color: var(--color-ink);
+  background: #fff;
+}
+.staff-form__grid input[readonly] { background: #f4f4f6; color: var(--color-ink-soft); }
+.staff-form__grid small { font-size: 12px; color: var(--color-ink-soft); line-height: 1.5; }
+
+.staff-form__toggle { flex-direction: row !important; align-items: center; gap: 8px !important; font-size: 13.5px; color: var(--color-ink); }
+.staff-form__toggle input { width: 17px; height: 17px; }
+
+.staff-form__actions { margin-top: 16px; }
+.staff-form__remove { margin-top: 10px; }
+.staff-form__delete {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #b91c1c;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .staff-form__grid { grid-template-columns: 1fr; }
+}
+
+/* ── /admin/ops — owner day board, built only from real records ────────────── */
+
+.owner-ops { display: flex; flex-direction: column; gap: 18px; }
+.owner-ops__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+
+.owner-ops__date { display: flex; align-items: flex-end; gap: 10px; }
+.owner-ops__date label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--color-ink-soft); }
+.owner-ops__date input,
+.owner-ops__date button {
+  padding: 8px 12px;
+  border: 1px solid rgba(45,49,66,0.18);
+  border-radius: 9px;
+  font-size: 14px;
+}
+.owner-ops__date button { background: var(--color-ink); color: #fff; border-color: transparent; cursor: pointer; }
+
+.owner-ops__metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.owner-ops__metrics .board-stat small { display: block; margin-top: 3px; font-size: 12px; color: var(--color-ink-soft); }
+.owner-ops__metrics .is-alert { color: #b91c1c; }
+
+.owner-ops__panel {
+  border: 1px solid rgba(45,49,66,0.12);
+  border-radius: 14px;
+  background: #fff;
+  padding: 18px 20px;
+}
+.owner-ops__staff { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.owner-ops__staff article { border-top: 1px solid rgba(45,49,66,0.08); padding-top: 12px; }
+.owner-ops__staff article:first-child { border-top: none; padding-top: 0; }
+.owner-ops__staff-head { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.owner-ops__staff-head span { color: var(--color-ink-soft); }
+
+.owner-ops__phases { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.owner-ops__phase {
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(45,49,66,0.14);
+}
+
+.owner-ops__list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.owner-ops__list li { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.owner-ops__list small { color: var(--color-ink-soft); font-size: 12.5px; }
+
+.owner-ops__empty { margin: 12px 0 0; color: var(--color-ink-soft); font-size: 14px; }
+.owner-ops__note { margin: 12px 0 0; color: #92400e; font-size: 13.5px; }
+.owner-ops__link { display: inline-block; margin-top: 14px; font-size: 13.5px; font-weight: 600; }
+
+@media (max-width: 640px) {
+  .owner-ops__row { grid-template-columns: 1fr; }
+  .owner-ops__date { width: 100%; }
+}

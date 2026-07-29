@@ -1,12 +1,10 @@
-"use client";
-
 import {
   elapsedSeconds,
   isWorkflowRecordOnTime,
   summarizeMonthlyRecords,
   workflowVisualStatus
 } from "../lib/workflow-records.ts";
-import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
+import type { WorkflowDailyRecord } from "../lib/workflow-records.ts";
 
 const monthlyLabel = {
   white: "ยังไม่เริ่ม",
@@ -16,9 +14,10 @@ const monthlyLabel = {
   purple: "ต่อเนื่อง 3 วัน"
 };
 
-export function MonthlySummaryMonitor() {
-  const { records } = useWorkflowRecords();
-  const monthKey = new Date().toISOString().slice(0, 7);
+// Records come from the page (every employee's, read on the server). This used to call
+// useWorkflowRecords(), which returns only the VIEWER's records — so an admin, who never
+// ticks a checklist, always saw a month of zeros.
+export function MonthlySummaryMonitor({ records, monthKey }: { records: WorkflowDailyRecord[]; monthKey: string }) {
 
   const summary = summarizeMonthlyRecords(records, monthKey);
   const reviewRecords = records.filter(
@@ -57,7 +56,7 @@ export function MonthlySummaryMonitor() {
             const isMissed = record.status === "missed";
 
             return (
-            <div key={`${record.workDate}:${record.phaseId}`} className={`review-row workflow-status-${visualStatus}`}>
+            <div key={`${record.workDate}:${record.phaseId}:${record.startedAt}`} className={`review-row workflow-status-${visualStatus}`}>
               <span className="phase-icon">{isMissed ? "!" : isWorkflowRecordOnTime(record) ? "✓" : "!"}</span>
               <div>
                 <strong>{record.phaseTitle}</strong>

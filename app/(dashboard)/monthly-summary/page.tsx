@@ -2,11 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MonthlySummaryMonitor } from "../../../components/MonthlySummaryMonitor.tsx";
 import { requireUser } from "../../../lib/auth.ts";
-import { isPreviewMode } from "../../../lib/preview-data.ts";
+import { getMonthlyTeamRecords } from "../../../lib/ops-summary.ts";
+import { formatWorkDate } from "../../../lib/workflow-records.ts";
 
 export default async function MonthlySummaryPage() {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
+
+  const monthKey = formatWorkDate().slice(0, 7);
+  const records = await getMonthlyTeamRecords(monthKey);
 
   return (
     <main className="page">
@@ -18,7 +22,7 @@ export default async function MonthlySummaryPage() {
           <p>ติดตามจำนวนงานที่ส่งตรวจ ความครบถ้วนของ checklist และรายการที่ต้องตามต่อในเดือนนี้</p>
         </div>
       </section>
-      <MonthlySummaryMonitor />
+      <MonthlySummaryMonitor records={records} monthKey={monthKey} />
     </main>
   );
 }

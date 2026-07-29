@@ -20,6 +20,7 @@ const adminLinks = [
   { href: "/admin/schedule", label: "ตารางกะ" },
   { href: "/admin/assign", label: "มอบหมายงาน" },
   { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
+  { href: "/admin/staff", label: "จัดการพนักงาน" },
   { href: "/admin/checklist-config", label: "ปรับ Checklist" },
   { href: "/admin/ops", label: "สรุปเจ้าของร้าน" },
   { href: "/admin/performance-score", label: "คะแนนพนักงาน" },

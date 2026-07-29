@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AssignWork } from "../../../../components/AssignWork.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
-import { isPreviewMode } from "../../../../lib/preview-data.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 

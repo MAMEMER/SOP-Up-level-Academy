@@ -3,7 +3,6 @@ import Link from "next/link";
 import { StaffReviewView } from "../../../../components/StaffReviewView.tsx";
 import { ViewAsSwitcher } from "../../../../components/ViewAsSwitcher.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
-import { isPreviewMode } from "../../../../lib/preview-data.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 

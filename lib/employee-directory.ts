@@ -64,7 +64,24 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
   }
 ];
 
-export const employeeCodes = employeeDirectory.map((entry) => entry.code);
+export const employeeCodes: string[] = employeeDirectory.map((entry) => entry.code);
+
+/**
+ * Replaces the roster in place with the list managed at /admin/staff.
+ * Mutating rather than reassigning keeps the ~50 existing `employeeDirectory` /
+ * `employeeCodes` imports valid — they hold the same array object. Callers must run
+ * this before anything reads the roster; lib/staff-store.ts does it from requireUser().
+ */
+export function replaceEmployeeDirectory(entries: EmployeeDirectoryEntry[]) {
+  employeeDirectory.splice(0, employeeDirectory.length, ...entries);
+  employeeCodes.splice(0, employeeCodes.length, ...entries.map((entry) => entry.code));
+}
+
+/** the compiled-in roster, kept as the seed + offline fallback for the Firestore list */
+export const seedEmployeeDirectory: EmployeeDirectoryEntry[] = employeeDirectory.map((entry) => ({
+  ...entry,
+  aliases: [...entry.aliases]
+}));
 
 export function resolveEmployeeCode(rawName: string): string {
   const normalized = rawName.trim().toLowerCase();

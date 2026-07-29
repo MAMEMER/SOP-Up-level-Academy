@@ -553,7 +553,6 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
         ))}
       </section>
 
-      {showAdminBackLink ? <Link href="/admin/performance" className="back-link">ดูหน้า performance เดิม</Link> : null}
     </main>
   );
 }

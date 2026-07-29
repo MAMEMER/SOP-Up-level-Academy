@@ -23,6 +23,14 @@ export const sopUsers: SopUser[] = [
   { email: "waranon4work@gmail.com", name: "Waranon", role: "employee", departmentId: "front-store" }
 ];
 
+/** the compiled-in list, kept as the seed + offline fallback for the Firestore list */
+export const seedSopUsers: SopUser[] = sopUsers.map((user) => ({ ...user }));
+
+/** Replaces the allow-list in place with the accounts managed at /admin/staff. */
+export function replaceSopUsers(users: SopUser[]) {
+  sopUsers.splice(0, sopUsers.length, ...users);
+}
+
 export function sopUserForEmail(email: string | null | undefined): SopUser | undefined {
   const normalized = (email || "").trim().toLowerCase();
   if (!normalized) return undefined;

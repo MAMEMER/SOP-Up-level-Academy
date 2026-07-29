@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { WorkflowReviewRecords } from "../../../components/WorkflowReviewRecords.tsx";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { requireUser } from "../../../lib/auth.ts";
-import { isPreviewMode } from "../../../lib/preview-data.ts";
 
 export default async function ManagerReviewPage() {
   const user = await requireUser();

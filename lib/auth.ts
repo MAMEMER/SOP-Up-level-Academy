@@ -5,6 +5,7 @@ import { hasSessionSecret, verifySession } from "./session-jwt.ts";
 import { sopUserForEmail, type SopUser } from "./sop-users.ts";
 import { SOP_SESSION_COOKIE } from "./auth-session.ts";
 import { VIEW_AS_COOKIE, canImpersonate } from "./impersonation.ts";
+import { ensureStaffLoaded } from "./staff-store.ts";
 
 export type CurrentUser = {
   id: string;
@@ -43,6 +44,8 @@ function toCurrentUser(uid: string, sopUser: SopUser, actual: SopUser): CurrentU
 // via the SOP allow-list (sop-users.ts). When no SESSION_SECRET is configured (local
 // dev), fall back to a preview admin so the app runs with `npm run dev` and no login.
 export async function requireUser(): Promise<CurrentUser> {
+  // pulls the /admin/staff list into sopUsers + employeeDirectory before anything reads them
+  await ensureStaffLoaded();
   const jar = await cookies();
 
   const actual: SopUser | undefined = hasSessionSecret()
