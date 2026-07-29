@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { replaceSopUsers, type SopUser } from "./sop-users.ts";
 import { replaceEmployeeDirectory, type EmployeeDirectoryEntry } from "./employee-directory.ts";
-import { normalizeEmail, sanitizeStaffRecord, seedStaffRecords, type StaffRecord } from "./staff-records.ts";
+import { nextEmployeeId, normalizeEmail, sanitizeStaffRecord, seedStaffRecords, type StaffRecord } from "./staff-records.ts";
 
 export { normalizeEmail, seedStaffRecords, type StaffRecord } from "./staff-records.ts";
 
@@ -117,7 +117,15 @@ export async function saveStaff(input: Partial<StaffRecord> & { email: string })
   const mode = storageMode();
   if (mode === "unavailable") throw new Error("staff_storage_unavailable");
 
-  const record = sanitizeStaffRecord(input);
+  const stored = await readStored();
+  const record = sanitizeStaffRecord({
+    ...input,
+    // assign a staff number on first save, and keep whatever this person already has
+    employeeId:
+      input.employeeId ||
+      stored.find((row) => row.email === normalizeEmail(input.email))?.employeeId ||
+      nextEmployeeId(stored)
+  });
   if (!record.email.includes("@")) throw new Error("invalid_email");
 
   if (mode === "firestore") {
@@ -148,6 +156,35 @@ export async function removeStaff(email: string): Promise<void> {
 
   invalidateStaffCache();
   await ensureStaffLoaded();
+}
+
+/**
+ * Issues a staff number to anyone still without one.
+ *
+ * Runs when /admin/staff is opened rather than from a script, because the service-account
+ * credentials only exist on the server. Numbers go out in roster order, so the founding
+ * team keeps the low ones, and an existing number is never changed.
+ */
+export async function ensureEmployeeIds(): Promise<number> {
+  if (storageMode() === "unavailable") return 0;
+
+  const stored = await readStored();
+  const pending = stored.filter((record) => !record.employeeId);
+  if (!pending.length) return 0;
+
+  const seedOrder = seedStaffRecords().map((record) => record.email);
+  const rank = (email: string) => {
+    const index = seedOrder.indexOf(email);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+
+  const issued = stored.filter((record) => record.employeeId);
+  for (const record of [...pending].sort((left, right) => rank(left.email) - rank(right.email) || left.email.localeCompare(right.email))) {
+    const employeeId = nextEmployeeId(issued);
+    await saveStaff({ ...record, employeeId });
+    issued.push({ ...record, employeeId });
+  }
+  return pending.length;
 }
 
 /**

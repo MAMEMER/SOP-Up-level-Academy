@@ -8,6 +8,13 @@ import { seedEmployeeDirectory, type EmploymentType } from "./employee-directory
 export type StaffRecord = {
   /** lowercased — this is the document id */
   email: string;
+  /**
+   * Human-readable staff number for paperwork and for referring to someone outside the
+   * app (UP-001, UP-002, …). Assigned once and never reused, so it stays a stable
+   * reference even if the person's name or code changes. Distinct from `code`, which is
+   * the internal key the schedule, KPI and work records join on.
+   */
+  employeeId: string;
   /** name shown in the app shell */
   name: string;
   role: Role;
@@ -30,6 +37,20 @@ export function normalizeEmail(email: string) {
   return String(email || "").trim().toLowerCase();
 }
 
+export const EMPLOYEE_ID_PREFIX = "UP";
+
+/**
+ * The next unused staff number. Numbers are never recycled — a departed employee keeps
+ * theirs so old paperwork still resolves to the right person.
+ */
+export function nextEmployeeId(existing: Array<{ employeeId?: string }>): string {
+  const used = existing
+    .map((record) => Number(String(record.employeeId || "").replace(`${EMPLOYEE_ID_PREFIX}-`, "")))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const next = used.length ? Math.max(...used) + 1 : 1;
+  return `${EMPLOYEE_ID_PREFIX}-${String(next).padStart(3, "0")}`;
+}
+
 /** The compiled-in lists expressed as staff records — used to seed an empty collection. */
 export function seedStaffRecords(): StaffRecord[] {
   const rosterByEmail = new Map(
@@ -40,6 +61,7 @@ export function seedStaffRecords(): StaffRecord[] {
     const roster = rosterByEmail.get(normalizeEmail(user.email));
     return {
       email: normalizeEmail(user.email),
+      employeeId: "",
       name: user.name,
       role: user.role,
       departmentId: user.departmentId,
@@ -57,10 +79,12 @@ export function seedStaffRecords(): StaffRecord[] {
 export function sanitizeStaffRecord(input: Partial<StaffRecord> & { email: string }): StaffRecord {
   const email = normalizeEmail(input.email);
   const role: Role = input.role === "admin" || input.role === "leader" ? input.role : "employee";
+  const employeeId = String(input.employeeId || "").trim().toUpperCase();
   const onRoster = input.onRoster !== false;
   const code = String(input.code || "").trim();
   return {
     email,
+    employeeId,
     name: String(input.name || "").trim() || email,
     role,
     departmentId: input.departmentId ?? (role === "admin" ? "admin" : "front-store"),

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "../../../../lib/auth.ts";
 import { StaffManager } from "../../../../components/StaffManager.tsx";
-import { listStaff, removeStaff, saveStaff, seedStaffIfEmpty } from "../../../../lib/staff-store.ts";
+import { ensureEmployeeIds, listStaff, removeStaff, saveStaff, seedStaffIfEmpty } from "../../../../lib/staff-store.ts";
 import type { StaffRecord } from "../../../../lib/staff-records.ts";
 import { branchConfigs } from "../../../../lib/store-config.ts";
 
@@ -34,6 +34,7 @@ async function saveStaffAction(formData: FormData) {
   try {
     await saveStaff({
       email,
+      employeeId: stringValue(formData, "employeeId"),
       name: stringValue(formData, "name"),
       role: stringValue(formData, "role") as StaffRecord["role"],
       departmentId: stringValue(formData, "departmentId") || null,
@@ -88,6 +89,7 @@ export default async function AdminStaffPage({ searchParams }: PageProps) {
   if (user.role !== "admin") redirect("/");
 
   await seedStaffIfEmpty();
+  await ensureEmployeeIds();
   const staff = await listStaff();
   const params = searchParams ? await searchParams : {};
   const status = params.status ? statusMessages[params.status] : undefined;

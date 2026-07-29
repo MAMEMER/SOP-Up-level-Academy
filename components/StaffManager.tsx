@@ -37,12 +37,18 @@ function StaffForm({
         <div className="staff-form__head">
           <div>
             <strong>{isNew ? "เพิ่มพนักงานใหม่" : record.name}</strong>
-            {!isNew ? <small>{record.email}</small> : null}
+            {!isNew ? <small>{record.employeeId ? `${record.employeeId} · ` : ""}{record.email}</small> : null}
           </div>
           {!isNew && !record.active ? <span className="score-badge score-badge-red">ปิดการใช้งาน</span> : null}
         </div>
 
         <div className="staff-form__grid">
+          <label>
+            รหัสพนักงาน (ใช้อ้างอิงในเอกสาร)
+            <input name="employeeId" defaultValue={record?.employeeId || ""} placeholder={isNew ? "ระบบตั้งให้อัตโนมัติ" : ""} />
+            <small>ออกให้ครั้งเดียวและไม่นำกลับมาใช้ซ้ำ — คนละอย่างกับ “รหัสพนักงาน” ด้านล่างที่เป็นตัวเชื่อมข้อมูลภายใน</small>
+          </label>
+
           <label>
             อีเมล Google
             {isNew ? (
@@ -82,7 +88,7 @@ function StaffForm({
           </label>
 
           <label>
-            รหัสพนักงาน
+            รหัสเชื่อมข้อมูล (ภายในระบบ)
             <input name="code" defaultValue={record?.code || ""} placeholder="เช่น Boom" />
             <small>ใช้เชื่อมตารางกะ / KPI / งานที่บันทึกไว้ — เปลี่ยนแล้วประวัติเดิมจะไม่ตามมา</small>
           </label>
