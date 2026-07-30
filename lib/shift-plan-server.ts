@@ -1,6 +1,6 @@
 import "server-only";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
-import { isWorkingAssignment, type ShiftAssignment } from "./shift-schedule.ts";
+import { isWorkingAssignment, type ShiftAssignment, type ShiftCode } from "./shift-schedule.ts";
 
 // Server-side reader for the shift PLAN (schedule_shifts). The planner UI writes these
 // docs via the client SDK (lib/shift-schedule-store.ts); the owner dashboard needs the
@@ -23,6 +23,24 @@ export async function fetchWorkingStaffCodesForDate(
   branch: string,
   workDate: string
 ): Promise<Set<string> | null> {
+  const shifts = await fetchShiftAssignmentsForDate(branch, workDate);
+  return shifts ? new Set(shifts.keys()) : null;
+}
+
+/**
+ * Per-staff WORKING shift (s1/s2) rostered on `workDate`, keyed by staff code. Off days,
+ * leave, and staff with no plan cell are omitted. Returns `null` when there is NO plan for
+ * the branch-day (planner not filled yet) so callers can tell "off-duty" apart from
+ * "no schedule to compare against".
+ *
+ * The owner dashboard uses this to show each staffer's rostered shift next to what they
+ * actually ticked — surfacing e.g. a closing-shift person who submitted the opening
+ * (เปิดร้าน) checklist by mistake.
+ */
+export async function fetchShiftAssignmentsForDate(
+  branch: string,
+  workDate: string
+): Promise<Map<string, ShiftCode> | null> {
   if (!hasAdminCredentials()) return null;
 
   const snapshot = await adminDb()
@@ -34,12 +52,12 @@ export async function fetchWorkingStaffCodesForDate(
   // No plan cells at all for this day → no schedule to filter against.
   if (snapshot.empty) return null;
 
-  const working = new Set<string>();
+  const shifts = new Map<string, ShiftCode>();
   for (const doc of snapshot.docs) {
     const data = doc.data() as { staffCode?: string; assignment?: ShiftAssignment };
     if (data.staffCode && data.assignment && isWorkingAssignment(data.assignment)) {
-      working.add(data.staffCode);
+      shifts.set(data.staffCode, data.assignment);
     }
   }
-  return working;
+  return shifts;
 }

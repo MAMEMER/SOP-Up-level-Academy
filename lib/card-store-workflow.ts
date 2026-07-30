@@ -33,6 +33,18 @@ export function phasesForShift(phases: WorkflowPhase[], shift: ShiftCode): Workf
   return phases.filter((phase) => !phase.shift || phase.shift.includes(shift));
 }
 
+/**
+ * True when a phase belongs to `shift` (tagged for it, or untagged/shared). An unknown
+ * phaseId is treated as in-shift so a renamed/removed phase never gets falsely flagged.
+ * Used by the owner dashboard to spot records ticked outside a staffer's rostered shift —
+ * e.g. a closing (s2) worker who submitted the opening (เปิดร้าน) checklist.
+ */
+export function isPhaseInShift(phaseId: string, shift: ShiftCode): boolean {
+  const phase = cardStoreWorkflow.find((item) => item.id === phaseId);
+  if (!phase) return true;
+  return !phase.shift || phase.shift.includes(shift);
+}
+
 export const stockWorkSummaryCards = [
   { id: "daily", kicker: "01 Daily", title: "น้ำ ขนม" },
   { id: "weekly", kicker: "02 Weekly", title: "อุปกรณ์, Sleeve" },

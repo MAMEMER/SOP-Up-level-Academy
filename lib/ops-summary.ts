@@ -8,9 +8,11 @@ import { fetchAssignmentsForDate, fetchOpenHandoffs, type WorkAssignment, type W
 import { customerServiceRecordsForDate, type CustomerServiceRecord } from "./performance-service-records.ts";
 import { monthlyTasks } from "./monthly-event-tasks.ts";
 import { weeklyEvents } from "./weekly-event-tasks.ts";
-import { employeeDirectory } from "./employee-directory.ts";
+import { employeeDirectory, employeeCodeForEmail } from "./employee-directory.ts";
 import { fetchPerformanceDailyStore } from "./performance-daily-store.ts";
-import { fetchWorkingStaffCodesForDate } from "./shift-plan-server.ts";
+import { fetchShiftAssignmentsForDate } from "./shift-plan-server.ts";
+import { isPhaseInShift } from "./card-store-workflow.ts";
+import { shiftLabel, type ShiftCode } from "./shift-schedule.ts";
 
 // Everything the owner dashboard shows, read straight from the records staff actually
 // write. No fixtures: if a number is not backed by a real source it is not on the page.
@@ -24,6 +26,12 @@ export type StaffDaySummary = {
   total: number;
   submittedPhases: number;
   latePhases: number;
+  /** the shift this person is rostered to work today (from the schedule), if any */
+  scheduledShift?: ShiftCode;
+  /** human label for `scheduledShift`, e.g. "กะ 2 (ปิดร้าน)" */
+  scheduledShiftLabel?: string;
+  /** phaseIds this person ticked that don't belong to their rostered shift */
+  offShiftPhaseIds: string[];
 };
 
 export type OpsSummary = {
@@ -77,19 +85,26 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     };
   }
 
-  const [dayDocs, weekDocs, monthDocs, assignments, handoffs, dailyStore, workingCodes] = await Promise.all([
+  const [dayDocs, weekDocs, monthDocs, assignments, handoffs, dailyStore, shiftAssignments] = await Promise.all([
     safe(() => listRecordsForScopeKey(dailyScopeKey(workDate)), [] as WorkRecordDoc[]),
     safe(() => listAllRecordsInScopeRange(weeklyScopeKey(periodKey), `${weeklyScopeKey(periodKey)}-event`), [] as WorkRecordDoc[]),
     safe(() => listRecordsForScopeKey(monthlyScopeKey(monthKey)), [] as WorkRecordDoc[]),
     safe(() => fetchAssignmentsForDate(branch, workDate), [] as WorkAssignment[]),
     safe(() => fetchOpenHandoffs(branch), [] as WorkHandoff[]),
     safe(() => fetchPerformanceDailyStore(), { serviceRecords: [], assignedWorkRecords: [], stockCheckRecords: [] }),
-    safe(() => fetchWorkingStaffCodesForDate(branch, workDate), null as Set<string> | null)
+    safe(() => fetchShiftAssignmentsForDate(branch, workDate), null as Map<string, ShiftCode> | null)
   ]);
 
   const staff: StaffDaySummary[] = dayDocs
     .map((doc) => {
       const records = dayPayloads([doc]).filter((record) => record.workDate === workDate);
+      const code = employeeCodeForEmail(doc.employeeEmail);
+      const scheduledShift = (code && shiftAssignments?.get(code)) || undefined;
+      // Records for phases outside the rostered shift (e.g. an s2 worker who ticked the
+      // s1-only เปิดร้าน checklist). Only meaningful once we know the person's shift.
+      const offShiftPhaseIds = scheduledShift
+        ? records.filter((record) => !isPhaseInShift(record.phaseId, scheduledShift)).map((record) => record.phaseId)
+        : [];
       return {
         employeeName: doc.employeeName || doc.employeeEmail,
         employeeEmail: doc.employeeEmail,
@@ -97,12 +112,16 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
         completed: records.reduce((sum, record) => sum + record.completed, 0),
         total: records.reduce((sum, record) => sum + record.total, 0),
         submittedPhases: records.filter((record) => record.status === "submitted").length,
-        latePhases: records.filter((record) => record.status === "missed").length
+        latePhases: records.filter((record) => record.status === "missed").length,
+        scheduledShift,
+        scheduledShiftLabel: scheduledShift ? shiftLabel(scheduledShift) : undefined,
+        offShiftPhaseIds
       };
     })
     .filter((entry) => entry.records.length > 0)
     .sort((left, right) => left.employeeName.localeCompare(right.employeeName, "th"));
 
+  const workingCodes = shiftAssignments ? new Set(shiftAssignments.keys()) : null;
   const seen = new Set(staff.map((entry) => entry.employeeEmail.toLowerCase()));
   // Only nag people who are actually rostered to work today. `workingCodes` is the set of
   // staff codes with a working shift (s1/s2) per the schedule; off/leave/unrostered are

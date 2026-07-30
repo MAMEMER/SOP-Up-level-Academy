@@ -82,18 +82,32 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
               <article key={person.employeeEmail}>
                 <div className="owner-ops__staff-head">
                   <strong>{person.employeeName}</strong>
+                  {person.scheduledShiftLabel ? (
+                    <span className="owner-ops__shift-tag">{person.scheduledShiftLabel}</span>
+                  ) : null}
                   <span>{percent(person.completed, person.total)}% · {person.completed}/{person.total} ข้อ</span>
                 </div>
                 <div className="owner-ops__phases">
                   {person.records.map((record) => {
                     const visual = workflowVisualStatus(person.records, summary.workDate, record.phaseId);
+                    const offShift = person.offShiftPhaseIds.includes(record.phaseId);
                     return (
-                      <span key={record.phaseId} className={`owner-ops__phase workflow-status-${visual}`}>
+                      <span
+                        key={record.phaseId}
+                        className={`owner-ops__phase workflow-status-${visual}${offShift ? " is-off-shift" : ""}`}
+                        title={offShift ? `${record.phaseTitle} ไม่อยู่ในกะที่ลงตาราง (${person.scheduledShiftLabel})` : undefined}
+                      >
                         {record.phaseTitle} · {record.completed}/{record.total} · {phaseStatusLabel[visual] || visual}
+                        {offShift ? " · ⚠ นอกกะ" : ""}
                       </span>
                     );
                   })}
                 </div>
+                {person.offShiftPhaseIds.length ? (
+                  <p className="owner-ops__note owner-ops__note--warn">
+                    ⚠ มีงานที่ติ๊กนอกกะที่ลงตาราง ({person.scheduledShiftLabel}) — ตรวจสอบว่าลงกะถูกหรือติ๊ก checklist ผิดกะ
+                  </p>
+                ) : null}
               </article>
             ))}
           </div>
