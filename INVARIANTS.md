@@ -46,9 +46,10 @@
 - **ควรทำเพิ่ม:** schema check + audit ว่าใคร upload version ไหน (ตอนนี้ยังไม่มี — จุดเสี่ยง).
 - **พังถ้าละเมิด:** CSV attendance ปลอม (ชื่อ/เวลามั่ว) หักเงินคนบริสุทธิ์.
 
-## 7. Evidence image attach — `components/EvidenceImageInput.tsx`, `components/EvidencePhotosInput.tsx`, `app/api/evidence-upload/route.ts`
-- Upload ผ่าน **server route `/api/evidence-upload`** (admin SDK + `requireUser()`) — **ไม่ใช้** client `uploadBytes`/Firebase Auth อีกต่อไป. เหตุผล: SOP session cookie อยู่ได้ 14 วัน แต่ Firebase Auth token ฝั่ง client หมดใน 1 ชม. → user login อยู่แต่ upload ไม่ได้ ("ต้อง login Google ก่อน"). Route auth ด้วย session cookie แทน.
-- เช็ค `image/` + cap 5MB **ทั้ง client และ server**. path มี timestamp+random. download token = UUID (เดา URL ไม่ได้). **evidence URL immutable ใน record**. Impersonate (view-as) = upload ไม่ได้ (read-only).
+## 7. Evidence image attach — `components/EvidenceImageInput.tsx`, `components/EvidencePhotosInput.tsx`, `components/AssignWork.tsx`, `components/AssignmentDetail.tsx`, `app/api/evidence-upload/route.ts`
+- ทุกจุดที่แนบไฟล์ (evidence หลักฐาน + owner "มอบหมายงาน" attachments + assignment detail) upload ผ่าน **server route `/api/evidence-upload`** (admin SDK + `requireUser()`) ผ่าน helper `uploadEvidenceImage()` — **ไม่ใช้** client `uploadBytes`/Firebase Auth อีกต่อไป. เหตุผล: SOP session cookie อยู่ได้ 14 วัน แต่ Firebase Auth token ฝั่ง client หมดใน 1 ชม. → user login อยู่แต่ upload ไม่ได้ ("ต้อง login Google ก่อน"). Route auth ด้วย session cookie แทน.
+- `kind` param เลือก path + ชนิดไฟล์: `evidence` = รูปเท่านั้น (`sop-evidence/`), `assign-attachment` = รูป หรือ PDF (`sop-assign-attachments/`).
+- เช็คชนิดไฟล์ + cap 5MB **ทั้ง client และ server**. path มี timestamp+random. download token = UUID (เดา URL ไม่ได้). **evidence URL immutable ใน record**. Impersonate (view-as) = upload ไม่ได้ (read-only).
 - **ห้ามหลวม:** กลับไปใช้ client `uploadBytes` (พึ่ง Firebase Auth = บั๊กเดิม) / ปลด `requireUser()` ใน route / ปลด image-type/size check ฝั่ง server / ใช้ชื่อเดาได้ / ให้แก้ evidence ย้อนหลัง / เปิด Storage rule `allow write: if true`.
 - **พังถ้าละเมิด:** upload ไฟล์อันตราย, คนนอก POST รูปมั่ว, เดา URL หลักฐานคนอื่น, แก้หลักฐานหลังส่ง (เสีย audit), หรือบั๊ก "login แล้วยัง upload ไม่ได้" กลับมา.
 

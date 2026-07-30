@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../lib/firebase-client.ts";
+import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
 import {
   acceptAssignment,
   assignWork,
@@ -65,8 +64,9 @@ export function AssignWork({
   }
 
   // Owner attaches reference files (รูปสินค้า/ใบปะหน้า/สลิป) when handing out the task.
-  // Same Firebase Storage pattern as staff evidence (INVARIANT #7): login-gated,
-  // 5MB cap, timestamp+random path so URLs can't be guessed.
+  // Uploads through /api/evidence-upload (service account, authorized by the SOP cookie) —
+  // no client Firebase Auth, so a logged-in owner whose Firebase Auth session lapsed can
+  // still upload (INVARIANT #7). 5MB cap + unguessable path enforced server-side.
   async function onAttachFile(file: File | undefined) {
     if (!file) return;
     const okType = file.type.startsWith("image/") || file.type === "application/pdf";
@@ -81,13 +81,10 @@ export function AssignWork({
     setUploadError(null);
     setUploading(true);
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `sop-assign-attachments/${Date.now()}-${Math.floor(Math.random() * 1e6)}-${safe}`;
-      const snap = await uploadBytes(ref(storage, path), file, { contentType: file.type });
-      const url = await getDownloadURL(snap.ref);
+      const url = await uploadEvidenceImage(file, "assign-attachment");
       setAttachments((prev) => [...prev, url]);
-    } catch {
-      setUploadError("อัปโหลดไม่สำเร็จ — ต้อง login Google ก่อน");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setUploading(false);
     }

@@ -10,13 +10,20 @@ const ERRORS: Record<string, string> = {
   storage_not_configured: "ระบบอัปโหลดยังไม่พร้อม แจ้งแอดมิน",
   missing_file: "ไม่พบไฟล์",
   not_an_image: "ไฟล์ต้องเป็นรูปภาพ",
+  not_allowed_type: "ไฟล์ต้องเป็นรูปภาพ หรือ PDF",
   too_large: "รูปต้องไม่เกิน 5MB",
   upload_failed: "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง"
 };
 
-export async function uploadEvidenceImage(file: File): Promise<string> {
+// kind selects the server-side storage bucket path + which file types are allowed:
+//   "evidence"          → images only (staff checklist photos)  [default]
+//   "assign-attachment" → images or PDF (owner มอบหมายงาน references)
+export type UploadKind = "evidence" | "assign-attachment";
+
+export async function uploadEvidenceImage(file: File, kind: UploadKind = "evidence"): Promise<string> {
   const body = new FormData();
   body.append("file", file);
+  body.append("kind", kind);
 
   let res: Response;
   try {

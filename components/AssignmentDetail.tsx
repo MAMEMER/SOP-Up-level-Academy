@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../lib/firebase-client.ts";
+import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { assignmentStatusClass, assignmentStatusLabel } from "../lib/assignment-view.ts";
 import {
@@ -117,13 +116,12 @@ export function AssignmentDetail({
     setError(null);
     setUploading(true);
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `sop-evidence/${Date.now()}-${Math.floor(Math.random() * 1e6)}-${safe}`;
-      const snap = await uploadBytes(ref(storage, path), file, { contentType: file.type });
-      const url = await getDownloadURL(snap.ref);
+      // Server route upload (service account, SOP cookie) — no client Firebase Auth needed,
+      // so a logged-in owner whose Firebase Auth session lapsed can still upload. See INVARIANT #7.
+      const url = await uploadEvidenceImage(file);
       setImages((prev) => [...prev, url]);
-    } catch {
-      setError("อัปโหลดไม่สำเร็จ — ต้อง login Google ก่อน");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setUploading(false);
     }

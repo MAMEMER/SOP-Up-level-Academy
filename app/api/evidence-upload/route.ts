@@ -7,11 +7,19 @@ export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB, same cap the client enforced
 
-// POST /api/evidence-upload  (multipart/form-data, field "file")
-// Uploads one evidence image to Firebase Storage using the service account, authorized by
-// the SOP session cookie. This replaces the old browser-direct uploadBytes() call, which
-// required a live Firebase Auth session — the 14-day SOP session cookie routinely outlives
-// that, so a logged-in user would hit "อัปโหลดไม่สำเร็จ — ต้อง login Google ก่อน".
+// Storage path prefix per upload kind. Evidence photos (staff checklists) are image-only;
+// owner "มอบหมายงาน" attachments also allow PDF (ใบปะหน้า/สลิป). Both go through this one
+// server route so neither depends on client Firebase Auth.
+const KINDS: Record<string, { prefix: string; allowPdf: boolean }> = {
+  evidence: { prefix: "sop-evidence", allowPdf: false },
+  "assign-attachment": { prefix: "sop-assign-attachments", allowPdf: true }
+};
+
+// POST /api/evidence-upload  (multipart/form-data, field "file", optional field "kind")
+// Uploads one evidence image/attachment to Firebase Storage using the service account,
+// authorized by the SOP session cookie. This replaces the old browser-direct uploadBytes()
+// call, which required a live Firebase Auth session — the 14-day SOP session cookie routinely
+// outlives that, so a logged-in user would hit "อัปโหลดไม่สำเร็จ — ต้อง login Google ก่อน".
 export async function POST(request: Request) {
   // requireUser() redirects unauthenticated requests to /login; a valid SOP cookie is enough.
   const user = await requireUser();
@@ -28,15 +36,18 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "missing_file" }, { status: 400 });
   }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "not_an_image" }, { status: 400 });
+  const kind = KINDS[String(form?.get("kind") ?? "evidence")] ?? KINDS.evidence;
+  const isImage = file.type.startsWith("image/");
+  const isPdf = file.type === "application/pdf";
+  if (!isImage && !(kind.allowPdf && isPdf)) {
+    return NextResponse.json({ error: kind.allowPdf ? "not_allowed_type" : "not_an_image" }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: "too_large" }, { status: 413 });
   }
 
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_") || "image";
-  const path = `sop-evidence/${Date.now()}-${randomUUID().slice(0, 8)}-${safe}`;
+  const path = `${kind.prefix}/${Date.now()}-${randomUUID().slice(0, 8)}-${safe}`;
   const token = randomUUID();
 
   try {
