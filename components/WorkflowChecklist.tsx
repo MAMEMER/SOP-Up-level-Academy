@@ -143,10 +143,15 @@ function OpenStoreTaskDetails({
           <strong>มาตรฐานความสะอาด</strong>
           <small>โต๊ะ เคาน์เตอร์ ชั้นวาง ทางเดิน ต้องโล่งและสะอาด</small>
         </div>
-        <label className="detail-upload">
-          <span>อัปโหลดรูปหลังทำเสร็จ</span>
-          <input type="file" accept="image/*" disabled={!canEdit} />
-        </label>
+        <div className="detail-upload">
+          <span>อัปโหลดรูปหลังทำเสร็จ (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={details[detailKey(workDate, "open-clean-photos")] || ""}
+            onChange={(value) => updateDetail("open-clean-photos", value)}
+            disabled={!canEdit}
+            max={3}
+          />
+        </div>
       </div>
     );
   }
@@ -187,10 +192,15 @@ function OpenStoreTaskDetails({
         {details[detailKey(workDate, "cash-check")] === "ไม่ตรง" ? (
           <a href="/monthly-summary" className="detail-link">ส่งบัญชีตรวจ</a>
         ) : null}
-        <label className="detail-upload">
-          <span>อัปโหลดรูปเงินสด</span>
-          <input type="file" accept="image/*" disabled={!canEdit} />
-        </label>
+        <div className="detail-upload">
+          <span>อัปโหลดรูปเงินสด (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={details[detailKey(workDate, "open-cash-photos")] || ""}
+            onChange={(value) => updateDetail("open-cash-photos", value)}
+            disabled={!canEdit}
+            max={3}
+          />
+        </div>
       </div>
     );
   }
@@ -235,10 +245,15 @@ function OpenStoreTaskDetails({
             );
           })}
         </div>
-        <label className="detail-upload">
-          <span>อัปโหลดรูปหลังเติมสินค้า</span>
-          <input name="stock-shelf-refill-photo" type="file" accept="image/*" disabled={!canEdit} />
-        </label>
+        <div className="detail-upload">
+          <span>อัปโหลดรูปหลังเติมสินค้า (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={details[detailKey(workDate, "open-shelf-refill-photos")] || ""}
+            onChange={(value) => updateDetail("open-shelf-refill-photos", value)}
+            disabled={!canEdit}
+            max={3}
+          />
+        </div>
       </div>
     );
   }
@@ -430,10 +445,15 @@ function CloseStoreTaskDetails({
           />
           <span>แจ้งในกลุ่มแอดมินเพื่อส่งของในวันพรุ่งนี้</span>
         </label>
-        <label className="detail-upload">
-          <span>อัปโหลดรูปแพ็คออเดอร์ที่ค้าง</span>
-          <input type="file" accept="image/*" disabled={!canEdit || noOrder} />
-        </label>
+        <div className="detail-upload">
+          <span>อัปโหลดรูปแพ็คออเดอร์ที่ค้าง (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={noOrder ? "" : details[detailKey(workDate, "closing-pack-order-photos")] || ""}
+            onChange={(value) => updateDetail("closing-pack-order-photos", value)}
+            disabled={!canEdit || noOrder}
+            max={3}
+          />
+        </div>
       </div>
     );
   }
@@ -445,10 +465,15 @@ function CloseStoreTaskDetails({
           <strong>เก็บอุปกรณ์ ทำความสะอาดพื้นที่เล่น</strong>
           <small>แนบรูปหลักฐานหลังเก็บพื้นที่และอุปกรณ์เรียบร้อย</small>
         </div>
-        <label className="detail-upload">
-          <span>อัปโหลดรูปหลักฐานทำความสะอาด</span>
-          <input type="file" accept="image/*" disabled={!canEdit} />
-        </label>
+        <div className="detail-upload">
+          <span>อัปโหลดรูปหลักฐานทำความสะอาด (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={details[detailKey(workDate, "closing-clean-photos")] || ""}
+            onChange={(value) => updateDetail("closing-clean-photos", value)}
+            disabled={!canEdit}
+            max={3}
+          />
+        </div>
       </div>
     );
   }
@@ -472,10 +497,15 @@ function CloseStoreTaskDetails({
             placeholder="เช่น 4775"
           />
         </label>
-        <label className="detail-upload">
-          <span>อัปโหลดรูปเงินสดปิดร้าน</span>
-          <input type="file" accept="image/*" disabled={!canEdit} />
-        </label>
+        <div className="detail-upload">
+          <span>อัปโหลดรูปเงินสดปิดร้าน (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={details[detailKey(workDate, "closing-cash-photos")] || ""}
+            onChange={(value) => updateDetail("closing-cash-photos", value)}
+            disabled={!canEdit}
+            max={3}
+          />
+        </div>
       </div>
     );
   }
