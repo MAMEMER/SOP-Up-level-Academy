@@ -196,6 +196,48 @@ export async function saveAssignedWorkRecord(input: AssignedWorkRecordInput) {
   return record;
 }
 
+// Idempotent write for the supply-needs reorder assignment (ticket aFa09TOnAQDYzs850k5D).
+// The doc id is DETERMINISTIC per (workDate, employeeName) so re-running the reorder alert
+// on the same day PATCHES the same task instead of stacking duplicate KPI penalties
+// (INVARIANT #5: upsert ไม่ increment — ID เดิม = replace/merge). restUpsertDoc uses a
+// field-scoped updateMask, so this only writes title/status/note/recordedAt and never
+// clobbers a `submittedAt` the staff already filed. status "on_time" is neutral (0) until
+// the 23:59 Bangkok deadline; if the staff never submits, effectiveAssignedWorkStatus()
+// flips it to "not_finished" (−10) — that is the KPI teeth the ticket asks for.
+export function reorderAssignedWorkId(workDate: string, employeeName: string): string {
+  return `assigned-reorder-${workDate}-${employeeName}`.replace(/[^a-zA-Z0-9-]/g, "-");
+}
+
+export async function saveReorderAssignedWorkRecord(input: {
+  workDate: string;
+  employeeName: string;
+  title: string;
+  note: string;
+  recordedAt?: string;
+}): Promise<AssignedWorkRecord> {
+  const recordedAt = input.recordedAt ?? new Date().toISOString();
+  const id = reorderAssignedWorkId(input.workDate, input.employeeName);
+  const record: AssignedWorkRecord = {
+    id,
+    workDate: input.workDate,
+    employeeName: input.employeeName,
+    title: input.title.trim(),
+    status: "on_time",
+    note: input.note.trim(),
+    recordedAt
+  };
+  await restUpsertDoc(ASSIGNED_COLLECTION, id, {
+    id: record.id,
+    workDate: record.workDate,
+    employeeName: record.employeeName,
+    title: record.title,
+    status: record.status,
+    note: record.note,
+    recordedAt: record.recordedAt
+  });
+  return record;
+}
+
 export async function updateAssignedWorkRecordSubmission(
   id: string,
   input: { status?: AssignedWork["status"]; note: string; evidence?: string; trackingNumber?: string; imageEvidence?: string[] },

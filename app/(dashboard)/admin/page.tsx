@@ -65,6 +65,11 @@ export default async function AdminHubPage() {
           detail: "สั่งงานรายคน แนบไฟล์ได้ · ขึ้นบนหน้าของเขาทันทีที่ login",
           badge: openWork ? { count: openWork, label: "ยังไม่ส่ง" } : undefined
         },
+        {
+          href: "/admin/reorder-alert",
+          title: "แจ้งเตือนสั่งซื้อ",
+          detail: "วางรายการเติมสต็อกจาก StoreHub · ยอดถึง ฿1,000 → มอบงานสั่งซื้อให้พนักงานตามกะ (KPI)"
+        },
         { href: "/admin/schedule", title: "ตารางกะ", detail: "วางกะรายเดือน · ดึงเวลาเข้างานจริงจาก StoreHub มาเทียบ" },
         { href: "/admin/checklist-config", title: "ปรับ Checklist", detail: "แก้รายการงานแต่ละช่วง — พนักงานเห็นทันที" }
       ]
