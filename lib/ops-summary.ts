@@ -10,6 +10,7 @@ import { monthlyTasks } from "./monthly-event-tasks.ts";
 import { weeklyEvents } from "./weekly-event-tasks.ts";
 import { employeeDirectory } from "./employee-directory.ts";
 import { fetchPerformanceDailyStore } from "./performance-daily-store.ts";
+import { fetchWorkingStaffCodesForDate } from "./shift-plan-server.ts";
 
 // Everything the owner dashboard shows, read straight from the records staff actually
 // write. No fixtures: if a number is not backed by a real source it is not on the page.
@@ -76,13 +77,14 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     };
   }
 
-  const [dayDocs, weekDocs, monthDocs, assignments, handoffs, dailyStore] = await Promise.all([
+  const [dayDocs, weekDocs, monthDocs, assignments, handoffs, dailyStore, workingCodes] = await Promise.all([
     safe(() => listRecordsForScopeKey(dailyScopeKey(workDate)), [] as WorkRecordDoc[]),
     safe(() => listAllRecordsInScopeRange(weeklyScopeKey(periodKey), `${weeklyScopeKey(periodKey)}-event`), [] as WorkRecordDoc[]),
     safe(() => listRecordsForScopeKey(monthlyScopeKey(monthKey)), [] as WorkRecordDoc[]),
     safe(() => fetchAssignmentsForDate(branch, workDate), [] as WorkAssignment[]),
     safe(() => fetchOpenHandoffs(branch), [] as WorkHandoff[]),
-    safe(() => fetchPerformanceDailyStore(), { serviceRecords: [], assignedWorkRecords: [], stockCheckRecords: [] })
+    safe(() => fetchPerformanceDailyStore(), { serviceRecords: [], assignedWorkRecords: [], stockCheckRecords: [] }),
+    safe(() => fetchWorkingStaffCodesForDate(branch, workDate), null as Set<string> | null)
   ]);
 
   const staff: StaffDaySummary[] = dayDocs
@@ -102,8 +104,13 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     .sort((left, right) => left.employeeName.localeCompare(right.employeeName, "th"));
 
   const seen = new Set(staff.map((entry) => entry.employeeEmail.toLowerCase()));
+  // Only nag people who are actually rostered to work today. `workingCodes` is the set of
+  // staff codes with a working shift (s1/s2) per the schedule; off/leave/unrostered are
+  // excluded. When there is no plan for the day at all (workingCodes === null) we fall back
+  // to the whole branch roster so a forgotten plan doesn't silently mute every reminder.
   const noRecordStaff = employeeDirectory
     .filter((entry) => entry.branch === branch && !seen.has((entry.email || "").toLowerCase()))
+    .filter((entry) => (workingCodes ? workingCodes.has(entry.code) : true))
     .map((entry) => entry.displayName);
 
   const stockDoc = weekDocs.find((doc) => doc.scopeKey === weeklyScopeKey(periodKey));
