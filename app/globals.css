@@ -4387,6 +4387,28 @@ main .page > section, main > section { margin-top: 16px !important; }
 
 .auth-error { color: #c0392b; font-size: 13px; margin: 10px 0 0; }
 
+.auth-denied {
+  margin: 14px 0 0;
+  padding: 14px;
+  border: 1px solid #f2c8c0;
+  border-radius: 12px;
+  background: #fff5f3;
+  display: grid;
+  gap: 8px;
+}
+.auth-denied-head { margin: 0; font-weight: 700; color: #17264f; font-size: 14px; }
+.auth-denied-email {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: #c0392b;
+  word-break: break-all;
+}
+.auth-denied-help { margin: 0; font-size: 13px; color: #4b5563; line-height: 1.5; }
+.auth-denied-ok { margin: 0; font-size: 13px; color: #157347; line-height: 1.5; font-weight: 600; }
+.auth-request { margin-top: 4px; }
+
 /* ── Evidence image input (performance form) ──────────────────────────────── */
 .evidence-input { display: flex; flex-direction: column; gap: 6px; }
 .evidence-input__row { display: flex; gap: 8px; align-items: stretch; }
