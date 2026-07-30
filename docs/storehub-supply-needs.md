@@ -19,14 +19,19 @@ backoffice `https://uplevel.storehubhq.com/stocks/supplyNeeds` เท่าน�
 
 | ตัวแปร | ค่า |
 | --- | --- |
-| `STOREHUB_SUPPLY_NEEDS_URL` | ลิงก์ export ของ Supply Needs (JSON หรือ CSV) |
+| `STOREHUB_SUPPLY_NEEDS_URL` | ลิงก์ export ของ Supply Needs (JSON หรือ CSV) หรือ backoffice XHR endpoint |
 | `STOREHUB_SUPPLY_NEEDS_TOKEN` | (ถ้าต้องใช้) Bearer token ของ feed — เว้นว่างได้ถ้าลิงก์เปิด public |
+| `STOREHUB_SUPPLY_NEEDS_COOKIE` | (ถ้าชี้ตรงไป backoffice) session cookie ที่ copy จาก browser |
 
 ตัวเลือกแหล่ง feed:
 1. **StoreHub scheduled export** — ตั้ง export Supply Needs เป็นลิงก์ CSV/JSON.
 2. **Google Sheet** — วางข้อมูล Supply Needs ในชีต แล้ว File → Share → Publish to web → CSV,
    เอาลิงก์ `.../pub?output=csv` มาใส่. (เหมาะสุดถ้ายังต้อง copy อยู่ช่วงแรก — วางในชีตแทนวางใน SOP
    ทีละวัน แล้วจากนั้นค่อยทำ export อัตโนมัติเต็มรูปแบบ.)
+3. **Backoffice XHR endpoint โดยตรง** — เปิดหน้า `stocks/supplyNeeds` ใน browser → DevTools →
+   Network → หาคำขอที่คืน JSON ของ supply needs → copy ทั้ง Request URL มาใส่ `..._URL` และ
+   copy header `Cookie` มาใส่ `..._COOKIE`. ดึงจาก StoreHub ตรง ๆ ไม่ต้องทำ export กลาง
+   (ข้อควรระวัง: cookie หมดอายุตาม session ต้องอัปเดตเป็นครั้งคราว).
 
 ## รูปแบบข้อมูลที่รองรับ
 - **JSON**: array ของ object หรือ object ที่ห่อด้วย `supplyNeeds` / `products` / `items` / `data` / `inventory` / `rows`.

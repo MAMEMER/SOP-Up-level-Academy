@@ -182,10 +182,15 @@ export async function fetchSupplyNeeds(threshold = DEFAULT_THRESHOLD): Promise<S
   if (!url) throw new Error("STOREHUB_SUPPLY_NEEDS_URL is not configured");
 
   const token = process.env.STOREHUB_SUPPLY_NEEDS_TOKEN;
+  // Cookie header ทางเลือก: ให้ชี้ feed URL ตรงไปที่ backoffice XHR endpoint ของ StoreHub
+  // (เช่นที่หน้า supplyNeeds เรียกใช้) แล้ววาง session cookie ที่ copy จาก browser ได้เลย —
+  // ไม่ต้องทำ export กลาง. (cookie หมดอายุตาม session ของ StoreHub จึงต้องอัปเดตเป็นครั้งคราว.)
+  const cookie = process.env.STOREHUB_SUPPLY_NEEDS_COOKIE;
   const res = await fetch(url, {
     headers: {
       Accept: "application/json, text/csv, */*",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(cookie ? { Cookie: cookie } : {})
     },
     cache: "no-store"
   });
