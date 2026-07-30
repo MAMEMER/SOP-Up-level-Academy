@@ -272,8 +272,19 @@ export function AssignmentDetail({
                   </label>
                   <input
                     className="evidence-input__link"
+                    type="url"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={link}
                     onChange={(e) => setLink(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addLink();
+                      }
+                    }}
                     placeholder="หรือวางลิงก์รูป/แชท/สลิป หรือเลขแทค"
                   />
                   <button type="button" className="btn-soft" onClick={addLink} disabled={!link.trim()}>
