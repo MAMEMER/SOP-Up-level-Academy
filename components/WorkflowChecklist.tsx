@@ -554,6 +554,115 @@ function CloseStoreTaskDetails({
   return null;
 }
 
+type SupplyNeedItem = { name: string; remaining: number; reorderPoint?: number; unit?: string };
+type SupplyNeedsState =
+  | { status: "loading" }
+  | { status: "not_configured" }
+  | { status: "error"; detail?: string }
+  | { status: "ready"; items: SupplyNeedItem[]; fetchedAt: string };
+
+function formatFetchedAt(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
+}
+
+// แจ้งเตือนสินค้าใกล้หมดแบบอัตโนมัติ: ดึงจาก StoreHub Supply Needs feed ผ่าน API
+// พนักงานเห็นรายการที่ต้องสั่งได้เลย ไม่ต้อง copy CSV มาวาง. ถ้ายังไม่ได้ตั้งค่า feed
+// จะแสดงคำแนะนำให้เปิด StoreHub เอง(fallback) — ไม่พังของเดิม.
+function SupplyNeedsAlert({ canEdit, onUseSummary }: { canEdit: boolean; onUseSummary: (summary: string) => void }) {
+  const [state, setState] = useState<SupplyNeedsState>({ status: "loading" });
+
+  async function load() {
+    setState({ status: "loading" });
+    try {
+      const res = await fetch("/api/storehub/supply-needs", { cache: "no-store" });
+      if (res.status === 503) {
+        setState({ status: "not_configured" });
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setState({ status: "error", detail: typeof body.detail === "string" ? body.detail : undefined });
+        return;
+      }
+      const body = await res.json();
+      const items: SupplyNeedItem[] = Array.isArray(body.items) ? body.items : [];
+      setState({ status: "ready", items, fetchedAt: typeof body.fetchedAt === "string" ? body.fetchedAt : "" });
+    } catch (error) {
+      setState({ status: "error", detail: error instanceof Error ? error.message : undefined });
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  if (state.status === "loading") {
+    return <p className="detail-hint">กำลังดึงรายการสินค้าใกล้หมดจาก StoreHub...</p>;
+  }
+
+  if (state.status === "not_configured") {
+    return <p className="detail-hint">ยังไม่ได้ตั้งค่าดึงอัตโนมัติ — เปิด StoreHub Supply Needs แล้วสรุปรายการด้านล่างเอง</p>;
+  }
+
+  if (state.status === "error") {
+    return (
+      <div className="supply-alert">
+        <p className="detail-hint">ดึงอัตโนมัติไม่สำเร็จ — เปิด StoreHub เองได้ หรือกดลองใหม่</p>
+        <button type="button" className="supply-alert-button" onClick={() => void load()}>
+          ลองใหม่
+        </button>
+      </div>
+    );
+  }
+
+  if (state.items.length === 0) {
+    return (
+      <div className="supply-alert">
+        <p className="detail-hint">
+          ตอนนี้ไม่มีสินค้าที่ใกล้หมด{state.fetchedAt ? ` (อัปเดต ${formatFetchedAt(state.fetchedAt)})` : ""}
+        </p>
+        <button type="button" className="supply-alert-button" onClick={() => void load()}>
+          รีเฟรช
+        </button>
+      </div>
+    );
+  }
+
+  const summary = state.items
+    .map((item) => `${item.name} | ${item.remaining}${item.unit ? ` ${item.unit}` : ""}`)
+    .join("\n");
+
+  return (
+    <div className="supply-alert">
+      <div className="supply-alert-head">
+        <strong>สินค้าใกล้หมด {state.items.length} รายการ — ต้องสั่งเพิ่ม</strong>
+        {state.fetchedAt ? <small>อัปเดต {formatFetchedAt(state.fetchedAt)}</small> : null}
+      </div>
+      <ul className="supply-alert-list">
+        {state.items.map((item) => (
+          <li key={`${item.name}-${item.remaining}`}>
+            <span className="supply-alert-name">{item.name}</span>
+            <span className="supply-alert-qty">
+              เหลือ {item.remaining}
+              {item.unit ? ` ${item.unit}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="supply-alert-actions">
+        <button type="button" className="supply-alert-button" onClick={() => onUseSummary(summary)} disabled={!canEdit}>
+          ใช้รายการนี้เป็นสรุป
+        </button>
+        <button type="button" className="supply-alert-button ghost" onClick={() => void load()}>
+          รีเฟรช
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function StockTaskDetails({
   index,
   canEdit,
@@ -634,6 +743,7 @@ function StockTaskDetails({
           <strong>แจ้งเตือนสินค้าใกล้หมด</strong>
           <small>สรุปรายวันจาก StoreHub Supply Needs เฉพาะชื่อสินค้าและจำนวนที่เหลือ</small>
         </div>
+        <SupplyNeedsAlert canEdit={canEdit} onUseSummary={(summary) => updateDetail("supply-needs-summary", summary)} />
         <a href={supplyNeedsUrl} target="_blank" rel="noreferrer" className="detail-action-link">
           เปิด StoreHub Supply Needs
         </a>

@@ -100,7 +100,7 @@ describe("dashboard task sections UI", () => {
   it("captures shelf refill evidence and product groups", () => {
     const source = readFileSync(new URL("../components/WorkflowChecklist.tsx", import.meta.url), "utf8");
 
-    assert.equal(source.includes("stock-shelf-refill-photo"), true);
+    assert.equal(source.includes("stock-refill-photos"), true);
     assert.equal(source.includes("น้ำ,ขนม"), true);
     assert.equal(source.includes("ชั้นแขวน อุปกรณ์"), true);
     assert.equal(source.includes("การ์ด Booster box"), true);
