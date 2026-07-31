@@ -46,7 +46,17 @@ export function mergeDayMaps(maps: Array<Record<string, string> | undefined>) {
 }
 
 export function formatWorkDate(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  // The shop runs on the Bangkok business day. `toISOString()` resolves to UTC, so on a
+  // UTC server (Vercel) — or a browser between Bangkok 00:00–07:00 — the calendar day rolls
+  // back 7h and "today" becomes yesterday. That silently dropped freshly-assigned work from
+  // the owner ops board and split staff/owner records across two date buckets. Pin the
+  // Bangkok calendar date so every page agrees on the same business day. (en-CA → YYYY-MM-DD)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
 }
 
 export function upsertWorkflowRecord(records: WorkflowDailyRecord[], record: WorkflowDailyRecord) {
