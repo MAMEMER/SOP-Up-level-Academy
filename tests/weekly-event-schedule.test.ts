@@ -47,10 +47,28 @@ describe("weekly event scheduling (active days)", () => {
     assert.equal(isWeeklyEventActiveOn(lorcana!, "2026-08-02"), true); // Sunday
   });
 
+  it("Rift Bound runs Wednesday and Eidolon runs Thursday", () => {
+    const rift = weeklyEventById("weekly-event-riftbound");
+    assert.ok(rift);
+    assert.deepEqual(rift!.activeDays, [3]);
+    assert.equal(isWeeklyEventActiveOn(rift!, "2026-07-29"), true); // Wednesday
+    assert.equal(isWeeklyEventActiveOn(rift!, "2026-07-30"), false); // Thursday
+
+    const eidolon = weeklyEventById("weekly-event-eidolon");
+    assert.ok(eidolon);
+    assert.deepEqual(eidolon!.activeDays, [4]);
+    assert.equal(isWeeklyEventActiveOn(eidolon!, "2026-07-30"), true); // Thursday
+    assert.equal(isWeeklyEventActiveOn(eidolon!, "2026-07-29"), false); // Wednesday
+  });
+
   it("weeklyEventsActiveOn returns only the events due that weekday", () => {
     // Tuesday 2026-07-28 → only Gym Pokemon is due
     const tuesday = weeklyEventsActiveOn("2026-07-28").map((event) => event.key);
     assert.deepEqual(tuesday, ["gym-pokemon"]);
+    // Wednesday 2026-07-29 → Lorcana + Rift Bound, in declaration order
+    assert.deepEqual(weeklyEventsActiveOn("2026-07-29").map((event) => event.key), ["lorcana", "riftbound"]);
+    // Thursday 2026-07-30 → Lorcana + Eidolon
+    assert.deepEqual(weeklyEventsActiveOn("2026-07-30").map((event) => event.key), ["lorcana", "eidolon"]);
     // Monday 2026-07-27 → nothing due
     assert.deepEqual(weeklyEventsActiveOn("2026-07-27"), []);
   });

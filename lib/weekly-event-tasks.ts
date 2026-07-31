@@ -208,9 +208,18 @@ export const weeklyEvents: WeeklyEvent[] = [
     name: "Rift Bound",
     game: "Rift Bound",
     lineGroup: "กลุ่ม LINE Rift Bound",
-    schedule: "ทุกวันเสาร์ อาทิตย์",
-    // เสาร์(6), อาทิตย์(0) — ค่าเริ่มต้น รอ Champ ยืนยันวันจริง
-    activeDays: [6, 0]
+    schedule: "ทุกวันพุธ",
+    // พุธ(3) — ยืนยันโดย Champ 31 ก.ค. 2026 (เดิมตั้งไว้ เสาร์+อาทิตย์ ซึ่งไม่ตรงของจริง)
+    activeDays: [3]
+  }),
+  makeEvent({
+    key: "eidolon",
+    name: "Eidolon",
+    game: "Eidolon",
+    lineGroup: "กลุ่ม LINE Eidolon",
+    schedule: "ทุกวันพฤหัสบดี",
+    // พฤหัสบดี(4) — ยืนยันโดย Champ 31 ก.ค. 2026
+    activeDays: [4]
   })
 ];
 
