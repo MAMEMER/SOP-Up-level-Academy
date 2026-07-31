@@ -13,6 +13,7 @@ import {
   type MonthlyTaskState
 } from "../lib/monthly-event-tasks.ts";
 import { fetchMonthlyEventPayload, saveMonthlyEventPayload } from "../lib/monthly-event-store.ts";
+import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 
 // สถานะที่ staff บันทึกได้เอง (เจ้าของร้านเพิ่ม "เสร็จสิ้น" ได้หลังตรวจงาน)
 const staffStates: { value: MonthlyTaskState; label: string }[] = [
@@ -206,10 +207,14 @@ export function MonthlyEventChecklist({ canManage = false }: { canManage?: boole
                         placeholder="ตัวอย่าง: จัดบูธเสร็จ ยอดขาย 12,000 บาท แนบรูปหน้างาน"
                       />
                     </label>
-                    <label className="detail-upload">
-                      <span>อัปโหลดรูปหลักฐาน</span>
-                      <input type="file" accept="image/*" />
-                    </label>
+                    <div className="detail-upload">
+                      <span>อัปโหลดรูปหลักฐาน (แนบรูป/สกรีนช็อตจากคอมได้ สูงสุด 5 รูป)</span>
+                      <EvidencePhotosInput
+                        value={evidence[`${item.key}:__photos`] || ""}
+                        onChange={(next) => updateEvidence(`${item.key}:__photos`, next)}
+                        max={5}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}

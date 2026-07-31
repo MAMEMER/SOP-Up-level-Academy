@@ -20,6 +20,7 @@ import {
   type WeeklyEventPayload
 } from "../lib/weekly-event-store.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
+import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 
 export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
@@ -310,10 +311,14 @@ function WeeklyEventItem({
               <li key={label}>{label}</li>
             ))}
           </ul>
-          <label className="detail-upload">
-            <span>อัปโหลดรูปหลักฐาน</span>
-            <input type="file" accept="image/*" multiple />
-          </label>
+          <div className="detail-upload">
+            <span>อัปโหลดรูปหลักฐาน (แนบรูป/สกรีนช็อตจากคอมได้ สูงสุด 5 รูป)</span>
+            <EvidencePhotosInput
+              value={value("__photos")}
+              onChange={(next) => onField("__photos", next)}
+              max={5}
+            />
+          </div>
         </div>
       </div>
     </div>
