@@ -9,7 +9,7 @@ import { fetchChecklistOverrides } from "../lib/daily-checklist-store.ts";
 import type { Role } from "../lib/permissions.ts";
 import { fetchShiftForStaffDate } from "../lib/shift-schedule-store.ts";
 import type { ShiftCode } from "../lib/shift-schedule.ts";
-import { shiftLabel } from "../lib/shift-schedule.ts";
+import { defaultShiftStart, shiftLabel } from "../lib/shift-schedule.ts";
 
 type Tab = "daily" | "weekly" | "monthly";
 
@@ -37,6 +37,7 @@ export function ChecklistView({
 }) {
   const [tab, setTab] = useState<Tab>("daily");
   const [shift, setShift] = useState<ShiftCode | null>(null);
+  const [shiftStart, setShiftStart] = useState<string | null>(null);
   const [shiftLoaded, setShiftLoaded] = useState(!staffCode);
   const [overrides, setOverrides] = useState<ChecklistOverrides>({});
 
@@ -46,9 +47,18 @@ export function ChecklistView({
     fetchShiftForStaffDate(branch, workDate, staffCode)
       .then((plan) => {
         if (!alive) return;
-        setShift(plan?.assignment === "s1" || plan?.assignment === "s2" ? plan.assignment : null);
+        const assignment =
+          plan?.assignment === "s1" || plan?.assignment === "s2" ? plan.assignment : null;
+        setShift(assignment);
+        // Shift-1 checklist window is counted from the real clock-in time + 4h; fall back to
+        // the shift's default entry time when the planner left it blank.
+        setShiftStart(assignment ? plan?.startTime ?? defaultShiftStart(assignment) : null);
       })
-      .catch(() => alive && setShift(null))
+      .catch(() => {
+        if (!alive) return;
+        setShift(null);
+        setShiftStart(null);
+      })
       .finally(() => alive && setShiftLoaded(true));
     return () => {
       alive = false;
@@ -89,7 +99,7 @@ export function ChecklistView({
           {staffCode && shiftLoaded && !shift ? (
             <p className="checklist-view__note">วันนี้คุณไม่ได้ลงกะ — แสดง checklist ทั้งหมดไว้อ้างอิง</p>
           ) : null}
-          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} readOnly={readOnly} />
+          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} shift={shift} shiftStart={shiftStart} readOnly={readOnly} />
         </>
       ) : (
         <SharedPeriodicChecklist period={tab} branch={branch} workDate={workDate} staffCode={staffCode ?? "-"} readOnly={readOnly} />

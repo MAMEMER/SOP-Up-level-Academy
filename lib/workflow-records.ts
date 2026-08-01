@@ -128,7 +128,40 @@ export function isFlexibleWorkflowPhase(phaseId: string) {
   return phaseId === "stock-work" || phaseId === "daytime-work" || phaseId === "guild-chat-exp";
 }
 
-export function phaseScheduleForWorkDate(phaseId: string, workDate: string) {
+/** Shift 1 (opening) works its checklist within this many hours of clocking in. */
+export const SHIFT1_WORK_WINDOW_HOURS = 4;
+
+/**
+ * Shift context for schedule resolution. When a staffer is on shift 1 (opening), the
+ * checklist "actual working time" is counted from their real shift-entry time + 4h — a
+ * staff suggestion (ticket MHQqvwhhtpARNEcuecfj) — instead of the fixed store-open hours,
+ * because opening staff clock in well before the store opens to customers.
+ */
+export type ShiftScheduleContext = { shift?: "s1" | "s2" | null; shiftStart?: string | null };
+
+function isValidHhMm(value: string): boolean {
+  return /^\d{1,2}:\d{2}$/.test(value);
+}
+
+export function phaseScheduleForWorkDate(
+  phaseId: string,
+  workDate: string,
+  context?: ShiftScheduleContext
+) {
+  // Shift-1 override: window = [เวลาเข้ากะ, เวลาเข้ากะ + 4h] for every phase the opener does.
+  if (context?.shift === "s1" && context.shiftStart && isValidHhMm(context.shiftStart)) {
+    const startAt = bangkokDateAt(workDate, context.shiftStart);
+    const endAt = addMinutes(startAt, SHIFT1_WORK_WINDOW_HOURS * 60);
+    return {
+      startAt: startAt.toISOString(),
+      endAt: endAt.toISOString(),
+      dueAt: endAt.toISOString(),
+      startLabel: timeLabel(startAt),
+      endLabel: timeLabel(endAt),
+      dueMinutes: SHIFT1_WORK_WINDOW_HOURS * 60
+    };
+  }
+
   const hours = storeHoursForWorkDate(workDate);
   const openAt = bangkokDateAt(workDate, hours.open);
   const closeAt = bangkokDateAt(workDate, hours.close);
@@ -153,31 +186,38 @@ export function phaseScheduleForWorkDate(phaseId: string, workDate: string) {
   };
 }
 
-export function isPhasePastDue(phaseId: string, workDate: string, now = new Date()) {
-  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate).dueAt) < now.getTime();
+export function isPhasePastDue(
+  phaseId: string,
+  workDate: string,
+  now = new Date(),
+  context?: ShiftScheduleContext
+) {
+  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, context).dueAt) < now.getTime();
 }
 
 export function canAdminUnlockWorkflowRecord(
   record: Pick<WorkflowDailyRecord, "status"> | undefined,
   phaseId: string,
   workDate: string,
-  now = new Date()
+  now = new Date(),
+  context?: ShiftScheduleContext
 ) {
   if (record?.status === "submitted") return false;
   if (record?.status === "missed") return true;
-  return isPhasePastDue(phaseId, workDate, now);
+  return isPhasePastDue(phaseId, workDate, now, context);
 }
 
 export function shouldAutoMissWorkflowRecord(
   record: Pick<WorkflowDailyRecord, "status" | "adminUnlockedAt"> | undefined,
   phaseId: string,
   workDate: string,
-  now = new Date()
+  now = new Date(),
+  context?: ShiftScheduleContext
 ) {
   if (isFlexibleWorkflowPhase(phaseId)) return false;
   if (record?.status === "submitted" || record?.status === "missed") return false;
   if (record?.adminUnlockedAt) return false;
-  return isPhasePastDue(phaseId, workDate, now);
+  return isPhasePastDue(phaseId, workDate, now, context);
 }
 
 function phaseCanAdvance(records: WorkflowDailyRecord[], workDate: string, phaseId: string) {

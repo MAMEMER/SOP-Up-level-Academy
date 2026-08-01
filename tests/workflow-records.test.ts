@@ -154,6 +154,37 @@ describe("workflow daily records", () => {
     assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T08:01:00.000Z")), true);
   });
 
+  it("counts shift-1 checklist window from clock-in + 4h instead of store hours", () => {
+    // Ticket MHQqvwhhtpARNEcuecfj: opener enters 09:00 → window 09:00–13:00 (Bangkok).
+    const s1At9 = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s1", shiftStart: "09:00" });
+    assert.equal(s1At9.startLabel, "09:00");
+    assert.equal(s1At9.endLabel, "13:00");
+    assert.equal(s1At9.dueMinutes, 240);
+
+    // The +4h window covers every phase the opener sees, not just open-store.
+    const s1Stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", { shift: "s1", shiftStart: "11:00" });
+    assert.equal(s1Stock.startLabel, "11:00");
+    assert.equal(s1Stock.endLabel, "15:00");
+
+    // Due enforcement follows the clock-in window: due 13:00 Bangkok = 06:00 UTC.
+    assert.equal(
+      isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T05:59:00.000Z"), { shift: "s1", shiftStart: "09:00" }),
+      false
+    );
+    assert.equal(
+      isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T06:01:00.000Z"), { shift: "s1", shiftStart: "09:00" }),
+      true
+    );
+
+    // Shift 2 and admin (no shift context) keep the store-hours schedule unchanged.
+    const s2Unchanged = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s2", shiftStart: "13:00" });
+    assert.equal(s2Unchanged.startLabel, "14:30");
+    assert.equal(s2Unchanged.endLabel, "15:00");
+    const noContext = phaseScheduleForWorkDate("open-store", "2026-07-06");
+    assert.equal(noContext.startLabel, "14:30");
+    assert.equal(noContext.endLabel, "15:00");
+  });
+
   it("allows workflow work only from 09:00 to 23:00 Bangkok time", () => {
     assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T01:59:00.000Z")), false);
     assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T02:00:00.000Z")), true);

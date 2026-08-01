@@ -17,6 +17,7 @@ import {
   shouldAutoMissWorkflowRecord,
   upsertWorkflowRecord,
   WORKFLOW_HISTORY_DAYS,
+  type ShiftScheduleContext,
   type WorkflowDailyRecord,
   type WorkflowDayPayload,
   type WorkflowRecordStatus
@@ -861,14 +862,21 @@ export function WorkflowChecklist({
   phases,
   userEmail,
   userRole,
+  shift = null,
+  shiftStart = null,
   readOnly = false
 }: {
   phases: WorkflowPhase[];
   userEmail: string;
   userRole: "employee" | "leader" | "admin";
+  /** Today's shift for this staffer (drives the shift-1 clock-in+4h checklist window). */
+  shift?: "s1" | "s2" | null;
+  /** Real shift-entry time HH:MM — shift-1 checklist due = shiftStart + 4h. */
+  shiftStart?: string | null;
   /** Admin previewing another account — render everything, save nothing. */
   readOnly?: boolean;
 }) {
+  const shiftContext = useMemo<ShiftScheduleContext>(() => ({ shift, shiftStart }), [shift, shiftStart]);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState(() => new Date());
   const checklistPhases = useMemo(() => phases.filter((phase) => phase.checklist.length > 0), [phases]);
@@ -956,9 +964,9 @@ export function WorkflowChecklist({
     if (!loaded || readOnly) return;
     const next = checklistPhases.reduce((current, phase) => {
       const existing = current.find((record) => record.workDate === workDate && record.phaseId === phase.id);
-      if (!shouldAutoMissWorkflowRecord(existing, phase.id, workDate, now)) return current;
+      if (!shouldAutoMissWorkflowRecord(existing, phase.id, workDate, now, shiftContext)) return current;
 
-      const schedule = phaseScheduleForWorkDate(phase.id, workDate);
+      const schedule = phaseScheduleForWorkDate(phase.id, workDate, shiftContext);
       return upsertWorkflowRecord(current, {
         workDate,
         phaseId: phase.id,
@@ -985,7 +993,7 @@ export function WorkflowChecklist({
     const existing = todayRecords.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours()) return;
     if (!canEditWorkflowRecord(existing, { adminOverride: isAdmin })) return;
-    if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
+    if (isPhasePastDue(phase.id, workDate, now, shiftContext) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
 
     const noOrderKey = noOrderKeyForPhase(phase);
     const checkedKeys = phase.checklist.map((_, index) => itemKey(phase.id, index)).filter((key) => {
@@ -996,7 +1004,7 @@ export function WorkflowChecklist({
     if (recordStatus === "submitted" && phaseCompleted < phase.checklist.length) return;
 
     const recordedAt = new Date().toISOString();
-    const schedule = phaseScheduleForWorkDate(phase.id, workDate);
+    const schedule = phaseScheduleForWorkDate(phase.id, workDate, shiftContext);
     const next = upsertWorkflowRecord(todayRecords, {
       workDate,
       phaseId: phase.id,
@@ -1037,7 +1045,7 @@ export function WorkflowChecklist({
     if (locked) return;
     const record = todayRecords.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
-    if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
+    if (isPhasePastDue(phase.id, workDate, now, shiftContext) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
     if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
 
     const next = { ...checked, [key]: !checked[key] };
@@ -1079,7 +1087,7 @@ export function WorkflowChecklist({
   function setCloseStoreNoOrder(phase: WorkflowPhase, isNoOrder: boolean) {
     const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
-    if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
+    if (isPhasePastDue(phase.id, workDate, now, shiftContext) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
     if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
 
     updateDetail("closing-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
@@ -1101,7 +1109,7 @@ export function WorkflowChecklist({
   function setDaytimeNoOrder(phase: WorkflowPhase, isNoOrder: boolean) {
     const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
-    if (isPhasePastDue(phase.id, workDate) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
+    if (isPhasePastDue(phase.id, workDate, now, shiftContext) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
     if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
 
     updateDetail("shipping-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
@@ -1124,10 +1132,10 @@ export function WorkflowChecklist({
   function unlockPhaseForAdmin(phase: WorkflowPhase) {
     if (!isAdmin || locked) return;
     const existing = todayRecords.find((item) => item.workDate === workDate && item.phaseId === phase.id);
-    if (!canAdminUnlockWorkflowRecord(existing, phase.id, workDate, now)) return;
+    if (!canAdminUnlockWorkflowRecord(existing, phase.id, workDate, now, shiftContext)) return;
 
     const unlockedAt = new Date().toISOString();
-    const schedule = phaseScheduleForWorkDate(phase.id, workDate);
+    const schedule = phaseScheduleForWorkDate(phase.id, workDate, shiftContext);
     const checkedKeys = existing?.checkedKeys || [];
     updateRecords(
       upsertWorkflowRecord(todayRecords, {
@@ -1204,7 +1212,7 @@ export function WorkflowChecklist({
           const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
           const isSubmitted = record?.status === "submitted";
           const unlocked = isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds);
-          const isExpired = !isSubmitted && isPhasePastDue(phase.id, workDate, now);
+          const isExpired = !isSubmitted && isPhasePastDue(phase.id, workDate, now, shiftContext);
           const adminUnlocked = Boolean(record?.adminUnlockedAt);
           const flexible = isFlexibleWorkflowPhase(phase.id);
           const canEdit = !locked && withinWorkHours && canEditWorkflowRecord(record, { adminOverride: isAdmin }) && unlocked && (isAdmin || flexible || !isExpired);
@@ -1221,8 +1229,8 @@ export function WorkflowChecklist({
             !missingStockReorderList &&
             !missingStockTakeStatus &&
             !missingHandoff;
-          const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now) && !adminUnlocked && !locked;
-          const schedule = phaseScheduleForWorkDate(phase.id, workDate);
+          const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now, shiftContext) && !adminUnlocked && !locked;
+          const schedule = phaseScheduleForWorkDate(phase.id, workDate, shiftContext);
           return (
             <section key={phase.id} id={phase.id} className={`training-card phase-${phase.category}`}>
               <div className="workflow-card-head">
