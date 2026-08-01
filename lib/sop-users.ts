@@ -5,6 +5,9 @@ import type { Role } from "./permissions.ts";
 // in with a Google account NOT on this list is denied. Keep emails lowercase.
 //   admin    = owner tier (Champ + เนม) — full planning + review
 //   employee = front-store staff — personal shift view + checklist + handoff
+// Leavers are removed here AND deactivated in the `sop_staff` collection, which
+// overrides this seed at runtime — editing only one of the two leaves them
+// signed in. ไอซ์ (phooreephat.k) resigned 2026-08-01.
 
 export type SopUser = {
   email: string;
@@ -17,7 +20,6 @@ export const sopUsers: SopUser[] = [
   { email: "champ.championest@gmail.com", name: "Champ Master", role: "admin", departmentId: "admin" },
   { email: "namenrw@gmail.com", name: "Namen RW", role: "admin", departmentId: "admin" },
   { email: "boomboom08755@gmail.com", name: "บูม", role: "employee", departmentId: "front-store" },
-  { email: "phooreephat.k@gmail.com", name: "ไอซ์", role: "employee", departmentId: "front-store" },
   { email: "nuslove2560@gmail.com", name: "ลีโอ", role: "employee", departmentId: "front-store" },
   { email: "wipop.tho@gmail.com", name: "Wipop", role: "employee", departmentId: "front-store" },
   { email: "waranon4work@gmail.com", name: "Waranon", role: "employee", departmentId: "front-store" }
