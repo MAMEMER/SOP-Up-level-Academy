@@ -167,9 +167,20 @@ export function phaseScheduleForWorkDate(
   const closeAt = bangkokDateAt(workDate, hours.close);
   const closeStartAt = addMinutes(closeAt, -60);
 
+  // Opening prep starts 30 min before the store opens, but the checklist must stay
+  // tickable while the opener actually works — not lock the instant the store opens.
+  // When we can't resolve the staffer's shift (blank roster / staffCode not in the
+  // planner / shift fetch failed) we fall back here, so the window has to be forgiving:
+  // give the same clock-in + 4h working span the shift-1 path grants, capped before the
+  // closing window. Previously this ended exactly at store-open, so any opener who ticked
+  // even a minute after open was permanently locked out — "กดติ๊กไม่ได้". (ticket 9XEZ…)
+  const openStoreEndAt = new Date(
+    Math.min(addMinutes(openAt, SHIFT1_WORK_WINDOW_HOURS * 60).getTime(), closeStartAt.getTime())
+  );
+
   const schedule =
     phaseId === "open-store"
-      ? { startAt: addMinutes(openAt, -30), endAt: openAt }
+      ? { startAt: addMinutes(openAt, -30), endAt: openStoreEndAt }
       : phaseId === "close-store"
         ? { startAt: closeStartAt, endAt: closeAt }
         : isFlexibleWorkflowPhase(phaseId)
