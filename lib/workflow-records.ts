@@ -148,20 +148,6 @@ export function phaseScheduleForWorkDate(
   workDate: string,
   context?: ShiftScheduleContext
 ) {
-  // Shift-1 override: window = [เวลาเข้ากะ, เวลาเข้ากะ + 4h] for every phase the opener does.
-  if (context?.shift === "s1" && context.shiftStart && isValidHhMm(context.shiftStart)) {
-    const startAt = bangkokDateAt(workDate, context.shiftStart);
-    const endAt = addMinutes(startAt, SHIFT1_WORK_WINDOW_HOURS * 60);
-    return {
-      startAt: startAt.toISOString(),
-      endAt: endAt.toISOString(),
-      dueAt: endAt.toISOString(),
-      startLabel: timeLabel(startAt),
-      endLabel: timeLabel(endAt),
-      dueMinutes: SHIFT1_WORK_WINDOW_HOURS * 60
-    };
-  }
-
   const hours = storeHoursForWorkDate(workDate);
   const openAt = bangkokDateAt(workDate, hours.open);
   const closeAt = bangkokDateAt(workDate, hours.close);
@@ -177,6 +163,30 @@ export function phaseScheduleForWorkDate(
   const openStoreEndAt = new Date(
     Math.min(addMinutes(openAt, SHIFT1_WORK_WINDOW_HOURS * 60).getTime(), closeStartAt.getTime())
   );
+
+  // Shift-1 override: window = [เวลาเข้ากะ, เวลาเข้ากะ + 4h] for every phase the opener does.
+  if (context?.shift === "s1" && context.shiftStart && isValidHhMm(context.shiftStart)) {
+    const startAt = bangkokDateAt(workDate, context.shiftStart);
+    // The opener's window is clock-in + 4h, but it must NEVER expire before the store's own
+    // opening window does. The shift entry-time options (09:00 / 11:00) — and the 09:00
+    // auto-plan default — are weekend-shaped (store opens 09:30). On a weekday the store
+    // opens 15:00, so a blank-roster opener carrying the 09:00 default would see this window
+    // close at 13:00 — two hours BEFORE the store even opens — and be locked out of the
+    // whole open-store checklist the moment they arrive. Floor the end at the store-hours
+    // open-store end so the opener always has a live window while the store is opening.
+    // (ticket ALEara1vixtGml8Z09lb — "เปิดร้าน...ล็อคก่อนกำหนด ส่งงานไม่ได้")
+    const endAt = new Date(
+      Math.max(addMinutes(startAt, SHIFT1_WORK_WINDOW_HOURS * 60).getTime(), openStoreEndAt.getTime())
+    );
+    return {
+      startAt: startAt.toISOString(),
+      endAt: endAt.toISOString(),
+      dueAt: endAt.toISOString(),
+      startLabel: timeLabel(startAt),
+      endLabel: timeLabel(endAt),
+      dueMinutes: Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60000))
+    };
+  }
 
   const schedule =
     phaseId === "open-store"
