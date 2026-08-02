@@ -1205,7 +1205,7 @@ export function WorkflowChecklist({
       {!withinWorkHours ? (
         <div className="time-lock-banner">
           <strong>นอกเวลาทำงาน</strong>
-          <span>สามารถทำ checklist ได้เฉพาะเวลา 09:00-23:00 เท่านั้น</span>
+          <span>สามารถทำ checklist ได้เฉพาะเวลา 09:00-23:59 เท่านั้น</span>
         </div>
       ) : null}
       <div className="runner-status">
@@ -1267,7 +1267,7 @@ export function WorkflowChecklist({
                 เวลาที่กำหนด {schedule.startLabel}-{schedule.endLabel}
                 {isExpired && !flexible && !isAdmin && !adminUnlocked ? " · เลยเวลาแล้ว ไม่สามารถกลับไปทำได้" : ""}
                 {adminUnlocked ? " · admin ปลดล็อคให้แก้ไข" : ""}
-                {!withinWorkHours ? " · นอกเวลาทำงาน 09:00-23:00" : ""}
+                {!withinWorkHours ? " · นอกเวลาทำงาน 09:00-23:59" : ""}
               </p>
               <div className="checklist-tick-list">
                 {phase.checklist.map((item, index) => {

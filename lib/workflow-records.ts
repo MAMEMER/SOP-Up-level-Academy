@@ -80,10 +80,6 @@ function bangkokDateAt(workDate: string, time: string) {
   return new Date(`${workDate}T${time}:00+07:00`);
 }
 
-function addMinutes(date: Date, minutes: number) {
-  return new Date(date.getTime() + minutes * 60 * 1000);
-}
-
 function timeLabel(date: Date) {
   return new Intl.DateTimeFormat("th-TH", {
     timeZone: "Asia/Bangkok",
@@ -108,7 +104,10 @@ function bangkokTimeParts(date: Date) {
 export function isWithinWorkflowWorkHours(now = new Date()) {
   const { hour, minute } = bangkokTimeParts(now);
   const totalMinutes = hour * 60 + minute;
-  return totalMinutes >= 9 * 60 && totalMinutes < 23 * 60;
+  // 09:00–23:59 Bangkok. The closing (กะ2) checklist window now runs to 23:59, so writes
+  // must stay allowed right up to end-of-day; earlier this capped at 23:00 and locked the
+  // last hour of closing. (ใบงาน fnpHvruMlF4Vvg7UvJUQ — ปรับเวลา checklist บางแค)
+  return totalMinutes >= 9 * 60 && totalMinutes < 24 * 60;
 }
 
 function bangkokWeekday(workDate: string) {
@@ -128,82 +127,53 @@ export function isFlexibleWorkflowPhase(phaseId: string) {
   return phaseId === "stock-work" || phaseId === "daytime-work" || phaseId === "guild-chat-exp";
 }
 
-/** Shift 1 (opening) works its checklist within this many hours of clocking in. */
-export const SHIFT1_WORK_WINDOW_HOURS = 4;
-
 /**
- * Shift context for schedule resolution. When a staffer is on shift 1 (opening), the
- * checklist "actual working time" is counted from their real shift-entry time + 4h — a
- * staff suggestion (ticket MHQqvwhhtpARNEcuecfj) — instead of the fixed store-open hours,
- * because opening staff clock in well before the store opens to customers.
+ * Shift context for schedule resolution. Kept for backwards-compatible call sites — the
+ * บางแค branch now runs FIXED checklist windows (below) that don't vary by clock-in time,
+ * so this no longer changes the window, but the type is still threaded through the
+ * past-due / auto-miss helpers.
  */
 export type ShiftScheduleContext = { shift?: "s1" | "s2" | null; shiftStart?: string | null };
 
-function isValidHhMm(value: string): boolean {
-  return /^\d{1,2}:\d{2}$/.test(value);
-}
+/**
+ * Fixed checklist windows for the บางแค branch (the only branch today), Asia/Bangkok,
+ * applied every day (no weekday/weekend split) — sized to the real on-floor shift reality
+ * so staff finish within the window and never lock out too early
+ * (ใบงาน fnpHvruMlF4Vvg7UvJUQ — ปรับเวลาการทำ checklist):
+ *   กะ1 เปิดร้าน + Stock                         : 09:00–13:00
+ *   กะ1 หลังเปิดร้าน (แชท/Exp ค้าง, จัดส่งสินค้า) : ทำได้หลังส่งงานเปิดร้าน+stock ถึง 20:00
+ *   กะ2 ปิดร้าน                                   : 19:00–23:59
+ *
+ * open-store / close-store are non-flexible (auto-miss + lock at the end time); the
+ * after-open phases are flexible (stay editable past due, just flagged late), so the
+ * "ทำได้หลังส่งงานเปิดร้าน" ordering is enforced by phase sequencing, not the clock.
+ */
+const CHECKLIST_WINDOWS: Record<string, { start: string; end: string }> = {
+  "open-store": { start: "09:00", end: "13:00" },
+  "stock-work": { start: "09:00", end: "13:00" },
+  "guild-chat-exp": { start: "09:00", end: "20:00" },
+  "daytime-work": { start: "09:00", end: "20:00" },
+  "close-store": { start: "19:00", end: "23:59" }
+};
+
+const DEFAULT_CHECKLIST_WINDOW = { start: "09:00", end: "20:00" };
 
 export function phaseScheduleForWorkDate(
   phaseId: string,
   workDate: string,
-  context?: ShiftScheduleContext
+  _context?: ShiftScheduleContext
 ) {
-  const hours = storeHoursForWorkDate(workDate);
-  const openAt = bangkokDateAt(workDate, hours.open);
-  const closeAt = bangkokDateAt(workDate, hours.close);
-  const closeStartAt = addMinutes(closeAt, -60);
-
-  // Opening prep starts 30 min before the store opens, but the checklist must stay
-  // tickable while the opener actually works — not lock the instant the store opens.
-  // When we can't resolve the staffer's shift (blank roster / staffCode not in the
-  // planner / shift fetch failed) we fall back here, so the window has to be forgiving:
-  // give the same clock-in + 4h working span the shift-1 path grants, capped before the
-  // closing window. Previously this ended exactly at store-open, so any opener who ticked
-  // even a minute after open was permanently locked out — "กดติ๊กไม่ได้". (ticket 9XEZ…)
-  const openStoreEndAt = new Date(
-    Math.min(addMinutes(openAt, SHIFT1_WORK_WINDOW_HOURS * 60).getTime(), closeStartAt.getTime())
-  );
-
-  // Shift-1 override: window = [เวลาเข้ากะ, เวลาเข้ากะ + 4h] for every phase the opener does.
-  if (context?.shift === "s1" && context.shiftStart && isValidHhMm(context.shiftStart)) {
-    const startAt = bangkokDateAt(workDate, context.shiftStart);
-    // The opener's window is clock-in + 4h, but it must NEVER expire before the store's own
-    // opening window does. The shift entry-time options (09:00 / 11:00) — and the 09:00
-    // auto-plan default — are weekend-shaped (store opens 09:30). On a weekday the store
-    // opens 15:00, so a blank-roster opener carrying the 09:00 default would see this window
-    // close at 13:00 — two hours BEFORE the store even opens — and be locked out of the
-    // whole open-store checklist the moment they arrive. Floor the end at the store-hours
-    // open-store end so the opener always has a live window while the store is opening.
-    // (ticket ALEara1vixtGml8Z09lb — "เปิดร้าน...ล็อคก่อนกำหนด ส่งงานไม่ได้")
-    const endAt = new Date(
-      Math.max(addMinutes(startAt, SHIFT1_WORK_WINDOW_HOURS * 60).getTime(), openStoreEndAt.getTime())
-    );
-    return {
-      startAt: startAt.toISOString(),
-      endAt: endAt.toISOString(),
-      dueAt: endAt.toISOString(),
-      startLabel: timeLabel(startAt),
-      endLabel: timeLabel(endAt),
-      dueMinutes: Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60000))
-    };
-  }
-
-  const schedule =
-    phaseId === "open-store"
-      ? { startAt: addMinutes(openAt, -30), endAt: openStoreEndAt }
-      : phaseId === "close-store"
-        ? { startAt: closeStartAt, endAt: closeAt }
-        : isFlexibleWorkflowPhase(phaseId)
-          ? { startAt: openAt, endAt: closeAt }
-          : { startAt: openAt, endAt: closeStartAt };
+  const window = CHECKLIST_WINDOWS[phaseId] ?? DEFAULT_CHECKLIST_WINDOW;
+  const startAt = bangkokDateAt(workDate, window.start);
+  const endAt = bangkokDateAt(workDate, window.end);
 
   return {
-    startAt: schedule.startAt.toISOString(),
-    endAt: schedule.endAt.toISOString(),
-    dueAt: schedule.endAt.toISOString(),
-    startLabel: timeLabel(schedule.startAt),
-    endLabel: timeLabel(schedule.endAt),
-    dueMinutes: Math.max(0, Math.round((schedule.endAt.getTime() - schedule.startAt.getTime()) / 60000))
+    startAt: startAt.toISOString(),
+    endAt: endAt.toISOString(),
+    dueAt: endAt.toISOString(),
+    startLabel: timeLabel(startAt),
+    endLabel: timeLabel(endAt),
+    dueMinutes: Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60000))
   };
 }
 

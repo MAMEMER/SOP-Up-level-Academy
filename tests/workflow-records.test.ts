@@ -134,90 +134,58 @@ describe("workflow daily records", () => {
     assert.equal(summary.completionRate, 100);
   });
 
-  it("uses Bang Khae store hours for weekday and weekend phase windows", () => {
-    const weekdayOpen = phaseScheduleForWorkDate("open-store", "2026-07-06");
-    const weekdayStock = phaseScheduleForWorkDate("stock-work", "2026-07-06");
-    const weekdayShipping = phaseScheduleForWorkDate("daytime-work", "2026-07-06");
-    const weekendClose = phaseScheduleForWorkDate("close-store", "2026-07-05");
+  it("uses the fixed Bang Khae checklist windows every day (ใบงาน fnpHvruMlF4Vvg7UvJUQ)", () => {
+    // Fixed windows now, same on weekday and weekend:
+    //   กะ1 เปิดร้าน + Stock : 09:00–13:00
+    //   กะ1 หลังเปิดร้าน (แชท/Exp ค้าง, จัดส่งสินค้า) : 09:00–20:00
+    //   กะ2 ปิดร้าน : 19:00–23:59
+    for (const workDate of ["2026-07-06" /* Mon */, "2026-07-05" /* Sun */]) {
+      const open = phaseScheduleForWorkDate("open-store", workDate);
+      const stock = phaseScheduleForWorkDate("stock-work", workDate);
+      const chat = phaseScheduleForWorkDate("guild-chat-exp", workDate);
+      const shipping = phaseScheduleForWorkDate("daytime-work", workDate);
+      const close = phaseScheduleForWorkDate("close-store", workDate);
 
-    // Opening prep still starts 30 min before open, but the fallback window (shift
-    // unknown) now runs 4h past open so an opener isn't locked the instant the store
-    // opens — weekday open 15:00 → window 14:30–19:00 (ticket 9XEZ… "กดติ๊กไม่ได้").
-    assert.equal(weekdayOpen.startLabel, "14:30");
-    assert.equal(weekdayOpen.endLabel, "19:00");
-    assert.equal(weekdayOpen.dueMinutes, 270);
-    assert.equal(weekdayStock.startLabel, "15:00");
-    assert.equal(weekdayStock.endLabel, "22:00");
-    assert.equal(weekdayShipping.startLabel, "15:00");
-    assert.equal(weekdayShipping.endLabel, "22:00");
-    assert.equal(weekendClose.startLabel, "19:30");
-    assert.equal(weekendClose.endLabel, "20:30");
-    assert.equal(weekendClose.dueMinutes, 60);
-    // Due now at 19:00 Bangkok = 12:00 UTC, not the old 15:00/08:00 boundary.
-    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T11:59:00.000Z")), false);
-    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T12:01:00.000Z")), true);
+      assert.equal(open.startLabel, "09:00");
+      assert.equal(open.endLabel, "13:00");
+      assert.equal(open.dueMinutes, 240);
+      assert.equal(stock.startLabel, "09:00");
+      assert.equal(stock.endLabel, "13:00");
+      assert.equal(chat.startLabel, "09:00");
+      assert.equal(chat.endLabel, "20:00");
+      assert.equal(shipping.startLabel, "09:00");
+      assert.equal(shipping.endLabel, "20:00");
+      assert.equal(close.startLabel, "19:00");
+      assert.equal(close.endLabel, "23:59");
+      assert.equal(close.dueMinutes, 299);
+    }
+
+    // open-store now due at 13:00 Bangkok = 06:00 UTC.
+    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T05:59:00.000Z")), false);
+    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T06:01:00.000Z")), true);
+    // close-store now due at 23:59 Bangkok = 16:59 UTC.
+    assert.equal(isPhasePastDue("close-store", "2026-07-06", new Date("2026-07-06T16:58:00.000Z")), false);
+    assert.equal(isPhasePastDue("close-store", "2026-07-06", new Date("2026-07-06T16:59:30.000Z")), true);
   });
 
-  it("counts shift-1 checklist window from clock-in + 4h instead of store hours", () => {
-    // Ticket MHQqvwhhtpARNEcuecfj: on a weekend (store opens 09:30) an opener who enters at
-    // 11:00 gets a tight clock-in + 4h window → 11:00–15:00 (Bangkok). 2026-07-05 = Sunday.
-    const s1At11 = phaseScheduleForWorkDate("open-store", "2026-07-05", { shift: "s1", shiftStart: "11:00" });
-    assert.equal(s1At11.startLabel, "11:00");
-    assert.equal(s1At11.endLabel, "15:00");
-    assert.equal(s1At11.dueMinutes, 240);
-
-    // The clock-in window covers every phase the opener sees, not just open-store.
-    const s1Stock = phaseScheduleForWorkDate("stock-work", "2026-07-05", { shift: "s1", shiftStart: "11:00" });
-    assert.equal(s1Stock.startLabel, "11:00");
-    assert.equal(s1Stock.endLabel, "15:00");
+  it("keeps the fixed window regardless of shift context", () => {
+    // The windows no longer vary by clock-in time — shift context is accepted but ignored.
+    const base = phaseScheduleForWorkDate("open-store", "2026-07-06");
+    const s1At11 = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s1", shiftStart: "11:00" });
+    const s2 = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s2", shiftStart: "13:00" });
+    assert.equal(s1At11.startLabel, base.startLabel);
+    assert.equal(s1At11.endLabel, base.endLabel);
+    assert.equal(s2.endLabel, base.endLabel);
+    assert.equal(base.startLabel, "09:00");
+    assert.equal(base.endLabel, "13:00");
   });
 
-  it("never expires the shift-1 opener window before the store's own opening window (ticket ALEara1vixtGml8Z09lb)", () => {
-    // Root cause: the shift entry-time options (09:00 / 11:00) and the auto-plan default of
-    // 09:00 are weekend-shaped. On a WEEKDAY the store opens 15:00, so a blank-roster opener
-    // carrying the 09:00 default previously got a window that closed at 13:00 — two hours
-    // BEFORE the store even opens — locking them out of the whole open-store checklist the
-    // moment they arrived ("เปิดร้าน...ล็อคก่อนกำหนด ส่งงานไม่ได้"). The window end is now
-    // floored at the store-hours open-store end (weekday 19:00). 2026-07-06 = Monday.
-    const s1At9Weekday = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s1", shiftStart: "09:00" });
-    assert.equal(s1At9Weekday.startLabel, "09:00");
-    assert.equal(s1At9Weekday.endLabel, "19:00");
-
-    // The opener arriving at store-open (15:00 Bangkok = 08:00 UTC) is NOT past due anymore.
-    assert.equal(
-      isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T08:00:00.000Z"), { shift: "s1", shiftStart: "09:00" }),
-      false
-    );
-    // It only closes at the store-hours open-store end (19:00 Bangkok = 12:00 UTC).
-    assert.equal(
-      isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T11:59:00.000Z"), { shift: "s1", shiftStart: "09:00" }),
-      false
-    );
-    assert.equal(
-      isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T12:01:00.000Z"), { shift: "s1", shiftStart: "09:00" }),
-      true
-    );
-
-    // On a weekend the tight clock-in window is preserved: a late-morning entry keeps its
-    // full 4h span (floor only lifts an end that would fall before the store opens).
-    const s1At11Weekend = phaseScheduleForWorkDate("open-store", "2026-07-05", { shift: "s1", shiftStart: "11:00" });
-    assert.equal(s1At11Weekend.endLabel, "15:00");
-
-    // Shift 2 and admin (no shift context) use the store-hours fallback: opening prep
-    // from 14:30, tickable through the 4h opener window to 19:00.
-    const s2Unchanged = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s2", shiftStart: "13:00" });
-    assert.equal(s2Unchanged.startLabel, "14:30");
-    assert.equal(s2Unchanged.endLabel, "19:00");
-    const noContext = phaseScheduleForWorkDate("open-store", "2026-07-06");
-    assert.equal(noContext.startLabel, "14:30");
-    assert.equal(noContext.endLabel, "19:00");
-  });
-
-  it("allows workflow work only from 09:00 to 23:00 Bangkok time", () => {
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T01:59:00.000Z")), false);
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T02:00:00.000Z")), true);
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T15:59:00.000Z")), true);
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T16:00:00.000Z")), false);
+  it("allows workflow work from 09:00 to 23:59 Bangkok time", () => {
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T01:59:00.000Z")), false); // 08:59
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T02:00:00.000Z")), true); // 09:00
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T15:59:00.000Z")), true); // 22:59
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T16:59:00.000Z")), true); // 23:59
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T17:00:00.000Z")), false); // 00:00
   });
 
   it("keeps stock and shipping editable after time instead of auto-missing them", () => {
@@ -355,11 +323,13 @@ describe("workflow daily records", () => {
 
   it("maps workflow records to white, green, orange, red, and purple visual states", () => {
     assert.equal(
-      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T07:40:00.000Z")),
+      // 05:40 UTC = 12:40 Bangkok — still inside the open-store window (09:00–13:00).
+      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T05:40:00.000Z")),
       "white"
     );
     assert.equal(
-      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T12:01:00.000Z")),
+      // 06:01 UTC = 13:01 Bangkok — past the 13:00 due, unstarted → red.
+      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T06:01:00.000Z")),
       "red"
     );
 
