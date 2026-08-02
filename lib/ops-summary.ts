@@ -7,7 +7,7 @@ import { cardStoreWorkflow } from "./card-store-workflow.ts";
 import { fetchAssignmentsForDate, fetchOpenHandoffs, type WorkAssignment, type WorkHandoff } from "./work-assignments-store.ts";
 import { customerServiceRecordsForDate, type CustomerServiceRecord } from "./performance-service-records.ts";
 import { monthlyTasks } from "./monthly-event-tasks.ts";
-import { weeklyEvents } from "./weekly-event-tasks.ts";
+import { weeklyEventsActiveOn } from "./weekly-event-tasks.ts";
 import { employeeDirectory, employeeCodeForEmail } from "./employee-directory.ts";
 import { fetchPerformanceDailyStore } from "./performance-daily-store.ts";
 import { fetchShiftAssignmentsForDate } from "./shift-plan-server.ts";
@@ -134,7 +134,11 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
 
   const stockDoc = weekDocs.find((doc) => doc.scopeKey === weeklyScopeKey(periodKey));
   const eventDoc = weekDocs.find((doc) => doc.scopeKey === `${weeklyScopeKey(periodKey)}-event`);
-  const eventTotal = weeklyEvents.reduce((sum, event) => sum + event.checklist.length, 0);
+  // นับเฉพาะกิจกรรมที่ "ถึงกำหนดจริง" ในวันนี้ (ตาม activeDays) — วันที่ไม่มีกิจกรรมของเกมไหน
+  // จะไม่ถูกนับรวมในตัวหาร มิฉะนั้น owner board จะโชว์ X/24 ทุกวันทั้งที่วันนั้นจัดแค่ 1-2 เกม
+  // (ตรงกับหลักการ ticket: ระบบต้องทำงานตามวันที่มีกิจกรรมจริงเท่านั้น)
+  const activeEvents = weeklyEventsActiveOn(workDate);
+  const eventTotal = activeEvents.reduce((sum, event) => sum + event.checklist.length, 0);
 
   const monthStates = (monthDocs[0]?.data?.states || {}) as Record<string, string>;
   const monthValues = Object.values(monthStates);
