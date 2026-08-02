@@ -177,7 +177,11 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
             </li>
             <li>
               <strong>งานวันกิจกรรม</strong>
-              <small>ติ๊กแล้ว {weekly.eventTicks}/{weekly.eventTotal} ข้อ</small>
+              <small>
+                {weekly.eventTotal > 0
+                  ? `ติ๊กแล้ว ${weekly.eventTicks}/${weekly.eventTotal} ข้อ`
+                  : "วันนี้ไม่มีกิจกรรม"}
+              </small>
             </li>
           </ul>
           <Link href="/checklist-weekly" className="owner-ops__link">เปิด checklist สัปดาห์ →</Link>
