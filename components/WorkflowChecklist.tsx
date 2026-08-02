@@ -922,6 +922,19 @@ export function WorkflowChecklist({
   const locked = readOnly || !loaded;
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
 
+  // The ordered routine (open → … → close) only makes sense for a rostered shift. When we
+  // can't resolve one — no roster entry for the day (e.g. a Sunday nobody planned) or an
+  // email that isn't in the staff directory — the checklist falls back to showing every
+  // phase, and the sequential gate then hard-locks the worker out of their actual task: an
+  // ad-hoc staffer who came in to tick "ติดป้ายราคา" (stock-work) could never reach it,
+  // because the opening phases they don't own were never submitted. Closing the browser
+  // didn't help because the lock is state-, not session-, based. Unrostered / unknown ⇒
+  // let them tick any phase freely; rostered staff keep the ordered flow. (ticket iyZn2W…)
+  const sequencingActive = shift !== null;
+  function phaseUnlocked(phaseId: string) {
+    return sequencingActive ? isPhaseUnlocked(phaseId, workDate, records, visiblePhaseIds) : true;
+  }
+
   function updateRecords(next: WorkflowDailyRecord[]) {
     update((previous) => ({ ...previous, records: next }));
   }
@@ -1046,7 +1059,7 @@ export function WorkflowChecklist({
     const record = todayRecords.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
     if (isPhasePastDue(phase.id, workDate, now, shiftContext) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
-    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !phaseUnlocked(phase.id)) return;
 
     const next = { ...checked, [key]: !checked[key] };
     const noOrderKey = noOrderKeyForPhase(phase);
@@ -1088,7 +1101,7 @@ export function WorkflowChecklist({
     const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
     if (isPhasePastDue(phase.id, workDate, now, shiftContext) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
-    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !phaseUnlocked(phase.id)) return;
 
     updateDetail("closing-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
     if (isNoOrder) {
@@ -1110,7 +1123,7 @@ export function WorkflowChecklist({
     const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
     if (!isWithinWorkflowWorkHours(now)) return;
     if (isPhasePastDue(phase.id, workDate, now, shiftContext) && !isFlexibleWorkflowPhase(phase.id) && !isAdmin) return;
-    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds)) return;
+    if (!canEditWorkflowRecord(record, { adminOverride: isAdmin }) || !phaseUnlocked(phase.id)) return;
 
     updateDetail("shipping-no-order", isNoOrder ? "ไม่มีออเดอร์" : "");
     if (isNoOrder) {
@@ -1211,7 +1224,7 @@ export function WorkflowChecklist({
           const done = completedCountForPhase(phase, checked);
           const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
           const isSubmitted = record?.status === "submitted";
-          const unlocked = isPhaseUnlocked(phase.id, workDate, records, visiblePhaseIds);
+          const unlocked = phaseUnlocked(phase.id);
           const isExpired = !isSubmitted && isPhasePastDue(phase.id, workDate, now, shiftContext);
           const adminUnlocked = Boolean(record?.adminUnlockedAt);
           const flexible = isFlexibleWorkflowPhase(phase.id);
