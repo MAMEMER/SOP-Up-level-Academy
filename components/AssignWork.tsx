@@ -34,6 +34,9 @@ export function AssignWork({
   const [selectedCodes, setSelectedCodes] = useState<string[]>(staff[0] ? [staff[0].code] : []);
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
+  const [location, setLocation] = useState("");
+  const [expectedResult, setExpectedResult] = useState("");
+  const [dueTime, setDueTime] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   const [attachLink, setAttachLink] = useState("");
@@ -115,6 +118,9 @@ export function AssignWork({
           staffCode,
           title: title.trim(),
           detail: detail.trim() || undefined,
+          location: location.trim() || undefined,
+          expectedResult: expectedResult.trim() || undefined,
+          dueTime: dueTime.trim() || undefined,
           attachments: attachments.length ? attachments : undefined,
           trackingNumber: trackingNumber.trim() || undefined,
           assignedBy,
@@ -123,6 +129,9 @@ export function AssignWork({
       }
       setTitle("");
       setDetail("");
+      setLocation("");
+      setExpectedResult("");
+      setDueTime("");
       setTrackingNumber("");
       setAttachments([]);
       setAttachLink("");
@@ -157,31 +166,75 @@ export function AssignWork({
     <div className="assign-work">
       <section className="assign-work__form soft-card">
         <p className="assign-work__label">มอบหมายงานใหม่</p>
-        <div className="assign-work__row">
-          <label>
-            วันที่
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
-        </div>
-        <div className="assign-work__staff-pick">
-          <span className="assign-work__pick-label">พนักงาน (เลือกได้หลายคน = มอบเป็นทีม)</span>
-          <div className="assign-work__chips">
-            {staff.map((s) => (
-              <label key={s.code} className={selectedCodes.includes(s.code) ? "assign-work__chip is-on" : "assign-work__chip"}>
-                <input type="checkbox" checked={selectedCodes.includes(s.code)} onChange={() => toggleCode(s.code)} />
-                {s.displayName} ({s.employmentType === "full_time" ? "Full" : "Part"})
-              </label>
-            ))}
+        <p className="assign-work__hint-lead">
+          กรอกให้ครบ 5 ข้อ พนักงานจะเข้าใจทันทีว่า <strong>หน้าที่ใคร · ต้องทำอะไร · ที่ไหน · ส่งผลลัพธ์แบบไหน · เสร็จเมื่อไหร่</strong>
+        </p>
+
+        {/* 1. หน้าที่ใคร — ผู้รับผิดชอบ */}
+        <div className="assign-work__field">
+          <span className="assign-work__field-label">1. ผู้รับผิดชอบ <span className="assign-work__req">*</span> — ใครเป็นเจ้าของงานนี้</span>
+          <div className="assign-work__staff-pick">
+            <span className="assign-work__pick-label">พนักงาน (เลือกได้หลายคน = มอบเป็นทีม)</span>
+            <div className="assign-work__chips">
+              {staff.map((s) => (
+                <label key={s.code} className={selectedCodes.includes(s.code) ? "assign-work__chip is-on" : "assign-work__chip"}>
+                  <input type="checkbox" checked={selectedCodes.includes(s.code)} onChange={() => toggleCode(s.code)} />
+                  {s.displayName} ({s.employmentType === "full_time" ? "Full" : "Part"})
+                </label>
+              ))}
+            </div>
           </div>
         </div>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="งาน เช่น ส่งเสื้อให้ลูกค้าคุณ A" />
-        <textarea
-          className="assign-work__detail"
-          value={detail}
-          onChange={(e) => setDetail(e.target.value)}
-          placeholder="กรอกรายละเอียดงาน เช่น ที่อยู่จัดส่ง / จำนวน / ขนาด / หมายเหตุ (ถ้ามี)"
-          rows={4}
-        />
+
+        {/* 2. ต้องทำอะไร — ชื่องาน + รายละเอียด */}
+        <div className="assign-work__field">
+          <span className="assign-work__field-label">2. ต้องทำอะไร <span className="assign-work__req">*</span></span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ชื่องานสั้นๆ เช่น ส่งเสื้อให้ลูกค้าคุณ A" />
+          <textarea
+            className="assign-work__detail"
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            placeholder="รายละเอียด/ขั้นตอน เช่น จำนวน / ขนาด / วิธีทำ / หมายเหตุ (ถ้ามี)"
+            rows={3}
+          />
+        </div>
+
+        {/* 3. ที่ไหน — สถานที่ */}
+        <div className="assign-work__field">
+          <span className="assign-work__field-label">3. ที่ไหน</span>
+          <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="สถานที่/โซน/ที่อยู่จัดส่ง เช่น หน้าร้าน · สโตร์ชั้น 2 · ส่งไปรษณีย์สาขาบางแค"
+          />
+        </div>
+
+        {/* 4. ส่งผลลัพธ์แบบไหน — definition of done */}
+        <div className="assign-work__field">
+          <span className="assign-work__field-label">4. ส่งผลลัพธ์แบบไหน (งานเสร็จหน้าตาเป็นยังไง + ต้องแนบหลักฐานอะไร)</span>
+          <textarea
+            className="assign-work__detail"
+            value={expectedResult}
+            onChange={(e) => setExpectedResult(e.target.value)}
+            placeholder="เช่น แพ็กเรียบร้อย + ถ่ายรูปกล่อง 1 รูป · ได้เลขพัสดุ · ตอบแชทลูกค้าแล้วแคปหน้าจอ"
+            rows={2}
+          />
+        </div>
+
+        {/* 5. เสร็จเมื่อไหร่ — กำหนดวัน + เวลา */}
+        <div className="assign-work__field">
+          <span className="assign-work__field-label">5. ต้องสำเร็จเมื่อไหร่ <span className="assign-work__req">*</span></span>
+          <div className="assign-work__due-row">
+            <label>
+              วันที่
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+            <label>
+              ภายในเวลา (ถ้ามี)
+              <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+            </label>
+          </div>
+        </div>
 
         <label className="assign-work__tracking">
           เลขแทค / เลขพัสดุ ส่งสินค้า (ถ้ามี)
@@ -251,9 +304,12 @@ export function AssignWork({
                   <div className="assign-work__item-main">
                     <strong>{row.title}</strong>
                     <em>
-                      {displayNameFor(row.staffCode)}
-                      {row.detail ? ` · ${row.detail}` : ""}
+                      👤 {displayNameFor(row.staffCode)}
+                      {row.dueTime ? ` · ⏰ ภายใน ${row.dueTime}` : ""}
                     </em>
+                    {row.detail ? <em>📝 {row.detail}</em> : null}
+                    {row.location ? <em>📍 ที่ไหน: {row.location}</em> : null}
+                    {row.expectedResult ? <em>✅ ผลลัพธ์: {row.expectedResult}</em> : null}
                     {row.trackingNumber ? <em>เลขแทค/พัสดุ: {row.trackingNumber}</em> : null}
                     {row.attachments?.length ? (
                       <em>

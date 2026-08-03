@@ -4360,6 +4360,24 @@ main .page > section, main > section { margin-top: 16px !important; }
 .assign-work__chip.is-on { background: linear-gradient(135deg, var(--color-orange), var(--color-sun)); color: #fff; border-color: transparent; }
 .assign-work__chip input { accent-color: var(--color-orange); }
 
+/* ── Assign clarity: 5-field guided form (ticket McMb5SCrbKBp24VZN1vu) ─────── */
+.assign-work__hint-lead { font-size: 12.5px; color: var(--color-ink-soft); margin: -2px 0 6px; line-height: 1.5; }
+.assign-work__hint-lead strong { color: var(--color-orange); }
+.assign-work__field { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid rgba(255,199,142,0.35); border-radius: 12px; background: rgba(255,140,66,0.03); }
+.assign-work__field-label { font-size: 12.5px; font-weight: 700; color: var(--color-ink); }
+.assign-work__req { color: #b0343f; }
+.assign-work__due-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.assign-work__due-row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); flex: 1; min-width: 130px; }
+
+/* ── Assign clarity: staff-facing responsibility banner + spec list ────────── */
+.assignment-detail__responsibility { font-size: 13.5px; line-height: 1.5; color: #8a4a1f; background: rgba(255,199,142,0.22); border: 1px solid rgba(255,140,66,0.4); border-left: 4px solid var(--color-orange); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; }
+.assignment-detail__spec { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.assignment-detail__spec > div { display: grid; grid-template-columns: 130px 1fr; gap: 10px; align-items: start; }
+.assignment-detail__spec dt { font-size: 12.5px; font-weight: 700; color: var(--color-ink-soft); margin: 0; }
+.assignment-detail__spec dd { margin: 0; font-size: 14px; color: var(--color-ink); white-space: pre-line; }
+.assignment-detail__spec dd strong { display: block; }
+@media (max-width: 520px) { .assignment-detail__spec > div { grid-template-columns: 1fr; gap: 2px; } }
+
 /* ── Staff review (owner "มุมมองพนักงาน") ─────────────────────────────────── */
 .staff-review__controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .staff-review__controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); }
