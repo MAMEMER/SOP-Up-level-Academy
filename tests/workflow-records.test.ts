@@ -180,6 +180,22 @@ describe("workflow daily records", () => {
     assert.equal(base.endLabel, "13:00");
   });
 
+  it("moves the Stock window to the evening for กะ2 (ใบงาน TnkYKc7ha4Go07Az8m74)", () => {
+    // Stock is shared by both shifts. กะ1 counts in the morning (09:00–13:00); กะ2 counts
+    // at closing (19:00–23:00). Only the s2 Stock window shifts — other phases are unchanged.
+    const s1Stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", { shift: "s1", shiftStart: "09:00" });
+    const s2Stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", { shift: "s2", shiftStart: "19:00" });
+    assert.equal(s1Stock.startLabel, "09:00");
+    assert.equal(s1Stock.endLabel, "13:00");
+    assert.equal(s2Stock.startLabel, "19:00");
+    assert.equal(s2Stock.endLabel, "23:00");
+
+    // Non-stock phases keep their shared window even for s2 (only Stock was overridden).
+    const s2Chat = phaseScheduleForWorkDate("guild-chat-exp", "2026-07-06", { shift: "s2", shiftStart: "19:00" });
+    assert.equal(s2Chat.startLabel, "09:00");
+    assert.equal(s2Chat.endLabel, "20:00");
+  });
+
   it("allows workflow work from 09:00 to 23:59 Bangkok time", () => {
     assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T01:59:00.000Z")), false); // 08:59
     assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T02:00:00.000Z")), true); // 09:00
