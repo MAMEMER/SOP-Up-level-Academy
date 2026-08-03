@@ -142,6 +142,7 @@ export type ShiftScheduleContext = { shift?: "s1" | "s2" | null; shiftStart?: st
  * (ใบงาน fnpHvruMlF4Vvg7UvJUQ — ปรับเวลาการทำ checklist):
  *   กะ1 เปิดร้าน + Stock                         : 09:00–13:00
  *   กะ1 หลังเปิดร้าน (แชท/Exp ค้าง, จัดส่งสินค้า) : ทำได้หลังส่งงานเปิดร้าน+stock ถึง 20:00
+ *   กะ2 นับ Stock                                : 19:00–23:00
  *   กะ2 ปิดร้าน                                   : 19:00–23:59
  *
  * open-store / close-store are non-flexible (auto-miss + lock at the end time); the
@@ -156,14 +157,25 @@ const CHECKLIST_WINDOWS: Record<string, { start: string; end: string }> = {
   "close-store": { start: "19:00", end: "23:59" }
 };
 
+/**
+ * Shift-2 (closing) overrides. The Stock phase is shared by both shifts, but กะ2 counts
+ * stock during the evening, not the morning — so for s2 its window is 19:00–23:00 instead
+ * of the daytime 09:00–13:00 (ใบงาน TnkYKc7ha4Go07Az8m74 — เวลาการนับ stock ของกะ2).
+ * Phases not listed here fall back to the shared CHECKLIST_WINDOWS.
+ */
+const SHIFT2_CHECKLIST_WINDOWS: Record<string, { start: string; end: string }> = {
+  "stock-work": { start: "19:00", end: "23:00" }
+};
+
 const DEFAULT_CHECKLIST_WINDOW = { start: "09:00", end: "20:00" };
 
 export function phaseScheduleForWorkDate(
   phaseId: string,
   workDate: string,
-  _context?: ShiftScheduleContext
+  context?: ShiftScheduleContext
 ) {
-  const window = CHECKLIST_WINDOWS[phaseId] ?? DEFAULT_CHECKLIST_WINDOW;
+  const shift2Window = context?.shift === "s2" ? SHIFT2_CHECKLIST_WINDOWS[phaseId] : undefined;
+  const window = shift2Window ?? CHECKLIST_WINDOWS[phaseId] ?? DEFAULT_CHECKLIST_WINDOW;
   const startAt = bangkokDateAt(workDate, window.start);
   const endAt = bangkokDateAt(workDate, window.end);
 
