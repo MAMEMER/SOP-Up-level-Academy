@@ -410,12 +410,19 @@ export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResu
   return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
-// KPI 21 Jul 2026: assigned work is scored by cumulative deductions from 20 (not an average).
-// early/on-time = no cut; needs revision or 1-day-late = -2; not finished / overdue = -10 + coach.
+// KPI 3 Aug 2026 (ticket 6D3HIfy7): assigned work scored by cumulative deductions from 20.
+// The three "approved / got the points" outcomes cost nothing — owner approval is what
+// credits the point, and it does not have to happen the same day (only the submission must
+// beat the deadline):
+//   - early_quality  เสร็จก่อนกำหนดพร้อมคุณภาพ (owner approved)   -> 0
+//   - on_time        เสร็จตรงเวลา (owner approved)                 -> 0
+//   - needs_revision เสร็จแต่ต้องแก้ไข แล้ว owner approved         -> 0
+// Only late / unfinished submissions are docked:
+//   - late_one_day   ส่งช้ากว่ากำหนดไม่เกิน 1 วัน                  -> -1
+//   - not_finished   ไม่เสร็จ / เกินกำหนด (auto if unsubmitted past deadline) -> -5 + coach
 function assignedWorkItemDeduction(status: AssignedWork["status"]) {
-  if (status === "needs_revision") return 2;
-  if (status === "late_one_day") return 2;
-  if (status === "not_finished") return 10;
+  if (status === "late_one_day") return 1;
+  if (status === "not_finished") return 5;
   return 0;
 }
 
