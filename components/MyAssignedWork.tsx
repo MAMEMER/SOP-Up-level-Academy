@@ -56,9 +56,11 @@ export function MyAssignedWork({
             >
               <span>{String(index + 1).padStart(2, "0")}</span>
               <div>
-                <small>กำหนด {item.workDate}</small>
+                <small>กำหนด {item.workDate}{item.dueTime ? ` · ภายใน ${item.dueTime}` : ""}</small>
                 <strong>{item.title}</strong>
                 <em>{assignmentStatusLabel[item.status]}{item.detail ? ` · ${item.detail}` : ""}</em>
+                {item.location ? <em>📍 {item.location}</em> : null}
+                {item.expectedResult ? <em>✅ {item.expectedResult}</em> : null}
                 {item.status === "needs_revision" && item.revisionNote ? (
                   <em>ต้องแก้: {item.revisionNote}</em>
                 ) : null}

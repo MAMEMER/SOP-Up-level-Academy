@@ -41,7 +41,13 @@ export type WorkAssignment = {
   workDate: string; // YYYY-MM-DD — the day it's due
   staffCode: string; // who it's for
   title: string;
-  detail?: string;
+  detail?: string; // ต้องทำอะไร — รายละเอียดขั้นตอน
+  // Clarity fields (ticket McMb5SCrbKBp24VZN1vu): make an assignment unambiguous
+  // before the staff even starts. Together with staffCode (หน้าที่ใคร) + title (ต้องทำอะไร)
+  // these answer ที่ไหน / ส่งผลลัพธ์แบบไหน / ต้องสำเร็จเมื่อไหร่.
+  location?: string; // ที่ไหน — สถานที่/โซน/ที่อยู่จัดส่ง
+  expectedResult?: string; // ส่งผลลัพธ์แบบไหน — งานเสร็จหน้าตาเป็นยังไง + ต้องแนบหลักฐานอะไร (definition of done)
+  dueTime?: string; // ต้องสำเร็จเมื่อไหร่ — เวลา HH:MM ภายใน workDate (ถ้ามี)
   // Reference material the owner attaches when handing the task out (แนบตอนสั่งงาน) —
   // e.g. รูปสินค้า / ใบปะหน้า / สลิป. Separate from staff-submitted imageEvidence below.
   attachments?: string[]; // ไฟล์/รูปแนบจากเจ้าของร้าน (URL)
@@ -90,6 +96,9 @@ export async function assignWork(input: {
   staffCode: string;
   title: string;
   detail?: string;
+  location?: string;
+  expectedResult?: string;
+  dueTime?: string;
   attachments?: string[];
   trackingNumber?: string;
   assignedBy: string;
@@ -103,6 +112,9 @@ export async function assignWork(input: {
     staffCode: input.staffCode,
     title: input.title,
     ...(input.detail ? { detail: input.detail } : {}),
+    ...(input.location ? { location: input.location } : {}),
+    ...(input.expectedResult ? { expectedResult: input.expectedResult } : {}),
+    ...(input.dueTime ? { dueTime: input.dueTime } : {}),
     ...(input.attachments && input.attachments.length ? { attachments: input.attachments } : {}),
     ...(input.trackingNumber ? { trackingNumber: input.trackingNumber } : {}),
     status: "open",
