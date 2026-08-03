@@ -577,7 +577,7 @@ describe("performance score engine", () => {
     const works = assignedWorkRecordsToWorks(records, undefined, new Date("2026-07-23T17:00:00.000Z"));
     const result = calculateAssignedWorkScore(works.map((item) => item.work));
 
-    assert.equal(result.score, 10);
+    assert.equal(result.score, 15);
     assert.equal(result.deductions[0]?.reason, "not_finished");
     assert.equal(result.flags.includes("coaching_required"), true);
   });
@@ -600,24 +600,24 @@ describe("performance score engine", () => {
     assert.deepEqual(works.map((item) => item.work.status), ["not_finished", "not_finished", "not_finished"]);
   });
 
-  it("deducts 10 for unfinished assigned work and flags coaching", () => {
+  it("deducts 5 for unfinished assigned work and flags coaching", () => {
     const result = calculateAssignedWorkScore([{ title: "ทำคอนเทนต์", status: "not_finished", source: "manual" }]);
 
-    assert.equal(result.score, 10);
+    assert.equal(result.score, 15);
     assert.equal(result.flags.includes("coaching_required"), true);
   });
 
   it("scores assigned work by cumulative deductions across items", () => {
     const result = calculateAssignedWorkScore([
       { title: "งานเสร็จตรงเวลา", status: "on_time", source: "manual" },
-      { title: "งานต้องแก้", status: "needs_revision", source: "manual" },
+      { title: "งานต้องแก้ (approved)", status: "needs_revision", source: "manual" },
       { title: "งานช้า 1 วัน", status: "late_one_day", source: "manual" },
       { title: "งานเสร็จก่อน", status: "early_quality", source: "manual" }
     ]);
 
-    // 0 + 2 + 2 + 0 = 4 deducted
-    assert.equal(result.score, 16);
-    assert.equal(result.deductions.length, 2);
+    // 0 (on_time) + 0 (needs_revision approved) + 1 (late_one_day) + 0 (early_quality) = 1 deducted
+    assert.equal(result.score, 19);
+    assert.equal(result.deductions.length, 1);
   });
 
   it("calculates salary deduction: full time docks 500 per whole point below 50", () => {
