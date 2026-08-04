@@ -15,7 +15,7 @@ import {
 import {
   assignedWorkRecordsForDate,
   customerServiceRecordsForDate,
-  saveAssignedWorkRecord,
+  saveAssignedWorkRecords,
   saveCustomerServiceRecord
 } from "../lib/performance-service-records.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
@@ -60,6 +60,29 @@ function isDateValue(value: string | undefined) {
  */
 function staffOptions() {
   return employeeDirectory.map((entry) => ({ code: entry.code, label: entry.displayName }));
+}
+
+// Collapse records that share a groupId into one line so a task handed to several people
+// (ticket S3JjyiwLxyHLpPn6uOyX) reads as "งานเดียวกัน → คนนั้นคนนี้" instead of N scattered
+// rows. Ungrouped records (single-assignee / legacy team rows) each stay their own group.
+type AssignedRecordForDisplay = { id: string; employeeName: string; title: string; status: string; groupId?: string };
+function groupAssignedRecords<T extends AssignedRecordForDisplay>(records: T[]) {
+  const groups: { key: string; groupId?: string; title: string; status: string; members: T[] }[] = [];
+  const byGroupId = new Map<string, number>();
+  records.forEach((record) => {
+    if (record.groupId) {
+      const idx = byGroupId.get(record.groupId);
+      if (idx !== undefined) {
+        groups[idx].members.push(record);
+        return;
+      }
+      byGroupId.set(record.groupId, groups.length);
+      groups.push({ key: record.groupId, groupId: record.groupId, title: record.title, status: record.status, members: [record] });
+      return;
+    }
+    groups.push({ key: record.id, title: record.title, status: record.status, members: [record] });
+  });
+  return groups;
 }
 
 function resolvePeriod(params: { period?: string; startDate?: string; endDate?: string }): PerformanceReviewPeriod {
@@ -173,14 +196,29 @@ async function saveComplaintServiceAction(formData: FormData) {
   redirect(withInputStatus(redirectTo, inputStatus));
 }
 
+// Sentinel value emitted by the "ทั้งทีมบางแค (ทุกคน)" checkbox in the assigned-work form.
+// When present, the task is handed to every staff member in the picker — but as one record
+// per person (each scored independently), not the legacy single-row team fan-out.
+const ASSIGN_ALL_TEAM = "__ALL_TEAM__";
+
+function resolveAssignEmployees(formData: FormData): string[] {
+  const selected = formData.getAll("employeeName").map((value) => String(value).trim()).filter(Boolean);
+  if (selected.includes(ASSIGN_ALL_TEAM)) {
+    return staffOptions().map((option) => option.code);
+  }
+  return [...new Set(selected)];
+}
+
 async function saveAssignedWorkAction(formData: FormData) {
   "use server";
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
   const title = stringValue(formData, "assignedTitle");
-  if (title) {
-    await saveAssignedWorkRecord({
+  const employeeNames = resolveAssignEmployees(formData);
+  // Same task → one record per selected person, sharing a groupId (ticket S3JjyiwLxyHLpPn6uOyX).
+  if (title && employeeNames.length > 0) {
+    await saveAssignedWorkRecords({
       workDate: stringValue(formData, "assignedDate"),
-      employeeName: stringValue(formData, "employeeName"),
+      employeeNames,
       title,
       status: assignedStatus(stringValue(formData, "assignedStatus")),
       note: stringValue(formData, "assignedNote"),
@@ -369,13 +407,24 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               วันที่
               <input name="assignedDate" type="date" defaultValue={entryDate} />
             </label>
-            <label>
-              พนักงาน
-              <select name="employeeName" defaultValue={staffOptions()[0]?.code}>
-                {staffOptions().map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
-                <option value="ทีม บางแค">ทีม บางแค</option>
-              </select>
-            </label>
+            <fieldset className="assign-multi wide">
+              <legend>พนักงาน (เลือกได้หลายคน = งานเดียวกันมอบหลายคน)</legend>
+              <div className="assign-multi__chips">
+                <label className="assign-multi__chip assign-multi__chip--all">
+                  <input type="checkbox" name="employeeName" value={ASSIGN_ALL_TEAM} />
+                  ทั้งทีมบางแค (ทุกคน)
+                </label>
+                {staffOptions().map((option) => (
+                  <label key={option.code} className="assign-multi__chip">
+                    <input type="checkbox" name="employeeName" value={option.code} />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+              <small className="assign-multi__hint">
+                เลือกหลายคน = สร้างงานเดียวกันให้แต่ละคน (ให้คะแนนแยกรายคน แต่รู้ว่าเป็นงานเดียวกัน)
+              </small>
+            </fieldset>
             <label>
               สถานะ
               <select name="assignedStatus" defaultValue="on_time">
@@ -403,9 +452,17 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
           <div className="performance-daily-records">
             <strong>รายการวันที่ {entryDate}</strong>
             {assignedRecordsForDay.length ? (
-              assignedRecordsForDay.map((record) => (
-                <span key={record.id}>{record.employeeName}: {record.title} / {record.status}</span>
-              ))
+              groupAssignedRecords(assignedRecordsForDay).map((group) =>
+                group.groupId ? (
+                  <span key={group.groupId}>
+                    👥 {group.title}: {group.members.map((m) => displayNameFor(m.employeeName)).join(", ")} / {group.status}
+                  </span>
+                ) : (
+                  <span key={group.members[0].id}>
+                    {displayNameFor(group.members[0].employeeName)}: {group.title} / {group.status}
+                  </span>
+                )
+              )
             ) : (
               <span>ยังไม่มีงานที่มอบหมายวันนี้</span>
             )}

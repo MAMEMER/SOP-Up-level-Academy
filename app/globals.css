@@ -330,6 +330,61 @@
   font-weight: 700;
 }
 
+.performance-input-form fieldset.assign-multi {
+  grid-column: 1 / -1;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+.performance-input-form fieldset.assign-multi legend {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.assign-multi__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assign-multi__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #fff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assign-multi__chip input {
+  min-height: 0;
+  width: auto;
+  accent-color: #111827;
+}
+
+.assign-multi__chip--all {
+  border-color: #111827;
+  background: #f1f5f9;
+}
+
+.assign-multi__hint {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+}
+
 .performance-daily-records {
   display: grid;
   gap: 6px;

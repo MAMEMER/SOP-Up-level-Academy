@@ -35,6 +35,14 @@ export type AssignedWorkRecord = {
   recordedAt: string;
   submittedAt?: string;
   updatedAt?: string;
+  // Multi-assign grouping (ticket S3JjyiwLxyHLpPn6uOyX): when the same task is handed to
+  // several named staff at once, each person still gets their OWN record (so each is scored
+  // independently on how THEY did it) but they share a groupId so the UI can show them as one
+  // task and the owner can tell "งานเดียวกันมอบหลายคน" apart from unrelated same-title records.
+  // Absent on single-assignee records and on legacy "ทีม บางแค" team records.
+  groupId?: string;
+  /** how many staff the shared task was handed to (only set on grouped records) */
+  assigneeCount?: number;
 };
 
 export type AssignedWorkRecordInput = Omit<AssignedWorkRecord, "id" | "recordedAt">;
@@ -78,6 +86,38 @@ export function addAssignedWorkRecord(records: AssignedWorkRecord[], input: Assi
       id: recordId("assigned", input, recordedAt)
     }
   ];
+}
+
+/**
+ * Assign one shared task to several named staff at once (ticket S3JjyiwLxyHLpPn6uOyX).
+ *
+ * Old behaviour forced a choice with no middle ground: either the "ทีม บางแค" sentinel
+ * (which fans out to EVERY Bangkae member and gives them all one identical status) or
+ * re-submitting the form per person (which produced disconnected records the system could
+ * not tell were the same task). This writes one record PER selected person — so each is
+ * scored independently on their own completion — while stamping a shared groupId so the batch
+ * stays recognisable as a single task. A single-name call behaves exactly like the old
+ * addAssignedWorkRecord (no groupId).
+ */
+export function addAssignedWorkRecords(
+  records: AssignedWorkRecord[],
+  input: Omit<AssignedWorkRecordInput, "employeeName" | "groupId" | "assigneeCount"> & { employeeNames: string[] },
+  recordedAt = new Date().toISOString()
+): AssignedWorkRecord[] {
+  const { employeeNames, ...rest } = input;
+  const uniqueNames = [...new Set(employeeNames.map((name) => name.trim()).filter(Boolean))];
+  if (uniqueNames.length === 0) return records;
+  const shared =
+    uniqueNames.length > 1
+      ? {
+          groupId: `agrp-${rest.workDate}-${rest.title}-${recordedAt}`.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 140),
+          assigneeCount: uniqueNames.length
+        }
+      : {};
+  return uniqueNames.reduce(
+    (acc, employeeName) => addAssignedWorkRecord(acc, { ...rest, employeeName, ...shared }, recordedAt),
+    records
+  );
 }
 
 export function customerServiceRecordsForDate(records: CustomerServiceRecord[], workDate: string) {
@@ -194,6 +234,33 @@ export async function saveAssignedWorkRecord(input: AssignedWorkRecordInput) {
     recordedAt: record.recordedAt
   });
   return record;
+}
+
+/**
+ * Persist a shared task assigned to one or more staff (ticket S3JjyiwLxyHLpPn6uOyX).
+ * Writes one Firestore doc per selected person, linked by a shared groupId when >1.
+ */
+export async function saveAssignedWorkRecords(
+  input: Omit<AssignedWorkRecordInput, "employeeName" | "groupId" | "assigneeCount"> & { employeeNames: string[] }
+) {
+  const created = addAssignedWorkRecords([], input);
+  await Promise.all(
+    created.map((record) =>
+      restUpsertDoc(ASSIGNED_COLLECTION, record.id, {
+        id: record.id,
+        workDate: record.workDate,
+        employeeName: record.employeeName,
+        title: record.title,
+        status: record.status,
+        note: record.note,
+        evidence: record.evidence,
+        groupId: record.groupId,
+        assigneeCount: record.assigneeCount,
+        recordedAt: record.recordedAt
+      })
+    )
+  );
+  return created;
 }
 
 export async function updateAssignedWorkRecordSubmission(

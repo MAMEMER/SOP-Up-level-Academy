@@ -28,6 +28,7 @@ import {
 } from "../lib/performance-score-data.ts";
 import {
   addAssignedWorkRecord,
+  addAssignedWorkRecords,
   addCustomerServiceRecord,
   assignedWorkRecordsForDate,
   assignedWorkRecordsToWorks,
@@ -517,6 +518,52 @@ describe("performance score engine", () => {
     assert.equal(works[0].work.status, "not_finished");
   });
 
+  it("assigns one shared task to several staff as linked per-person records (ticket S3Jjyiwx)", () => {
+    const records = addAssignedWorkRecords(
+      [],
+      {
+        workDate: "2026-08-04",
+        employeeNames: ["Boom", "Leo", "ICE"],
+        title: "จัดบูธงาน event",
+        status: "on_time",
+        note: "ช่วยกันเซ็ตบูธ"
+      },
+      "2026-08-04T03:00:00.000Z"
+    );
+
+    // one record per person, each independently scoreable
+    assert.equal(records.length, 3);
+    assert.deepEqual(records.map((r) => r.employeeName).sort(), ["Boom", "ICE", "Leo"]);
+    // all linked by one shared groupId so the system knows it is the same task
+    const groupIds = new Set(records.map((r) => r.groupId));
+    assert.equal(groupIds.size, 1);
+    assert.ok([...groupIds][0]);
+    assert.ok(records.every((r) => r.assigneeCount === 3));
+    // distinct doc ids so no record overwrites another
+    assert.equal(new Set(records.map((r) => r.id)).size, 3);
+
+    // maps into per-employee score input with no team fan-out needed
+    const works = assignedWorkRecordsToWorks(records);
+    assert.equal(works.length, 3);
+    assert.ok(works.every((w) => w.work.title === "จัดบูธงาน event"));
+  });
+
+  it("keeps a single-assignee record ungrouped and dedupes repeated names", () => {
+    const single = addAssignedWorkRecords([], {
+      workDate: "2026-08-04",
+      employeeNames: ["Boom", "Boom"],
+      title: "เติมสต๊อก",
+      status: "on_time",
+      note: ""
+    });
+    assert.equal(single.length, 1);
+    assert.equal(single[0].groupId, undefined);
+    assert.equal(single[0].assigneeCount, undefined);
+
+    // empty selection writes nothing
+    assert.equal(addAssignedWorkRecords([], { workDate: "2026-08-04", employeeNames: [], title: "x", status: "on_time", note: "" }).length, 0);
+  });
+
   it("updates assigned work note, evidence, tracking number, and image names after submission", () => {
     const records = addAssignedWorkRecord([], {
       workDate: "2026-07-23",
@@ -824,7 +871,10 @@ describe("performance score engine", () => {
     assert.equal(source.includes("Assigned work input"), true);
     assert.equal(source.includes("name=\"assignedDate\""), true);
     assert.equal(source.includes("name=\"assignedStatus\""), true);
-    assert.equal(source.includes("value=\"ทีม บางแค\""), true);
+    // Assigned-work picker is now multi-select (same task → several staff, ticket S3Jjyiwx):
+    // checkboxes named "employeeName" plus a "whole team" convenience toggle.
+    assert.equal(source.includes("ทั้งทีมบางแค"), true);
+    assert.equal(source.includes("ASSIGN_ALL_TEAM"), true);
     // the CSV upload/path forms are gone: they wrote to a filesystem Vercel wipes
     assert.equal(source.includes("ไฟล์ CSV ที่ใช้วิเคราะห์"), false);
     assert.equal(source.includes("saveCsvSourcePathAction"), false);
