@@ -2,7 +2,15 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
-import { KPI_RULES_COLLECTION, KPI_RULES_DOC, mergeKpiRules, type KpiCustomRule, type KpiRules, type KpiRulesOverride } from "./kpi-rules.ts";
+import {
+  KPI_RULES_COLLECTION,
+  KPI_RULES_DOC,
+  mergeKpiRules,
+  type IncentiveTierRule,
+  type KpiCustomRule,
+  type KpiRules,
+  type KpiRulesOverride
+} from "./kpi-rules.ts";
 
 // Written with the service account: these numbers decide salary deductions, so they must
 // not be writable with the public client key. A missing/broken doc falls back to the
@@ -84,6 +92,12 @@ export async function saveCustomKpiRule(rule: KpiCustomRule, updatedBy: string):
   const current = (await fetchKpiRulesOverride()) || {};
   const rest = (current.customRules || []).filter((item) => item.id !== rule.id);
   await saveKpiRulesOverride({ ...current, customRules: [...rest, rule] }, updatedBy);
+}
+
+/** Replaces the incentive ladder wholesale — the tiers only make sense as a set. */
+export async function saveIncentiveTiers(tiers: IncentiveTierRule[], updatedBy: string): Promise<void> {
+  const current = (await fetchKpiRulesOverride()) || {};
+  await saveKpiRulesOverride({ ...current, incentive: { tiers } }, updatedBy);
 }
 
 export async function deleteCustomKpiRule(id: string, updatedBy: string): Promise<void> {

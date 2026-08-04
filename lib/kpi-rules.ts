@@ -11,7 +11,13 @@
 export const KPI_RULES_COLLECTION = "sop_kpi_rules";
 export const KPI_RULES_DOC = "default";
 
-export type IncentiveTierRule = { min: number; percent: 0 | 20 | 50 | 80 | 100; label: string };
+export type IncentiveTierRule = {
+  /** คะแนนรวมขั้นต่ำของระดับนี้ */
+  min: number;
+  /** ได้ incentive กี่ % — 0 = ไม่ได้ และติดธง coach */
+  percent: number;
+  label: string;
+};
 
 /**
  * A rule the owner wrote themselves.
@@ -180,8 +186,12 @@ export function mergeKpiRules(override?: KpiRulesOverride | null): KpiRules {
   const tiers = override.incentive?.tiers;
   if (Array.isArray(tiers) && tiers.length) {
     const cleaned = tiers
-      .filter((tier) => isFiniteNumber(tier?.min) && [0, 20, 50, 80, 100].includes(tier?.percent))
-      .map((tier) => ({ min: tier.min, percent: tier.percent, label: String(tier.label || `${tier.min}+`) }))
+      .filter((tier) => isFiniteNumber(tier?.min) && isFiniteNumber(tier?.percent))
+      .map((tier) => ({
+        min: Math.max(0, Math.round(tier.min)),
+        percent: Math.min(100, Math.max(0, Math.round(tier.percent))),
+        label: String(tier.label || "").trim() || `${Math.round(tier.min)} ขึ้นไป`
+      }))
       .sort((left, right) => right.min - left.min);
     if (cleaned.length) merged.incentive = { tiers: cleaned };
   }

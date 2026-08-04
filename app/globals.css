@@ -4408,6 +4408,14 @@ main .page > section, main > section { margin-top: 16px !important; }
 .kpi-rules__row label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--color-ink-soft); }
 .kpi-rules__row input { width: 72px; border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 7px 10px; font-size: 13.5px; font-family: inherit; text-align: right; }
 .kpi-rules__row input:disabled { opacity: 0.6; }
+.kpi-rules__tier { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 8px 0; border-bottom: 1px dashed rgba(255,199,142,0.35); }
+.kpi-rules__tier label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); }
+.kpi-rules__tier input[type="number"] { width: 80px; }
+.kpi-rules__tier input { border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 7px 10px; font-size: 13.5px; font-family: inherit; }
+.kpi-rules__tier-label { flex: 1 1 160px; }
+.kpi-rules__tier-label input { width: 100%; }
+.kpi-rules__tier-remove { flex-direction: row !important; align-items: center; gap: 5px; color: #b0343f; }
+.kpi-rules__rows > button[type="submit"] { align-self: flex-start; border: none; background: var(--color-orange); color: #fff; border-radius: 9px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit; margin-top: 10px; }
 .kpi-rules__hint { font-size: 11.5px; color: var(--color-ink-soft); margin-top: 8px; }
 .kpi-rules__reset { border: 1px solid rgba(176,52,63,0.4); background: transparent; color: #b0343f; border-radius: 9px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit; }
 

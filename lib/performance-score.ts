@@ -113,7 +113,8 @@ export type AssignedWork = {
 
 export type IncentiveTier = {
   label: string;
-  percent: 0 | 20 | 50 | 80 | 100;
+  /** ได้ incentive กี่ % ของเต็ม — ตั้งได้ที่ /admin/kpi-rules */
+  percent: number;
   requiresCoaching: boolean;
 };
 

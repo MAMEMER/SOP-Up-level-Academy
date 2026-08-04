@@ -119,3 +119,38 @@ describe("owner-written rules", () => {
     assert.deepEqual(mergeKpiRules(null).customRules, []);
   });
 });
+
+describe("incentive ladder", () => {
+  it("picks the first tier the score reaches, highest first", () => {
+    const rules = mergeKpiRules({
+      incentive: {
+        tiers: [
+          { min: 0, percent: 0, label: "ต่ำกว่า 70" },
+          { min: 95, percent: 120, label: "95+" },
+          { min: 70, percent: 40, label: "70-94" }
+        ]
+      }
+    });
+
+    // stored sorted high → low, and a % above 100 is clamped
+    assert.deepEqual(rules.incentive.tiers.map((tier) => tier.min), [95, 70, 0]);
+    assert.equal(getIncentiveTier(100, rules).percent, 100);
+    assert.equal(getIncentiveTier(80, rules).percent, 40);
+    assert.equal(getIncentiveTier(69, rules).percent, 0);
+    // a 0% tier is what flags coaching
+    assert.equal(getIncentiveTier(69, rules).requiresCoaching, true);
+    assert.equal(getIncentiveTier(80, rules).requiresCoaching, false);
+  });
+
+  it("keeps the built-in ladder when the override is unusable", () => {
+    const rules = mergeKpiRules({ incentive: { tiers: [{ min: Number.NaN, percent: 50, label: "x" }] } } as never);
+
+    assert.deepEqual(rules.incentive.tiers, defaultKpiRules.incentive.tiers);
+  });
+
+  it("names a tier that was saved without a label", () => {
+    const rules = mergeKpiRules({ incentive: { tiers: [{ min: 42, percent: 30, label: "" }] } });
+
+    assert.equal(rules.incentive.tiers[0].label, "42 ขึ้นไป");
+  });
+});

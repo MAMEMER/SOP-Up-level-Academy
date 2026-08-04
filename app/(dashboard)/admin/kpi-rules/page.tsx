@@ -8,9 +8,10 @@ import {
   fetchKpiRules,
   patchKpiRule,
   resetKpiRulesOverride,
-  saveCustomKpiRule
+  saveCustomKpiRule,
+  saveIncentiveTiers
 } from "../../../../lib/kpi-rules-store.ts";
-import { defaultKpiRules, kpiRuleRows, type KpiCustomRule } from "../../../../lib/kpi-rules.ts";
+import { defaultKpiRules, kpiRuleRows, type IncentiveTierRule, type KpiCustomRule } from "../../../../lib/kpi-rules.ts";
 import { adjustmentCategoryOptions } from "../../../../lib/score-adjustments.ts";
 
 // The live rulebook: how a score is added up today, and the numbers behind it. Everyone on
@@ -100,6 +101,74 @@ async function deleteCustomRuleAction(formData: FormData) {
   back("custom-removed");
 }
 
+/**
+ * The whole ladder saves at once: a tier only means anything relative to the ones around
+ * it, so editing one row in isolation would let the ladder go inconsistent between saves.
+ */
+async function saveIncentiveAction(formData: FormData) {
+  "use server";
+  const user = await requireOwner();
+
+  const mins = formData.getAll("tierMin").map((value) => Number(String(value)));
+  const percents = formData.getAll("tierPercent").map((value) => Number(String(value)));
+  const labels = formData.getAll("tierLabel").map((value) => String(value).trim());
+  const removed = new Set(formData.getAll("removeTier").map((value) => String(value)));
+
+  const tiers: IncentiveTierRule[] = mins
+    .map((min, index) => ({ min, percent: percents[index], label: labels[index], index }))
+    .filter((tier) => !removed.has(String(tier.index)))
+    .filter((tier) => Number.isFinite(tier.min) && Number.isFinite(tier.percent))
+    .map((tier) => ({
+      min: Math.max(0, Math.round(tier.min)),
+      percent: Math.min(100, Math.max(0, Math.round(tier.percent))),
+      label: tier.label || `${Math.round(tier.min)} ขึ้นไป`
+    }))
+    .sort((left, right) => right.min - left.min);
+
+  if (!tiers.length) back("incentive-empty");
+  // Someone has to score below the lowest tier, otherwise a bad month has no landing spot.
+  if (!tiers.some((tier) => tier.min === 0)) back("incentive-no-floor");
+
+  try {
+    await saveIncentiveTiers(tiers, user.actualEmail);
+  } catch {
+    back("error");
+  }
+
+  revalidatePath("/admin/kpi-rules");
+  revalidatePath("/admin/performance-score");
+  revalidatePath("/my-view");
+  back("incentive-saved");
+}
+
+async function addIncentiveTierAction(formData: FormData) {
+  "use server";
+  const user = await requireOwner();
+  const existing = (await fetchKpiRules()).incentive.tiers;
+  const min = Number(stringValue(formData, "newTierMin"));
+  const percent = Number(stringValue(formData, "newTierPercent"));
+  if (!Number.isFinite(min) || !Number.isFinite(percent)) back("incentive-bad-tier");
+
+  const tier: IncentiveTierRule = {
+    min: Math.max(0, Math.round(min)),
+    percent: Math.min(100, Math.max(0, Math.round(percent))),
+    label: stringValue(formData, "newTierLabel") || `${Math.round(min)} ขึ้นไป`
+  };
+
+  try {
+    await saveIncentiveTiers(
+      [...existing.filter((item) => item.min !== tier.min), tier].sort((left, right) => right.min - left.min),
+      user.actualEmail
+    );
+  } catch {
+    back("error");
+  }
+
+  revalidatePath("/admin/kpi-rules");
+  revalidatePath("/admin/performance-score");
+  back("incentive-saved");
+}
+
 async function resetAction() {
   "use server";
   const user = await requireOwner();
@@ -122,6 +191,10 @@ const statusMessages: Record<string, { tone: "success" | "warning"; text: string
   "custom-missing-label": { tone: "warning", text: "ต้องตั้งชื่อข้อ" },
   "custom-missing-points": { tone: "warning", text: "ใส่จำนวนคะแนน (+ หัก / − เพิ่มให้) ไม่ใช่ 0" },
   "bad-value": { tone: "warning", text: "ใส่ตัวเลขไม่ติดลบ" },
+  "incentive-saved": { tone: "success", text: "บันทึกระดับ incentive แล้ว" },
+  "incentive-empty": { tone: "warning", text: "ต้องเหลืออย่างน้อย 1 ระดับ" },
+  "incentive-no-floor": { tone: "warning", text: "ต้องมีระดับที่เริ่มจาก 0 ไว้รับคนที่คะแนนต่ำกว่าทุกระดับ" },
+  "incentive-bad-tier": { tone: "warning", text: "ใส่คะแนนขั้นต่ำและ % ให้ครบ" },
   denied: { tone: "warning", text: "แก้กติกาได้เฉพาะเจ้าของ และต้องไม่อยู่ในโหมดดูแทนพนักงาน" },
   error: { tone: "warning", text: "บันทึกไม่สำเร็จ" }
 };
@@ -255,18 +328,54 @@ export default async function AdminKpiRulesPage({ searchParams }: PageProps) {
 
         <section className="kpi-rules__group soft-card">
           <h3>Incentive</h3>
-          <div className="kpi-rules__rows">
-            {rules.incentive.tiers.map((tier) => (
-              <div key={tier.label} className="kpi-rules__row">
-                <div><strong>คะแนน {tier.label}</strong>{tier.percent === 0 ? <small>ต้องประเมินรายสัปดาห์ (coach)</small> : null}</div>
+          <p className="kpi-rules__hint">
+            คะแนนรวมของคนนั้นตกระดับไหน ได้ incentive ตาม % ของระดับนั้น · ระบบไล่จากระดับคะแนนสูงลงต่ำ
+            แล้วหยุดที่ระดับแรกที่คะแนนถึง · ระดับที่ให้ 0% จะติดธงต้องประเมินรายสัปดาห์ (coach) อัตโนมัติ
+          </p>
+          <form action={saveIncentiveAction} className="kpi-rules__rows">
+            {rules.incentive.tiers.map((tier, index) => (
+              <div key={`${tier.min}-${index}`} className="kpi-rules__tier">
                 <label>
-                  <input type="number" defaultValue={tier.percent} disabled readOnly />
-                  <span>% ของ incentive</span>
+                  ตั้งแต่คะแนน
+                  <input type="number" name="tierMin" defaultValue={tier.min} min="0" max={rules.categoryMax * 5} step="1" disabled={!canEdit} />
                 </label>
+                <label>
+                  ได้ incentive
+                  <input type="number" name="tierPercent" defaultValue={tier.percent} min="0" max="100" step="1" disabled={!canEdit} />
+                  <span>%</span>
+                </label>
+                <label className="kpi-rules__tier-label">
+                  ชื่อระดับ
+                  <input name="tierLabel" defaultValue={tier.label} disabled={!canEdit} />
+                </label>
+                {canEdit ? (
+                  <label className="kpi-rules__tier-remove">
+                    <input type="checkbox" name="removeTier" value={index} />
+                    ลบระดับนี้
+                  </label>
+                ) : null}
               </div>
             ))}
-          </div>
-          <p className="kpi-rules__hint">ระดับ incentive ยังแก้ในโค้ด — บอกได้ถ้าจะให้เปิดแก้ตรงนี้ด้วย</p>
+            {canEdit ? <button type="submit">บันทึกระดับ incentive</button> : null}
+          </form>
+
+          {canEdit ? (
+            <form action={addIncentiveTierAction} className="performance-adjust-form">
+              <label>
+                ตั้งแต่คะแนน
+                <input name="newTierMin" type="number" min="0" step="1" defaultValue="95" />
+              </label>
+              <label>
+                ได้ incentive %
+                <input name="newTierPercent" type="number" min="0" max="100" step="1" defaultValue="100" />
+              </label>
+              <label className="wide">
+                ชื่อระดับ (ไม่บังคับ)
+                <input name="newTierLabel" placeholder="เช่น 95-100" />
+              </label>
+              <button type="submit">เพิ่มระดับ</button>
+            </form>
+          ) : null}
         </section>
 
         {canEdit ? (
