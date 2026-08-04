@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AssignWork } from "../../../../components/AssignWork.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
+import { buildTeamOptions } from "../../../../lib/team-options.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
 export default async function AdminAssignPage() {
@@ -12,6 +13,10 @@ export default async function AdminAssignPage() {
   const staff = employeeDirectory
     .filter((entry) => entry.branch === "bangkae")
     .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType }));
+
+  // Team quick-select shortcuts for the ผู้รับผิดชอบ picker (ticket AvYge3vV6w39OUfEHwIE).
+  // Built from the full roster so onboarding a Sena-fest staff activates that team.
+  const teams = buildTeamOptions(employeeDirectory);
 
   return (
     <main className="page">
@@ -23,7 +28,7 @@ export default async function AdminAssignPage() {
           <p>สั่งงานให้ staff รายคน — งานจะขึ้นบนหน้า &quot;วันนี้ของฉัน&quot; ของเขาทันทีที่ login</p>
         </div>
       </section>
-      <AssignWork branch="bangkae" assignedBy={user.email ?? user.name} staff={staff} defaultDate={formatWorkDate()} />
+      <AssignWork branch="bangkae" assignedBy={user.email ?? user.name} staff={staff} teams={teams} defaultDate={formatWorkDate()} />
     </main>
   );
 }

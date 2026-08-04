@@ -13,6 +13,7 @@ import {
 } from "../lib/work-assignments-store.ts";
 import { assignmentStatusClass, assignmentStatusLabel } from "../lib/assignment-view.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
+import { isTeamSelected, toggleTeamSelection, type TeamOption } from "../lib/team-options.ts";
 
 type StaffOption = { code: string; displayName: string; employmentType: "full_time" | "part_time" };
 
@@ -23,11 +24,13 @@ export function AssignWork({
   branch,
   assignedBy,
   staff,
+  teams = [],
   defaultDate
 }: {
   branch: string;
   assignedBy: string;
   staff: StaffOption[];
+  teams?: TeamOption[];
   defaultDate: string;
 }) {
   const [date, setDate] = useState(defaultDate);
@@ -174,6 +177,29 @@ export function AssignWork({
         <div className="assign-work__field">
           <span className="assign-work__field-label">1. ผู้รับผิดชอบ <span className="assign-work__req">*</span> — ใครเป็นเจ้าของงานนี้</span>
           <div className="assign-work__staff-pick">
+            {teams.length > 0 ? (
+              <div className="assign-work__team-pick">
+                <span className="assign-work__pick-label">เลือกทั้งทีม (กดทีเดียว = เลือกทุกคนในทีม)</span>
+                <div className="assign-work__chips">
+                  {teams.map((team) => {
+                    const on = isTeamSelected(selectedCodes, team.memberCodes);
+                    const empty = team.memberCodes.length === 0;
+                    return (
+                      <button
+                        type="button"
+                        key={team.key}
+                        className={on ? "assign-work__chip assign-work__chip--team is-on" : "assign-work__chip assign-work__chip--team"}
+                        onClick={() => setSelectedCodes((prev) => toggleTeamSelection(prev, team.memberCodes))}
+                        disabled={empty}
+                        title={empty ? "ยังไม่มีสมาชิกในทีมนี้ — เพิ่มพนักงานทีมนี้ก่อน" : `${team.memberCodes.length} คน`}
+                      >
+                        {on ? "✓ " : ""}{team.label}{empty ? " (ยังไม่มีสมาชิก)" : ` (${team.memberCodes.length})`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             <span className="assign-work__pick-label">พนักงาน (เลือกได้หลายคน = มอบเป็นทีม)</span>
             <div className="assign-work__chips">
               {staff.map((s) => (
