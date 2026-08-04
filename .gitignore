@@ -12,3 +12,4 @@ dist/
 .data/
 .vercel
 tsconfig.tsbuildinfo
+tsconfig.lint.tsbuildinfo
