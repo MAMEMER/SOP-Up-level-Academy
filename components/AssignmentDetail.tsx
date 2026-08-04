@@ -203,6 +203,7 @@ export function AssignmentDetail({
           <h2>{record.title}</h2>
           <p>
             {displayNameFor(record.staffCode)} · กำหนด {record.workDate}
+            {record.dueTime ? ` ภายใน ${record.dueTime}` : ""}
             {record.assignedBy ? ` · มอบโดย ${record.assignedBy}` : ""}
           </p>
         </div>
@@ -211,10 +212,46 @@ export function AssignmentDetail({
         </span>
       </section>
 
-      {record.detail || record.trackingNumber || record.attachments?.length ? (
+      <p className="assignment-detail__responsibility">
+        🙋 งานนี้เป็น<strong>ความรับผิดชอบของ {displayNameFor(record.staffCode)}</strong> — ทำให้เสร็จตามกำหนด แล้วส่งงานพร้อมหลักฐาน
+      </p>
+
+      <section className="assignment-detail__brief soft-card">
+        <p className="assign-work__label">สรุปงานที่ต้องทำ</p>
+        <dl className="assignment-detail__spec">
+          <div>
+            <dt>👤 หน้าที่ใคร</dt>
+            <dd>{displayNameFor(record.staffCode)}</dd>
+          </div>
+          <div>
+            <dt>📝 ต้องทำอะไร</dt>
+            <dd>
+              <strong>{record.title}</strong>
+              {record.detail ? <span style={{ whiteSpace: "pre-wrap" }}>{"\n"}{record.detail}</span> : null}
+            </dd>
+          </div>
+          {record.location ? (
+            <div>
+              <dt>📍 ที่ไหน</dt>
+              <dd>{record.location}</dd>
+            </div>
+          ) : null}
+          {record.expectedResult ? (
+            <div>
+              <dt>✅ ส่งผลลัพธ์แบบไหน</dt>
+              <dd style={{ whiteSpace: "pre-wrap" }}>{record.expectedResult}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>⏰ เสร็จเมื่อไหร่</dt>
+            <dd>{record.workDate}{record.dueTime ? ` ภายใน ${record.dueTime} น.` : ""}</dd>
+          </div>
+        </dl>
+      </section>
+
+      {record.trackingNumber || record.attachments?.length ? (
         <section className="assignment-detail__brief soft-card">
-          <p className="assign-work__label">รายละเอียดงานจากเจ้าของร้าน</p>
-          {record.detail ? <p style={{ whiteSpace: "pre-wrap" }}>{record.detail}</p> : null}
+          <p className="assign-work__label">ข้อมูล/ไฟล์ประกอบจากเจ้าของร้าน</p>
           {record.trackingNumber ? (
             <p><strong>เลขแทค / พัสดุ ส่งสินค้า:</strong> {record.trackingNumber}</p>
           ) : null}

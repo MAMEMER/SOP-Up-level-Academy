@@ -63,7 +63,8 @@
 
 ## 10. Attendance rules — `lib/performance-score.ts` (L192-244)
 - สาย ≤10 นาที = -1, สาย >10 นาที = -2, ไม่ตอก = -2. วันลาที่อนุมัติ **ไม่นับ**. หนึ่ง incident = หนึ่ง deduction.
-- **ห้ามหลวม:** ตัด 10-min grace / ไม่เช็ค leave record (หักคนลาถูกต้อง) / ยอมหักหลายครั้งต่อ 1 clock event.
+- **กะที่ยังไม่ถึงเวลาเข้างาน (scheduledStart > now) ไม่นับ/ไม่หัก** — `calculateAttendanceScore(input, now=Date.now())` (ticket OklOUlQlG). วันในอดีตไม่กระทบ.
+- **ห้ามหลวม:** ตัด 10-min grace / ไม่เช็ค leave record (หักคนลาถูกต้อง) / ยอมหักหลายครั้งต่อ 1 clock event / **หักกะที่ยังไม่เริ่ม**.
 
 ---
 **Origin:** MAMEMER — **ห้าม push origin โดยไม่ review**. Deploy ผ่าน Netlify alias.

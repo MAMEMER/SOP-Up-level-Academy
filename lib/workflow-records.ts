@@ -1,5 +1,11 @@
 import { CHECKLIST_DAY_END, CHECKLIST_DAY_START, resolvePhaseWindow, type PhaseWindows } from "./daily-checklist.ts";
 
+/**
+ * What a schedule lookup needs: the owner-configured windows, and which กะ is asking
+ * (a หัวข้อ shared by both can be due at different hours — see defaultPhaseWindows).
+ */
+export type PhaseScheduleContext = { windows?: PhaseWindows; shift?: "s1" | "s2" | null };
+
 export type WorkflowRecordStatus = "saved" | "submitted" | "missed";
 export type WorkflowVisualStatus = "white" | "green" | "orange" | "red" | "purple";
 
@@ -82,10 +88,6 @@ function bangkokDateAt(workDate: string, time: string) {
   return new Date(`${workDate}T${time}:00+07:00`);
 }
 
-function addMinutes(date: Date, minutes: number) {
-  return new Date(date.getTime() + minutes * 60 * 1000);
-}
-
 function timeLabel(date: Date) {
   return new Intl.DateTimeFormat("th-TH", {
     timeZone: "Asia/Bangkok",
@@ -110,14 +112,10 @@ function bangkokTimeParts(date: Date) {
 export function isWithinWorkflowWorkHours(now = new Date()) {
   const { hour, minute } = bangkokTimeParts(now);
   const totalMinutes = hour * 60 + minute;
-  // Runs to 23:59: ปิดร้าน is due at 23:59, so a 23:00 cut-off would lock the closing
-  // shift out of the very checklist it is being scored on.
-  return totalMinutes >= toMinutes(CHECKLIST_DAY_START) && totalMinutes <= toMinutes(CHECKLIST_DAY_END);
-}
-
-function toMinutes(time: string) {
-  const [hour, minute] = time.split(":").map(Number);
-  return hour * 60 + minute;
+  // 09:00–23:59 Bangkok. The closing (กะ2) checklist window now runs to 23:59, so writes
+  // must stay allowed right up to end-of-day; earlier this capped at 23:00 and locked the
+  // last hour of closing. (ใบงาน fnpHvruMlF4Vvg7UvJUQ — ปรับเวลา checklist บางแค)
+  return totalMinutes >= 9 * 60 && totalMinutes < 24 * 60;
 }
 
 function bangkokWeekday(workDate: string) {
@@ -133,19 +131,16 @@ export function storeHoursForWorkDate(workDate: string) {
 }
 
 /**
- * The window a phase runs on today, in Bangkok time.
+ * The window a หัวข้อ runs on today. Times come from the owner config (built-in defaults in
+ * lib/daily-checklist.ts) and are absolute Bangkok clock times, per shift where the two กะ
+ * do the same หัวข้อ at different hours.
  *
- * Each หัวข้อ carries its own clock time (owner-editable at /admin/checklist-config):
  * `dueAt` is the deadline — submitting after it still works, it costs 2 KPI points — and
  * `endAt` is the hard end of the business day, after which nothing can be submitted.
- * `startAt` locks a phase that must not be done early (ปิดร้าน opens at 19:00).
- *
- * Replaces the old model where the window was derived from store hours and, for shift 1,
- * from clock-in + 4h. Times are now the same for everyone on the หัวข้อ, so a staffer can
- * read the deadline off the card and the KPI charges the same lateness to both shifts.
+ * `startAt` locks a หัวข้อ that must not be done early (ปิดร้าน opens at 19:00).
  */
-export function phaseScheduleForWorkDate(phaseId: string, workDate: string, windows?: PhaseWindows) {
-  const window = resolvePhaseWindow(phaseId, windows);
+export function phaseScheduleForWorkDate(phaseId: string, workDate: string, context?: PhaseScheduleContext) {
+  const window = resolvePhaseWindow(phaseId, context?.windows, context?.shift);
   const startAt = bangkokDateAt(workDate, window.openTime || CHECKLIST_DAY_START);
   const dueAt = bangkokDateAt(workDate, window.dueTime);
   const endAt = bangkokDateAt(workDate, CHECKLIST_DAY_END);
@@ -157,31 +152,31 @@ export function phaseScheduleForWorkDate(phaseId: string, workDate: string, wind
     startLabel: timeLabel(startAt),
     endLabel: timeLabel(endAt),
     dueLabel: timeLabel(dueAt),
-    /** true when the phase may not be started before startAt (e.g. ปิดร้าน) */
-    hasOpenTime: Boolean(window.openTime),
+    /** true when the หัวข้อ may not be started before startAt (e.g. ปิดร้าน) */
+    hasOpenTime: Boolean(window.openTime) && window.openTime !== CHECKLIST_DAY_START,
     dueMinutes: Math.max(0, Math.round((dueAt.getTime() - startAt.getTime()) / 60000))
   };
 }
 
 /** Past the deadline — still submittable, but the submission counts as late (-2). */
-export function isPhasePastDue(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
-  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, windows).dueAt) < now.getTime();
+export function isPhasePastDue(phaseId: string, workDate: string, now = new Date(), context?: PhaseScheduleContext) {
+  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, context).dueAt) < now.getTime();
 }
 
-/** Before the phase opens — ปิดร้าน cannot be ticked off at noon. */
-export function isPhaseNotYetOpen(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
-  const schedule = phaseScheduleForWorkDate(phaseId, workDate, windows);
+/** Before the หัวข้อ opens — ปิดร้าน cannot be ticked off at noon. */
+export function isPhaseNotYetOpen(phaseId: string, workDate: string, now = new Date(), context?: PhaseScheduleContext) {
+  const schedule = phaseScheduleForWorkDate(phaseId, workDate, context);
   return schedule.hasOpenTime && now.getTime() < Date.parse(schedule.startAt);
 }
 
-/** After the business day ends (23:59) — the phase is closed for good. */
-export function isPhaseDayClosed(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
-  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, windows).endAt) < now.getTime();
+/** After the business day ends (23:59) — the หัวข้อ is closed for good. */
+export function isPhaseDayClosed(phaseId: string, workDate: string, now = new Date(), context?: PhaseScheduleContext) {
+  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, context).endAt) < now.getTime();
 }
 
-/** The phase accepts a submission right now (late is allowed, early and next-day are not). */
-export function isPhaseSubmittable(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
-  return !isPhaseNotYetOpen(phaseId, workDate, now, windows) && !isPhaseDayClosed(phaseId, workDate, now, windows);
+/** The หัวข้อ accepts a submission right now (late is allowed, early and next-day are not). */
+export function isPhaseSubmittable(phaseId: string, workDate: string, now = new Date(), context?: PhaseScheduleContext) {
+  return !isPhaseNotYetOpen(phaseId, workDate, now, context) && !isPhaseDayClosed(phaseId, workDate, now, context);
 }
 
 export function canAdminUnlockWorkflowRecord(
@@ -189,11 +184,11 @@ export function canAdminUnlockWorkflowRecord(
   phaseId: string,
   workDate: string,
   now = new Date(),
-  windows?: PhaseWindows
+  context?: PhaseScheduleContext
 ) {
   if (record?.status === "submitted") return false;
   if (record?.status === "missed") return true;
-  return isPhasePastDue(phaseId, workDate, now, windows);
+  return isPhasePastDue(phaseId, workDate, now, context);
 }
 
 export function shouldAutoMissWorkflowRecord(
@@ -201,19 +196,19 @@ export function shouldAutoMissWorkflowRecord(
   phaseId: string,
   workDate: string,
   now = new Date(),
-  windows?: PhaseWindows
+  context?: PhaseScheduleContext
 ) {
   if (record?.status === "submitted" || record?.status === "missed") return false;
   if (record?.adminUnlockedAt) return false;
-  // Missed only once the day is over: between the deadline and 23:59 the phase is still
+  // Missed only once the day is over: between the deadline and 23:59 the หัวข้อ is still
   // open and the staffer can hand it in late for -2 instead of losing it entirely.
-  return isPhaseDayClosed(phaseId, workDate, now, windows);
+  return isPhaseDayClosed(phaseId, workDate, now, context);
 }
 
 /**
- * Phases are no longer sequenced — หัวข้อ can be done in any order, each one is held to
- * its own clock time instead of to the one before it. Kept as a function because the
- * checklist UI asks per phase, and a future rule might lock a phase again.
+ * หัวข้อ are no longer sequenced — they can be done in any order, each one held to its own
+ * clock time instead of to the one before it. Kept as a function because the checklist UI
+ * asks per หัวข้อ, and a future rule might lock one again.
  */
 export function isPhaseUnlocked(
   _phaseId: string,
@@ -257,7 +252,7 @@ export function workflowVisualStatus(
   workDate: string,
   phaseId: string,
   now = new Date(),
-  windows?: PhaseWindows
+  context?: PhaseScheduleContext
 ): WorkflowVisualStatus {
   const record = records.find((item) => item.workDate === workDate && item.phaseId === phaseId);
 
@@ -267,8 +262,8 @@ export function workflowVisualStatus(
   }
 
   // Red = lost for the day. Orange = past the deadline but still handable in, for -2.
-  if (isPhaseDayClosed(phaseId, workDate, now, windows)) return "red";
-  if (isPhasePastDue(phaseId, workDate, now, windows)) return "orange";
+  if (isPhaseDayClosed(phaseId, workDate, now, context)) return "red";
+  if (isPhasePastDue(phaseId, workDate, now, context)) return "orange";
   return "white";
 }
 

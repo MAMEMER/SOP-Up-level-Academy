@@ -137,26 +137,57 @@ describe("workflow daily records", () => {
     assert.equal(summary.completionRate, 100);
   });
 
-  it("gives every หัวข้อ its own clock deadline instead of a store-hours window", () => {
-    // 2026-07-06 is a Monday. Deadlines are absolute Bangkok times, same for both shifts.
-    const open = phaseScheduleForWorkDate("open-store", "2026-07-06");
-    const stock = phaseScheduleForWorkDate("stock-work", "2026-07-06");
-    const close = phaseScheduleForWorkDate("close-store", "2026-07-06");
+  it("uses the fixed Bang Khae checklist windows every day (ใบงาน fnpHvruMlF4Vvg7UvJUQ)", () => {
+    // Fixed windows, same on weekday and weekend, one clock time per หัวข้อ:
+    //   กะ1 เปิดร้าน + Stock : 09:00–13:00
+    //   หลังเปิดร้าน (แชท/Exp ค้าง, จัดส่งสินค้า) : 09:00–20:00
+    //   กะ2 ปิดร้าน : 19:00–23:59
+    for (const workDate of ["2026-07-06" /* Mon */, "2026-07-05" /* Sun */]) {
+      const open = phaseScheduleForWorkDate("open-store", workDate);
+      const stock = phaseScheduleForWorkDate("stock-work", workDate);
+      const chat = phaseScheduleForWorkDate("guild-chat-exp", workDate);
+      const shipping = phaseScheduleForWorkDate("daytime-work", workDate);
+      const close = phaseScheduleForWorkDate("close-store", workDate);
 
-    assert.equal(open.dueLabel, "12:00");
-    assert.equal(stock.dueLabel, "18:00");
-    assert.equal(close.dueLabel, "23:59");
-    // ปิดร้าน is the one phase with a start lock: it cannot be handed in before 19:00.
-    assert.equal(close.hasOpenTime, true);
-    assert.equal(close.startLabel, "19:00");
-    assert.equal(open.hasOpenTime, false);
+      assert.equal(open.startLabel, "09:00");
+      assert.equal(open.dueLabel, "13:00");
+      assert.equal(open.dueMinutes, 240);
+      assert.equal(stock.dueLabel, "13:00");
+      assert.equal(chat.dueLabel, "20:00");
+      assert.equal(shipping.dueLabel, "20:00");
+      assert.equal(close.startLabel, "19:00");
+      assert.equal(close.dueLabel, "23:59");
+      // ปิดร้าน is the one หัวข้อ locked until its start time
+      assert.equal(close.hasOpenTime, true);
+      assert.equal(open.hasOpenTime, false);
+      // every หัวข้อ closes for good at end of day, whatever its own deadline is
+      assert.equal(open.endLabel, "23:59");
+    }
 
-    // 12:00 Bangkok = 05:00 UTC
-    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T04:59:00.000Z")), false);
-    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T05:01:00.000Z")), true);
+    // open-store due at 13:00 Bangkok = 06:00 UTC.
+    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T05:59:00.000Z")), false);
+    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T06:01:00.000Z")), true);
+    // close-store due at 23:59 Bangkok = 16:59 UTC.
+    assert.equal(isPhasePastDue("close-store", "2026-07-06", new Date("2026-07-06T16:58:00.000Z")), false);
+    assert.equal(isPhasePastDue("close-store", "2026-07-06", new Date("2026-07-06T16:59:30.000Z")), true);
   });
 
-  it("locks ปิดร้าน until 19:00 and closes every หัวข้อ at 23:59", () => {
+  it("moves the Stock window to the evening for กะ2 (ใบงาน TnkYKc7ha4Go07Az8m74)", () => {
+    // Stock is shared by both shifts. กะ1 counts in the morning (09:00–13:00); กะ2 counts
+    // at closing (19:00–23:00). Only the s2 Stock window shifts.
+    const s1Stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", { shift: "s1" });
+    const s2Stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", { shift: "s2" });
+    assert.equal(s1Stock.startLabel, "09:00");
+    assert.equal(s1Stock.dueLabel, "13:00");
+    assert.equal(s2Stock.startLabel, "19:00");
+    assert.equal(s2Stock.dueLabel, "23:00");
+    assert.equal(s2Stock.hasOpenTime, true);
+
+    const s2Chat = phaseScheduleForWorkDate("guild-chat-exp", "2026-07-06", { shift: "s2" });
+    assert.equal(s2Chat.dueLabel, "20:00");
+  });
+
+  it("locks a หัวข้อ until its start time and closes every one at 23:59", () => {
     const beforeSeven = new Date("2026-07-06T11:00:00.000Z"); // 18:00 Bangkok
     const afterSeven = new Date("2026-07-06T12:30:00.000Z"); // 19:30 Bangkok
     const nextDay = new Date("2026-07-07T00:30:00.000Z"); // 07:30 Bangkok, วันถัดไป
@@ -173,11 +204,11 @@ describe("workflow daily records", () => {
     assert.equal(isPhaseSubmittable("close-store", "2026-07-06", nextDay), false);
   });
 
-  it("keeps a phase past its deadline open until the day ends, then misses it", () => {
-    const late = new Date("2026-07-06T06:00:00.000Z"); // 13:00 Bangkok, เปิดร้าน due 12:00
+  it("keeps a หัวข้อ past its deadline open until the day ends, then misses it", () => {
+    const late = new Date("2026-07-06T07:00:00.000Z"); // 14:00 Bangkok, เปิดร้าน due 13:00
     const nextDay = new Date("2026-07-07T00:30:00.000Z");
 
-    // Late is a 2-point deduction, not a lost phase — it must stay submittable.
+    // Late is a 2-point deduction, not a lost หัวข้อ — it must stay submittable.
     assert.equal(isPhasePastDue("open-store", "2026-07-06", late), true);
     assert.equal(isPhaseSubmittable("open-store", "2026-07-06", late), true);
     assert.equal(shouldAutoMissWorkflowRecord(undefined, "open-store", "2026-07-06", late), false);
@@ -188,27 +219,31 @@ describe("workflow daily records", () => {
   });
 
   it("uses the owner's configured window when there is one", () => {
-    const windows = { "stock-work": { openTime: "10:00", dueTime: "16:30" } };
-    const stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", windows);
+    const context = { windows: { "stock-work": { openTime: "10:00", dueTime: "16:30" } } };
+    const stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", context);
 
     assert.equal(stock.startLabel, "10:00");
     assert.equal(stock.dueLabel, "16:30");
     assert.equal(stock.hasOpenTime, true);
     // 16:30 Bangkok = 09:30 UTC
-    assert.equal(isPhasePastDue("stock-work", "2026-07-06", new Date("2026-07-06T09:29:00.000Z"), windows), false);
-    assert.equal(isPhasePastDue("stock-work", "2026-07-06", new Date("2026-07-06T09:31:00.000Z"), windows), true);
+    assert.equal(isPhasePastDue("stock-work", "2026-07-06", new Date("2026-07-06T09:29:00.000Z"), context), false);
+    assert.equal(isPhasePastDue("stock-work", "2026-07-06", new Date("2026-07-06T09:31:00.000Z"), context), true);
+
+    // "เปิดให้กดตลอด" = no start time configured
+    const alwaysOpen = phaseScheduleForWorkDate("close-store", "2026-07-06", { windows: { "close-store": { dueTime: "23:59" } } });
+    assert.equal(alwaysOpen.hasOpenTime, false);
+    assert.equal(isPhaseNotYetOpen("close-store", "2026-07-06", new Date("2026-07-06T04:00:00.000Z"), { windows: { "close-store": { dueTime: "23:59" } } }), false);
 
     // A malformed time falls back to the built-in deadline rather than scoring nonsense.
-    const broken = phaseScheduleForWorkDate("stock-work", "2026-07-06", { "stock-work": { dueTime: "ไม่ใช่เวลา" } });
-    assert.equal(broken.dueLabel, "18:00");
+    const broken = phaseScheduleForWorkDate("stock-work", "2026-07-06", { windows: { "stock-work": { dueTime: "ไม่ใช่เวลา" } } });
+    assert.equal(broken.dueLabel, "13:00");
   });
 
   it("allows workflow work from 09:00 to 23:59 Bangkok time", () => {
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T01:59:00.000Z")), false);
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T02:00:00.000Z")), true);
-    // 23:30 Bangkok — the closing shift is still inside its 19:00–23:59 window
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T16:30:00.000Z")), true);
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T17:00:00.000Z")), false);
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T01:59:00.000Z")), false); // 08:59
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T02:00:00.000Z")), true); // 09:00
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T16:59:00.000Z")), true); // 23:59
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T17:00:00.000Z")), false); // 00:00
   });
 
   it("lets หัวข้อ be done in any order", () => {
@@ -238,18 +273,18 @@ describe("workflow daily records", () => {
   });
 
   it("maps workflow records to white, green, orange, red, and purple visual states", () => {
-    // 11:00 Bangkok — เปิดร้าน is due at 12:00, still on the clock
     assert.equal(
-      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T04:00:00.000Z")),
+      // 05:40 UTC = 12:40 Bangkok — still inside the open-store window (09:00–13:00).
+      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T05:40:00.000Z")),
       "white"
     );
-    // 15:00 Bangkok — past the deadline but still handable in for -2
     assert.equal(
-      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T08:01:00.000Z")),
+      // 06:01 UTC = 13:01 Bangkok — past the 13:00 due but still handable in for -2 → orange.
+      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T06:01:00.000Z")),
       "orange"
     );
-    // next morning — the day closed at 23:59 and the phase is lost
     assert.equal(
+      // next morning — the day closed at 23:59 and the หัวข้อ is lost → red.
       workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-07T00:30:00.000Z")),
       "red"
     );

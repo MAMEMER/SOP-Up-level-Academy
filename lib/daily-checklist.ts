@@ -12,34 +12,41 @@ import type { ManualOverrides } from "./work-manual.ts";
 export type ChecklistOverrides = Record<string, string[]>;
 
 /**
- * The submit window of a phase, in Bangkok clock time.
+ * The submit window of a หัวข้อ, in Bangkok clock time.
  *
  * `dueTime` is the deadline: submitting after it still works but costs 2 KPI points
- * (หมวด Checklist). `openTime` locks the phase until that time — ปิดร้าน is the case that
- * needs it, so a closing checklist cannot be ticked off at noon.
+ * (หมวด Checklist). `openTime` locks the หัวข้อ until that time — ปิดร้าน is the case that
+ * needs it, so a closing checklist cannot be ticked off at noon. `s2` overrides both for
+ * the closing shift, because a หัวข้อ shared by both กะ can be due at different times
+ * (นับ stock: กะ1 ตอนเช้า, กะ2 ตอนเย็น).
  */
-export type PhaseWindow = { openTime?: string; dueTime: string };
+export type PhaseWindow = { openTime?: string; dueTime: string; s2?: { openTime?: string; dueTime: string } };
 export type PhaseWindows = Record<string, PhaseWindow>;
 
 /** Map of phaseId → the shift(s) that see it. An empty list means every shift. */
 export type PhaseShifts = Record<string, ShiftCode[]>;
 
-/** Nothing may be submitted after the business day closes, whatever the phase deadline is. */
+/** Nothing may be submitted after the business day closes, whatever the หัวข้อ deadline is. */
 export const CHECKLIST_DAY_END = "23:59";
 
 /** Earliest a checklist can be touched at all (matches the workflow work-hours window). */
 export const CHECKLIST_DAY_START = "09:00";
 
 /**
- * Built-in deadlines. Every phase now carries a clock time instead of a vague label
- * ("หลังเปิดร้าน") — late is a 2-point deduction, so the staff have to be able to read the
- * time off the card. The owner can change any of these at /admin/checklist-config.
+ * Built-in windows for บางแค (ใบงาน fnpHvruMlF4Vvg7UvJUQ + TnkYKc7ha4Go07Az8m74), the same
+ * every day — no weekday/weekend split, and no clock-in-relative window: every หัวข้อ shows
+ * a fixed clock time the staff can read off the card, because late is a 2-point deduction.
+ *   กะ1 เปิดร้าน + นับ stock                      : 09:00–13:00
+ *   หลังเปิดร้าน (แชท/Exp ค้าง, จัดส่งสินค้า)      : 09:00–20:00
+ *   กะ2 นับ stock                                 : 19:00–23:00
+ *   กะ2 ปิดร้าน                                    : 19:00–23:59
+ * The owner can change any of these at /admin/checklist-config.
  */
 export const defaultPhaseWindows: PhaseWindows = {
-  "open-store": { dueTime: "12:00" },
-  "guild-chat-exp": { dueTime: "14:00" },
-  "daytime-work": { dueTime: "18:00" },
-  "stock-work": { dueTime: "18:00" },
+  "open-store": { openTime: CHECKLIST_DAY_START, dueTime: "13:00" },
+  "stock-work": { openTime: CHECKLIST_DAY_START, dueTime: "13:00", s2: { openTime: "19:00", dueTime: "23:00" } },
+  "guild-chat-exp": { openTime: CHECKLIST_DAY_START, dueTime: "20:00" },
+  "daytime-work": { openTime: CHECKLIST_DAY_START, dueTime: "20:00" },
   "close-store": { openTime: "19:00", dueTime: CHECKLIST_DAY_END }
 };
 
@@ -47,14 +54,23 @@ export function isHhMm(value: string | undefined): value is string {
   return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
-/** The window a phase runs on: owner override first, built-in second, end-of-day last. */
-export function resolvePhaseWindow(phaseId: string, windows: PhaseWindows = {}): PhaseWindow {
+/**
+ * The window a หัวข้อ runs on for this shift: owner override first, built-in second,
+ * end-of-day last. An owner-set window replaces the built-in for both กะ unless the owner
+ * also set a กะ2 time.
+ */
+export function resolvePhaseWindow(
+  phaseId: string,
+  windows: PhaseWindows = {},
+  shift?: "s1" | "s2" | null
+): { openTime?: string; dueTime: string } {
   const configured = windows[phaseId];
   const fallback = defaultPhaseWindows[phaseId] || { dueTime: CHECKLIST_DAY_END };
-  if (!configured || !isHhMm(configured.dueTime)) return fallback;
+  const source = configured && isHhMm(configured.dueTime) ? configured : fallback;
+  const forShift = shift === "s2" && source.s2 && isHhMm(source.s2.dueTime) ? source.s2 : source;
   return {
-    dueTime: configured.dueTime,
-    openTime: isHhMm(configured.openTime) ? configured.openTime : undefined
+    dueTime: isHhMm(forShift.dueTime) ? forShift.dueTime : CHECKLIST_DAY_END,
+    openTime: isHhMm(forShift.openTime) ? forShift.openTime : undefined
   };
 }
 

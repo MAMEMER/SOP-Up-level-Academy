@@ -15,15 +15,10 @@ import {
 import {
   assignedWorkRecordsForDate,
   customerServiceRecordsForDate,
-  saveAssignedWorkRecord,
+  saveAssignedWorkRecords,
   saveCustomerServiceRecord
 } from "../lib/performance-service-records.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
-import { requireUser } from "../lib/auth.ts";
-import { isOwner } from "../lib/owner.ts";
-import { deleteScoreAdjustment, saveScoreAdjustment } from "../lib/score-adjustment-store.ts";
-import { adjustmentCategoryOptions } from "../lib/score-adjustments.ts";
-import type { ScoreCategoryKey } from "../lib/performance-score.ts";
 import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
 import { displayNameFor, employeeDirectory } from "../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../lib/performance-daily-store.ts";
@@ -47,15 +42,6 @@ const categoryLabels = {
   assignedWork: "งานที่มอบหมาย"
 };
 
-/** DeductionRecord uses snake_case category keys; the labels above are camelCase. */
-const categoryKeyToLabelKey: Record<ScoreCategoryKey, keyof typeof categoryLabels> = {
-  attendance: "attendance",
-  stock: "stock",
-  checklist: "checklist",
-  customer_service: "customerService",
-  assigned_work: "assignedWork"
-};
-
 function isDateValue(value: string | undefined) {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
@@ -74,6 +60,29 @@ function isDateValue(value: string | undefined) {
  */
 function staffOptions() {
   return employeeDirectory.map((entry) => ({ code: entry.code, label: entry.displayName }));
+}
+
+// Collapse records that share a groupId into one line so a task handed to several people
+// (ticket S3JjyiwLxyHLpPn6uOyX) reads as "งานเดียวกัน → คนนั้นคนนี้" instead of N scattered
+// rows. Ungrouped records (single-assignee / legacy team rows) each stay their own group.
+type AssignedRecordForDisplay = { id: string; employeeName: string; title: string; status: string; groupId?: string };
+function groupAssignedRecords<T extends AssignedRecordForDisplay>(records: T[]) {
+  const groups: { key: string; groupId?: string; title: string; status: string; members: T[] }[] = [];
+  const byGroupId = new Map<string, number>();
+  records.forEach((record) => {
+    if (record.groupId) {
+      const idx = byGroupId.get(record.groupId);
+      if (idx !== undefined) {
+        groups[idx].members.push(record);
+        return;
+      }
+      byGroupId.set(record.groupId, groups.length);
+      groups.push({ key: record.groupId, groupId: record.groupId, title: record.title, status: record.status, members: [record] });
+      return;
+    }
+    groups.push({ key: record.id, title: record.title, status: record.status, members: [record] });
+  });
+  return groups;
 }
 
 function resolvePeriod(params: { period?: string; startDate?: string; endDate?: string }): PerformanceReviewPeriod {
@@ -142,31 +151,7 @@ function safeRedirectTo(value: FormDataEntryValue | null) {
   return path.startsWith("/admin/performance-score") || path.startsWith("/performance-score") ? path : "/admin/performance-score";
 }
 
-type InputStatus =
-  | "service-saved"
-  | "service-error"
-  | "adjust-saved"
-  | "adjust-removed"
-  | "adjust-error"
-  | "adjust-denied"
-  | "adjust-missing-reason"
-  | "adjust-missing-points";
-
-const adjustStatusMessages: Record<string, { tone: "success" | "warning"; text: string }> = {
-  "adjust-saved": { tone: "success", text: "แก้คะแนนแล้ว — คะแนนรวมและยอดหักเงินอัปเดตทันที" },
-  "adjust-removed": { tone: "success", text: "ยกเลิกการแก้คะแนนแล้ว" },
-  "adjust-denied": { tone: "warning", text: "แก้คะแนนได้เฉพาะเจ้าของ และต้องไม่อยู่ในโหมดดูแทนพนักงาน" },
-  "adjust-missing-reason": { tone: "warning", text: "ต้องใส่เหตุผลทุกครั้งที่แก้คะแนน" },
-  "adjust-missing-points": { tone: "warning", text: "ใส่จำนวนคะแนนที่ต้องการคืนหรือหักเพิ่ม (ไม่ใช่ 0)" },
-  "adjust-error": { tone: "warning", text: "บันทึกการแก้คะแนนไม่สำเร็จ" }
-};
-
-function adjustmentCategory(value: string): ScoreCategoryKey {
-  const known = adjustmentCategoryOptions.map((option) => option.value);
-  return (known as string[]).includes(value) ? (value as ScoreCategoryKey) : "checklist";
-}
-
-function withInputStatus(path: string, status: InputStatus) {
+function withInputStatus(path: string, status: "service-saved" | "service-error") {
   const separator = path.includes("?") ? "&" : "?";
   return `${path}${separator}inputStatus=${status}`;
 }
@@ -211,65 +196,29 @@ async function saveComplaintServiceAction(formData: FormData) {
   redirect(withInputStatus(redirectTo, inputStatus));
 }
 
-/**
- * Owner correction to a computed score. Guarded inside the action, not by the page: this
- * view also renders at the ungated /performance-score, and a server action is callable by
- * anyone who can render the form.
- */
-async function saveScoreAdjustmentAction(formData: FormData) {
-  "use server";
-  const redirectTo = safeRedirectTo(formData.get("redirectTo"));
-  const user = await requireUser();
-  if (!isOwner(user.actualEmail) || user.isImpersonating) redirect(withInputStatus(redirectTo, "adjust-denied"));
+// Sentinel value emitted by the "ทั้งทีมบางแค (ทุกคน)" checkbox in the assigned-work form.
+// When present, the task is handed to every staff member in the picker — but as one record
+// per person (each scored independently), not the legacy single-row team fan-out.
+const ASSIGN_ALL_TEAM = "__ALL_TEAM__";
 
-  const reason = stringValue(formData, "adjustReason");
-  const points = Number(stringValue(formData, "adjustPoints") || "0");
-  if (!reason) redirect(withInputStatus(redirectTo, "adjust-missing-reason"));
-  if (!Number.isFinite(points) || Math.round(points) === 0) redirect(withInputStatus(redirectTo, "adjust-missing-points"));
-
-  let inputStatus: InputStatus = "adjust-saved";
-  try {
-    await saveScoreAdjustment({
-      workDate: stringValue(formData, "adjustDate"),
-      employeeName: stringValue(formData, "employeeName"),
-      category: adjustmentCategory(stringValue(formData, "adjustCategory")),
-      points: Math.round(points),
-      reason,
-      recordedBy: user.actualEmail
-    });
-  } catch {
-    inputStatus = "adjust-error";
+function resolveAssignEmployees(formData: FormData): string[] {
+  const selected = formData.getAll("employeeName").map((value) => String(value).trim()).filter(Boolean);
+  if (selected.includes(ASSIGN_ALL_TEAM)) {
+    return staffOptions().map((option) => option.code);
   }
-  revalidatePath("/admin/performance-score");
-  revalidatePath("/performance-score");
-  redirect(withInputStatus(redirectTo, inputStatus));
-}
-
-async function deleteScoreAdjustmentAction(formData: FormData) {
-  "use server";
-  const redirectTo = safeRedirectTo(formData.get("redirectTo"));
-  const user = await requireUser();
-  if (!isOwner(user.actualEmail) || user.isImpersonating) redirect(withInputStatus(redirectTo, "adjust-denied"));
-
-  let inputStatus: InputStatus = "adjust-removed";
-  try {
-    await deleteScoreAdjustment(stringValue(formData, "adjustmentId"));
-  } catch {
-    inputStatus = "adjust-error";
-  }
-  revalidatePath("/admin/performance-score");
-  revalidatePath("/performance-score");
-  redirect(withInputStatus(redirectTo, inputStatus));
+  return [...new Set(selected)];
 }
 
 async function saveAssignedWorkAction(formData: FormData) {
   "use server";
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
   const title = stringValue(formData, "assignedTitle");
-  if (title) {
-    await saveAssignedWorkRecord({
+  const employeeNames = resolveAssignEmployees(formData);
+  // Same task → one record per selected person, sharing a groupId (ticket S3JjyiwLxyHLpPn6uOyX).
+  if (title && employeeNames.length > 0) {
+    await saveAssignedWorkRecords({
       workDate: stringValue(formData, "assignedDate"),
-      employeeName: stringValue(formData, "employeeName"),
+      employeeNames,
       title,
       status: assignedStatus(stringValue(formData, "assignedStatus")),
       note: stringValue(formData, "assignedNote"),
@@ -297,13 +246,6 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const inputStatus = params.inputStatus;
   const entryDate = activePeriod.endDate;
   const periodShortcuts = quickPeriodLinks(basePath, params.source);
-  // Adjustments are money-sensitive like the salary figures: same owner gate.
-  const isOwnerView = isOwner;
-  const adjustStatusMessage = adjustStatusMessages[params.inputStatus || ""];
-  const periodAdjustments = (dailyStore.scoreAdjustments || []).filter(
-    (adjustment) => adjustment.workDate >= activePeriod.startDate && adjustment.workDate <= activePeriod.endDate
-  );
-  const adjustmentsFor = (employeeName: string) => periodAdjustments.filter((adjustment) => adjustment.employeeName === employeeName);
   const serviceRecordsForDay = customerServiceRecordsForDate(dailyStore.serviceRecords, entryDate);
   const assignedRecordsForDay = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, entryDate);
 
@@ -465,13 +407,24 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               วันที่
               <input name="assignedDate" type="date" defaultValue={entryDate} />
             </label>
-            <label>
-              พนักงาน
-              <select name="employeeName" defaultValue={staffOptions()[0]?.code}>
-                {staffOptions().map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
-                <option value="ทีม บางแค">ทีม บางแค</option>
-              </select>
-            </label>
+            <fieldset className="assign-multi wide">
+              <legend>พนักงาน (เลือกได้หลายคน = งานเดียวกันมอบหลายคน)</legend>
+              <div className="assign-multi__chips">
+                <label className="assign-multi__chip assign-multi__chip--all">
+                  <input type="checkbox" name="employeeName" value={ASSIGN_ALL_TEAM} />
+                  ทั้งทีมบางแค (ทุกคน)
+                </label>
+                {staffOptions().map((option) => (
+                  <label key={option.code} className="assign-multi__chip">
+                    <input type="checkbox" name="employeeName" value={option.code} />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+              <small className="assign-multi__hint">
+                เลือกหลายคน = สร้างงานเดียวกันให้แต่ละคน (ให้คะแนนแยกรายคน แต่รู้ว่าเป็นงานเดียวกัน)
+              </small>
+            </fieldset>
             <label>
               สถานะ
               <select name="assignedStatus" defaultValue="on_time">
@@ -499,17 +452,23 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
           <div className="performance-daily-records">
             <strong>รายการวันที่ {entryDate}</strong>
             {assignedRecordsForDay.length ? (
-              assignedRecordsForDay.map((record) => (
-                <span key={record.id}>{record.employeeName}: {record.title} / {record.status}</span>
-              ))
+              groupAssignedRecords(assignedRecordsForDay).map((group) =>
+                group.groupId ? (
+                  <span key={group.groupId}>
+                    👥 {group.title}: {group.members.map((m) => displayNameFor(m.employeeName)).join(", ")} / {group.status}
+                  </span>
+                ) : (
+                  <span key={group.members[0].id}>
+                    {displayNameFor(group.members[0].employeeName)}: {group.title} / {group.status}
+                  </span>
+                )
+              )
             ) : (
               <span>ยังไม่มีงานที่มอบหมายวันนี้</span>
             )}
           </div>
         </article>
       </section>
-
-      {adjustStatusMessage ? <p className={`input-status ${adjustStatusMessage.tone}`}>{adjustStatusMessage.text}</p> : null}
 
       <section className="performance-score-table">
         <div className="performance-table-head">
@@ -573,32 +532,15 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                       <th>หัก</th>
                       <th>เหตุผล</th>
                       <th>Source</th>
-                      {isOwnerView ? <th>แก้คะแนน</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {row.deductions.map((deduction, index) => (
                       <tr key={`${deduction.reason}-${index}`}>
-                        <td>{categoryLabels[categoryKeyToLabelKey[deduction.category]]}</td>
-                        <td>{deduction.points >= 0 ? `-${deduction.points}` : `+${Math.abs(deduction.points)}`}</td>
+                        <td>{deduction.category}</td>
+                        <td>-{deduction.points}</td>
                         <td>{deduction.detail}</td>
                         <td>{deduction.source}</td>
-                        {isOwnerView ? (
-                          <td>
-                            {/* หักผิดตรงไหน แก้คืนได้ตรงนั้น — ต้องใส่เหตุผลเสมอ */}
-                            {deduction.points > 0 ? (
-                              <form action={saveScoreAdjustmentAction} className="performance-adjust-inline">
-                                <input type="hidden" name="redirectTo" value={redirectTo} />
-                                <input type="hidden" name="employeeName" value={row.employeeName} />
-                                <input type="hidden" name="adjustCategory" value={deduction.category} />
-                                <input type="hidden" name="adjustDate" value={entryDate} />
-                                <input name="adjustPoints" type="number" defaultValue={deduction.points} step="1" aria-label="คะแนนที่คืน" />
-                                <input name="adjustReason" placeholder="เหตุผลที่แก้" required />
-                                <button type="submit">คืนคะแนน</button>
-                              </form>
-                            ) : null}
-                          </td>
-                        ) : null}
                       </tr>
                     ))}
                   </tbody>
@@ -606,49 +548,6 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               ) : (
                 <p>ไม่มีรายการหักคะแนนในรอบนี้</p>
               )}
-              {isOwnerView ? (
-                <form action={saveScoreAdjustmentAction} className="performance-adjust-form">
-                  <input type="hidden" name="redirectTo" value={redirectTo} />
-                  <input type="hidden" name="employeeName" value={row.employeeName} />
-                  <label>
-                    หมวด
-                    <select name="adjustCategory" defaultValue="checklist">
-                      {adjustmentCategoryOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    คะแนน (+ คืน / − หักเพิ่ม)
-                    <input name="adjustPoints" type="number" step="1" defaultValue="2" />
-                  </label>
-                  <label>
-                    วันที่
-                    <input name="adjustDate" type="date" defaultValue={entryDate} />
-                  </label>
-                  <label className="wide">
-                    เหตุผล
-                    <input name="adjustReason" placeholder="เช่น clock-in ไม่ sync ไม่ใช่ความผิดพนักงาน" required />
-                  </label>
-                  <button type="submit">บันทึกการแก้คะแนน</button>
-                </form>
-              ) : null}
-              {isOwnerView && adjustmentsFor(row.employeeName).length ? (
-                <div className="performance-adjust-list">
-                  <strong>การแก้คะแนนในรอบนี้</strong>
-                  {adjustmentsFor(row.employeeName).map((adjustment) => (
-                    <span key={adjustment.id}>
-                      {adjustment.workDate} · {adjustment.points > 0 ? `+${adjustment.points}` : adjustment.points} ·{" "}
-                      {adjustment.reason} ({adjustment.recordedBy})
-                      <form action={deleteScoreAdjustmentAction}>
-                        <input type="hidden" name="redirectTo" value={redirectTo} />
-                        <input type="hidden" name="adjustmentId" value={adjustment.id} />
-                        <button type="submit" className="staff-form__delete">ยกเลิก</button>
-                      </form>
-                    </span>
-                  ))}
-                </div>
-              ) : null}
               {row.warnings.length ? (
                 <div className="performance-warning-list">
                   {row.warnings.map((warning) => (

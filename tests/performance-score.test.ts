@@ -28,6 +28,7 @@ import {
 } from "../lib/performance-score-data.ts";
 import {
   addAssignedWorkRecord,
+  addAssignedWorkRecords,
   addCustomerServiceRecord,
   assignedWorkRecordsForDate,
   assignedWorkRecordsToWorks,
@@ -90,6 +91,27 @@ describe("performance score engine", () => {
     assert.equal(result.score, 18);
     assert.equal(result.deductions[0].reason, "late_over_30_minutes_or_missing_clock_in");
     assert.equal(result.deductions[0].points, 2);
+  });
+
+  it("does not deduct a shift that has not started yet (ticket OklOUlQlG — ยังไม่ถึงเวลาเข้างาน)", () => {
+    // Leo scheduled 13:00, evaluated at 11:00 same day — no clock-in yet, but must not be docked.
+    const futureShift = {
+      ...schedule,
+      employeeName: "Leo",
+      workDate: "2026-08-04",
+      scheduledStart: "2026-08-04T13:00:00+07:00",
+      scheduledEnd: "2026-08-04T22:00:00+07:00"
+    };
+    const before = Date.parse("2026-08-04T11:00:00+07:00");
+    const resultBefore = calculateAttendanceScore({ schedules: [futureShift], clockEvents: [] }, before);
+    assert.equal(resultBefore.score, 20);
+    assert.equal(resultBefore.deductions.length, 0);
+
+    // Same shift once the start time has passed with still no clock-in → the -2 applies.
+    const after = Date.parse("2026-08-04T13:30:00+07:00");
+    const resultAfter = calculateAttendanceScore({ schedules: [futureShift], clockEvents: [] }, after);
+    assert.equal(resultAfter.deductions[0].reason, "late_over_30_minutes_or_missing_clock_in");
+    assert.equal(resultAfter.deductions[0].points, 2);
   });
 
   it("does not deduct attendance for approved sick or personal leave days", () => {
@@ -363,6 +385,118 @@ describe("performance score engine", () => {
     assert.equal(result.deductions[0].points, 0);
   });
 
+  it("keeps the full 20 checklist points when every phase is submitted (no events)", () => {
+    const result = calculateChecklistScore([]);
+
+    assert.equal(result.score, 20);
+    assert.equal(result.deductions.length, 0);
+    assert.equal(result.flags.length, 0);
+  });
+
+  it("escalates a missing checklist day: first two -10 each, third onward -5", () => {
+    // three separate single-day misses, ordered by date
+    const result = calculateChecklistScore([
+      { type: "missing_day", count: 1, source: "manual", dates: ["2026-08-01"] },
+      { type: "missing_day", count: 1, source: "manual", dates: ["2026-08-02"] },
+      { type: "missing_day", count: 1, source: "manual", dates: ["2026-08-03"] }
+    ]);
+
+    assert.deepEqual(result.deductions.map((d) => d.points), [10, 10, 5]);
+    // 25 deducted -> 20 - 25 = -5 (category not floored)
+    assert.equal(result.score, -5);
+    // readable admin detail, occurrence + date
+    assert.equal(result.deductions[0].detail, "ขาด checklist ทั้งวัน ครั้งที่ 1: 2026-08-01");
+    assert.equal(result.deductions[2].detail, "ขาด checklist ทั้งวัน ครั้งที่ 3: 2026-08-03");
+  });
+
+  it("deducts 1 checklist point per missing important item", () => {
+    const result = calculateChecklistScore([
+      { type: "missing_important", count: 2, source: "manual", label: "จัดส่งสินค้า / แจ้งเลข tracking กับลูกค้า" }
+    ]);
+
+    // 2 items x -1 = -2
+    assert.equal(result.deductions[0].points, 2);
+    assert.equal(result.score, 18);
+    assert.equal(result.deductions[0].reason, "missing_important");
+    assert.equal(result.deductions[0].detail, "ขาด item สำคัญ: จัดส่งสินค้า / แจ้งเลข tracking กับลูกค้า");
+  });
+
+  it("deducts 2 checklist points per หัวข้อ submitted complete but late", () => {
+    // Each หัวข้อ carries its own clock time now, so lateness is charged per หัวข้อ (-2),
+    // not once per day (Champ, 4 Aug 2026).
+    const one = calculateChecklistScore([{ type: "late_submit", count: 1, source: "manual", label: "ปิดร้าน 2026-08-01" }]);
+    assert.equal(one.deductions[0].points, 2);
+    assert.equal(one.score, 18);
+    assert.equal(one.deductions[0].reason, "late_submit");
+    assert.match(one.deductions[0].detail, /ปิดร้าน 2026-08-01/);
+    // late submit never triggers coaching
+    assert.equal(one.flags.includes("coaching_required"), false);
+
+    const three = calculateChecklistScore([{ type: "late_submit", count: 3, source: "manual" }]);
+    assert.equal(three.score, 14);
+  });
+
+  it("deducts 10 and flags coaching when an audit finds the checklist data is not real", () => {
+    const result = calculateChecklistScore([{ type: "false_record", count: 1, source: "manual", label: "2026-08-01" }]);
+
+    assert.equal(result.deductions[0].points, 10);
+    assert.equal(result.score, 10);
+    assert.equal(result.flags.includes("coaching_required"), true);
+    assert.equal(result.deductions[0].detail, "ข้อมูล checklist ไม่ตรงจริง: 2026-08-01");
+  });
+
+  it("lets the checklist score run below 0 as deductions keep stacking", () => {
+    const result = calculateChecklistScore([
+      { type: "missing_day", count: 4, source: "manual", dates: ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04"] },
+      { type: "false_record", count: 1, source: "manual" },
+      { type: "late_submit", count: 2, source: "manual" }
+    ]);
+
+    // missing: 10+10+5+5 = 30; false: 10; late: 2 x 2 = 4 -> 44 deducted -> 20 - 44 = -24
+    assert.equal(result.score, -24);
+    assert.equal(result.flags.includes("coaching_required"), true);
+  });
+
+  it("derives a late_submit checklist event from days submitted past the deadline", () => {
+    const events = missingChecklistEventsFromAttendance({
+      employeeName: "ICE",
+      period: { id: "custom", label: "custom", startDate: "2026-08-01", endDate: "2026-08-31" },
+      schedules: [
+        { ...schedule, workDate: "2026-08-02", scheduledStart: "2026-08-02T11:00:00+07:00" },
+        { ...schedule, workDate: "2026-08-03", scheduledStart: "2026-08-03T11:00:00+07:00" }
+      ],
+      clockEvents: [
+        { employeeName: "ICE", workDate: "2026-08-02", clockIn: "2026-08-02T11:00:00+07:00", source: "storehub" },
+        { employeeName: "ICE", workDate: "2026-08-03", clockIn: "2026-08-03T11:00:00+07:00", source: "storehub" }
+      ],
+      // both days submitted (nothing missing); the 3rd was submitted late
+      submittedChecklistDays: [
+        { employeeName: "ICE", workDate: "2026-08-02" },
+        { employeeName: "ICE", workDate: "2026-08-03" }
+      ],
+      lateChecklistSubmissions: [{ employeeName: "ICE", workDate: "2026-08-03", phaseId: "open-store" }]
+    });
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, "late_submit");
+    assert.equal(events[0].count, 1);
+    assert.deepEqual(events[0].dates, ["2026-08-03"]);
+  });
+
+  it("never charges a missing day as also late", () => {
+    const events = missingChecklistEventsFromAttendance({
+      employeeName: "ICE",
+      period: { id: "custom", label: "custom", startDate: "2026-08-01", endDate: "2026-08-31" },
+      schedules: [{ ...schedule, workDate: "2026-08-02", scheduledStart: "2026-08-02T11:00:00+07:00" }],
+      clockEvents: [{ employeeName: "ICE", workDate: "2026-08-02", clockIn: "2026-08-02T11:00:00+07:00", source: "storehub" }],
+      // nothing submitted -> the day is missing; a stray late marker for the same day is ignored
+      submittedChecklistDays: [],
+      lateChecklistSubmissions: [{ employeeName: "ICE", workDate: "2026-08-02", phaseId: "open-store" }]
+    });
+
+    assert.deepEqual(events.map((event) => event.type), ["missing_day"]);
+  });
+
   it("derives missing checklist events only when the employee has both schedule and StoreHub clock-in", () => {
     const events = missingChecklistEventsFromAttendance({
       employeeName: "ICE",
@@ -517,6 +651,52 @@ describe("performance score engine", () => {
     assert.equal(works[0].work.status, "not_finished");
   });
 
+  it("assigns one shared task to several staff as linked per-person records (ticket S3Jjyiwx)", () => {
+    const records = addAssignedWorkRecords(
+      [],
+      {
+        workDate: "2026-08-04",
+        employeeNames: ["Boom", "Leo", "ICE"],
+        title: "จัดบูธงาน event",
+        status: "on_time",
+        note: "ช่วยกันเซ็ตบูธ"
+      },
+      "2026-08-04T03:00:00.000Z"
+    );
+
+    // one record per person, each independently scoreable
+    assert.equal(records.length, 3);
+    assert.deepEqual(records.map((r) => r.employeeName).sort(), ["Boom", "ICE", "Leo"]);
+    // all linked by one shared groupId so the system knows it is the same task
+    const groupIds = new Set(records.map((r) => r.groupId));
+    assert.equal(groupIds.size, 1);
+    assert.ok([...groupIds][0]);
+    assert.ok(records.every((r) => r.assigneeCount === 3));
+    // distinct doc ids so no record overwrites another
+    assert.equal(new Set(records.map((r) => r.id)).size, 3);
+
+    // maps into per-employee score input with no team fan-out needed
+    const works = assignedWorkRecordsToWorks(records);
+    assert.equal(works.length, 3);
+    assert.ok(works.every((w) => w.work.title === "จัดบูธงาน event"));
+  });
+
+  it("keeps a single-assignee record ungrouped and dedupes repeated names", () => {
+    const single = addAssignedWorkRecords([], {
+      workDate: "2026-08-04",
+      employeeNames: ["Boom", "Boom"],
+      title: "เติมสต๊อก",
+      status: "on_time",
+      note: ""
+    });
+    assert.equal(single.length, 1);
+    assert.equal(single[0].groupId, undefined);
+    assert.equal(single[0].assigneeCount, undefined);
+
+    // empty selection writes nothing
+    assert.equal(addAssignedWorkRecords([], { workDate: "2026-08-04", employeeNames: [], title: "x", status: "on_time", note: "" }).length, 0);
+  });
+
   it("updates assigned work note, evidence, tracking number, and image names after submission", () => {
     const records = addAssignedWorkRecord([], {
       workDate: "2026-07-23",
@@ -577,7 +757,7 @@ describe("performance score engine", () => {
     const works = assignedWorkRecordsToWorks(records, undefined, new Date("2026-07-23T17:00:00.000Z"));
     const result = calculateAssignedWorkScore(works.map((item) => item.work));
 
-    assert.equal(result.score, 10);
+    assert.equal(result.score, 15);
     assert.equal(result.deductions[0]?.reason, "not_finished");
     assert.equal(result.flags.includes("coaching_required"), true);
   });
@@ -600,24 +780,24 @@ describe("performance score engine", () => {
     assert.deepEqual(works.map((item) => item.work.status), ["not_finished", "not_finished", "not_finished"]);
   });
 
-  it("deducts 10 for unfinished assigned work and flags coaching", () => {
+  it("deducts 5 for unfinished assigned work and flags coaching", () => {
     const result = calculateAssignedWorkScore([{ title: "ทำคอนเทนต์", status: "not_finished", source: "manual" }]);
 
-    assert.equal(result.score, 10);
+    assert.equal(result.score, 15);
     assert.equal(result.flags.includes("coaching_required"), true);
   });
 
   it("scores assigned work by cumulative deductions across items", () => {
     const result = calculateAssignedWorkScore([
       { title: "งานเสร็จตรงเวลา", status: "on_time", source: "manual" },
-      { title: "งานต้องแก้", status: "needs_revision", source: "manual" },
+      { title: "งานต้องแก้ (approved)", status: "needs_revision", source: "manual" },
       { title: "งานช้า 1 วัน", status: "late_one_day", source: "manual" },
       { title: "งานเสร็จก่อน", status: "early_quality", source: "manual" }
     ]);
 
-    // 0 + 2 + 2 + 0 = 4 deducted
-    assert.equal(result.score, 16);
-    assert.equal(result.deductions.length, 2);
+    // 0 (on_time) + 0 (needs_revision approved) + 1 (late_one_day) + 0 (early_quality) = 1 deducted
+    assert.equal(result.score, 19);
+    assert.equal(result.deductions.length, 1);
   });
 
   it("calculates salary deduction: full time docks 500 per whole point below 50", () => {
@@ -824,7 +1004,10 @@ describe("performance score engine", () => {
     assert.equal(source.includes("Assigned work input"), true);
     assert.equal(source.includes("name=\"assignedDate\""), true);
     assert.equal(source.includes("name=\"assignedStatus\""), true);
-    assert.equal(source.includes("value=\"ทีม บางแค\""), true);
+    // Assigned-work picker is now multi-select (same task → several staff, ticket S3Jjyiwx):
+    // checkboxes named "employeeName" plus a "whole team" convenience toggle.
+    assert.equal(source.includes("ทั้งทีมบางแค"), true);
+    assert.equal(source.includes("ASSIGN_ALL_TEAM"), true);
     // the CSV upload/path forms are gone: they wrote to a filesystem Vercel wipes
     assert.equal(source.includes("ไฟล์ CSV ที่ใช้วิเคราะห์"), false);
     assert.equal(source.includes("saveCsvSourcePathAction"), false);

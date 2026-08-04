@@ -15,9 +15,12 @@ const phaseIds = (phases: { id: string }[]) => phases.map((phase) => phase.id);
 
 describe("owner checklist config", () => {
   it("keeps the built-in deadline until the owner sets one", () => {
-    assert.equal(resolvePhaseWindow("open-store").dueTime, "12:00");
+    assert.equal(resolvePhaseWindow("open-store").dueTime, "13:00");
     assert.equal(resolvePhaseWindow("close-store").openTime, "19:00");
     assert.equal(resolvePhaseWindow("open-store", { "open-store": { dueTime: "10:30" } }).dueTime, "10:30");
+    // กะ2 can have its own time for a หัวข้อ both shifts do
+    assert.equal(resolvePhaseWindow("stock-work", {}, "s2").dueTime, "23:00");
+    assert.equal(resolvePhaseWindow("stock-work", {}, "s1").dueTime, "13:00");
     // an unknown phase is held only to the end of the business day
     assert.equal(resolvePhaseWindow("brand-new-phase").dueTime, "23:59");
   });
@@ -58,12 +61,13 @@ describe("owner checklist config", () => {
     const shifts = seedShiftsFromPhases(cardStoreWorkflow, {});
 
     assert.equal(windows["close-store"].dueTime, "23:59");
+    assert.equal(windows["open-store"].dueTime, "13:00");
     assert.deepEqual(shifts["open-store"], ["s1"]);
   });
 
   it("charges 2 points per หัวข้อ handed in late", () => {
     const result = calculateChecklistScore([
-      { type: "late_phase", count: 3, dates: ["2026-08-03", "2026-08-04"], source: "live" }
+      { type: "late_submit", count: 3, dates: ["2026-08-03", "2026-08-04"], source: "live" }
     ]);
 
     assert.equal(result.score, 14);

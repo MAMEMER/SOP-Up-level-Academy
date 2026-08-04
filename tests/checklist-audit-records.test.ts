@@ -31,10 +31,10 @@ describe("admin-entered checklist audits", () => {
     assert.ok(result.flags.includes("coaching_required"));
   });
 
-  it("charges 2 per missed important item and does not flag coaching", () => {
+  it("charges 1 per missed important item and does not flag coaching", () => {
     const result = calculateChecklistScore(eventsFor("ICE", [entry({ type: "missing_important", count: 3 })]));
 
-    assert.equal(result.score, 14);
+    assert.equal(result.score, 17);
     assert.equal(result.flags.length, 0);
   });
 

@@ -239,6 +239,8 @@ export function missingChecklistEventsFromAttendance(input: {
   clockEvents: ClockEvent[];
   missingChecklistDays?: { employeeName: string; workDate: string }[];
   submittedChecklistDays?: { employeeName: string; workDate: string }[];
+  /** หัวข้อ the employee submitted after its own deadline (-2 each) */
+  lateChecklistSubmissions?: ChecklistLateSubmission[];
 }): ChecklistEvent[] {
   const scheduledDays = new Set(input.schedules.map((schedule) => `${schedule.employeeName}:${schedule.workDate}`));
   const clockedInDays = new Set(input.clockEvents.map((clock) => `${clock.employeeName}:${clock.workDate}`));
@@ -254,17 +256,33 @@ export function missingChecklistEventsFromAttendance(input: {
         .map((schedule) => ({ employeeName: schedule.employeeName, workDate: schedule.workDate }));
     })();
 
-  const dates = candidates
-    .filter((day) => day.employeeName === input.employeeName && inPeriod(day.workDate, input.period))
-    // Nothing before go-live: those days have no records to be missing from.
-    .filter((day) => (input.missingChecklistDays ? true : day.workDate >= CHECKLIST_DEDUCTION_START))
-    .filter((day) => scheduledDays.has(`${day.employeeName}:${day.workDate}`))
-    .filter((day) => clockedInDays.has(`${day.employeeName}:${day.workDate}`))
+  // A day is only scoreable when the employee was scheduled AND clocked in, within the
+  // period, and (for derived days) from go-live onward.
+  const scoreable = (day: { employeeName: string; workDate: string }) =>
+    day.employeeName === input.employeeName &&
+    inPeriod(day.workDate, input.period) &&
+    (input.missingChecklistDays ? true : day.workDate >= CHECKLIST_DEDUCTION_START) &&
+    scheduledDays.has(`${day.employeeName}:${day.workDate}`) &&
+    clockedInDays.has(`${day.employeeName}:${day.workDate}`);
+
+  const missingDates = candidates
+    .filter(scoreable)
     .map((day) => day.workDate)
     .sort();
+  const missingSet = new Set(missingDates);
 
-  if (!dates.length) return [];
-  return [{ type: "missing_day", count: dates.length, dates, source: "google-sheet" }];
+  // Submitted-but-late: the หัวข้อ was handed in complete, past its own clock time. Charged
+  // per หัวข้อ, not per day — each one has its own deadline now. A day already counted as
+  // missing is never also charged as late (nothing was submitted on it at all).
+  const late = (input.lateChecklistSubmissions || [])
+    .filter(scoreable)
+    .filter((item) => !missingSet.has(item.workDate));
+  const lateDates = [...new Set(late.map((item) => item.workDate))].sort();
+
+  const events: ChecklistEvent[] = [];
+  if (missingDates.length) events.push({ type: "missing_day", count: missingDates.length, dates: missingDates, source: "google-sheet" });
+  if (late.length) events.push({ type: "late_submit", count: late.length, dates: lateDates, source: "live" });
+  return events;
 }
 
 function inPeriod(date: string, period: PerformanceReviewPeriod) {
@@ -327,8 +345,8 @@ export function getPerformanceScoreRowsForRange(
   // the same miss twice).
   const allStockCounts = stockCheckRecordsToCounts(dailyStore.stockCheckRecords);
   const serviceEventsFromRecords = customerServiceRecordsToEvents(dailyStore.serviceRecords.filter((record) => inPeriod(record.workDate, period)));
-  // สุ่มตรวจ checklist — recorded by an admin at /admin/checklist-audit. Adds to the
-  // missing_day events derived from the submitted records, it does not replace them.
+  // สุ่มตรวจ checklist — recorded by an admin at /admin/checklist-audit. Adds to the events
+  // derived from the submitted records, it does not replace them.
   const checklistAuditEvents = checklistAuditRecordsToEvents(
     (dailyStore.checklistAuditRecords || []).filter((record) => inPeriod(record.workDate, period))
   );
@@ -336,15 +354,6 @@ export function getPerformanceScoreRowsForRange(
     teamAssigneeName: bangkaeTeamAssigneeName,
     teamMembers: employees
   });
-  // Each หัวข้อ handed in after its own deadline costs 2. One event carries the count so
-  // the deduction line reads "x N หัวข้อ" with the days it happened on.
-  const lateInPeriod = lateChecklistSubmissions.filter((item) => inPeriod(item.workDate, period));
-  const lateChecklistEventsFor = (employeeName: string): ChecklistEvent[] => {
-    const mine = lateInPeriod.filter((item) => item.employeeName === employeeName);
-    if (!mine.length) return [];
-    const dates = [...new Set(mine.map((item) => item.workDate))].sort();
-    return [{ type: "late_phase", count: mine.length, dates, source: "live" }];
-  };
   return employees.map((employeeName) => {
     const employeeSchedules = srcSchedules.filter((item) => item.employeeName === employeeName);
     const employeePeriodSchedules = employeeSchedules.filter((item) => inPeriod(item.workDate, period));
@@ -359,7 +368,8 @@ export function getPerformanceScoreRowsForRange(
       period,
       schedules: employeePeriodSchedules,
       clockEvents: employeePeriodClockEvents,
-      submittedChecklistDays
+      submittedChecklistDays,
+      lateChecklistSubmissions
     });
     return calculateEmployeePerformanceScore({
       employeeName,
@@ -375,6 +385,10 @@ export function getPerformanceScoreRowsForRange(
         records: srcLeaves.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year))
       },
       stockCounts: employeePeriodStockCounts,
+      checklistEvents: [
+        ...derivedChecklistEvents,
+        ...checklistAuditEvents.filter((item) => item.employeeName === employeeName).map((item) => item.event)
+      ],
       adjustments: (dailyStore.scoreAdjustments || [])
         .filter((adjustment) => adjustment.employeeName === employeeName && inPeriod(adjustment.workDate, period))
         .map((adjustment) => ({
@@ -383,11 +397,6 @@ export function getPerformanceScoreRowsForRange(
           reason: adjustment.reason,
           workDate: adjustment.workDate
         })),
-      checklistEvents: [
-        ...derivedChecklistEvents,
-        ...lateChecklistEventsFor(employeeName),
-        ...checklistAuditEvents.filter((item) => item.employeeName === employeeName).map((item) => item.event)
-      ],
       serviceEvents: serviceEventsFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.event),
       assignedWorks: assignedWorksFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.work)
     });

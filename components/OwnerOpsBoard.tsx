@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { OpsSummary } from "../lib/ops-summary.ts";
 import { workflowVisualStatus } from "../lib/workflow-records.ts";
-import { assignmentStatusLabel } from "../lib/assignment-view.ts";
+import { OpsAssignmentsPanel } from "./OpsAssignmentsPanel.tsx";
 
 const severityLabel: Record<string, string> = {
   fixed_immediately: "แก้ได้ทันที",
@@ -123,25 +123,7 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
       </section>
 
       <div className="owner-ops__row">
-        <section className="owner-ops__panel">
-          <div className="section-heading">
-            <p className="eyebrow">assigned work</p>
-            <h3>งานที่มอบหมาย ({summary.assignments.length})</h3>
-          </div>
-          {summary.assignments.length ? (
-            <ul className="owner-ops__list">
-              {summary.assignments.map((item) => (
-                <li key={item.id}>
-                  <Link href={`/assigned-work/task/${encodeURIComponent(item.id)}`}>{item.title}</Link>
-                  <small>{item.staffCode} · {assignmentStatusLabel[item.status]}</small>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="owner-ops__empty">ไม่มีงานที่มอบหมายในวันนี้</p>
-          )}
-          <Link href="/admin/assign" className="owner-ops__link">มอบหมายงาน →</Link>
-        </section>
+        <OpsAssignmentsPanel workDate={summary.workDate} initialGroups={summary.assignmentGroups} />
 
         <section className="owner-ops__panel">
           <div className="section-heading">
@@ -177,7 +159,11 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
             </li>
             <li>
               <strong>งานวันกิจกรรม</strong>
-              <small>ติ๊กแล้ว {weekly.eventTicks}/{weekly.eventTotal} ข้อ</small>
+              <small>
+                {weekly.eventTotal > 0
+                  ? `ติ๊กแล้ว ${weekly.eventTicks}/${weekly.eventTotal} ข้อ`
+                  : "วันนี้ไม่มีกิจกรรม"}
+              </small>
             </li>
           </ul>
           <Link href="/checklist-weekly" className="owner-ops__link">เปิด checklist สัปดาห์ →</Link>

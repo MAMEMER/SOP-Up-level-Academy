@@ -132,6 +132,34 @@ describe("weekly task pages lock un-scheduled events", () => {
   });
 });
 
+describe("owner ops board event-total counts only active events (ticket mNdkq0qk)", () => {
+  // ตัวหาร "งานวันกิจกรรม" บน OwnerOpsBoard ต้องนับเฉพาะกิจกรรมที่จัดจริงในวันนั้น
+  // ไม่ใช่รวมทุกเกมเสมอ (เดิม X/24 ทุกวัน) — ตรงหลักการ ticket: ทำงานตามวันมีกิจกรรมจริง
+  const eventTotalOn = (workDate: string) =>
+    weeklyEventsActiveOn(workDate).reduce((sum, event) => sum + event.checklist.length, 0);
+  const allEventsTotal = weeklyEvents.reduce((sum, event) => sum + event.checklist.length, 0);
+
+  it("ops-summary derives eventTotal from active events, not all events", () => {
+    const source = readFileSync(new URL("../lib/ops-summary.ts", import.meta.url), "utf8");
+    assert.equal(source.includes("weeklyEventsActiveOn(workDate)"), true);
+    // ต้องไม่กลับไปนับทุกเกมแบบเดิม
+    assert.equal(source.includes("weeklyEvents.reduce"), false);
+  });
+
+  it("Wednesday (Lorcana + Rift Bound) totals fewer items than all-games total", () => {
+    // 2026-07-29 = วันพุธ → Lorcana(6) + Rift Bound(6) = 12
+    const wed = eventTotalOn("2026-07-29");
+    assert.equal(wed, 12);
+    assert.ok(wed < allEventsTotal, "active-day total must be less than all-games total");
+  });
+
+  it("a no-event weekday yields a zero denominator (แสดง 'วันนี้ไม่มีกิจกรรม')", () => {
+    // 2026-08-03 = วันจันทร์ → ไม่มีเกมไหนจัด → total 0
+    assert.equal(weekdayOfWorkDate("2026-08-03"), 1);
+    assert.equal(eventTotalOn("2026-08-03"), 0);
+  });
+});
+
 describe("todayWorkDate (Bangkok work date)", () => {
   it("formats a fixed instant as the Bangkok calendar date (YYYY-MM-DD)", () => {
     // 2026-07-27T20:00:00Z = 2026-07-28 03:00 Bangkok → ต้องได้วันที่ 28 (ไม่โดน UTC เลื่อน)

@@ -92,6 +92,17 @@ export function DailyChecklistEditor({
     });
   }
 
+  /** กะ2 time for a หัวข้อ both shifts do (เช่น นับ stock เช้า/เย็น). Cleared = ใช้เวลาเดียวกับกะ1. */
+  function updateShift2Window(phaseId: string, field: "openTime" | "dueTime", value: string) {
+    setDraft((prev) => {
+      const current = prev.windows[phaseId] || { dueTime: CHECKLIST_DAY_END };
+      const s2 = current.s2 || { dueTime: current.dueTime };
+      const nextS2 = field === "dueTime" ? { ...s2, dueTime: value } : { ...s2, openTime: value || undefined };
+      const cleared = !nextS2.dueTime;
+      return { ...prev, windows: { ...prev.windows, [phaseId]: { ...current, s2: cleared ? undefined : nextS2 } } };
+    });
+  }
+
   function toggleShift(phaseId: string, shift: ShiftCode) {
     setDraft((prev) => {
       const current = prev.shifts[phaseId] || [];
@@ -118,8 +129,10 @@ export function DailyChecklistEditor({
     for (const [phaseId, items] of Object.entries(draft.overrides)) {
       overrides[phaseId] = items.map((item) => item.trim()).filter(Boolean);
     }
+    const validWindow = (window: { openTime?: string; dueTime: string }) =>
+      isHhMm(window.dueTime) && (window.openTime === undefined || window.openTime === "" || isHhMm(window.openTime));
     const badTime = Object.entries(draft.windows).find(
-      ([, window]) => !isHhMm(window.dueTime) || (window.openTime !== undefined && window.openTime !== "" && !isHhMm(window.openTime))
+      ([, window]) => !validWindow(window) || (window.s2 !== undefined && !validWindow(window.s2))
     );
     if (badTime) {
       setStatus(`เวลาไม่ถูกต้องที่หัวข้อ ${badTime[0]} — ใช้รูปแบบ HH:MM`);
@@ -158,8 +171,16 @@ export function DailyChecklistEditor({
                 <input type="time" value={window.dueTime} onChange={(e) => updateWindow(phase.id, "dueTime", e.target.value)} />
               </label>
               <label>
-                เริ่มส่งได้ตั้งแต่ (เว้นว่าง = ส่งได้ทั้งวัน)
+                เริ่มกดได้ตั้งแต่ (เว้นว่าง = กดได้ตลอดวัน)
                 <input type="time" value={window.openTime || ""} onChange={(e) => updateWindow(phase.id, "openTime", e.target.value)} />
+              </label>
+              <label>
+                กะ 2 · กำหนดส่ง (เว้นว่าง = ใช้เวลาเดียวกับกะ 1)
+                <input type="time" value={window.s2?.dueTime || ""} onChange={(e) => updateShift2Window(phase.id, "dueTime", e.target.value)} />
+              </label>
+              <label>
+                กะ 2 · เริ่มกดได้ตั้งแต่
+                <input type="time" value={window.s2?.openTime || ""} onChange={(e) => updateShift2Window(phase.id, "openTime", e.target.value)} disabled={!window.s2?.dueTime} />
               </label>
               <div className="checklist-config__shifts">
                 <span>กะที่ต้องทำ</span>

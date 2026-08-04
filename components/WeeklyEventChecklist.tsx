@@ -29,7 +29,7 @@ export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
     () => (eventId ? weeklyEvents.filter((event) => event.id === eventId) : weeklyEvents),
     [eventId]
   );
-  // periodKey (ISO week) คำนวณ client-side เท่านั้น กัน hydration mismatch จาก new Date()
+  // periodKey (วันทำงาน YYYY-MM-DD) คำนวณ client-side เท่านั้น กัน hydration mismatch จาก new Date()
   const [periodKey, setPeriodKey] = useState<string>("");
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
   const [data, setData] = useState<Record<string, string>>({});
@@ -219,7 +219,7 @@ function WeeklyEventCard({
           {submitted ? "ส่งงานแล้ว" : "ส่งงาน"}
         </button>
         <strong className={submitted ? "record-status submitted" : "record-status"}>
-          {submitted ? "ส่งงานสัปดาห์นี้แล้ว" : savedLabel ? `บันทึก draft แล้ว ${savedLabel}` : "ยังไม่ส่ง"}
+          {submitted ? "ส่งงานวันนี้แล้ว" : savedLabel ? `บันทึก draft แล้ว ${savedLabel}` : "ยังไม่ส่ง"}
         </strong>
       </div>
     </section>

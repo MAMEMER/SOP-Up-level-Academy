@@ -88,10 +88,12 @@ export const STOCK_DIFFERENCE_DEDUCTION_START = "2026-08-01";
 export const CHECKLIST_DEDUCTION_START = "2026-08-01";
 
 export type ChecklistEvent = {
-  type: "missing_day" | "missing_important" | "backfilled" | "false_record" | "late_phase";
+  type: "missing_day" | "missing_important" | "late_submit" | "backfilled" | "false_record";
   count: number;
   source: DataSource;
   dates?: string[];
+  /** human-readable subject for the deduction detail (item name / phase / วันปิดร้าน) */
+  label?: string;
 };
 
 export type ServiceEvent = {
@@ -137,6 +139,8 @@ export type EmployeePerformanceInput = {
   employmentType?: EmploymentType;
   /** scheduled work days in the month, used for part-time salary deduction */
   daysWorked?: number;
+  /** evaluation time (ms). Shifts starting after this are not yet scored for attendance. */
+  now?: number;
   /**
    * Owner corrections in points (+ คืน / − หักเพิ่ม) with a reason each. Applied to the
    * total after the five categories are computed — see lib/score-adjustments.ts.
@@ -226,7 +230,12 @@ function scheduledLeaveRecords(records: LeaveRecord[], schedules: ShiftSchedule[
   return records.filter((record) => scheduledWorkDays.has(dateKey(record.employeeName, record.workDate)));
 }
 
-export function calculateAttendanceScore(input: AttendanceInput): ScoreResult {
+// ticket OklOUlQlGcwFW0Ikvijk (4 Aug 2026): a shift that has not started yet was being
+// docked -2 for a "missing clock-in" while the employee had simply not reached เวลาเข้างาน.
+// Attendance is only knowable once the shift has actually begun, so `now` gates the
+// no-clock (and late) evaluation: a schedule whose scheduledStart is still in the future is
+// left unscored until it starts. Historical days (scheduledStart < now) are unaffected.
+export function calculateAttendanceScore(input: AttendanceInput, now: number = Date.now()): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const warnings: string[] = [];
   const clocks = new Map(input.clockEvents.map((event) => [dateKey(event.employeeName, event.workDate), event]));
@@ -235,6 +244,11 @@ export function calculateAttendanceScore(input: AttendanceInput): ScoreResult {
 
   input.schedules.forEach((schedule) => {
     if (approvedLeave.has(dateKey(schedule.employeeName, schedule.workDate))) return;
+
+    // Shift not started yet → cannot be late or absent. Skip until scheduledStart passes.
+    // (Unparseable scheduledStart → NaN comparison is false → falls through to old behavior.)
+    const startsAt = Date.parse(schedule.scheduledStart);
+    if (startsAt > now) return;
 
     const clock = clocks.get(dateKey(schedule.employeeName, schedule.workDate));
     if (!clock) {
@@ -344,26 +358,35 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const flags: string[] = [];
 
-  // KPI 23 Jul 2026: a missed checklist day escalates like stock — first 2 misses cost
-  // 10 each, then 5 each. No backfill/ส่งย้อนหลัง (checklist closes same day 23:59), so a
-  // missing_day always counts. false_record (สุ่มตรวจไม่เจอ/ข้อมูลไม่จริง) = -10 + coach.
-  // Occurrence order is deterministic: missing_day events processed by earliest date.
+  // KPI checklist (started 4 Aug 2026) — เริ่มที่ 20 คะแนน/เดือน, หักตามเหตุการณ์:
+  //  - missing_day (ขาด checklist ทั้งวัน): escalate เหมือน stock — ครั้งที่ 1-2 หัก 10, ครั้งที่ 3+ หัก 5.
+  //    (submit ครบทุก phase = ไม่มี event นี้ = ไม่หัก). "ไม่มีงานนั้น" ที่พนักงานติ๊กถือว่าครบ ไม่ขาด
+  //    (กรองที่ชั้น data ก่อนสร้าง event).
+  //  - missing_important (ขาด item สำคัญ เช่น จัดส่งสินค้า/แจ้งเลข tracking): -1 ต่อข้อ.
+  //  - late_submit (ส่งหัวข้อนั้นช้ากว่าเวลาที่กำหนด แต่ยังในวันเดียวกัน): -2 ต่อหัวข้อ.
+  //  - false_record (audit แล้วข้อมูลไม่ตรงจริง): -10 ต่อครั้ง + flag coaching_required.
+  //  - backfilled (ส่งย้อนหลัง): 0 — ไม่หัก.
+  // คะแนนหมวดไม่ floor ที่ 0 (categoryScore) — หักไปเรื่อยๆ ติดลบได้.
+  // Occurrence order สำหรับ missing_day เป็นแบบ deterministic: เรียงตามวันที่เก่าสุดก่อน.
   const missingDayEvents = events
     .filter((event) => event.type === "missing_day")
     .sort((left, right) => (left.dates?.[0] ?? "").localeCompare(right.dates?.[0] ?? ""));
   let missingOccurrence = 0;
   missingDayEvents.forEach((event) => {
     let points = 0;
+    const occurrences: number[] = [];
     for (let i = 0; i < event.count; i += 1) {
       missingOccurrence += 1;
+      occurrences.push(missingOccurrence);
       points += missingOccurrence <= 2 ? 10 : 5;
     }
-    const dateDetail = event.dates?.length ? ` (${event.dates.join(", ")})` : "";
+    const dateDetail = event.dates?.length ? `: ${event.dates.join(", ")}` : "";
+    const occLabel = occurrences.length === 1 ? `ครั้งที่ ${occurrences[0]}` : `ครั้งที่ ${occurrences[0]}-${occurrences[occurrences.length - 1]}`;
     deductions.push({
       category: "checklist",
       points,
       reason: "missing_day",
-      detail: `ขาด checklist x ${event.count} วัน${dateDetail} (สะสม ${missingOccurrence} ครั้ง)`,
+      detail: `ขาด checklist ทั้งวัน ${occLabel}${dateDetail}`,
       source: event.source
     });
   });
@@ -371,20 +394,20 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
   events
     .filter((event) => event.type !== "missing_day")
     .forEach((event) => {
-      // late_phase = ส่งหัวข้อนั้นหลังเวลาที่กำหนด (แต่ยังในวันเดียวกัน) — 2 ต่อหัวข้อ
-      const pointsByType = { missing_important: 2, backfilled: 0, false_record: 10, late_phase: 2 } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, number>;
-      const dateDetail = event.dates?.length ? ` (${event.dates.join(", ")})` : "";
+      type OtherType = Exclude<ChecklistEvent["type"], "missing_day">;
+      const pointsByType = { missing_important: 1, late_submit: 2, backfilled: 0, false_record: 10 } satisfies Record<OtherType, number>;
+      const subject = event.label ?? event.dates?.join(", ");
       const detailByType = {
-        missing_important: `missing_important x ${event.count}`,
-        backfilled: `backfilled x ${event.count}`,
-        false_record: `สุ่มตรวจไม่เจอข้อมูล/ข้อมูลไม่ตรงจริง x ${event.count}`,
-        late_phase: `ส่ง checklist สายกว่าเวลาที่กำหนด x ${event.count} หัวข้อ${dateDetail}`
-      } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, string>;
+        missing_important: `ขาด item สำคัญ${subject ? `: ${subject}` : ` x ${event.count}`}`,
+        late_submit: `ส่ง checklist ช้ากว่าเวลาที่กำหนด x ${event.count} หัวข้อ${subject ? ` (${subject})` : ""}`,
+        backfilled: `ส่ง checklist ย้อนหลัง x ${event.count}`,
+        false_record: `ข้อมูล checklist ไม่ตรงจริง${subject ? `: ${subject}` : ` x ${event.count}`}`
+      } satisfies Record<OtherType, string>;
       deductions.push({
         category: "checklist",
-        points: pointsByType[event.type as Exclude<ChecklistEvent["type"], "missing_day">] * event.count,
+        points: pointsByType[event.type as OtherType] * event.count,
         reason: event.type,
-        detail: detailByType[event.type as Exclude<ChecklistEvent["type"], "missing_day">],
+        detail: detailByType[event.type as OtherType],
         source: event.source
       });
       if (event.type === "false_record") flags.push("coaching_required");
@@ -422,12 +445,19 @@ export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResu
   return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
-// KPI 21 Jul 2026: assigned work is scored by cumulative deductions from 20 (not an average).
-// early/on-time = no cut; needs revision or 1-day-late = -2; not finished / overdue = -10 + coach.
+// KPI 3 Aug 2026 (ticket 6D3HIfy7): assigned work scored by cumulative deductions from 20.
+// The three "approved / got the points" outcomes cost nothing — owner approval is what
+// credits the point, and it does not have to happen the same day (only the submission must
+// beat the deadline):
+//   - early_quality  เสร็จก่อนกำหนดพร้อมคุณภาพ (owner approved)   -> 0
+//   - on_time        เสร็จตรงเวลา (owner approved)                 -> 0
+//   - needs_revision เสร็จแต่ต้องแก้ไข แล้ว owner approved         -> 0
+// Only late / unfinished submissions are docked:
+//   - late_one_day   ส่งช้ากว่ากำหนดไม่เกิน 1 วัน                  -> -1
+//   - not_finished   ไม่เสร็จ / เกินกำหนด (auto if unsubmitted past deadline) -> -5 + coach
 function assignedWorkItemDeduction(status: AssignedWork["status"]) {
-  if (status === "needs_revision") return 2;
-  if (status === "late_one_day") return 2;
-  if (status === "not_finished") return 10;
+  if (status === "late_one_day") return 1;
+  if (status === "not_finished") return 5;
   return 0;
 }
 
@@ -505,7 +535,7 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
   };
   const leaveRecords = scheduledLeaveRecords(annualLeave.records, annualLeave.schedules);
   const categories = {
-    attendance: calculateAttendanceScore(input.attendance),
+    attendance: calculateAttendanceScore(input.attendance, input.now),
     stock: calculateStockScore(input.stockCounts),
     checklist: calculateChecklistScore(input.checklistEvents),
     customerService: calculateCustomerServiceScore(input.serviceEvents),
@@ -513,8 +543,8 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
   };
   const adjustments = input.adjustments || [];
   const adjustmentPoints = adjustments.reduce((sum, adjustment) => sum + Math.round(adjustment.points), 0);
-  // Adjustments land on the total, not inside a category: a category is capped at 20 and
-  // floored at 0, so a correction applied there could silently vanish.
+  // Adjustments land on the total, not inside a category: a category is capped at 20, so a
+  // correction applied there could silently vanish.
   const totalScore = clampScore(
     categories.attendance.score +
       categories.stock.score +
