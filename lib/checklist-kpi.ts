@@ -33,3 +33,30 @@ export async function fetchSubmittedChecklistDays(branch: string, startDate: str
 
   return days;
 }
+
+/**
+ * Days where the employee submitted the checklist complete but after the phase deadline
+ * (submittedAt later than the phase dueAt). The KPI charges -1 per such day (ส่งครบแต่ช้า).
+ * A day already flagged as missing never lands here — a missed day was never submitted.
+ */
+export async function fetchLateChecklistDays(branch: string, startDate: string, endDate: string): Promise<ChecklistDay[]> {
+  const docs = await listAllRecordsInScopeRange(dailyScopeKey(startDate), dailyScopeKey(endDate));
+  const days: ChecklistDay[] = [];
+
+  for (const doc of docs) {
+    if (doc.scope !== "daily" || doc.branch !== branch) continue;
+    const employeeName = employeeCodeForEmail(doc.employeeEmail);
+    if (!employeeName) continue;
+
+    const records = (doc.data as Partial<WorkflowDayPayload>)?.records || [];
+    for (const record of records) {
+      if (record.status !== "submitted") continue;
+      if (!record.submittedAt || !record.dueAt) continue;
+      if (Date.parse(record.submittedAt) <= Date.parse(record.dueAt)) continue;
+      if (days.some((day) => day.employeeName === employeeName && day.workDate === record.workDate)) continue;
+      days.push({ employeeName, workDate: record.workDate });
+    }
+  }
+
+  return days;
+}

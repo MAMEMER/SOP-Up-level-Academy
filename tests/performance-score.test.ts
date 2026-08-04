@@ -385,6 +385,116 @@ describe("performance score engine", () => {
     assert.equal(result.deductions[0].points, 0);
   });
 
+  it("keeps the full 20 checklist points when every phase is submitted (no events)", () => {
+    const result = calculateChecklistScore([]);
+
+    assert.equal(result.score, 20);
+    assert.equal(result.deductions.length, 0);
+    assert.equal(result.flags.length, 0);
+  });
+
+  it("escalates a missing checklist day: first two -10 each, third onward -5", () => {
+    // three separate single-day misses, ordered by date
+    const result = calculateChecklistScore([
+      { type: "missing_day", count: 1, source: "manual", dates: ["2026-08-01"] },
+      { type: "missing_day", count: 1, source: "manual", dates: ["2026-08-02"] },
+      { type: "missing_day", count: 1, source: "manual", dates: ["2026-08-03"] }
+    ]);
+
+    assert.deepEqual(result.deductions.map((d) => d.points), [10, 10, 5]);
+    // 25 deducted -> 20 - 25 = -5 (category not floored)
+    assert.equal(result.score, -5);
+    // readable admin detail, occurrence + date
+    assert.equal(result.deductions[0].detail, "ขาด checklist ทั้งวัน ครั้งที่ 1: 2026-08-01");
+    assert.equal(result.deductions[2].detail, "ขาด checklist ทั้งวัน ครั้งที่ 3: 2026-08-03");
+  });
+
+  it("deducts 1 checklist point per missing important item", () => {
+    const result = calculateChecklistScore([
+      { type: "missing_important", count: 2, source: "manual", label: "จัดส่งสินค้า / แจ้งเลข tracking กับลูกค้า" }
+    ]);
+
+    // 2 items x -1 = -2
+    assert.equal(result.deductions[0].points, 2);
+    assert.equal(result.score, 18);
+    assert.equal(result.deductions[0].reason, "missing_important");
+    assert.equal(result.deductions[0].detail, "ขาด item สำคัญ: จัดส่งสินค้า / แจ้งเลข tracking กับลูกค้า");
+  });
+
+  it("deducts 1 checklist point per day submitted complete but late", () => {
+    const one = calculateChecklistScore([{ type: "late_submit", count: 1, source: "manual", label: "ปิดร้าน 2026-08-01" }]);
+    assert.equal(one.deductions[0].points, 1);
+    assert.equal(one.score, 19);
+    assert.equal(one.deductions[0].reason, "late_submit");
+    assert.equal(one.deductions[0].detail, "ส่ง checklist ช้า: ปิดร้าน 2026-08-01");
+    // late submit never triggers coaching
+    assert.equal(one.flags.includes("coaching_required"), false);
+
+    const three = calculateChecklistScore([{ type: "late_submit", count: 3, source: "manual" }]);
+    assert.equal(three.score, 17);
+  });
+
+  it("deducts 10 and flags coaching when an audit finds the checklist data is not real", () => {
+    const result = calculateChecklistScore([{ type: "false_record", count: 1, source: "manual", label: "2026-08-01" }]);
+
+    assert.equal(result.deductions[0].points, 10);
+    assert.equal(result.score, 10);
+    assert.equal(result.flags.includes("coaching_required"), true);
+    assert.equal(result.deductions[0].detail, "ข้อมูล checklist ไม่ตรงจริง: 2026-08-01");
+  });
+
+  it("lets the checklist score run below 0 as deductions keep stacking", () => {
+    const result = calculateChecklistScore([
+      { type: "missing_day", count: 4, source: "manual", dates: ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04"] },
+      { type: "false_record", count: 1, source: "manual" },
+      { type: "late_submit", count: 2, source: "manual" }
+    ]);
+
+    // missing: 10+10+5+5 = 30; false: 10; late: 2 -> 42 deducted -> 20 - 42 = -22
+    assert.equal(result.score, -22);
+    assert.equal(result.flags.includes("coaching_required"), true);
+  });
+
+  it("derives a late_submit checklist event from days submitted past the deadline", () => {
+    const events = missingChecklistEventsFromAttendance({
+      employeeName: "ICE",
+      period: { id: "custom", label: "custom", startDate: "2026-08-01", endDate: "2026-08-31" },
+      schedules: [
+        { ...schedule, workDate: "2026-08-02", scheduledStart: "2026-08-02T11:00:00+07:00" },
+        { ...schedule, workDate: "2026-08-03", scheduledStart: "2026-08-03T11:00:00+07:00" }
+      ],
+      clockEvents: [
+        { employeeName: "ICE", workDate: "2026-08-02", clockIn: "2026-08-02T11:00:00+07:00", source: "storehub" },
+        { employeeName: "ICE", workDate: "2026-08-03", clockIn: "2026-08-03T11:00:00+07:00", source: "storehub" }
+      ],
+      // both days submitted (nothing missing); the 3rd was submitted late
+      submittedChecklistDays: [
+        { employeeName: "ICE", workDate: "2026-08-02" },
+        { employeeName: "ICE", workDate: "2026-08-03" }
+      ],
+      lateChecklistDays: [{ employeeName: "ICE", workDate: "2026-08-03" }]
+    });
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, "late_submit");
+    assert.equal(events[0].count, 1);
+    assert.deepEqual(events[0].dates, ["2026-08-03"]);
+  });
+
+  it("never charges a missing day as also late", () => {
+    const events = missingChecklistEventsFromAttendance({
+      employeeName: "ICE",
+      period: { id: "custom", label: "custom", startDate: "2026-08-01", endDate: "2026-08-31" },
+      schedules: [{ ...schedule, workDate: "2026-08-02", scheduledStart: "2026-08-02T11:00:00+07:00" }],
+      clockEvents: [{ employeeName: "ICE", workDate: "2026-08-02", clockIn: "2026-08-02T11:00:00+07:00", source: "storehub" }],
+      // nothing submitted -> the day is missing; a stray late marker for the same day is ignored
+      submittedChecklistDays: [],
+      lateChecklistDays: [{ employeeName: "ICE", workDate: "2026-08-02" }]
+    });
+
+    assert.deepEqual(events.map((event) => event.type), ["missing_day"]);
+  });
+
   it("derives missing checklist events only when the employee has both schedule and StoreHub clock-in", () => {
     const events = missingChecklistEventsFromAttendance({
       employeeName: "ICE",

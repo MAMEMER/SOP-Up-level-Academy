@@ -86,10 +86,12 @@ export const STOCK_DIFFERENCE_DEDUCTION_START = "2026-08-01";
 export const CHECKLIST_DEDUCTION_START = "2026-08-01";
 
 export type ChecklistEvent = {
-  type: "missing_day" | "missing_important" | "backfilled" | "false_record";
+  type: "missing_day" | "missing_important" | "late_submit" | "backfilled" | "false_record";
   count: number;
   source: DataSource;
   dates?: string[];
+  /** human-readable subject for the deduction detail (item name / phase / วันปิดร้าน) */
+  label?: string;
 };
 
 export type ServiceEvent = {
@@ -347,26 +349,35 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const flags: string[] = [];
 
-  // KPI 23 Jul 2026: a missed checklist day escalates like stock — first 2 misses cost
-  // 10 each, then 5 each. No backfill/ส่งย้อนหลัง (checklist closes same day 23:59), so a
-  // missing_day always counts. false_record (สุ่มตรวจไม่เจอ/ข้อมูลไม่จริง) = -10 + coach.
-  // Occurrence order is deterministic: missing_day events processed by earliest date.
+  // KPI checklist (started 4 Aug 2026) — เริ่มที่ 20 คะแนน/เดือน, หักตามเหตุการณ์:
+  //  - missing_day (ขาด checklist ทั้งวัน): escalate เหมือน stock — ครั้งที่ 1-2 หัก 10, ครั้งที่ 3+ หัก 5.
+  //    (submit ครบทุก phase = ไม่มี event นี้ = ไม่หัก). "ไม่มีงานนั้น" ที่พนักงานติ๊กถือว่าครบ ไม่ขาด
+  //    (กรองที่ชั้น data ก่อนสร้าง event).
+  //  - missing_important (ขาด item สำคัญ เช่น จัดส่งสินค้า/แจ้งเลข tracking): -1 ต่อข้อ.
+  //  - late_submit (ส่งครบแต่ช้ากว่ากำหนด): -1 ต่อวัน.
+  //  - false_record (audit แล้วข้อมูลไม่ตรงจริง): -10 ต่อครั้ง + flag coaching_required.
+  //  - backfilled (ส่งย้อนหลัง): 0 — ไม่หัก.
+  // คะแนนหมวดไม่ floor ที่ 0 (categoryScore) — หักไปเรื่อยๆ ติดลบได้.
+  // Occurrence order สำหรับ missing_day เป็นแบบ deterministic: เรียงตามวันที่เก่าสุดก่อน.
   const missingDayEvents = events
     .filter((event) => event.type === "missing_day")
     .sort((left, right) => (left.dates?.[0] ?? "").localeCompare(right.dates?.[0] ?? ""));
   let missingOccurrence = 0;
   missingDayEvents.forEach((event) => {
     let points = 0;
+    const occurrences: number[] = [];
     for (let i = 0; i < event.count; i += 1) {
       missingOccurrence += 1;
+      occurrences.push(missingOccurrence);
       points += missingOccurrence <= 2 ? 10 : 5;
     }
-    const dateDetail = event.dates?.length ? ` (${event.dates.join(", ")})` : "";
+    const dateDetail = event.dates?.length ? `: ${event.dates.join(", ")}` : "";
+    const occLabel = occurrences.length === 1 ? `ครั้งที่ ${occurrences[0]}` : `ครั้งที่ ${occurrences[0]}-${occurrences[occurrences.length - 1]}`;
     deductions.push({
       category: "checklist",
       points,
       reason: "missing_day",
-      detail: `ขาด checklist x ${event.count} วัน${dateDetail} (สะสม ${missingOccurrence} ครั้ง)`,
+      detail: `ขาด checklist ทั้งวัน ${occLabel}${dateDetail}`,
       source: event.source
     });
   });
@@ -374,17 +385,20 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
   events
     .filter((event) => event.type !== "missing_day")
     .forEach((event) => {
-      const pointsByType = { missing_important: 2, backfilled: 0, false_record: 10 } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, number>;
+      type OtherType = Exclude<ChecklistEvent["type"], "missing_day">;
+      const pointsByType = { missing_important: 1, late_submit: 1, backfilled: 0, false_record: 10 } satisfies Record<OtherType, number>;
+      const subject = event.label ?? event.dates?.join(", ");
       const detailByType = {
-        missing_important: `missing_important x ${event.count}`,
-        backfilled: `backfilled x ${event.count}`,
-        false_record: `สุ่มตรวจไม่เจอข้อมูล/ข้อมูลไม่ตรงจริง x ${event.count}`
-      } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, string>;
+        missing_important: `ขาด item สำคัญ${subject ? `: ${subject}` : ` x ${event.count}`}`,
+        late_submit: `ส่ง checklist ช้า${subject ? `: ${subject}` : ` x ${event.count}`}`,
+        backfilled: `ส่ง checklist ย้อนหลัง x ${event.count}`,
+        false_record: `ข้อมูล checklist ไม่ตรงจริง${subject ? `: ${subject}` : ` x ${event.count}`}`
+      } satisfies Record<OtherType, string>;
       deductions.push({
         category: "checklist",
-        points: pointsByType[event.type as Exclude<ChecklistEvent["type"], "missing_day">] * event.count,
+        points: pointsByType[event.type as OtherType] * event.count,
         reason: event.type,
-        detail: detailByType[event.type as Exclude<ChecklistEvent["type"], "missing_day">],
+        detail: detailByType[event.type as OtherType],
         source: event.source
       });
       if (event.type === "false_record") flags.push("coaching_required");
