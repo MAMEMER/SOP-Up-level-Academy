@@ -16,6 +16,7 @@ import {
 } from "./performance-service-records.ts";
 import { branchFor, employeeCodes, employmentTypeFor } from "./employee-directory.ts";
 import { stockCheckRecordsToCounts } from "./stock-check-records.ts";
+import { checklistAuditRecordsToEvents } from "./checklist-audit-records.ts";
 import { branchConfig, isSlowMorningCount } from "./store-config.ts";
 
 export type PerformanceReviewPeriod = {
@@ -321,6 +322,11 @@ export function getPerformanceScoreRowsForRange(
   // the same miss twice).
   const allStockCounts = stockCheckRecordsToCounts(dailyStore.stockCheckRecords);
   const serviceEventsFromRecords = customerServiceRecordsToEvents(dailyStore.serviceRecords.filter((record) => inPeriod(record.workDate, period)));
+  // สุ่มตรวจ checklist — recorded by an admin at /admin/checklist-audit. Adds to the
+  // missing_day events derived from the submitted records, it does not replace them.
+  const checklistAuditEvents = checklistAuditRecordsToEvents(
+    (dailyStore.checklistAuditRecords || []).filter((record) => inPeriod(record.workDate, period))
+  );
   const assignedWorksFromRecords = assignedWorkRecordsToWorks(dailyStore.assignedWorkRecords.filter((record) => inPeriod(record.workDate, period)), {
     teamAssigneeName: bangkaeTeamAssigneeName,
     teamMembers: employees
@@ -355,7 +361,10 @@ export function getPerformanceScoreRowsForRange(
         records: srcLeaves.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year))
       },
       stockCounts: employeePeriodStockCounts,
-      checklistEvents: derivedChecklistEvents,
+      checklistEvents: [
+        ...derivedChecklistEvents,
+        ...checklistAuditEvents.filter((item) => item.employeeName === employeeName).map((item) => item.event)
+      ],
       serviceEvents: serviceEventsFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.event),
       assignedWorks: assignedWorksFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.work)
     });

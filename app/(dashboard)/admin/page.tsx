@@ -74,6 +74,7 @@ export default async function AdminHubPage() {
       hint: owner ? "มีตัวเลขการหักเงินอยู่ในนี้" : "ตัวเลขการหักเงินเห็นเฉพาะเจ้าของ",
       tools: [
         { href: "/admin/stock-check", title: "ลงคะแนน Stock", detail: "บันทึกผลนับ stock ของวันนั้น — ตรง / ไม่ตรง / ไม่ได้นับ" },
+        { href: "/admin/checklist-audit", title: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแล้วแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach" },
         {
           href: "/admin/performance-score",
           title: "คะแนนพนักงาน",
