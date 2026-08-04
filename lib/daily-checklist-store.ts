@@ -1,35 +1,50 @@
 "use client";
 
-// Firestore store for owner-edited daily checklist overrides. One doc per branch in
-// sop_daily_checklist holds phaseId → item-list overrides. Read by the checklist page
-// (to render the tailored list) and the owner editor (to edit it).
+// Firestore store for the owner-edited daily checklist config. One doc per branch in
+// sop_daily_checklist holds the per-phase item overrides, submit windows, phase order and
+// shift assignment. Read by the checklist page (to render the tailored routine) and the
+// owner editor (to edit it).
 
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "./firebase-client.ts";
-import type { ChecklistOverrides } from "./daily-checklist.ts";
+import { emptyChecklistConfig, type ChecklistConfig, type ChecklistOverrides } from "./daily-checklist.ts";
 
 const COLLECTION = "sop_daily_checklist";
 
 export type DailyChecklistDoc = {
   branch: string;
   overrides: ChecklistOverrides;
+  windows?: ChecklistConfig["windows"];
+  order?: ChecklistConfig["order"];
+  shifts?: ChecklistConfig["shifts"];
   updatedAt: string;
   updatedBy: string;
 };
 
-export async function fetchChecklistOverrides(branch: string): Promise<ChecklistOverrides> {
+/** Reads the whole config. Docs written before windows/order/shifts existed still load. */
+export async function fetchChecklistConfig(branch: string): Promise<ChecklistConfig> {
   const snap = await getDoc(doc(db, COLLECTION, branch));
-  return snap.exists() ? ((snap.data() as DailyChecklistDoc).overrides ?? {}) : {};
+  if (!snap.exists()) return emptyChecklistConfig;
+  const data = snap.data() as DailyChecklistDoc;
+  return {
+    overrides: data.overrides ?? {},
+    windows: data.windows ?? {},
+    order: data.order ?? [],
+    shifts: data.shifts ?? {}
+  };
 }
 
-export async function saveChecklistOverrides(input: {
+export async function saveChecklistConfig(input: {
   branch: string;
-  overrides: ChecklistOverrides;
+  config: ChecklistConfig;
   updatedBy: string;
 }): Promise<void> {
   const record: DailyChecklistDoc = {
     branch: input.branch,
-    overrides: input.overrides,
+    overrides: input.config.overrides,
+    windows: input.config.windows,
+    order: input.config.order,
+    shifts: input.config.shifts,
     updatedAt: new Date().toISOString(),
     updatedBy: input.updatedBy
   };

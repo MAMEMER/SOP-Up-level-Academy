@@ -1,3 +1,5 @@
+import { CHECKLIST_DAY_END, CHECKLIST_DAY_START, resolvePhaseWindow, type PhaseWindows } from "./daily-checklist.ts";
+
 export type WorkflowRecordStatus = "saved" | "submitted" | "missed";
 export type WorkflowVisualStatus = "white" | "green" | "orange" | "red" | "purple";
 
@@ -108,7 +110,14 @@ function bangkokTimeParts(date: Date) {
 export function isWithinWorkflowWorkHours(now = new Date()) {
   const { hour, minute } = bangkokTimeParts(now);
   const totalMinutes = hour * 60 + minute;
-  return totalMinutes >= 9 * 60 && totalMinutes < 23 * 60;
+  // Runs to 23:59: ปิดร้าน is due at 23:59, so a 23:00 cut-off would lock the closing
+  // shift out of the very checklist it is being scored on.
+  return totalMinutes >= toMinutes(CHECKLIST_DAY_START) && totalMinutes <= toMinutes(CHECKLIST_DAY_END);
+}
+
+function toMinutes(time: string) {
+  const [hour, minute] = time.split(":").map(Number);
+  return hour * 60 + minute;
 }
 
 function bangkokWeekday(workDate: string) {
@@ -123,76 +132,56 @@ export function storeHoursForWorkDate(workDate: string) {
   return isWeekend ? { open: "09:30", close: "20:30" } : { open: "15:00", close: "22:00" };
 }
 
-export function isFlexibleWorkflowPhase(phaseId: string) {
-  // Flexible = doable any time the store is open, so it never auto-misses on a window.
-  return phaseId === "stock-work" || phaseId === "daytime-work" || phaseId === "guild-chat-exp";
-}
-
-/** Shift 1 (opening) works its checklist within this many hours of clocking in. */
-export const SHIFT1_WORK_WINDOW_HOURS = 4;
-
 /**
- * Shift context for schedule resolution. When a staffer is on shift 1 (opening), the
- * checklist "actual working time" is counted from their real shift-entry time + 4h — a
- * staff suggestion (ticket MHQqvwhhtpARNEcuecfj) — instead of the fixed store-open hours,
- * because opening staff clock in well before the store opens to customers.
+ * The window a phase runs on today, in Bangkok time.
+ *
+ * Each หัวข้อ carries its own clock time (owner-editable at /admin/checklist-config):
+ * `dueAt` is the deadline — submitting after it still works, it costs 2 KPI points — and
+ * `endAt` is the hard end of the business day, after which nothing can be submitted.
+ * `startAt` locks a phase that must not be done early (ปิดร้าน opens at 19:00).
+ *
+ * Replaces the old model where the window was derived from store hours and, for shift 1,
+ * from clock-in + 4h. Times are now the same for everyone on the หัวข้อ, so a staffer can
+ * read the deadline off the card and the KPI charges the same lateness to both shifts.
  */
-export type ShiftScheduleContext = { shift?: "s1" | "s2" | null; shiftStart?: string | null };
-
-function isValidHhMm(value: string): boolean {
-  return /^\d{1,2}:\d{2}$/.test(value);
-}
-
-export function phaseScheduleForWorkDate(
-  phaseId: string,
-  workDate: string,
-  context?: ShiftScheduleContext
-) {
-  // Shift-1 override: window = [เวลาเข้ากะ, เวลาเข้ากะ + 4h] for every phase the opener does.
-  if (context?.shift === "s1" && context.shiftStart && isValidHhMm(context.shiftStart)) {
-    const startAt = bangkokDateAt(workDate, context.shiftStart);
-    const endAt = addMinutes(startAt, SHIFT1_WORK_WINDOW_HOURS * 60);
-    return {
-      startAt: startAt.toISOString(),
-      endAt: endAt.toISOString(),
-      dueAt: endAt.toISOString(),
-      startLabel: timeLabel(startAt),
-      endLabel: timeLabel(endAt),
-      dueMinutes: SHIFT1_WORK_WINDOW_HOURS * 60
-    };
-  }
-
-  const hours = storeHoursForWorkDate(workDate);
-  const openAt = bangkokDateAt(workDate, hours.open);
-  const closeAt = bangkokDateAt(workDate, hours.close);
-  const closeStartAt = addMinutes(closeAt, -60);
-
-  const schedule =
-    phaseId === "open-store"
-      ? { startAt: addMinutes(openAt, -30), endAt: openAt }
-      : phaseId === "close-store"
-        ? { startAt: closeStartAt, endAt: closeAt }
-        : isFlexibleWorkflowPhase(phaseId)
-          ? { startAt: openAt, endAt: closeAt }
-          : { startAt: openAt, endAt: closeStartAt };
+export function phaseScheduleForWorkDate(phaseId: string, workDate: string, windows?: PhaseWindows) {
+  const window = resolvePhaseWindow(phaseId, windows);
+  const startAt = bangkokDateAt(workDate, window.openTime || CHECKLIST_DAY_START);
+  const dueAt = bangkokDateAt(workDate, window.dueTime);
+  const endAt = bangkokDateAt(workDate, CHECKLIST_DAY_END);
 
   return {
-    startAt: schedule.startAt.toISOString(),
-    endAt: schedule.endAt.toISOString(),
-    dueAt: schedule.endAt.toISOString(),
-    startLabel: timeLabel(schedule.startAt),
-    endLabel: timeLabel(schedule.endAt),
-    dueMinutes: Math.max(0, Math.round((schedule.endAt.getTime() - schedule.startAt.getTime()) / 60000))
+    startAt: startAt.toISOString(),
+    endAt: endAt.toISOString(),
+    dueAt: dueAt.toISOString(),
+    startLabel: timeLabel(startAt),
+    endLabel: timeLabel(endAt),
+    dueLabel: timeLabel(dueAt),
+    /** true when the phase may not be started before startAt (e.g. ปิดร้าน) */
+    hasOpenTime: Boolean(window.openTime),
+    dueMinutes: Math.max(0, Math.round((dueAt.getTime() - startAt.getTime()) / 60000))
   };
 }
 
-export function isPhasePastDue(
-  phaseId: string,
-  workDate: string,
-  now = new Date(),
-  context?: ShiftScheduleContext
-) {
-  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, context).dueAt) < now.getTime();
+/** Past the deadline — still submittable, but the submission counts as late (-2). */
+export function isPhasePastDue(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
+  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, windows).dueAt) < now.getTime();
+}
+
+/** Before the phase opens — ปิดร้าน cannot be ticked off at noon. */
+export function isPhaseNotYetOpen(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
+  const schedule = phaseScheduleForWorkDate(phaseId, workDate, windows);
+  return schedule.hasOpenTime && now.getTime() < Date.parse(schedule.startAt);
+}
+
+/** After the business day ends (23:59) — the phase is closed for good. */
+export function isPhaseDayClosed(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
+  return Date.parse(phaseScheduleForWorkDate(phaseId, workDate, windows).endAt) < now.getTime();
+}
+
+/** The phase accepts a submission right now (late is allowed, early and next-day are not). */
+export function isPhaseSubmittable(phaseId: string, workDate: string, now = new Date(), windows?: PhaseWindows) {
+  return !isPhaseNotYetOpen(phaseId, workDate, now, windows) && !isPhaseDayClosed(phaseId, workDate, now, windows);
 }
 
 export function canAdminUnlockWorkflowRecord(
@@ -200,11 +189,11 @@ export function canAdminUnlockWorkflowRecord(
   phaseId: string,
   workDate: string,
   now = new Date(),
-  context?: ShiftScheduleContext
+  windows?: PhaseWindows
 ) {
   if (record?.status === "submitted") return false;
   if (record?.status === "missed") return true;
-  return isPhasePastDue(phaseId, workDate, now, context);
+  return isPhasePastDue(phaseId, workDate, now, windows);
 }
 
 export function shouldAutoMissWorkflowRecord(
@@ -212,44 +201,27 @@ export function shouldAutoMissWorkflowRecord(
   phaseId: string,
   workDate: string,
   now = new Date(),
-  context?: ShiftScheduleContext
+  windows?: PhaseWindows
 ) {
-  if (isFlexibleWorkflowPhase(phaseId)) return false;
   if (record?.status === "submitted" || record?.status === "missed") return false;
   if (record?.adminUnlockedAt) return false;
-  return isPhasePastDue(phaseId, workDate, now, context);
+  // Missed only once the day is over: between the deadline and 23:59 the phase is still
+  // open and the staffer can hand it in late for -2 instead of losing it entirely.
+  return isPhaseDayClosed(phaseId, workDate, now, windows);
 }
-
-function phaseCanAdvance(records: WorkflowDailyRecord[], workDate: string, phaseId: string) {
-  const record = records.find((item) => item.workDate === workDate && item.phaseId === phaseId);
-  return Boolean(
-    record &&
-      ((record.status === "submitted" && record.completed >= record.total) || record.status === "missed")
-  );
-}
-
-// The routine runs in order — a phase only opens once every phase before it is finished
-// (or was already missed, so the day isn't dead-ended).
-const workflowPhaseOrder = ["open-store", "guild-chat-exp", "daytime-work", "stock-work", "close-store"];
 
 /**
- * `visiblePhaseIds` = the phases this person actually sees today (the checklist is
- * shift-filtered). Records are per employee, so an s2 staffer has no s1 open-store record
- * of their own — gating them on it would lock their whole day. Sequencing therefore only
- * applies within the phases in front of them.
+ * Phases are no longer sequenced — หัวข้อ can be done in any order, each one is held to
+ * its own clock time instead of to the one before it. Kept as a function because the
+ * checklist UI asks per phase, and a future rule might lock a phase again.
  */
 export function isPhaseUnlocked(
-  phaseId: string,
-  workDate: string,
-  records: WorkflowDailyRecord[],
-  visiblePhaseIds?: string[]
+  _phaseId: string,
+  _workDate: string,
+  _records: WorkflowDailyRecord[],
+  _visiblePhaseIds?: string[]
 ) {
-  const order = visiblePhaseIds
-    ? workflowPhaseOrder.filter((id) => visiblePhaseIds.includes(id))
-    : workflowPhaseOrder;
-  const index = order.indexOf(phaseId);
-  if (index <= 0) return true;
-  return order.slice(0, index).every((previousPhaseId) => phaseCanAdvance(records, workDate, previousPhaseId));
+  return true;
 }
 
 export function elapsedSeconds(startedAt?: string, submittedAt?: string) {
@@ -284,17 +256,19 @@ export function workflowVisualStatus(
   records: WorkflowDailyRecord[],
   workDate: string,
   phaseId: string,
-  now = new Date()
+  now = new Date(),
+  windows?: PhaseWindows
 ): WorkflowVisualStatus {
   const record = records.find((item) => item.workDate === workDate && item.phaseId === phaseId);
-  const schedule = phaseScheduleForWorkDate(phaseId, workDate);
 
   if (record?.status === "submitted") {
     if (!isWorkflowRecordOnTime(record)) return "orange";
     return onTimeStreakForPhase(records, workDate, phaseId) >= 3 ? "purple" : "green";
   }
 
-  if (!isFlexibleWorkflowPhase(phaseId) && isPhasePastDue(phaseId, workDate, now)) return "red";
+  // Red = lost for the day. Orange = past the deadline but still handable in, for -2.
+  if (isPhaseDayClosed(phaseId, workDate, now, windows)) return "red";
+  if (isPhasePastDue(phaseId, workDate, now, windows)) return "orange";
   return "white";
 }
 

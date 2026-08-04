@@ -4,6 +4,9 @@ import {
   canEditWorkflowRecord,
   canAdminUnlockWorkflowRecord,
   formatWorkDate,
+  isPhaseDayClosed,
+  isPhaseNotYetOpen,
+  isPhaseSubmittable,
   isPhaseUnlocked,
   isPhasePastDue,
   isWithinWorkflowWorkHours,
@@ -134,177 +137,86 @@ describe("workflow daily records", () => {
     assert.equal(summary.completionRate, 100);
   });
 
-  it("uses Bang Khae store hours for weekday and weekend phase windows", () => {
-    const weekdayOpen = phaseScheduleForWorkDate("open-store", "2026-07-06");
-    const weekdayStock = phaseScheduleForWorkDate("stock-work", "2026-07-06");
-    const weekdayShipping = phaseScheduleForWorkDate("daytime-work", "2026-07-06");
-    const weekendClose = phaseScheduleForWorkDate("close-store", "2026-07-05");
+  it("gives every หัวข้อ its own clock deadline instead of a store-hours window", () => {
+    // 2026-07-06 is a Monday. Deadlines are absolute Bangkok times, same for both shifts.
+    const open = phaseScheduleForWorkDate("open-store", "2026-07-06");
+    const stock = phaseScheduleForWorkDate("stock-work", "2026-07-06");
+    const close = phaseScheduleForWorkDate("close-store", "2026-07-06");
 
-    assert.equal(weekdayOpen.startLabel, "14:30");
-    assert.equal(weekdayOpen.endLabel, "15:00");
-    assert.equal(weekdayOpen.dueMinutes, 30);
-    assert.equal(weekdayStock.startLabel, "15:00");
-    assert.equal(weekdayStock.endLabel, "22:00");
-    assert.equal(weekdayShipping.startLabel, "15:00");
-    assert.equal(weekdayShipping.endLabel, "22:00");
-    assert.equal(weekendClose.startLabel, "19:30");
-    assert.equal(weekendClose.endLabel, "20:30");
-    assert.equal(weekendClose.dueMinutes, 60);
-    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T07:59:00.000Z")), false);
-    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T08:01:00.000Z")), true);
+    assert.equal(open.dueLabel, "12:00");
+    assert.equal(stock.dueLabel, "18:00");
+    assert.equal(close.dueLabel, "23:59");
+    // ปิดร้าน is the one phase with a start lock: it cannot be handed in before 19:00.
+    assert.equal(close.hasOpenTime, true);
+    assert.equal(close.startLabel, "19:00");
+    assert.equal(open.hasOpenTime, false);
+
+    // 12:00 Bangkok = 05:00 UTC
+    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T04:59:00.000Z")), false);
+    assert.equal(isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T05:01:00.000Z")), true);
   });
 
-  it("counts shift-1 checklist window from clock-in + 4h instead of store hours", () => {
-    // Ticket MHQqvwhhtpARNEcuecfj: opener enters 09:00 → window 09:00–13:00 (Bangkok).
-    const s1At9 = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s1", shiftStart: "09:00" });
-    assert.equal(s1At9.startLabel, "09:00");
-    assert.equal(s1At9.endLabel, "13:00");
-    assert.equal(s1At9.dueMinutes, 240);
+  it("locks ปิดร้าน until 19:00 and closes every หัวข้อ at 23:59", () => {
+    const beforeSeven = new Date("2026-07-06T11:00:00.000Z"); // 18:00 Bangkok
+    const afterSeven = new Date("2026-07-06T12:30:00.000Z"); // 19:30 Bangkok
+    const nextDay = new Date("2026-07-07T00:30:00.000Z"); // 07:30 Bangkok, วันถัดไป
 
-    // The +4h window covers every phase the opener sees, not just open-store.
-    const s1Stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", { shift: "s1", shiftStart: "11:00" });
-    assert.equal(s1Stock.startLabel, "11:00");
-    assert.equal(s1Stock.endLabel, "15:00");
+    assert.equal(isPhaseNotYetOpen("close-store", "2026-07-06", beforeSeven), true);
+    assert.equal(isPhaseSubmittable("close-store", "2026-07-06", beforeSeven), false);
+    assert.equal(isPhaseNotYetOpen("close-store", "2026-07-06", afterSeven), false);
+    assert.equal(isPhaseSubmittable("close-store", "2026-07-06", afterSeven), true);
 
-    // Due enforcement follows the clock-in window: due 13:00 Bangkok = 06:00 UTC.
-    assert.equal(
-      isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T05:59:00.000Z"), { shift: "s1", shiftStart: "09:00" }),
-      false
-    );
-    assert.equal(
-      isPhasePastDue("open-store", "2026-07-06", new Date("2026-07-06T06:01:00.000Z"), { shift: "s1", shiftStart: "09:00" }),
-      true
-    );
+    // เปิดร้าน has no start lock, so it is submittable from the start of the day
+    assert.equal(isPhaseNotYetOpen("open-store", "2026-07-06", beforeSeven), false);
 
-    // Shift 2 and admin (no shift context) keep the store-hours schedule unchanged.
-    const s2Unchanged = phaseScheduleForWorkDate("open-store", "2026-07-06", { shift: "s2", shiftStart: "13:00" });
-    assert.equal(s2Unchanged.startLabel, "14:30");
-    assert.equal(s2Unchanged.endLabel, "15:00");
-    const noContext = phaseScheduleForWorkDate("open-store", "2026-07-06");
-    assert.equal(noContext.startLabel, "14:30");
-    assert.equal(noContext.endLabel, "15:00");
+    assert.equal(isPhaseDayClosed("close-store", "2026-07-06", nextDay), true);
+    assert.equal(isPhaseSubmittable("close-store", "2026-07-06", nextDay), false);
   });
 
-  it("allows workflow work only from 09:00 to 23:00 Bangkok time", () => {
+  it("keeps a phase past its deadline open until the day ends, then misses it", () => {
+    const late = new Date("2026-07-06T06:00:00.000Z"); // 13:00 Bangkok, เปิดร้าน due 12:00
+    const nextDay = new Date("2026-07-07T00:30:00.000Z");
+
+    // Late is a 2-point deduction, not a lost phase — it must stay submittable.
+    assert.equal(isPhasePastDue("open-store", "2026-07-06", late), true);
+    assert.equal(isPhaseSubmittable("open-store", "2026-07-06", late), true);
+    assert.equal(shouldAutoMissWorkflowRecord(undefined, "open-store", "2026-07-06", late), false);
+    assert.equal(workflowVisualStatus([], "2026-07-06", "open-store", late), "orange");
+
+    assert.equal(shouldAutoMissWorkflowRecord(undefined, "open-store", "2026-07-06", nextDay), true);
+    assert.equal(workflowVisualStatus([], "2026-07-06", "open-store", nextDay), "red");
+  });
+
+  it("uses the owner's configured window when there is one", () => {
+    const windows = { "stock-work": { openTime: "10:00", dueTime: "16:30" } };
+    const stock = phaseScheduleForWorkDate("stock-work", "2026-07-06", windows);
+
+    assert.equal(stock.startLabel, "10:00");
+    assert.equal(stock.dueLabel, "16:30");
+    assert.equal(stock.hasOpenTime, true);
+    // 16:30 Bangkok = 09:30 UTC
+    assert.equal(isPhasePastDue("stock-work", "2026-07-06", new Date("2026-07-06T09:29:00.000Z"), windows), false);
+    assert.equal(isPhasePastDue("stock-work", "2026-07-06", new Date("2026-07-06T09:31:00.000Z"), windows), true);
+
+    // A malformed time falls back to the built-in deadline rather than scoring nonsense.
+    const broken = phaseScheduleForWorkDate("stock-work", "2026-07-06", { "stock-work": { dueTime: "ไม่ใช่เวลา" } });
+    assert.equal(broken.dueLabel, "18:00");
+  });
+
+  it("allows workflow work from 09:00 to 23:59 Bangkok time", () => {
     assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T01:59:00.000Z")), false);
     assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T02:00:00.000Z")), true);
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T15:59:00.000Z")), true);
-    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T16:00:00.000Z")), false);
+    // 23:30 Bangkok — the closing shift is still inside its 19:00–23:59 window
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T16:30:00.000Z")), true);
+    assert.equal(isWithinWorkflowWorkHours(new Date("2026-07-06T17:00:00.000Z")), false);
   });
 
-  it("keeps stock and shipping editable after time instead of auto-missing them", () => {
-    const afterWeekdayClose = new Date("2026-07-06T15:30:00.000Z");
-
-    assert.equal(shouldAutoMissWorkflowRecord(undefined, "stock-work", "2026-07-06", afterWeekdayClose), false);
-    assert.equal(shouldAutoMissWorkflowRecord(undefined, "daytime-work", "2026-07-06", afterWeekdayClose), false);
-    assert.equal(workflowVisualStatus([], "2026-07-06", "stock-work", afterWeekdayClose), "white");
-    assert.equal(workflowVisualStatus([], "2026-07-06", "daytime-work", afterWeekdayClose), "white");
-
-    const lateStockRecord: WorkflowDailyRecord = {
-      workDate: "2026-07-06",
-      phaseId: "stock-work",
-      phaseTitle: "Stock",
-      completed: 5,
-      total: 5,
-      status: "submitted",
-      recordedAt: "2026-07-06T15:35:00.000Z",
-      dueAt: phaseScheduleForWorkDate("stock-work", "2026-07-06").dueAt,
-      submittedAt: "2026-07-06T15:35:00.000Z"
-    };
-
-    assert.equal(workflowVisualStatus([lateStockRecord], "2026-07-06", "stock-work"), "orange");
-  });
-
-  it("unlocks phases only after prior submitted checklists are complete", () => {
-    const records: WorkflowDailyRecord[] = [
-      {
-        workDate: "2026-07-04",
-        phaseId: "open-store",
-        phaseTitle: "เปิดร้าน",
-        completed: 7,
-        total: 7,
-        status: "submitted",
-        recordedAt: "2026-07-04T09:00:00Z"
-      },
-      {
-        workDate: "2026-07-04",
-        phaseId: "guild-chat-exp",
-        phaseTitle: "จัดการแชทและ Exp ค้าง",
-        completed: 2,
-        total: 2,
-        status: "submitted",
-        recordedAt: "2026-07-04T09:20:00Z"
-      }
-    ];
-
-    assert.equal(isPhaseUnlocked("open-store", "2026-07-04", []), true);
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", records), true);
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", records), false);
-    assert.equal(isPhaseUnlocked("close-store", "2026-07-04", records), false);
-
-    const daytimeDone = [
-      ...records,
-      {
-        workDate: "2026-07-04",
-        phaseId: "daytime-work",
-        phaseTitle: "จัดส่งสินค้า",
-        completed: 4,
-        total: 4,
-        status: "submitted",
-        recordedAt: "2026-07-04T10:00:00Z"
-      } satisfies WorkflowDailyRecord
-    ];
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", daytimeDone), true);
-  });
-
-  it("sequences only within the phases the shift actually sees", () => {
-    // An s2 staffer never gets open-store, so their own records can't contain it. Gating
-    // on it would leave their whole day locked.
-    const visible = ["daytime-work", "stock-work", "close-store"];
-
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", [], visible), true);
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", [], visible), false);
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", []), false);
-  });
-
-  it("unlocks the next phase when the prior phase is already missed", () => {
-    const missedOpen: WorkflowDailyRecord[] = [
-      {
-        workDate: "2026-07-04",
-        phaseId: "open-store",
-        phaseTitle: "เปิดร้าน",
-        completed: 0,
-        total: 7,
-        status: "missed",
-        recordedAt: "2026-07-04T02:31:00.000Z"
-      },
-      {
-        workDate: "2026-07-04",
-        phaseId: "guild-chat-exp",
-        phaseTitle: "จัดการแชทและ Exp ค้าง",
-        completed: 0,
-        total: 2,
-        status: "missed",
-        recordedAt: "2026-07-04T02:31:00.000Z"
-      }
-    ];
-
-    assert.equal(isPhaseUnlocked("daytime-work", "2026-07-04", missedOpen), true);
-
-    const missedDaytime = [
-      ...missedOpen,
-      {
-        workDate: "2026-07-04",
-        phaseId: "daytime-work",
-        phaseTitle: "จัดส่งสินค้า",
-        completed: 0,
-        total: 4,
-        status: "missed",
-        recordedAt: "2026-07-04T12:31:00.000Z"
-      } satisfies WorkflowDailyRecord
-    ];
-
-    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", missedDaytime), true);
+  it("lets หัวข้อ be done in any order", () => {
+    // The routine used to be sequenced: a phase only opened once the one before it was
+    // submitted. Each หัวข้อ now stands on its own clock time instead.
+    assert.equal(isPhaseUnlocked("close-store", "2026-07-04", []), true);
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", []), true);
+    assert.equal(isPhaseUnlocked("stock-work", "2026-07-04", [], ["daytime-work", "stock-work"]), true);
   });
 
   it("marks submitted phase records on time when submitted before the schedule end", () => {
@@ -326,12 +238,19 @@ describe("workflow daily records", () => {
   });
 
   it("maps workflow records to white, green, orange, red, and purple visual states", () => {
+    // 11:00 Bangkok — เปิดร้าน is due at 12:00, still on the clock
     assert.equal(
-      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T07:40:00.000Z")),
+      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T04:00:00.000Z")),
       "white"
     );
+    // 15:00 Bangkok — past the deadline but still handable in for -2
     assert.equal(
       workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-06T08:01:00.000Z")),
+      "orange"
+    );
+    // next morning — the day closed at 23:59 and the phase is lost
+    assert.equal(
+      workflowVisualStatus([], "2026-07-06", "open-store", new Date("2026-07-07T00:30:00.000Z")),
       "red"
     );
 

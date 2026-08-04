@@ -1,12 +1,71 @@
-// Owner-editable daily checklist overrides. The base checklist for each phase lives
-// in card-store-workflow.ts (code). The owner can tailor the ticked items per phase
-// without a deploy: an override doc holds, per phaseId, the replacement item list.
-// A phase with no override keeps its built-in checklist (safe default).
+// Owner-editable daily checklist config. The base checklist for each phase lives in
+// card-store-workflow.ts (code). The owner can tailor it per branch without a deploy:
+// the items in a phase, the submit window of a phase, the order the phases appear in,
+// and which shift each phase belongs to. Anything the owner has not touched keeps its
+// built-in value (safe default).
 
 import type { WorkflowPhase } from "./card-store-workflow.ts";
+import type { ShiftCode } from "./shift-schedule.ts";
 
 /** Map of phaseId → replacement checklist items. */
 export type ChecklistOverrides = Record<string, string[]>;
+
+/**
+ * The submit window of a phase, in Bangkok clock time.
+ *
+ * `dueTime` is the deadline: submitting after it still works but costs 2 KPI points
+ * (หมวด Checklist). `openTime` locks the phase until that time — ปิดร้าน is the case that
+ * needs it, so a closing checklist cannot be ticked off at noon.
+ */
+export type PhaseWindow = { openTime?: string; dueTime: string };
+export type PhaseWindows = Record<string, PhaseWindow>;
+
+/** Map of phaseId → the shift(s) that see it. An empty list means every shift. */
+export type PhaseShifts = Record<string, ShiftCode[]>;
+
+/** Nothing may be submitted after the business day closes, whatever the phase deadline is. */
+export const CHECKLIST_DAY_END = "23:59";
+
+/** Earliest a checklist can be touched at all (matches the workflow work-hours window). */
+export const CHECKLIST_DAY_START = "09:00";
+
+/**
+ * Built-in deadlines. Every phase now carries a clock time instead of a vague label
+ * ("หลังเปิดร้าน") — late is a 2-point deduction, so the staff have to be able to read the
+ * time off the card. The owner can change any of these at /admin/checklist-config.
+ */
+export const defaultPhaseWindows: PhaseWindows = {
+  "open-store": { dueTime: "12:00" },
+  "guild-chat-exp": { dueTime: "14:00" },
+  "daytime-work": { dueTime: "18:00" },
+  "stock-work": { dueTime: "18:00" },
+  "close-store": { openTime: "19:00", dueTime: CHECKLIST_DAY_END }
+};
+
+export function isHhMm(value: string | undefined): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+/** The window a phase runs on: owner override first, built-in second, end-of-day last. */
+export function resolvePhaseWindow(phaseId: string, windows: PhaseWindows = {}): PhaseWindow {
+  const configured = windows[phaseId];
+  const fallback = defaultPhaseWindows[phaseId] || { dueTime: CHECKLIST_DAY_END };
+  if (!configured || !isHhMm(configured.dueTime)) return fallback;
+  return {
+    dueTime: configured.dueTime,
+    openTime: isHhMm(configured.openTime) ? configured.openTime : undefined
+  };
+}
+
+export type ChecklistConfig = {
+  overrides: ChecklistOverrides;
+  windows: PhaseWindows;
+  /** phaseIds in the order the owner wants them shown */
+  order: string[];
+  shifts: PhaseShifts;
+};
+
+export const emptyChecklistConfig: ChecklistConfig = { overrides: {}, windows: {}, order: [], shifts: {} };
 
 /**
  * Returns phases with their checklist replaced where an override exists. An empty
@@ -21,6 +80,42 @@ export function applyChecklistOverrides(phases: WorkflowPhase[], overrides: Chec
   );
 }
 
+/**
+ * Reorders phases to the owner's order. Phases the order does not mention keep their
+ * built-in position after the ones it does, so adding a phase in code never hides it.
+ */
+export function applyPhaseOrder(phases: WorkflowPhase[], order: string[]): WorkflowPhase[] {
+  const ranked = order.filter((phaseId) => phases.some((phase) => phase.id === phaseId));
+  const builtIn = new Map(phases.map((phase, index) => [phase.id, index]));
+  return [...phases].sort((left, right) => {
+    const leftIndex = ranked.indexOf(left.id);
+    const rightIndex = ranked.indexOf(right.id);
+    if (leftIndex === -1 && rightIndex === -1) return (builtIn.get(left.id) || 0) - (builtIn.get(right.id) || 0);
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+  });
+}
+
+/**
+ * Applies the owner's shift assignment. An empty list means "ทุกกะ" — stored as `[]`,
+ * rendered as an untagged phase, which is what phasesForShift() treats as shared.
+ */
+export function applyPhaseShifts(phases: WorkflowPhase[], shifts: PhaseShifts): WorkflowPhase[] {
+  return phases.map((phase) => {
+    if (!Object.prototype.hasOwnProperty.call(shifts, phase.id)) return phase;
+    const assigned = shifts[phase.id].filter((shift) => shift === "s1" || shift === "s2");
+    return { ...phase, shift: assigned.length ? assigned : undefined };
+  });
+}
+
+/** Everything the owner configured, applied to the built-in phases in one call. */
+export function applyChecklistConfig(phases: WorkflowPhase[], config: Partial<ChecklistConfig>): WorkflowPhase[] {
+  const withItems = applyChecklistOverrides(phases, config.overrides || {});
+  const withShifts = applyPhaseShifts(withItems, config.shifts || {});
+  return applyPhaseOrder(withShifts, config.order || []);
+}
+
 /** Seeds an editable override map from the built-in checklists (for the editor UI). */
 export function seedOverridesFromPhases(phases: WorkflowPhase[], overrides: ChecklistOverrides): ChecklistOverrides {
   const seeded: ChecklistOverrides = {};
@@ -28,6 +123,24 @@ export function seedOverridesFromPhases(phases: WorkflowPhase[], overrides: Chec
     seeded[phase.id] = Object.prototype.hasOwnProperty.call(overrides, phase.id)
       ? overrides[phase.id]
       : [...phase.checklist];
+  }
+  return seeded;
+}
+
+/** Seeds the editable window map so every phase shows a real time in the editor. */
+export function seedWindowsFromPhases(phases: WorkflowPhase[], windows: PhaseWindows): PhaseWindows {
+  const seeded: PhaseWindows = {};
+  for (const phase of phases) seeded[phase.id] = resolvePhaseWindow(phase.id, windows);
+  return seeded;
+}
+
+/** Seeds the editable shift map from whatever the phase is tagged with today. */
+export function seedShiftsFromPhases(phases: WorkflowPhase[], shifts: PhaseShifts): PhaseShifts {
+  const seeded: PhaseShifts = {};
+  for (const phase of phases) {
+    seeded[phase.id] = Object.prototype.hasOwnProperty.call(shifts, phase.id)
+      ? shifts[phase.id]
+      : [...(phase.shift || [])];
   }
   return seeded;
 }

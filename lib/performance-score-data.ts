@@ -292,22 +292,27 @@ export type AttendanceSource = {
   annualSchedules?: ShiftSchedule[];
 };
 
+/** หัวข้อ checklist ที่ส่งช้ากว่าเวลาที่กำหนด — 2 คะแนนต่อหัวข้อ */
+export type ChecklistLateSubmission = { employeeName: string; workDate: string; phaseId: string };
+
 export function getPerformanceScoreRows(
   periodId: PerformanceReviewPeriod["id"],
   dailyStore: PerformanceDailyStore,
   attendance?: AttendanceSource,
-  submittedChecklistDays: { employeeName: string; workDate: string }[] = []
+  submittedChecklistDays: { employeeName: string; workDate: string }[] = [],
+  lateChecklistSubmissions: ChecklistLateSubmission[] = []
 ): EmployeePerformanceScore[] {
   const periods = performanceReviewPeriods();
   const period = periods.find((item) => item.id === periodId) || periods[0];
-  return getPerformanceScoreRowsForRange(period, dailyStore, attendance, submittedChecklistDays);
+  return getPerformanceScoreRowsForRange(period, dailyStore, attendance, submittedChecklistDays, lateChecklistSubmissions);
 }
 
 export function getPerformanceScoreRowsForRange(
   period: PerformanceReviewPeriod,
   dailyStore: PerformanceDailyStore,
   attendance?: AttendanceSource,
-  submittedChecklistDays: { employeeName: string; workDate: string }[] = []
+  submittedChecklistDays: { employeeName: string; workDate: string }[] = [],
+  lateChecklistSubmissions: ChecklistLateSubmission[] = []
 ): EmployeePerformanceScore[] {
   const year = period.startDate.slice(0, 4);
   // Shifts and leave come from the live planner (schedule_shifts / schedule_actual) only.
@@ -331,6 +336,15 @@ export function getPerformanceScoreRowsForRange(
     teamAssigneeName: bangkaeTeamAssigneeName,
     teamMembers: employees
   });
+  // Each หัวข้อ handed in after its own deadline costs 2. One event carries the count so
+  // the deduction line reads "x N หัวข้อ" with the days it happened on.
+  const lateInPeriod = lateChecklistSubmissions.filter((item) => inPeriod(item.workDate, period));
+  const lateChecklistEventsFor = (employeeName: string): ChecklistEvent[] => {
+    const mine = lateInPeriod.filter((item) => item.employeeName === employeeName);
+    if (!mine.length) return [];
+    const dates = [...new Set(mine.map((item) => item.workDate))].sort();
+    return [{ type: "late_phase", count: mine.length, dates, source: "live" }];
+  };
   return employees.map((employeeName) => {
     const employeeSchedules = srcSchedules.filter((item) => item.employeeName === employeeName);
     const employeePeriodSchedules = employeeSchedules.filter((item) => inPeriod(item.workDate, period));
@@ -363,6 +377,7 @@ export function getPerformanceScoreRowsForRange(
       stockCounts: employeePeriodStockCounts,
       checklistEvents: [
         ...derivedChecklistEvents,
+        ...lateChecklistEventsFor(employeeName),
         ...checklistAuditEvents.filter((item) => item.employeeName === employeeName).map((item) => item.event)
       ],
       serviceEvents: serviceEventsFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.event),

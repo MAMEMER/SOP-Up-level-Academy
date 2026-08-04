@@ -86,7 +86,7 @@ export const STOCK_DIFFERENCE_DEDUCTION_START = "2026-08-01";
 export const CHECKLIST_DEDUCTION_START = "2026-08-01";
 
 export type ChecklistEvent = {
-  type: "missing_day" | "missing_important" | "backfilled" | "false_record";
+  type: "missing_day" | "missing_important" | "backfilled" | "false_record" | "late_phase";
   count: number;
   source: DataSource;
   dates?: string[];
@@ -362,11 +362,14 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
   events
     .filter((event) => event.type !== "missing_day")
     .forEach((event) => {
-      const pointsByType = { missing_important: 2, backfilled: 0, false_record: 10 } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, number>;
+      // late_phase = ส่งหัวข้อนั้นหลังเวลาที่กำหนด (แต่ยังในวันเดียวกัน) — 2 ต่อหัวข้อ
+      const pointsByType = { missing_important: 2, backfilled: 0, false_record: 10, late_phase: 2 } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, number>;
+      const dateDetail = event.dates?.length ? ` (${event.dates.join(", ")})` : "";
       const detailByType = {
         missing_important: `missing_important x ${event.count}`,
         backfilled: `backfilled x ${event.count}`,
-        false_record: `สุ่มตรวจไม่เจอข้อมูล/ข้อมูลไม่ตรงจริง x ${event.count}`
+        false_record: `สุ่มตรวจไม่เจอข้อมูล/ข้อมูลไม่ตรงจริง x ${event.count}`,
+        late_phase: `ส่ง checklist สายกว่าเวลาที่กำหนด x ${event.count} หัวข้อ${dateDetail}`
       } satisfies Record<Exclude<ChecklistEvent["type"], "missing_day">, string>;
       deductions.push({
         category: "checklist",

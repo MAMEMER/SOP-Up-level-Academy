@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkflowChecklist } from "./WorkflowChecklist.tsx";
 import { SharedPeriodicChecklist } from "./SharedPeriodicChecklist.tsx";
 import { phasesForShift, type WorkflowPhase } from "../lib/card-store-workflow.ts";
-import { applyChecklistOverrides, type ChecklistOverrides } from "../lib/daily-checklist.ts";
-import { fetchChecklistOverrides } from "../lib/daily-checklist-store.ts";
+import { applyChecklistConfig, emptyChecklistConfig, type ChecklistConfig } from "../lib/daily-checklist.ts";
+import { fetchChecklistConfig } from "../lib/daily-checklist-store.ts";
 import type { Role } from "../lib/permissions.ts";
 import { fetchShiftForStaffDate } from "../lib/shift-schedule-store.ts";
 import type { ShiftCode } from "../lib/shift-schedule.ts";
@@ -39,7 +39,7 @@ export function ChecklistView({
   const [shift, setShift] = useState<ShiftCode | null>(null);
   const [shiftStart, setShiftStart] = useState<string | null>(null);
   const [shiftLoaded, setShiftLoaded] = useState(!staffCode);
-  const [overrides, setOverrides] = useState<ChecklistOverrides>({});
+  const [config, setConfig] = useState<ChecklistConfig>(emptyChecklistConfig);
 
   useEffect(() => {
     if (!staffCode) return;
@@ -67,18 +67,20 @@ export function ChecklistView({
 
   useEffect(() => {
     let alive = true;
-    fetchChecklistOverrides(branch)
-      .then((data) => alive && setOverrides(data))
-      .catch(() => alive && setOverrides({}));
+    fetchChecklistConfig(branch)
+      .then((data) => alive && setConfig(data))
+      .catch(() => alive && setConfig(emptyChecklistConfig));
     return () => {
       alive = false;
     };
   }, [branch]);
 
   const dailyPhases = useMemo(() => {
-    const shiftFiltered = shift ? phasesForShift(phases, shift) : phases;
-    return applyChecklistOverrides(shiftFiltered, overrides);
-  }, [phases, shift, overrides]);
+    // Config first, then the shift filter: the owner can move a หัวข้อ between กะ 1 / กะ 2 /
+    // ทุกกะ, so filtering before applying it would use the built-in tags.
+    const configured = applyChecklistConfig(phases, config);
+    return shift ? phasesForShift(configured, shift) : configured;
+  }, [phases, shift, config]);
 
   return (
     <div className="checklist-view">
@@ -99,7 +101,7 @@ export function ChecklistView({
           {staffCode && shiftLoaded && !shift ? (
             <p className="checklist-view__note">วันนี้คุณไม่ได้ลงกะ — แสดง checklist ทั้งหมดไว้อ้างอิง</p>
           ) : null}
-          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} shift={shift} shiftStart={shiftStart} readOnly={readOnly} />
+          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} shift={shift} windows={config.windows} readOnly={readOnly} />
         </>
       ) : (
         <SharedPeriodicChecklist period={tab} branch={branch} workDate={workDate} staffCode={staffCode ?? "-"} readOnly={readOnly} />
