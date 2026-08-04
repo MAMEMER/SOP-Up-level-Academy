@@ -2,7 +2,7 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
-import { KPI_RULES_COLLECTION, KPI_RULES_DOC, mergeKpiRules, type KpiRules, type KpiRulesOverride } from "./kpi-rules.ts";
+import { KPI_RULES_COLLECTION, KPI_RULES_DOC, mergeKpiRules, type KpiCustomRule, type KpiRules, type KpiRulesOverride } from "./kpi-rules.ts";
 
 // Written with the service account: these numbers decide salary deductions, so they must
 // not be writable with the public client key. A missing/broken doc falls back to the
@@ -61,4 +61,32 @@ export async function saveKpiRulesOverride(override: KpiRulesOverride, updatedBy
 /** Drops every override so the engine scores with the built-in defaults again. */
 export async function resetKpiRulesOverride(updatedBy: string): Promise<void> {
   await saveKpiRulesOverride({}, updatedBy);
+}
+
+/**
+ * Writes one rate without touching the rest — the rulebook page saves per row, so an owner
+ * fixing a single number never republishes values someone else changed in the meantime.
+ */
+export async function patchKpiRule(path: string, value: number, updatedBy: string): Promise<void> {
+  const current = (await fetchKpiRulesOverride()) || {};
+  const [group, key] = path.split(".");
+  const next: Record<string, unknown> = { ...current };
+  if (key) {
+    next[group] = { ...((current as Record<string, Record<string, number>>)[group] || {}), [key]: value };
+  } else {
+    next[group] = value;
+  }
+  await saveKpiRulesOverride(next as KpiRulesOverride, updatedBy);
+}
+
+/** Adds / replaces one owner-written rule, leaving every other setting alone. */
+export async function saveCustomKpiRule(rule: KpiCustomRule, updatedBy: string): Promise<void> {
+  const current = (await fetchKpiRulesOverride()) || {};
+  const rest = (current.customRules || []).filter((item) => item.id !== rule.id);
+  await saveKpiRulesOverride({ ...current, customRules: [...rest, rule] }, updatedBy);
+}
+
+export async function deleteCustomKpiRule(id: string, updatedBy: string): Promise<void> {
+  const current = (await fetchKpiRulesOverride()) || {};
+  await saveKpiRulesOverride({ ...current, customRules: (current.customRules || []).filter((item) => item.id !== id) }, updatedBy);
 }

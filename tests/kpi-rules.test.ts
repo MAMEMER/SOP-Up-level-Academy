@@ -87,3 +87,35 @@ describe("KPI rulebook", () => {
     assert.equal(mergeKpiRules(override).categoryMax, 25);
   });
 });
+
+describe("owner-written rules", () => {
+  it("keeps a custom rule with its rate and category", () => {
+    const rules = mergeKpiRules({
+      customRules: [
+        { id: "lock-case", label: "ลืมล็อกตู้การ์ด", category: "checklist", points: 3, note: "ตอนปิดร้าน" },
+        { id: "bonus", label: "ช่วยกะอื่น", category: "assigned_work", points: -2 }
+      ]
+    });
+
+    assert.equal(rules.customRules.length, 2);
+    assert.equal(rules.customRules[0].points, 3);
+    assert.equal(rules.customRules[1].points, -2);
+    // built-in rates are untouched by a custom rule
+    assert.equal(rules.checklist.lateSubmit, defaultKpiRules.checklist.lateSubmit);
+  });
+
+  it("drops a nameless or unnumbered custom rule instead of storing it", () => {
+    const rules = mergeKpiRules({
+      customRules: [
+        { id: "a", label: "   ", category: "checklist", points: 3 },
+        { id: "b", label: "ของจริง", category: "checklist", points: Number.NaN }
+      ] as never
+    });
+
+    assert.equal(rules.customRules.length, 0);
+  });
+
+  it("has no custom rules by default", () => {
+    assert.deepEqual(mergeKpiRules(null).customRules, []);
+  });
+});

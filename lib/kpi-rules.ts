@@ -13,6 +13,26 @@ export const KPI_RULES_DOC = "default";
 
 export type IncentiveTierRule = { min: number; percent: 0 | 20 | 50 | 80 | 100; label: string };
 
+/**
+ * A rule the owner wrote themselves.
+ *
+ * The built-in rules are wired to a data source (the planner, StoreHub, the submitted
+ * checklists) — a new one of those needs code. A custom rule is the other kind: a named
+ * reason with a fixed rate that the owner charges by hand from the score page. It rides the
+ * existing adjustment pipeline, so it lands in the breakdown with its reason, counts toward
+ * the salary figure, and can be cancelled.
+ */
+export type KpiCustomRule = {
+  id: string;
+  label: string;
+  category: ScoreCategoryKey;
+  /** points to take off (positive) — a bonus rule uses a negative number */
+  points: number;
+  note?: string;
+};
+
+type ScoreCategoryKey = "attendance" | "stock" | "checklist" | "customer_service" | "assigned_work";
+
 export type KpiRules = {
   /** points a category starts from — 5 categories × 20 = 100 */
   categoryMax: number;
@@ -61,6 +81,8 @@ export type KpiRules = {
     partTimeDailyRate: number;
   };
   leave: { sickAllowance: number; personalAllowance: number };
+  /** owner-written rules, charged by hand from the score page */
+  customRules: KpiCustomRule[];
 };
 
 export const defaultKpiRules: KpiRules = {
@@ -99,12 +121,13 @@ export const defaultKpiRules: KpiRules = {
     ]
   },
   salary: { threshold: 50, fullTimeRatePerPoint: 500, partTimeDailyRate: 400 },
-  leave: { sickAllowance: 30, personalAllowance: 3 }
+  leave: { sickAllowance: 30, personalAllowance: 3 },
+  customRules: []
 };
 
 export type KpiRulesOverride = {
-  [K in keyof KpiRules]?: KpiRules[K] extends object ? Partial<KpiRules[K]> : KpiRules[K];
-};
+  [K in keyof Omit<KpiRules, "customRules">]?: KpiRules[K] extends object ? Partial<KpiRules[K]> : KpiRules[K];
+} & { customRules?: KpiCustomRule[] };
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -126,8 +149,21 @@ export function mergeKpiRules(override?: KpiRulesOverride | null): KpiRules {
     assignedWork: { ...defaultKpiRules.assignedWork },
     incentive: { tiers: defaultKpiRules.incentive.tiers.map((tier) => ({ ...tier })) },
     salary: { ...defaultKpiRules.salary },
-    leave: { ...defaultKpiRules.leave }
+    leave: { ...defaultKpiRules.leave },
+    customRules: []
   };
+
+  if (Array.isArray(override.customRules)) {
+    merged.customRules = override.customRules
+      .filter((rule) => rule && typeof rule.label === "string" && rule.label.trim() && isFiniteNumber(rule.points))
+      .map((rule) => ({
+        id: String(rule.id || rule.label).trim(),
+        label: rule.label.trim(),
+        category: rule.category,
+        points: Math.round(rule.points),
+        note: rule.note?.trim() || undefined
+      }));
+  }
 
   if (isFiniteNumber(override.categoryMax) && override.categoryMax > 0) merged.categoryMax = override.categoryMax;
 

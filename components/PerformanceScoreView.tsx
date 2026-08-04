@@ -342,6 +342,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
     (adjustment) => adjustment.workDate >= activePeriod.startDate && adjustment.workDate <= activePeriod.endDate
   );
   const adjustmentsFor = (employeeName: string) => periodAdjustments.filter((adjustment) => adjustment.employeeName === employeeName);
+  const customRules = dailyStore.kpiRules?.customRules || [];
   const serviceRecordsForDay = customerServiceRecordsForDate(dailyStore.serviceRecords, entryDate);
   const assignedRecordsForDay = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, entryDate);
 
@@ -663,6 +664,25 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               ) : (
                 <p>ไม่มีรายการหักคะแนนในรอบนี้</p>
               )}
+              {isOwnerView && customRules.length ? (
+                <div className="performance-adjust-presets">
+                  <strong>ข้อที่เพิ่มเอง</strong>
+                  {/* กติกาที่เจ้าของเขียนเองที่ /admin/kpi-rules — กดครั้งเดียวหักตามเรตของข้อนั้น */}
+                  {customRules.map((rule) => (
+                    <form key={rule.id} action={saveScoreAdjustmentAction}>
+                      <input type="hidden" name="redirectTo" value={redirectTo} />
+                      <input type="hidden" name="employeeName" value={row.employeeName} />
+                      <input type="hidden" name="adjustCategory" value={rule.category} />
+                      <input type="hidden" name="adjustDate" value={entryDate} />
+                      <input type="hidden" name="adjustPoints" value={-rule.points} />
+                      <input type="hidden" name="adjustReason" value={rule.label} />
+                      <button type="submit" title={rule.note || rule.label}>
+                        {rule.label} ({rule.points > 0 ? `-${rule.points}` : `+${Math.abs(rule.points)}`})
+                      </button>
+                    </form>
+                  ))}
+                </div>
+              ) : null}
               {isOwnerView ? (
                 <form action={saveScoreAdjustmentAction} className="performance-adjust-form">
                   <input type="hidden" name="redirectTo" value={redirectTo} />

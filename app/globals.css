@@ -4416,6 +4416,9 @@ main .page > section, main > section { margin-top: 16px !important; }
 .performance-adjust-inline input[type="number"] { width: 56px; }
 .performance-adjust-inline input { border: 1px solid rgba(255,199,142,0.5); border-radius: 8px; padding: 5px 8px; font-size: 12px; font-family: inherit; }
 .performance-adjust-inline button { border: 1px solid rgba(255,140,66,0.6); background: transparent; color: var(--color-orange); border-radius: 8px; padding: 5px 9px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.performance-adjust-presets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; font-size: 12px; color: var(--color-ink-soft); }
+.performance-adjust-presets button { border: 1px solid rgba(255,140,66,0.5); background: transparent; color: var(--color-orange); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.kpi-rules__row label button { border: 1px solid rgba(255,140,66,0.6); background: transparent; color: var(--color-orange); border-radius: 8px; padding: 6px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .performance-adjust-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 12px; }
 .performance-adjust-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); }
 .performance-adjust-form label.wide { flex: 1 1 260px; }
