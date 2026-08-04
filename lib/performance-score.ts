@@ -135,6 +135,8 @@ export type EmployeePerformanceInput = {
   employmentType?: EmploymentType;
   /** scheduled work days in the month, used for part-time salary deduction */
   daysWorked?: number;
+  /** evaluation time (ms). Shifts starting after this are not yet scored for attendance. */
+  now?: number;
 };
 
 export type EmployeePerformanceScore = {
@@ -217,7 +219,12 @@ function scheduledLeaveRecords(records: LeaveRecord[], schedules: ShiftSchedule[
   return records.filter((record) => scheduledWorkDays.has(dateKey(record.employeeName, record.workDate)));
 }
 
-export function calculateAttendanceScore(input: AttendanceInput): ScoreResult {
+// ticket OklOUlQlGcwFW0Ikvijk (4 Aug 2026): a shift that has not started yet was being
+// docked -2 for a "missing clock-in" while the employee had simply not reached เวลาเข้างาน.
+// Attendance is only knowable once the shift has actually begun, so `now` gates the
+// no-clock (and late) evaluation: a schedule whose scheduledStart is still in the future is
+// left unscored until it starts. Historical days (scheduledStart < now) are unaffected.
+export function calculateAttendanceScore(input: AttendanceInput, now: number = Date.now()): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const warnings: string[] = [];
   const clocks = new Map(input.clockEvents.map((event) => [dateKey(event.employeeName, event.workDate), event]));
@@ -226,6 +233,11 @@ export function calculateAttendanceScore(input: AttendanceInput): ScoreResult {
 
   input.schedules.forEach((schedule) => {
     if (approvedLeave.has(dateKey(schedule.employeeName, schedule.workDate))) return;
+
+    // Shift not started yet → cannot be late or absent. Skip until scheduledStart passes.
+    // (Unparseable scheduledStart → NaN comparison is false → falls through to old behavior.)
+    const startsAt = Date.parse(schedule.scheduledStart);
+    if (startsAt > now) return;
 
     const clock = clocks.get(dateKey(schedule.employeeName, schedule.workDate));
     if (!clock) {
@@ -500,7 +512,7 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
   };
   const leaveRecords = scheduledLeaveRecords(annualLeave.records, annualLeave.schedules);
   const categories = {
-    attendance: calculateAttendanceScore(input.attendance),
+    attendance: calculateAttendanceScore(input.attendance, input.now),
     stock: calculateStockScore(input.stockCounts),
     checklist: calculateChecklistScore(input.checklistEvents),
     customerService: calculateCustomerServiceScore(input.serviceEvents),
