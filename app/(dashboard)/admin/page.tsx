@@ -66,7 +66,8 @@ export default async function AdminHubPage() {
           badge: openWork ? { count: openWork, label: "ยังไม่ส่ง" } : undefined
         },
         { href: "/admin/schedule", title: "ตารางกะ", detail: "วางกะรายเดือน · ดึงเวลาเข้างานจริงจาก StoreHub มาเทียบ" },
-        { href: "/admin/checklist-config", title: "ปรับ Checklist", detail: "แก้รายการงานแต่ละช่วง — พนักงานเห็นทันที" }
+        { href: "/admin/checklist-config", title: "ปรับ Checklist", detail: "แก้รายการงาน เวลาส่ง ลำดับหัวข้อ และกะที่ต้องทำ" },
+        { href: "/admin/manual-config", title: "แก้คู่มืองาน", detail: "แก้ขั้นตอน วัตถุประสงค์ ข้อควรระวัง ที่พนักงานอ่าน" }
       ]
     },
     {

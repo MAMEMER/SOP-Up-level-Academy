@@ -6,6 +6,7 @@
 
 import type { WorkflowPhase } from "./card-store-workflow.ts";
 import type { ShiftCode } from "./shift-schedule.ts";
+import type { ManualOverrides } from "./work-manual.ts";
 
 /** Map of phaseId → replacement checklist items. */
 export type ChecklistOverrides = Record<string, string[]>;
@@ -63,9 +64,11 @@ export type ChecklistConfig = {
   /** phaseIds in the order the owner wants them shown */
   order: string[];
   shifts: PhaseShifts;
+  /** long-form manual text per phase (rendered at /training) — see lib/work-manual.ts */
+  manual: ManualOverrides;
 };
 
-export const emptyChecklistConfig: ChecklistConfig = { overrides: {}, windows: {}, order: [], shifts: {} };
+export const emptyChecklistConfig: ChecklistConfig = { overrides: {}, windows: {}, order: [], shifts: {}, manual: {} };
 
 /**
  * Returns phases with their checklist replaced where an override exists. An empty

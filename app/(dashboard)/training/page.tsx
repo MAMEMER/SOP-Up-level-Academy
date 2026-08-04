@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
+import { fetchChecklistConfig } from "../../../lib/daily-checklist-store.ts";
+import { applyManualOverrides, type ManualOverrides } from "../../../lib/work-manual.ts";
 import { storehubStocktakesUrl, weeklyStockSleevePhase } from "../../../lib/weekly-stock-workflow.ts";
 import { monthlyStockSinglePhase } from "../../../lib/monthly-stock-single-workflow.ts";
 import { seatingTableRules, weeklyEvents } from "../../../lib/weekly-event-tasks.ts";
@@ -77,6 +82,22 @@ const manualMedia: Record<string, {
 };
 
 export default function TrainingPage() {
+  // The manual text is owner-editable at /admin/manual-config; the code below is the
+  // fallback that ships with the app. Fetched client-side, same as the checklist config.
+  const [manualOverrides, setManualOverrides] = useState<ManualOverrides>({});
+
+  useEffect(() => {
+    let alive = true;
+    fetchChecklistConfig("bangkae")
+      .then((config) => alive && setManualOverrides(config.manual))
+      .catch(() => alive && setManualOverrides({}));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const manualPhases = applyManualOverrides(cardStoreWorkflow, manualOverrides);
+
   return (
     <main className="page">
       <Link href="/" className="back-link">← กลับ Dashboard</Link>
@@ -89,7 +110,7 @@ export default function TrainingPage() {
       </section>
 
       <div className="wi-manual-list">
-        {cardStoreWorkflow.map((phase, phaseIndex) => {
+        {manualPhases.map((phase, phaseIndex) => {
           // fall back to an empty entry so adding a new phase can never 500 this page
           const media = manualMedia[phase.id] || { evidence: [] };
           return (

@@ -53,6 +53,7 @@ export function DailyChecklistEditor({
   function seedConfig(source: WorkflowPhase[], config: ChecklistConfig): ChecklistConfig {
     const ordered = config.order.filter((phaseId) => source.some((phase) => phase.id === phaseId));
     return {
+      manual: config.manual,
       overrides: seedOverridesFromPhases(source, config.overrides),
       windows: seedWindowsFromPhases(source, config.windows),
       shifts: seedShiftsFromPhases(source, config.shifts),

@@ -17,6 +17,7 @@ export type DailyChecklistDoc = {
   windows?: ChecklistConfig["windows"];
   order?: ChecklistConfig["order"];
   shifts?: ChecklistConfig["shifts"];
+  manual?: ChecklistConfig["manual"];
   updatedAt: string;
   updatedBy: string;
 };
@@ -30,7 +31,8 @@ export async function fetchChecklistConfig(branch: string): Promise<ChecklistCon
     overrides: data.overrides ?? {},
     windows: data.windows ?? {},
     order: data.order ?? [],
-    shifts: data.shifts ?? {}
+    shifts: data.shifts ?? {},
+    manual: data.manual ?? {}
   };
 }
 
@@ -45,6 +47,7 @@ export async function saveChecklistConfig(input: {
     windows: input.config.windows,
     order: input.config.order,
     shifts: input.config.shifts,
+    manual: input.config.manual,
     updatedAt: new Date().toISOString(),
     updatedBy: input.updatedBy
   };

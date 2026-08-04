@@ -8,7 +8,16 @@ const baseInput = {
   employmentType: "part_time" as const,
   daysWorked: 20,
   attendance: {
-    schedules: [{ employeeName: "ICE", workDate: "2026-08-03", scheduledStart: "2026-08-03T11:00:00+07:00", source: "google-sheet" as const }],
+    schedules: [
+      {
+        employeeName: "ICE",
+        workDate: "2026-08-03",
+        scheduledStart: "2026-08-03T11:00:00+07:00",
+        scheduledEnd: "2026-08-03T20:00:00+07:00",
+        shiftLabel: "s1",
+        source: "google-sheet" as const
+      }
+    ],
     clockEvents: [{ employeeName: "ICE", workDate: "2026-08-03", clockIn: "2026-08-03T11:00:00+07:00", source: "storehub" as const }],
     leaveRecords: []
   },
