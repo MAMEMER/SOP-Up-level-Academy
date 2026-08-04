@@ -238,6 +238,8 @@ export function missingChecklistEventsFromAttendance(input: {
   clockEvents: ClockEvent[];
   missingChecklistDays?: { employeeName: string; workDate: string }[];
   submittedChecklistDays?: { employeeName: string; workDate: string }[];
+  /** days the employee submitted the checklist complete, but after the deadline (-1 each) */
+  lateChecklistDays?: { employeeName: string; workDate: string }[];
 }): ChecklistEvent[] {
   const scheduledDays = new Set(input.schedules.map((schedule) => `${schedule.employeeName}:${schedule.workDate}`));
   const clockedInDays = new Set(input.clockEvents.map((clock) => `${clock.employeeName}:${clock.workDate}`));
@@ -253,17 +255,34 @@ export function missingChecklistEventsFromAttendance(input: {
         .map((schedule) => ({ employeeName: schedule.employeeName, workDate: schedule.workDate }));
     })();
 
-  const dates = candidates
-    .filter((day) => day.employeeName === input.employeeName && inPeriod(day.workDate, input.period))
-    // Nothing before go-live: those days have no records to be missing from.
-    .filter((day) => (input.missingChecklistDays ? true : day.workDate >= CHECKLIST_DEDUCTION_START))
-    .filter((day) => scheduledDays.has(`${day.employeeName}:${day.workDate}`))
-    .filter((day) => clockedInDays.has(`${day.employeeName}:${day.workDate}`))
+  // A day is only scoreable when the employee was scheduled AND clocked in, within the
+  // period, and (for derived days) from go-live onward.
+  const scoreable = (day: { employeeName: string; workDate: string }) =>
+    day.employeeName === input.employeeName &&
+    inPeriod(day.workDate, input.period) &&
+    (input.missingChecklistDays ? true : day.workDate >= CHECKLIST_DEDUCTION_START) &&
+    scheduledDays.has(`${day.employeeName}:${day.workDate}`) &&
+    clockedInDays.has(`${day.employeeName}:${day.workDate}`);
+
+  const missingDates = candidates
+    .filter(scoreable)
     .map((day) => day.workDate)
     .sort();
+  const missingSet = new Set(missingDates);
 
-  if (!dates.length) return [];
-  return [{ type: "missing_day", count: dates.length, dates, source: "google-sheet" }];
+  // Submitted-but-late: complete for the day but past the deadline. A day that is already
+  // counted as missing is never also charged as late (it never submitted at all).
+  const lateDates = (input.lateChecklistDays || [])
+    .filter(scoreable)
+    .map((day) => day.workDate)
+    .filter((workDate) => !missingSet.has(workDate))
+    .filter((workDate, index, all) => all.indexOf(workDate) === index)
+    .sort();
+
+  const events: ChecklistEvent[] = [];
+  if (missingDates.length) events.push({ type: "missing_day", count: missingDates.length, dates: missingDates, source: "google-sheet" });
+  if (lateDates.length) events.push({ type: "late_submit", count: lateDates.length, dates: lateDates, source: "google-sheet" });
+  return events;
 }
 
 function inPeriod(date: string, period: PerformanceReviewPeriod) {
@@ -295,18 +314,20 @@ export function getPerformanceScoreRows(
   periodId: PerformanceReviewPeriod["id"],
   dailyStore: PerformanceDailyStore,
   attendance?: AttendanceSource,
-  submittedChecklistDays: { employeeName: string; workDate: string }[] = []
+  submittedChecklistDays: { employeeName: string; workDate: string }[] = [],
+  lateChecklistDays: { employeeName: string; workDate: string }[] = []
 ): EmployeePerformanceScore[] {
   const periods = performanceReviewPeriods();
   const period = periods.find((item) => item.id === periodId) || periods[0];
-  return getPerformanceScoreRowsForRange(period, dailyStore, attendance, submittedChecklistDays);
+  return getPerformanceScoreRowsForRange(period, dailyStore, attendance, submittedChecklistDays, lateChecklistDays);
 }
 
 export function getPerformanceScoreRowsForRange(
   period: PerformanceReviewPeriod,
   dailyStore: PerformanceDailyStore,
   attendance?: AttendanceSource,
-  submittedChecklistDays: { employeeName: string; workDate: string }[] = []
+  submittedChecklistDays: { employeeName: string; workDate: string }[] = [],
+  lateChecklistDays: { employeeName: string; workDate: string }[] = []
 ): EmployeePerformanceScore[] {
   const year = period.startDate.slice(0, 4);
   // Shifts and leave come from the live planner (schedule_shifts / schedule_actual) only.
@@ -339,7 +360,8 @@ export function getPerformanceScoreRowsForRange(
       period,
       schedules: employeePeriodSchedules,
       clockEvents: employeePeriodClockEvents,
-      submittedChecklistDays
+      submittedChecklistDays,
+      lateChecklistDays
     });
     return calculateEmployeePerformanceScore({
       employeeName,

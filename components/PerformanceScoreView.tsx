@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { fetchSubmittedChecklistDays } from "../lib/checklist-kpi.ts";
+import { fetchLateChecklistDays, fetchSubmittedChecklistDays } from "../lib/checklist-kpi.ts";
 import {
   getPerformanceScoreRowsForRange,
   getPerformanceScoreRows,
@@ -236,10 +236,11 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const dailyStore = await fetchPerformanceDailyStore();
   const attendance = await fetchAttendanceSource("bangkae");
   const submittedChecklistDays = await fetchSubmittedChecklistDays("bangkae", activePeriod.startDate, activePeriod.endDate);
+  const lateChecklistDays = await fetchLateChecklistDays("bangkae", activePeriod.startDate, activePeriod.endDate);
   const rows =
     activePeriod.id === "custom"
-      ? getPerformanceScoreRowsForRange(activePeriod, dailyStore, attendance, submittedChecklistDays)
-      : getPerformanceScoreRows(activePeriod.id, dailyStore, attendance, submittedChecklistDays);
+      ? getPerformanceScoreRowsForRange(activePeriod, dailyStore, attendance, submittedChecklistDays, lateChecklistDays)
+      : getPerformanceScoreRows(activePeriod.id, dailyStore, attendance, submittedChecklistDays, lateChecklistDays);
   const summary = getPerformanceSummary(rows);
   const activeSourceDetail = getPerformanceSourceDetail(params.source || "");
   const redirectTo = `${basePath}?startDate=${activePeriod.startDate}&endDate=${activePeriod.endDate}${params.source ? `&source=${params.source}` : ""}`;

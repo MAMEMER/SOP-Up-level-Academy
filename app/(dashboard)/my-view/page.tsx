@@ -8,7 +8,7 @@ import {
   employeeDirectory
 } from "../../../lib/employee-directory.ts";
 import { currentReviewPeriod, getPerformanceScoreRows } from "../../../lib/performance-score-data.ts";
-import { fetchSubmittedChecklistDays } from "../../../lib/checklist-kpi.ts";
+import { fetchLateChecklistDays, fetchSubmittedChecklistDays } from "../../../lib/checklist-kpi.ts";
 import { fetchAttendanceSource } from "../../../lib/planner-kpi.ts";
 import { assignedWorkRecordsForDate } from "../../../lib/performance-service-records.ts";
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../../lib/assigned-work-feed.ts";
@@ -64,16 +64,18 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   const displayName = displayNameFor(selectedCode);
 
   const period = reviewPeriod();
-  const [dailyStore, attendance, feed, submittedChecklistDays] = await Promise.all([
+  const [dailyStore, attendance, feed, submittedChecklistDays, lateChecklistDays] = await Promise.all([
     fetchPerformanceDailyStore(),
     fetchAttendanceSource(branch),
     fetchAssignedWorkFeed(branch, workDate),
     // Without this the checklist KPI treats every scheduled+clocked-in day since go-live as a
     // missing checklist day, over-deducting the Checklist category vs. the admin view.
-    fetchSubmittedChecklistDays(branch, period.startDate, period.endDate)
+    fetchSubmittedChecklistDays(branch, period.startDate, period.endDate),
+    // Days submitted complete but past the deadline → -1 each (ส่งครบแต่ช้า).
+    fetchLateChecklistDays(branch, period.startDate, period.endDate)
   ]);
 
-  const rows = getPerformanceScoreRows(period.id, dailyStore, attendance, submittedChecklistDays);
+  const rows = getPerformanceScoreRows(period.id, dailyStore, attendance, submittedChecklistDays, lateChecklistDays);
   const row = rows.find((item) => item.employeeName === selectedCode);
 
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
