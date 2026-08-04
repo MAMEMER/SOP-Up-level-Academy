@@ -169,6 +169,42 @@ export function ShiftPlanner({
     };
   }, [branch, month, reloadNonce]);
 
+  // Near-real-time clock-in: when the schedule table is opened for the CURRENT month,
+  // pull fresh StoreHub clock-ins in the background so the ACTUAL row reflects today's
+  // arrivals without waiting for the 12-hour cron. Throttled per browser (localStorage)
+  // so re-opening the table doesn't hammer StoreHub. Past months are static — skip.
+  useEffect(() => {
+    if (month !== currentMonth()) return;
+    let alive = true;
+    const throttleKey = `sop:clockinSync:${branch}:${month}`;
+    const minGapMs = 5 * 60 * 1000; // at most one auto-sync per 5 minutes
+    let last = 0;
+    try {
+      last = Number(window.localStorage.getItem(throttleKey)) || 0;
+    } catch {
+      last = 0;
+    }
+    if (Date.now() - last < minGapMs) return;
+    try {
+      window.localStorage.setItem(throttleKey, String(Date.now()));
+    } catch {
+      // ignore — throttle is best-effort; the 12h cron is the backstop
+    }
+    fetch(`/api/storehub/sync-clockin?month=${month}&branch=${branch}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        // reload the month so the freshly-synced clock-ins show; stay silent on
+        // failure (non-admin 403 / StoreHub not configured) — cron remains the backstop
+        if (alive && data?.ok && data.synced > 0) setReloadNonce((n) => n + 1);
+      })
+      .catch(() => {
+        // silent background sync
+      });
+    return () => {
+      alive = false;
+    };
+  }, [branch, month]);
+
   const planCells: PlanCell[] = useMemo(
     () =>
       Object.entries(plans).map(([key, value]) => {
