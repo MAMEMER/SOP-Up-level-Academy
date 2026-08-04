@@ -82,6 +82,7 @@ export default async function AdminHubPage() {
           detail: "KPI 5 หมวด · incentive · เหตุผลการหักคะแนนรายวัน",
           ownerOnly: false
         },
+        { href: "/admin/kpi-rules", title: "กติกาให้คะแนน", detail: "ดู logic การบวก/หักคะแนนทั้งหมด · เจ้าของปรับเรตได้" },
         { href: "/monthly-summary", title: "สรุปรายเดือน", detail: "งานที่ส่งตรวจทั้งเดือน และความครบถ้วนของ checklist" }
       ]
     },

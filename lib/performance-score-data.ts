@@ -389,6 +389,7 @@ export function getPerformanceScoreRowsForRange(
         ...derivedChecklistEvents,
         ...checklistAuditEvents.filter((item) => item.employeeName === employeeName).map((item) => item.event)
       ],
+      rules: dailyStore.kpiRules,
       adjustments: (dailyStore.scoreAdjustments || [])
         .filter((adjustment) => adjustment.employeeName === employeeName && inPeriod(adjustment.workDate, period))
         .map((adjustment) => ({

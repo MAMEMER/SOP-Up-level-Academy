@@ -28,6 +28,7 @@ const adminLinks = [
   { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist" },
   { href: "/admin/ops", label: "สรุปเจ้าของร้าน" },
   { href: "/admin/performance-score", label: "คะแนนพนักงาน" },
+  { href: "/admin/kpi-rules", label: "กติกาให้คะแนน" },
   { href: "/manager-review", label: "ตรวจงาน" },
   { href: "/monthly-summary", label: "สรุปรายเดือน" }
 ];

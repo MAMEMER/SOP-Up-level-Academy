@@ -1,3 +1,5 @@
+import { defaultKpiRules, type KpiRules } from "./kpi-rules.ts";
+
 export type DataSource = "google-sheet" | "storehub" | "manual" | "mock" | "import" | "live";
 
 export type ScoreCategoryKey = "attendance" | "stock" | "checklist" | "customer_service" | "assigned_work";
@@ -141,6 +143,8 @@ export type EmployeePerformanceInput = {
   daysWorked?: number;
   /** evaluation time (ms). Shifts starting after this are not yet scored for attendance. */
   now?: number;
+  /** the scoring rulebook — owner-tuned values from /admin/kpi-rules, defaults otherwise */
+  rules?: KpiRules;
   /**
    * Owner corrections in points (+ คืน / − หักเพิ่ม) with a reason each. Applied to the
    * total after the five categories are computed — see lib/score-adjustments.ts.
@@ -182,8 +186,8 @@ function clampScore(score: number, maxScore: number) {
 // with deductions beyond its 20-point capacity goes negative and drags the total down
 // (heavier salary impact). Upper-capped at 20 (can't earn above the category max),
 // rounded to 2 decimals. The TOTAL is still floored at [0,100] (see clampScore).
-function categoryScore(totalDeduction: number) {
-  return Math.min(20, Math.round((20 - totalDeduction) * 100) / 100);
+function categoryScore(totalDeduction: number, categoryMax: number = defaultKpiRules.categoryMax) {
+  return Math.min(categoryMax, Math.round((categoryMax - totalDeduction) * 100) / 100);
 }
 
 function dateKey(employeeName: string, workDate: string) {
@@ -210,17 +214,17 @@ function uniqueLeaveDays(records: LeaveRecord[]): LeaveRecord[] {
   return [...byDay.values()].sort((left, right) => left.workDate.localeCompare(right.workDate));
 }
 
-export function summarizeLeave(input: LeaveRecord[]): LeaveSummary {
+export function summarizeLeave(input: LeaveRecord[], rules: KpiRules = defaultKpiRules): LeaveSummary {
   const records = uniqueLeaveDays(input);
   const sickUsed = records.filter((record) => record.type === "sick").length;
   const personalUsed = records.filter((record) => record.type === "personal").length;
   return {
     sickUsed,
-    sickAllowance: 30,
-    sickRemaining: Math.max(0, 30 - sickUsed),
+    sickAllowance: rules.leave.sickAllowance,
+    sickRemaining: Math.max(0, rules.leave.sickAllowance - sickUsed),
     personalUsed,
-    personalAllowance: 3,
-    personalRemaining: Math.max(0, 3 - personalUsed),
+    personalAllowance: rules.leave.personalAllowance,
+    personalRemaining: Math.max(0, rules.leave.personalAllowance - personalUsed),
     records
   };
 }
@@ -235,7 +239,7 @@ function scheduledLeaveRecords(records: LeaveRecord[], schedules: ShiftSchedule[
 // Attendance is only knowable once the shift has actually begun, so `now` gates the
 // no-clock (and late) evaluation: a schedule whose scheduledStart is still in the future is
 // left unscored until it starts. Historical days (scheduledStart < now) are unaffected.
-export function calculateAttendanceScore(input: AttendanceInput, now: number = Date.now()): ScoreResult {
+export function calculateAttendanceScore(input: AttendanceInput, now: number = Date.now(), rules: KpiRules = defaultKpiRules): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const warnings: string[] = [];
   const clocks = new Map(input.clockEvents.map((event) => [dateKey(event.employeeName, event.workDate), event]));
@@ -254,7 +258,7 @@ export function calculateAttendanceScore(input: AttendanceInput, now: number = D
     if (!clock) {
       deductions.push({
         category: "attendance",
-        points: 2,
+        points: rules.attendance.missingClockIn,
         reason: "late_over_30_minutes_or_missing_clock_in",
         detail: `${schedule.employeeName} missing clock-in or late over 30 minutes on ${schedule.workDate}`,
         source: schedule.source
@@ -263,10 +267,10 @@ export function calculateAttendanceScore(input: AttendanceInput, now: number = D
     }
 
     const lateMinutes = minutesLate(schedule.scheduledStart, clock.clockIn);
-    if (lateMinutes > 10) {
+    if (lateMinutes > rules.attendance.lateGraceMinutes) {
       deductions.push({
         category: "attendance",
-        points: 2,
+        points: rules.attendance.lateOver10Minutes,
         reason: "late_over_10_minutes",
         detail: `${schedule.employeeName} late ${lateMinutes} minutes on ${schedule.workDate}`,
         source: clock.source
@@ -274,7 +278,7 @@ export function calculateAttendanceScore(input: AttendanceInput, now: number = D
     } else if (lateMinutes > 0) {
       deductions.push({
         category: "attendance",
-        points: 1,
+        points: rules.attendance.lateWithin10Minutes,
         reason: "late_within_10_minutes",
         detail: `${schedule.employeeName} late ${lateMinutes} minutes on ${schedule.workDate}`,
         source: clock.source
@@ -291,10 +295,10 @@ export function calculateAttendanceScore(input: AttendanceInput, now: number = D
   });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [], warnings };
+  return { score: categoryScore(totalDeduction, rules.categoryMax), maxScore: rules.categoryMax, deductions, flags: [], warnings };
 }
 
-export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
+export function calculateStockScore(records: StockCountRecord[], rules: KpiRules = defaultKpiRules): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const flags: string[] = [];
   const warnings: string[] = [];
@@ -307,7 +311,7 @@ export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
   orderedRecords.forEach((record) => {
     if (record.discrepancyStatus === "not_counted") {
       notCountedOccurrence += 1;
-      const points = notCountedOccurrence <= 2 ? 10 : 5;
+      const points = notCountedOccurrence <= rules.stock.notCountedEscalateAfter ? rules.stock.notCountedFirst : rules.stock.notCountedAfter;
       deductions.push({
         category: "stock",
         points,
@@ -322,7 +326,7 @@ export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
     if (record.slowCount) {
       deductions.push({
         category: "stock",
-        points: 2,
+        points: rules.stock.slowCount,
         reason: "stock_slow_count",
         detail: `${record.employeeName} นับ stock ช้าเกินกรอบ 4 ชม. ${record.category} on ${record.dueDate}`,
         source: record.source
@@ -339,7 +343,7 @@ export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
       } else {
         deductions.push({
           category: "stock",
-          points: 2,
+          points: rules.stock.realLoss,
           reason: "stock_difference",
           detail: `${record.category} has StoreHub Difference`,
           source: record.source
@@ -351,10 +355,10 @@ export function calculateStockScore(records: StockCountRecord[]): ScoreResult {
   });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings };
+  return { score: categoryScore(totalDeduction, rules.categoryMax), maxScore: rules.categoryMax, deductions, flags: [...new Set(flags)], warnings };
 }
 
-export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
+export function calculateChecklistScore(events: ChecklistEvent[], rules: KpiRules = defaultKpiRules): ScoreResult {
   const deductions: DeductionRecord[] = [];
   const flags: string[] = [];
 
@@ -378,7 +382,7 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
     for (let i = 0; i < event.count; i += 1) {
       missingOccurrence += 1;
       occurrences.push(missingOccurrence);
-      points += missingOccurrence <= 2 ? 10 : 5;
+      points += missingOccurrence <= rules.checklist.missingDayEscalateAfter ? rules.checklist.missingDayFirst : rules.checklist.missingDayAfter;
     }
     const dateDetail = event.dates?.length ? `: ${event.dates.join(", ")}` : "";
     const occLabel = occurrences.length === 1 ? `ครั้งที่ ${occurrences[0]}` : `ครั้งที่ ${occurrences[0]}-${occurrences[occurrences.length - 1]}`;
@@ -395,7 +399,12 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
     .filter((event) => event.type !== "missing_day")
     .forEach((event) => {
       type OtherType = Exclude<ChecklistEvent["type"], "missing_day">;
-      const pointsByType = { missing_important: 1, late_submit: 2, backfilled: 0, false_record: 10 } satisfies Record<OtherType, number>;
+      const pointsByType = {
+        missing_important: rules.checklist.missingImportant,
+        late_submit: rules.checklist.lateSubmit,
+        backfilled: rules.checklist.backfilled,
+        false_record: rules.checklist.falseRecord
+      } satisfies Record<OtherType, number>;
       const subject = event.label ?? event.dates?.join(", ");
       const detailByType = {
         missing_important: `ขาด item สำคัญ${subject ? `: ${subject}` : ` x ${event.count}`}`,
@@ -414,10 +423,10 @@ export function calculateChecklistScore(events: ChecklistEvent[]): ScoreResult {
     });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+  return { score: categoryScore(totalDeduction, rules.categoryMax), maxScore: rules.categoryMax, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
-export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResult {
+export function calculateCustomerServiceScore(events: ServiceEvent[], rules: KpiRules = defaultKpiRules): ScoreResult {
   // KPI 23 Jul 2026: pure deduction model (no per-bucket floor, category can go negative).
   // First complaint / fixed on the spot = -5 each. Repeat of the same issue = -10 + coach.
   // Severe complaint = -10 + coach. Applies to both the feedback and event-response buckets.
@@ -427,10 +436,10 @@ export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResu
   events.forEach((event) => {
     let points: number;
     if (event.severity === "severe" || event.severity === "repeated") {
-      points = 10 * event.count;
+      points = rules.customerService.repeatedOrSevere * event.count;
       flags.push("coaching_required");
     } else {
-      points = 5 * event.count;
+      points = rules.customerService.fixedImmediately * event.count;
     }
     deductions.push({
       category: "customer_service",
@@ -442,7 +451,7 @@ export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResu
   });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);
-  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+  return { score: categoryScore(totalDeduction, rules.categoryMax), maxScore: rules.categoryMax, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
 // KPI 3 Aug 2026 (ticket 6D3HIfy7): assigned work scored by cumulative deductions from 20.
@@ -455,20 +464,20 @@ export function calculateCustomerServiceScore(events: ServiceEvent[]): ScoreResu
 // Only late / unfinished submissions are docked:
 //   - late_one_day   ส่งช้ากว่ากำหนดไม่เกิน 1 วัน                  -> -1
 //   - not_finished   ไม่เสร็จ / เกินกำหนด (auto if unsubmitted past deadline) -> -5 + coach
-function assignedWorkItemDeduction(status: AssignedWork["status"]) {
-  if (status === "late_one_day") return 1;
-  if (status === "not_finished") return 5;
+function assignedWorkItemDeduction(status: AssignedWork["status"], rules: KpiRules) {
+  if (status === "late_one_day") return rules.assignedWork.lateOneDay;
+  if (status === "not_finished") return rules.assignedWork.notFinished;
   return 0;
 }
 
-export function calculateAssignedWorkScore(works: AssignedWork[]): ScoreResult {
-  if (works.length === 0) return { score: 20, maxScore: 20, deductions: [], flags: [], warnings: [] };
+export function calculateAssignedWorkScore(works: AssignedWork[], rules: KpiRules = defaultKpiRules): ScoreResult {
+  if (works.length === 0) return { score: rules.categoryMax, maxScore: rules.categoryMax, deductions: [], flags: [], warnings: [] };
 
   const flags: string[] = [];
   const deductions: DeductionRecord[] = [];
   works.forEach((work) => {
     if (work.status === "not_finished") flags.push("coaching_required");
-    const points = assignedWorkItemDeduction(work.status);
+    const points = assignedWorkItemDeduction(work.status, rules);
     if (points > 0) {
       deductions.push({
         category: "assigned_work",
@@ -481,33 +490,32 @@ export function calculateAssignedWorkScore(works: AssignedWork[]): ScoreResult {
   });
 
   const totalDeduction = deductions.reduce((sum, item) => sum + item.points, 0);
-  return { score: categoryScore(totalDeduction), maxScore: 20, deductions, flags: [...new Set(flags)], warnings: [] };
+  return { score: categoryScore(totalDeduction, rules.categoryMax), maxScore: rules.categoryMax, deductions, flags: [...new Set(flags)], warnings: [] };
 }
 
-export function getIncentiveTier(totalScore: number): IncentiveTier {
-  if (totalScore >= 90) return { label: "90-100", percent: 100, requiresCoaching: false };
-  if (totalScore >= 80) return { label: "80-89", percent: 80, requiresCoaching: false };
-  if (totalScore >= 70) return { label: "70-79", percent: 50, requiresCoaching: false };
-  if (totalScore >= 60) return { label: "60-69", percent: 20, requiresCoaching: false };
-  return { label: "ต่ำกว่า 60", percent: 0, requiresCoaching: true };
+export function getIncentiveTier(totalScore: number, rules: KpiRules = defaultKpiRules): IncentiveTier {
+  const tiers = [...rules.incentive.tiers].sort((left, right) => right.min - left.min);
+  const tier = tiers.find((item) => totalScore >= item.min) || tiers[tiers.length - 1];
+  return { label: tier.label, percent: tier.percent, requiresCoaching: tier.percent === 0 };
 }
 
 // KPI 21 Jul 2026: below 50 total, salary is docked. Full time = whole points short × 500.
 // Part time = points-short percent of the month's earnings (daysWorked × dailyRate). Rounds up.
 export function calculateSalaryDeduction(
   totalScore: number,
-  opts?: { employmentType?: EmploymentType; daysWorked?: number; dailyRate?: number; fullTimeRatePerPoint?: number }
+  opts?: { employmentType?: EmploymentType; daysWorked?: number; dailyRate?: number; fullTimeRatePerPoint?: number; threshold?: number }
 ): SalaryDeduction {
   const employmentType = opts?.employmentType ?? "full_time";
-  const dailyRate = opts?.dailyRate ?? 400;
-  const fullTimeRatePerPoint = opts?.fullTimeRatePerPoint ?? 500;
+  const dailyRate = opts?.dailyRate ?? defaultKpiRules.salary.partTimeDailyRate;
+  const fullTimeRatePerPoint = opts?.fullTimeRatePerPoint ?? defaultKpiRules.salary.fullTimeRatePerPoint;
+  const threshold = opts?.threshold ?? defaultKpiRules.salary.threshold;
   const daysWorked = opts?.daysWorked ?? 0;
 
-  if (totalScore >= 50) {
-    return { amount: 0, employmentType, pointsShort: 0, basis: "คะแนน 50 ขึ้นไป ไม่หักเงิน" };
+  if (totalScore >= threshold) {
+    return { amount: 0, employmentType, pointsShort: 0, basis: `คะแนน ${threshold} ขึ้นไป ไม่หักเงิน` };
   }
 
-  const pointsShort = Math.ceil(50 - totalScore);
+  const pointsShort = Math.ceil(threshold - totalScore);
   if (employmentType === "part_time") {
     const monthEarnings = daysWorked * dailyRate;
     const amount = Math.ceil((pointsShort / 100) * monthEarnings);
@@ -529,17 +537,20 @@ export function calculateSalaryDeduction(
 }
 
 export function calculateEmployeePerformanceScore(input: EmployeePerformanceInput): EmployeePerformanceScore {
+  // Every rate comes from the rulebook (lib/kpi-rules.ts) — defaults unless the owner
+  // retuned them at /admin/kpi-rules.
+  const rules = input.rules || defaultKpiRules;
   const annualLeave = input.annualLeave || {
     schedules: input.attendance.schedules,
     records: input.attendance.leaveRecords || []
   };
   const leaveRecords = scheduledLeaveRecords(annualLeave.records, annualLeave.schedules);
   const categories = {
-    attendance: calculateAttendanceScore(input.attendance, input.now),
-    stock: calculateStockScore(input.stockCounts),
-    checklist: calculateChecklistScore(input.checklistEvents),
-    customerService: calculateCustomerServiceScore(input.serviceEvents),
-    assignedWork: calculateAssignedWorkScore(input.assignedWorks)
+    attendance: calculateAttendanceScore(input.attendance, input.now, rules),
+    stock: calculateStockScore(input.stockCounts, rules),
+    checklist: calculateChecklistScore(input.checklistEvents, rules),
+    customerService: calculateCustomerServiceScore(input.serviceEvents, rules),
+    assignedWork: calculateAssignedWorkScore(input.assignedWorks, rules)
   };
   const adjustments = input.adjustments || [];
   const adjustmentPoints = adjustments.reduce((sum, adjustment) => sum + Math.round(adjustment.points), 0);
@@ -554,7 +565,7 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
       adjustmentPoints,
     100
   );
-  const incentive = getIncentiveTier(totalScore);
+  const incentive = getIncentiveTier(totalScore, rules);
   const flags = [
     ...categories.attendance.flags,
     ...categories.stock.flags,
@@ -595,10 +606,13 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
       ...categories.customerService.warnings,
       ...categories.assignedWork.warnings
     ],
-    leaveSummary: summarizeLeave(leaveRecords),
+    leaveSummary: summarizeLeave(leaveRecords, rules),
     salaryDeduction: calculateSalaryDeduction(totalScore, {
       employmentType: input.employmentType,
-      daysWorked: input.daysWorked
+      daysWorked: input.daysWorked,
+      dailyRate: rules.salary.partTimeDailyRate,
+      fullTimeRatePerPoint: rules.salary.fullTimeRatePerPoint,
+      threshold: rules.salary.threshold
     })
   };
 }

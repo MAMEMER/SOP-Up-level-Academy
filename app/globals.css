@@ -4392,6 +4392,25 @@ main .page > section, main > section { margin-top: 16px !important; }
 .assignment-detail__evidence li { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .assignment-detail__evidence-view { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
 
+/* ── Owner: กติกาการให้คะแนน (KPI rulebook) ───────────────────────────────── */
+.kpi-rules { display: flex; flex-direction: column; gap: 14px; }
+.kpi-rules__flow { padding: 16px; margin-bottom: 14px; }
+.kpi-rules__flow h3 { font-size: 15px; margin-bottom: 8px; }
+.kpi-rules__flow ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--color-ink-soft); }
+.kpi-rules__group { padding: 16px; }
+.kpi-rules__group h3 { font-size: 15px; margin-bottom: 10px; }
+.kpi-rules__rows { display: flex; flex-direction: column; gap: 8px; }
+.kpi-rules__row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.kpi-rules__row > div { display: flex; flex-direction: column; gap: 2px; flex: 1 1 240px; }
+.kpi-rules__row strong { font-size: 13.5px; font-weight: 500; }
+.kpi-rules__row small { font-size: 11.5px; color: var(--color-ink-soft); }
+.kpi-rules__changed { color: var(--color-orange); }
+.kpi-rules__row label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--color-ink-soft); }
+.kpi-rules__row input { width: 72px; border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 7px 10px; font-size: 13.5px; font-family: inherit; text-align: right; }
+.kpi-rules__row input:disabled { opacity: 0.6; }
+.kpi-rules__hint { font-size: 11.5px; color: var(--color-ink-soft); margin-top: 8px; }
+.kpi-rules__reset { border: 1px solid rgba(176,52,63,0.4); background: transparent; color: #b0343f; border-radius: 9px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit; }
+
 /* ── Owner: แก้คะแนน KPI เอง ──────────────────────────────────────────────── */
 .performance-adjust-inline { display: flex; gap: 5px; align-items: center; }
 .performance-adjust-inline input[type="number"] { width: 56px; }

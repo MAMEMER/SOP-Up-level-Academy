@@ -3,6 +3,7 @@ import { fetchPerformanceDailyStore as fetchManualRecords, type PerformanceDaily
 import { fetchStockCheckRecords } from "./stock-check-store.ts";
 import { fetchChecklistAuditRecords } from "./checklist-audit-store.ts";
 import { fetchScoreAdjustments } from "./score-adjustment-store.ts";
+import { fetchKpiRules } from "./kpi-rules-store.ts";
 
 /**
  * Every manual KPI input in one object.
@@ -13,11 +14,12 @@ import { fetchScoreAdjustments } from "./score-adjustment-store.ts";
  * stay free of "server-only" and keep its record helpers unit-testable.
  */
 export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStore> {
-  const [manual, stockCheckRecords, checklistAuditRecords, scoreAdjustments] = await Promise.all([
+  const [manual, stockCheckRecords, checklistAuditRecords, scoreAdjustments, kpiRules] = await Promise.all([
     fetchManualRecords(),
     fetchStockCheckRecords(),
     fetchChecklistAuditRecords(),
-    fetchScoreAdjustments()
+    fetchScoreAdjustments(),
+    fetchKpiRules()
   ]);
-  return { ...manual, stockCheckRecords, checklistAuditRecords, scoreAdjustments };
+  return { ...manual, stockCheckRecords, checklistAuditRecords, scoreAdjustments, kpiRules };
 }

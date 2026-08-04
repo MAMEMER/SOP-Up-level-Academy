@@ -4,6 +4,7 @@ import { restListCollection, restUpsertDoc } from "./firestore-rest.ts";
 import type { StockCheckRecord } from "./stock-check-records.ts";
 import type { ChecklistAuditRecord } from "./checklist-audit-records.ts";
 import type { ScoreAdjustment } from "./score-adjustments.ts";
+import type { KpiRules } from "./kpi-rules.ts";
 
 const SERVICE_COLLECTION = "sop_service_records";
 const ASSIGNED_COLLECTION = "sop_assigned_records";
@@ -58,6 +59,8 @@ export type PerformanceDailyStore = {
   checklistAuditRecords?: ChecklistAuditRecord[];
   /** owner corrections in points, with a reason each */
   scoreAdjustments?: ScoreAdjustment[];
+  /** the scoring rulebook in force — owner-tuned at /admin/kpi-rules */
+  kpiRules?: KpiRules;
 };
 
 function recordId(prefix: string, input: { workDate: string; employeeName: string }, recordedAt: string) {
