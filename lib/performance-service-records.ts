@@ -3,6 +3,7 @@ import type { AssignedWork, ServiceEvent } from "./performance-score.ts";
 import { restListCollection, restUpsertDoc } from "./firestore-rest.ts";
 import type { StockCheckRecord } from "./stock-check-records.ts";
 import type { ChecklistAuditRecord } from "./checklist-audit-records.ts";
+import type { ScoreAdjustment } from "./score-adjustments.ts";
 
 const SERVICE_COLLECTION = "sop_service_records";
 const ASSIGNED_COLLECTION = "sop_assigned_records";
@@ -47,6 +48,8 @@ export type PerformanceDailyStore = {
   stockCheckRecords: StockCheckRecord[];
   /** admin-entered checklist audits (สุ่มตรวจ) — the manual half of the Checklist category */
   checklistAuditRecords?: ChecklistAuditRecord[];
+  /** owner corrections in points, with a reason each */
+  scoreAdjustments?: ScoreAdjustment[];
 };
 
 function recordId(prefix: string, input: { workDate: string; employeeName: string }, recordedAt: string) {
@@ -165,7 +168,7 @@ export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStor
     restListCollection<CustomerServiceRecord>(SERVICE_COLLECTION),
     restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION)
   ]);
-  return { serviceRecords, assignedWorkRecords, stockCheckRecords: [], checklistAuditRecords: [] };
+  return { serviceRecords, assignedWorkRecords, stockCheckRecords: [], checklistAuditRecords: [], scoreAdjustments: [] };
 }
 
 export async function saveCustomerServiceRecord(input: CustomerServiceRecordInput) {

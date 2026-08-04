@@ -1,7 +1,9 @@
 export type DataSource = "google-sheet" | "storehub" | "manual" | "mock" | "import" | "live";
 
+export type ScoreCategoryKey = "attendance" | "stock" | "checklist" | "customer_service" | "assigned_work";
+
 export type DeductionRecord = {
-  category: "attendance" | "stock" | "checklist" | "customer_service" | "assigned_work";
+  category: ScoreCategoryKey;
   points: number;
   reason: string;
   detail: string;
@@ -135,6 +137,11 @@ export type EmployeePerformanceInput = {
   employmentType?: EmploymentType;
   /** scheduled work days in the month, used for part-time salary deduction */
   daysWorked?: number;
+  /**
+   * Owner corrections in points (+ คืน / − หักเพิ่ม) with a reason each. Applied to the
+   * total after the five categories are computed — see lib/score-adjustments.ts.
+   */
+  adjustments?: Array<{ category: ScoreCategoryKey; points: number; reason: string; workDate: string }>;
 };
 
 export type EmployeePerformanceScore = {
@@ -147,6 +154,8 @@ export type EmployeePerformanceScore = {
    */
   hasData: boolean;
   incentive: IncentiveTier;
+  /** net points the owner added (+) or removed (−) by hand, already in totalScore */
+  adjustmentPoints: number;
   categories: {
     attendance: ScoreResult;
     stock: ScoreResult;
@@ -502,12 +511,17 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
     customerService: calculateCustomerServiceScore(input.serviceEvents),
     assignedWork: calculateAssignedWorkScore(input.assignedWorks)
   };
+  const adjustments = input.adjustments || [];
+  const adjustmentPoints = adjustments.reduce((sum, adjustment) => sum + Math.round(adjustment.points), 0);
+  // Adjustments land on the total, not inside a category: a category is capped at 20 and
+  // floored at 0, so a correction applied there could silently vanish.
   const totalScore = clampScore(
     categories.attendance.score +
       categories.stock.score +
       categories.checklist.score +
       categories.customerService.score +
-      categories.assignedWork.score,
+      categories.assignedWork.score +
+      adjustmentPoints,
     100
   );
   const incentive = getIncentiveTier(totalScore);
@@ -528,12 +542,20 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
     hasData,
     incentive,
     categories,
+    adjustmentPoints,
     deductions: [
       ...categories.attendance.deductions,
       ...categories.stock.deductions,
       ...categories.checklist.deductions,
       ...categories.customerService.deductions,
-      ...categories.assignedWork.deductions
+      ...categories.assignedWork.deductions,
+      ...adjustments.map((adjustment) => ({
+        category: adjustment.category,
+        points: -Math.round(adjustment.points),
+        reason: adjustment.points >= 0 ? "manual_credit" : "manual_deduction",
+        detail: `${adjustment.points >= 0 ? "คืน" : "หักเพิ่ม"} ${Math.abs(Math.round(adjustment.points))} คะแนน (${adjustment.workDate}) — ${adjustment.reason}`,
+        source: "manual" as const
+      }))
     ],
     flags: [...new Set(flags)],
     warnings: [

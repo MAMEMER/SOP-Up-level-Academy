@@ -19,6 +19,11 @@ import {
   saveCustomerServiceRecord
 } from "../lib/performance-service-records.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
+import { requireUser } from "../lib/auth.ts";
+import { isOwner } from "../lib/owner.ts";
+import { deleteScoreAdjustment, saveScoreAdjustment } from "../lib/score-adjustment-store.ts";
+import { adjustmentCategoryOptions } from "../lib/score-adjustments.ts";
+import type { ScoreCategoryKey } from "../lib/performance-score.ts";
 import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
 import { displayNameFor, employeeDirectory } from "../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../lib/performance-daily-store.ts";
@@ -40,6 +45,15 @@ const categoryLabels = {
   checklist: "Checklist",
   customerService: "บริการลูกค้า",
   assignedWork: "งานที่มอบหมาย"
+};
+
+/** DeductionRecord uses snake_case category keys; the labels above are camelCase. */
+const categoryKeyToLabelKey: Record<ScoreCategoryKey, keyof typeof categoryLabels> = {
+  attendance: "attendance",
+  stock: "stock",
+  checklist: "checklist",
+  customer_service: "customerService",
+  assigned_work: "assignedWork"
 };
 
 function isDateValue(value: string | undefined) {
@@ -128,7 +142,31 @@ function safeRedirectTo(value: FormDataEntryValue | null) {
   return path.startsWith("/admin/performance-score") || path.startsWith("/performance-score") ? path : "/admin/performance-score";
 }
 
-function withInputStatus(path: string, status: "service-saved" | "service-error") {
+type InputStatus =
+  | "service-saved"
+  | "service-error"
+  | "adjust-saved"
+  | "adjust-removed"
+  | "adjust-error"
+  | "adjust-denied"
+  | "adjust-missing-reason"
+  | "adjust-missing-points";
+
+const adjustStatusMessages: Record<string, { tone: "success" | "warning"; text: string }> = {
+  "adjust-saved": { tone: "success", text: "แก้คะแนนแล้ว — คะแนนรวมและยอดหักเงินอัปเดตทันที" },
+  "adjust-removed": { tone: "success", text: "ยกเลิกการแก้คะแนนแล้ว" },
+  "adjust-denied": { tone: "warning", text: "แก้คะแนนได้เฉพาะเจ้าของ และต้องไม่อยู่ในโหมดดูแทนพนักงาน" },
+  "adjust-missing-reason": { tone: "warning", text: "ต้องใส่เหตุผลทุกครั้งที่แก้คะแนน" },
+  "adjust-missing-points": { tone: "warning", text: "ใส่จำนวนคะแนนที่ต้องการคืนหรือหักเพิ่ม (ไม่ใช่ 0)" },
+  "adjust-error": { tone: "warning", text: "บันทึกการแก้คะแนนไม่สำเร็จ" }
+};
+
+function adjustmentCategory(value: string): ScoreCategoryKey {
+  const known = adjustmentCategoryOptions.map((option) => option.value);
+  return (known as string[]).includes(value) ? (value as ScoreCategoryKey) : "checklist";
+}
+
+function withInputStatus(path: string, status: InputStatus) {
   const separator = path.includes("?") ? "&" : "?";
   return `${path}${separator}inputStatus=${status}`;
 }
@@ -173,6 +211,57 @@ async function saveComplaintServiceAction(formData: FormData) {
   redirect(withInputStatus(redirectTo, inputStatus));
 }
 
+/**
+ * Owner correction to a computed score. Guarded inside the action, not by the page: this
+ * view also renders at the ungated /performance-score, and a server action is callable by
+ * anyone who can render the form.
+ */
+async function saveScoreAdjustmentAction(formData: FormData) {
+  "use server";
+  const redirectTo = safeRedirectTo(formData.get("redirectTo"));
+  const user = await requireUser();
+  if (!isOwner(user.actualEmail) || user.isImpersonating) redirect(withInputStatus(redirectTo, "adjust-denied"));
+
+  const reason = stringValue(formData, "adjustReason");
+  const points = Number(stringValue(formData, "adjustPoints") || "0");
+  if (!reason) redirect(withInputStatus(redirectTo, "adjust-missing-reason"));
+  if (!Number.isFinite(points) || Math.round(points) === 0) redirect(withInputStatus(redirectTo, "adjust-missing-points"));
+
+  let inputStatus: InputStatus = "adjust-saved";
+  try {
+    await saveScoreAdjustment({
+      workDate: stringValue(formData, "adjustDate"),
+      employeeName: stringValue(formData, "employeeName"),
+      category: adjustmentCategory(stringValue(formData, "adjustCategory")),
+      points: Math.round(points),
+      reason,
+      recordedBy: user.actualEmail
+    });
+  } catch {
+    inputStatus = "adjust-error";
+  }
+  revalidatePath("/admin/performance-score");
+  revalidatePath("/performance-score");
+  redirect(withInputStatus(redirectTo, inputStatus));
+}
+
+async function deleteScoreAdjustmentAction(formData: FormData) {
+  "use server";
+  const redirectTo = safeRedirectTo(formData.get("redirectTo"));
+  const user = await requireUser();
+  if (!isOwner(user.actualEmail) || user.isImpersonating) redirect(withInputStatus(redirectTo, "adjust-denied"));
+
+  let inputStatus: InputStatus = "adjust-removed";
+  try {
+    await deleteScoreAdjustment(stringValue(formData, "adjustmentId"));
+  } catch {
+    inputStatus = "adjust-error";
+  }
+  revalidatePath("/admin/performance-score");
+  revalidatePath("/performance-score");
+  redirect(withInputStatus(redirectTo, inputStatus));
+}
+
 async function saveAssignedWorkAction(formData: FormData) {
   "use server";
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
@@ -208,6 +297,13 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const inputStatus = params.inputStatus;
   const entryDate = activePeriod.endDate;
   const periodShortcuts = quickPeriodLinks(basePath, params.source);
+  // Adjustments are money-sensitive like the salary figures: same owner gate.
+  const isOwnerView = isOwner;
+  const adjustStatusMessage = adjustStatusMessages[params.inputStatus || ""];
+  const periodAdjustments = (dailyStore.scoreAdjustments || []).filter(
+    (adjustment) => adjustment.workDate >= activePeriod.startDate && adjustment.workDate <= activePeriod.endDate
+  );
+  const adjustmentsFor = (employeeName: string) => periodAdjustments.filter((adjustment) => adjustment.employeeName === employeeName);
   const serviceRecordsForDay = customerServiceRecordsForDate(dailyStore.serviceRecords, entryDate);
   const assignedRecordsForDay = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, entryDate);
 
@@ -413,6 +509,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
         </article>
       </section>
 
+      {adjustStatusMessage ? <p className={`input-status ${adjustStatusMessage.tone}`}>{adjustStatusMessage.text}</p> : null}
+
       <section className="performance-score-table">
         <div className="performance-table-head">
           <span>พนักงาน</span>
@@ -475,15 +573,32 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                       <th>หัก</th>
                       <th>เหตุผล</th>
                       <th>Source</th>
+                      {isOwnerView ? <th>แก้คะแนน</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {row.deductions.map((deduction, index) => (
                       <tr key={`${deduction.reason}-${index}`}>
-                        <td>{deduction.category}</td>
-                        <td>-{deduction.points}</td>
+                        <td>{categoryLabels[categoryKeyToLabelKey[deduction.category]]}</td>
+                        <td>{deduction.points >= 0 ? `-${deduction.points}` : `+${Math.abs(deduction.points)}`}</td>
                         <td>{deduction.detail}</td>
                         <td>{deduction.source}</td>
+                        {isOwnerView ? (
+                          <td>
+                            {/* หักผิดตรงไหน แก้คืนได้ตรงนั้น — ต้องใส่เหตุผลเสมอ */}
+                            {deduction.points > 0 ? (
+                              <form action={saveScoreAdjustmentAction} className="performance-adjust-inline">
+                                <input type="hidden" name="redirectTo" value={redirectTo} />
+                                <input type="hidden" name="employeeName" value={row.employeeName} />
+                                <input type="hidden" name="adjustCategory" value={deduction.category} />
+                                <input type="hidden" name="adjustDate" value={entryDate} />
+                                <input name="adjustPoints" type="number" defaultValue={deduction.points} step="1" aria-label="คะแนนที่คืน" />
+                                <input name="adjustReason" placeholder="เหตุผลที่แก้" required />
+                                <button type="submit">คืนคะแนน</button>
+                              </form>
+                            ) : null}
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
@@ -491,6 +606,49 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               ) : (
                 <p>ไม่มีรายการหักคะแนนในรอบนี้</p>
               )}
+              {isOwnerView ? (
+                <form action={saveScoreAdjustmentAction} className="performance-adjust-form">
+                  <input type="hidden" name="redirectTo" value={redirectTo} />
+                  <input type="hidden" name="employeeName" value={row.employeeName} />
+                  <label>
+                    หมวด
+                    <select name="adjustCategory" defaultValue="checklist">
+                      {adjustmentCategoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    คะแนน (+ คืน / − หักเพิ่ม)
+                    <input name="adjustPoints" type="number" step="1" defaultValue="2" />
+                  </label>
+                  <label>
+                    วันที่
+                    <input name="adjustDate" type="date" defaultValue={entryDate} />
+                  </label>
+                  <label className="wide">
+                    เหตุผล
+                    <input name="adjustReason" placeholder="เช่น clock-in ไม่ sync ไม่ใช่ความผิดพนักงาน" required />
+                  </label>
+                  <button type="submit">บันทึกการแก้คะแนน</button>
+                </form>
+              ) : null}
+              {isOwnerView && adjustmentsFor(row.employeeName).length ? (
+                <div className="performance-adjust-list">
+                  <strong>การแก้คะแนนในรอบนี้</strong>
+                  {adjustmentsFor(row.employeeName).map((adjustment) => (
+                    <span key={adjustment.id}>
+                      {adjustment.workDate} · {adjustment.points > 0 ? `+${adjustment.points}` : adjustment.points} ·{" "}
+                      {adjustment.reason} ({adjustment.recordedBy})
+                      <form action={deleteScoreAdjustmentAction}>
+                        <input type="hidden" name="redirectTo" value={redirectTo} />
+                        <input type="hidden" name="adjustmentId" value={adjustment.id} />
+                        <button type="submit" className="staff-form__delete">ยกเลิก</button>
+                      </form>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {row.warnings.length ? (
                 <div className="performance-warning-list">
                   {row.warnings.map((warning) => (

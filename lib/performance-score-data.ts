@@ -375,6 +375,14 @@ export function getPerformanceScoreRowsForRange(
         records: srcLeaves.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year))
       },
       stockCounts: employeePeriodStockCounts,
+      adjustments: (dailyStore.scoreAdjustments || [])
+        .filter((adjustment) => adjustment.employeeName === employeeName && inPeriod(adjustment.workDate, period))
+        .map((adjustment) => ({
+          category: adjustment.category,
+          points: adjustment.points,
+          reason: adjustment.reason,
+          workDate: adjustment.workDate
+        })),
       checklistEvents: [
         ...derivedChecklistEvents,
         ...lateChecklistEventsFor(employeeName),
