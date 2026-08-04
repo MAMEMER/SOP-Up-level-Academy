@@ -4,7 +4,9 @@ import { dailyScopeKey, monthlyScopeKey, weeklyScopeKey, type WorkRecordDoc } fr
 import { isoWeekKey } from "./periodic-tasks.ts";
 import { recordsFromDayPayloads, type WorkflowDailyRecord, type WorkflowDayPayload } from "./workflow-records.ts";
 import { cardStoreWorkflow } from "./card-store-workflow.ts";
-import { fetchAssignmentsForDate, fetchOpenHandoffs, type WorkAssignment, type WorkHandoff } from "./work-assignments-store.ts";
+import type { WorkAssignment, WorkHandoff } from "./work-assignments-store.ts";
+import { fetchAssignmentsForDateServer, fetchOpenHandoffsServer } from "./work-assignments-server.ts";
+import { groupAssignmentsByTask, type AssignmentGroup } from "./assigned-work-teams.ts";
 import { customerServiceRecordsForDate, type CustomerServiceRecord } from "./performance-service-records.ts";
 import { monthlyTasks } from "./monthly-event-tasks.ts";
 import { weeklyEventsActiveOn } from "./weekly-event-tasks.ts";
@@ -42,6 +44,8 @@ export type OpsSummary = {
   noRecordStaff: string[];
   daily: { completed: number; total: number; submittedPhases: number; latePhases: number; phaseCount: number };
   assignments: WorkAssignment[];
+  /** assignments folded into the tasks the owner handed out (team tasks grouped) */
+  assignmentGroups: AssignmentGroup[];
   handoffs: WorkHandoff[];
   serviceIssues: CustomerServiceRecord[];
   weekly: { periodKey: string; stockTicks: number; eventTicks: number; eventTotal: number };
@@ -78,6 +82,7 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
       noRecordStaff: [],
       daily: { completed: 0, total: 0, submittedPhases: 0, latePhases: 0, phaseCount },
       assignments: [],
+      assignmentGroups: [],
       handoffs: [],
       serviceIssues: [],
       weekly: { periodKey, stockTicks: 0, eventTicks: 0, eventTotal: 0 },
@@ -89,8 +94,8 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     safe(() => listRecordsForScopeKey(dailyScopeKey(workDate)), [] as WorkRecordDoc[]),
     safe(() => listAllRecordsInScopeRange(weeklyScopeKey(periodKey), `${weeklyScopeKey(periodKey)}-event`), [] as WorkRecordDoc[]),
     safe(() => listRecordsForScopeKey(monthlyScopeKey(monthKey)), [] as WorkRecordDoc[]),
-    safe(() => fetchAssignmentsForDate(branch, workDate), [] as WorkAssignment[]),
-    safe(() => fetchOpenHandoffs(branch), [] as WorkHandoff[]),
+    safe(() => fetchAssignmentsForDateServer(branch, workDate), [] as WorkAssignment[]),
+    safe(() => fetchOpenHandoffsServer(branch), [] as WorkHandoff[]),
     safe(() => fetchPerformanceDailyStore(), { serviceRecords: [], assignedWorkRecords: [], stockCheckRecords: [] }),
     safe(() => fetchShiftAssignmentsForDate(branch, workDate), null as Map<string, ShiftCode> | null)
   ]);
@@ -156,6 +161,7 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
       phaseCount
     },
     assignments,
+    assignmentGroups: groupAssignmentsByTask(assignments),
     handoffs,
     serviceIssues: customerServiceRecordsForDate(dailyStore.serviceRecords, workDate),
     weekly: {

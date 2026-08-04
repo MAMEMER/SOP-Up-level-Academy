@@ -6,6 +6,11 @@ import { isOwner } from "../../../../lib/owner.ts";
 import { getOpsSummary } from "../../../../lib/ops-summary.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
+// Always render fresh: the ops board reads live assignment/checklist data (no-store) so
+// the owner sees the current state, not a cached snapshot. The assignments panel then
+// polls its API every 60s for near-real-time updates within an open page.
+export const dynamic = "force-dynamic";
+
 type PageProps = {
   searchParams?: Promise<{ date?: string }>;
 };
