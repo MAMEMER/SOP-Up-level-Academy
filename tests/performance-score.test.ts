@@ -93,6 +93,27 @@ describe("performance score engine", () => {
     assert.equal(result.deductions[0].points, 2);
   });
 
+  it("does not deduct a shift that has not started yet (ticket OklOUlQlG — ยังไม่ถึงเวลาเข้างาน)", () => {
+    // Leo scheduled 13:00, evaluated at 11:00 same day — no clock-in yet, but must not be docked.
+    const futureShift = {
+      ...schedule,
+      employeeName: "Leo",
+      workDate: "2026-08-04",
+      scheduledStart: "2026-08-04T13:00:00+07:00",
+      scheduledEnd: "2026-08-04T22:00:00+07:00"
+    };
+    const before = Date.parse("2026-08-04T11:00:00+07:00");
+    const resultBefore = calculateAttendanceScore({ schedules: [futureShift], clockEvents: [] }, before);
+    assert.equal(resultBefore.score, 20);
+    assert.equal(resultBefore.deductions.length, 0);
+
+    // Same shift once the start time has passed with still no clock-in → the -2 applies.
+    const after = Date.parse("2026-08-04T13:30:00+07:00");
+    const resultAfter = calculateAttendanceScore({ schedules: [futureShift], clockEvents: [] }, after);
+    assert.equal(resultAfter.deductions[0].reason, "late_over_30_minutes_or_missing_clock_in");
+    assert.equal(resultAfter.deductions[0].points, 2);
+  });
+
   it("does not deduct attendance for approved sick or personal leave days", () => {
     const personalLeaveSchedule = {
       ...schedule,
