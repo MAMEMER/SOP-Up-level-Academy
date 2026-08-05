@@ -117,13 +117,15 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
       <MyAssignedWork staffCode={selectedCode} branch={branch} workDate={workDate} />
 
-      <DashboardChecklistStatus phases={cardStoreWorkflow} />
+      <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
       <DashboardTaskSections
         phases={cardStoreWorkflow}
         assignedWorkRecords={assignedWorkRecords}
         assignedWorkFeed={assignedWorkFeed}
         workDate={workDate}
         canManageAssignedWork={false}
+        staffCode={selectedCode}
+        branch={branch}
       />
     </main>
   );
