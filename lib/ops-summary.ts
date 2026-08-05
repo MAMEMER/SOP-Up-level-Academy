@@ -9,7 +9,7 @@ import { fetchAssignmentsForDateServer, fetchOpenHandoffsServer } from "./work-a
 import { groupAssignmentsByTask, type AssignmentGroup } from "./assigned-work-teams.ts";
 import { customerServiceRecordsForDate, type CustomerServiceRecord } from "./performance-service-records.ts";
 import { monthlyTasks } from "./monthly-event-tasks.ts";
-import { weeklyEventsActiveOn } from "./weekly-event-tasks.ts";
+import { weeklyEventsActiveOn, weeklyEventProgressFromTicks } from "./weekly-event-tasks.ts";
 import { employeeDirectory, employeeCodeForEmail } from "./employee-directory.ts";
 import { fetchPerformanceDailyStore } from "./performance-daily-store.ts";
 import { fetchShiftAssignmentsForDate } from "./shift-plan-server.ts";
@@ -18,6 +18,17 @@ import { shiftLabel, type ShiftCode } from "./shift-schedule.ts";
 
 // Everything the owner dashboard shows, read straight from the records staff actually
 // write. No fixtures: if a number is not backed by a real source it is not on the page.
+
+export type WeeklyEventDaySummary = {
+  id: string;
+  key: string;
+  /** ชื่อกิจกรรม เช่น "Gym pokemon" */
+  name: string;
+  game: string;
+  completed: number;
+  total: number;
+  submitted: boolean;
+};
 
 export type StaffDaySummary = {
   employeeName: string;
@@ -48,7 +59,16 @@ export type OpsSummary = {
   assignmentGroups: AssignmentGroup[];
   handoffs: WorkHandoff[];
   serviceIssues: CustomerServiceRecord[];
-  weekly: { periodKey: string; stockTicks: number; eventTicks: number; eventTotal: number };
+  weekly: {
+    periodKey: string;
+    stockTicks: number;
+    eventTicks: number;
+    eventTotal: number;
+    /** วันทำงานที่ใช้คิดกิจกรรม (YYYY-MM-DD) — event checklist reset ราย "วัน" */
+    eventDate: string;
+    /** สรุปรายกิจกรรมที่ "ถึงกำหนดจริง" ในวันนี้ (ตาม activeDays) */
+    events: WeeklyEventDaySummary[];
+  };
   monthly: { monthKey: string; done: number; inProgress: number; total: number };
 };
 
@@ -85,14 +105,19 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
       assignmentGroups: [],
       handoffs: [],
       serviceIssues: [],
-      weekly: { periodKey, stockTicks: 0, eventTicks: 0, eventTotal: 0 },
+      weekly: { periodKey, stockTicks: 0, eventTicks: 0, eventTotal: 0, eventDate: workDate, events: [] },
       monthly: { monthKey, done: 0, inProgress: 0, total: monthlyTasks.length }
     };
   }
 
-  const [dayDocs, weekDocs, monthDocs, assignments, handoffs, dailyStore, shiftAssignments] = await Promise.all([
+  // Stock weekly checklist keys by ISO week (reset ราย "สัปดาห์"); event checklist keys by
+  // "วันจัดกิจกรรม" (reset ราย "วัน") — staff เขียนคนละ scope key จึงต้องอ่านแยกกัน มิฉะนั้น
+  // owner board จะหา event doc ไม่เจอ (bug เดิม: อ่าน event ที่ scope ISO week → ได้ 0 เสมอ)
+  const eventScopeKey = `${weeklyScopeKey(workDate)}-event`;
+  const [dayDocs, stockDocs, eventDocs, monthDocs, assignments, handoffs, dailyStore, shiftAssignments] = await Promise.all([
     safe(() => listRecordsForScopeKey(dailyScopeKey(workDate)), [] as WorkRecordDoc[]),
-    safe(() => listAllRecordsInScopeRange(weeklyScopeKey(periodKey), `${weeklyScopeKey(periodKey)}-event`), [] as WorkRecordDoc[]),
+    safe(() => listRecordsForScopeKey(weeklyScopeKey(periodKey)), [] as WorkRecordDoc[]),
+    safe(() => listRecordsForScopeKey(eventScopeKey), [] as WorkRecordDoc[]),
     safe(() => listRecordsForScopeKey(monthlyScopeKey(monthKey)), [] as WorkRecordDoc[]),
     safe(() => fetchAssignmentsForDateServer(branch, workDate), [] as WorkAssignment[]),
     safe(() => fetchOpenHandoffsServer(branch), [] as WorkHandoff[]),
@@ -137,13 +162,29 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     .filter((entry) => (workingCodes ? workingCodes.has(entry.code) : true))
     .map((entry) => entry.displayName);
 
-  const stockDoc = weekDocs.find((doc) => doc.scopeKey === weeklyScopeKey(periodKey));
-  const eventDoc = weekDocs.find((doc) => doc.scopeKey === `${weeklyScopeKey(periodKey)}-event`);
+  const stockDoc = stockDocs.find((doc) => doc.scopeKey === weeklyScopeKey(periodKey)) || stockDocs[0];
+  const eventDoc = eventDocs.find((doc) => doc.scopeKey === eventScopeKey) || eventDocs[0];
   // นับเฉพาะกิจกรรมที่ "ถึงกำหนดจริง" ในวันนี้ (ตาม activeDays) — วันที่ไม่มีกิจกรรมของเกมไหน
   // จะไม่ถูกนับรวมในตัวหาร มิฉะนั้น owner board จะโชว์ X/24 ทุกวันทั้งที่วันนั้นจัดแค่ 1-2 เกม
   // (ตรงกับหลักการ ticket: ระบบต้องทำงานตามวันที่มีกิจกรรมจริงเท่านั้น)
   const activeEvents = weeklyEventsActiveOn(workDate);
   const eventTotal = activeEvents.reduce((sum, event) => sum + event.checklist.length, 0);
+  // ticks/submitted ของกิจกรรมถูก namespace ด้วย periodKey = workDate (reset ราย "วัน")
+  const eventTicksMap = (eventDoc?.data?.ticks || {}) as Record<string, boolean>;
+  const eventSubmittedMap = (eventDoc?.data?.submitted || {}) as Record<string, boolean>;
+  const eventSummaries: WeeklyEventDaySummary[] = activeEvents.map((event) => {
+    const progress = weeklyEventProgressFromTicks(event, workDate, eventTicksMap, eventSubmittedMap);
+    return {
+      id: event.id,
+      key: event.key,
+      name: event.name,
+      game: event.game,
+      completed: progress.completed,
+      total: progress.total,
+      submitted: progress.submitted
+    };
+  });
+  const eventTicks = eventSummaries.reduce((sum, event) => sum + event.completed, 0);
 
   const monthStates = (monthDocs[0]?.data?.states || {}) as Record<string, string>;
   const monthValues = Object.values(monthStates);
@@ -167,8 +208,10 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     weekly: {
       periodKey,
       stockTicks: countTicks(stockDoc?.data, "checked") + countTicks(stockDoc?.data, "ticks"),
-      eventTicks: countTicks(eventDoc?.data, "ticks"),
-      eventTotal
+      eventTicks,
+      eventTotal,
+      eventDate: workDate,
+      events: eventSummaries
     },
     monthly: {
       monthKey,

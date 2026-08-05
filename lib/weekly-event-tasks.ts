@@ -261,6 +261,36 @@ export function weeklyEventById(id: string): WeeklyEvent | undefined {
 
 export const weeklyEventChecklistTotal = weeklyEvents[0].checklist.length;
 
+// --- คีย์ที่ใช้เก็บ state ใน record เดียว (namespaced ด้วย periodKey = วันจัดกิจกรรม) ---
+// อยู่ที่นี่ (ไม่ใช่ weekly-event-store ที่เป็น "use client") เพื่อให้ทั้งฝั่ง client (ตอนบันทึก)
+// และฝั่ง server (owner ops summary ตอนอ่านสรุป) ใช้รูปแบบคีย์เดียวกัน ไม่หลุด sync
+export function weeklyEventScopeKeyPart(periodKey: string, eventId: string): string {
+  return `${periodKey}:${eventId}`;
+}
+
+export function weeklyEventTickKey(periodKey: string, eventId: string, itemId: string): string {
+  return `${weeklyEventScopeKeyPart(periodKey, eventId)}:${itemId}`;
+}
+
+export function weeklyEventSubmitKey(periodKey: string, eventId: string): string {
+  return weeklyEventScopeKeyPart(periodKey, eventId);
+}
+
+/** ความคืบหน้าของ event หนึ่งในวัน periodKey อ่านจาก ticks map ที่เก็บทั้งทีมไว้ record เดียว */
+export function weeklyEventProgressFromTicks(
+  event: WeeklyEvent,
+  periodKey: string,
+  ticks: Record<string, boolean>,
+  submitted: Record<string, boolean> = {}
+): { completed: number; total: number; submitted: boolean } {
+  const completed = event.checklist.filter((item) => ticks[weeklyEventTickKey(periodKey, event.id, item.id)]).length;
+  return {
+    completed,
+    total: event.checklist.length,
+    submitted: Boolean(submitted[weeklyEventSubmitKey(periodKey, event.id)])
+  };
+}
+
 /** ความคืบหน้าจากจำนวน checklist ที่ติ๊กครบของ event หนึ่ง */
 export function weeklyEventCompleted(event: WeeklyEvent, ticked: Record<string, boolean>): number {
   return event.checklist.filter((item) => ticked[item.id]).length;

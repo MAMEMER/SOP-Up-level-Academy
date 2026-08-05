@@ -14,6 +14,7 @@
 
 import { fetchWorkRecordRange, saveWorkRecord } from "./work-records-client.ts";
 import { weeklyScopeKey } from "./work-records.ts";
+import { weeklyEventScopeKeyPart, weeklyEventTickKey, weeklyEventSubmitKey } from "./weekly-event-tasks.ts";
 
 export type WeeklyEventPayload = {
   ticks: Record<string, boolean>;
@@ -29,20 +30,12 @@ export function weeklyEventPeriodKey(workDate: string): string {
   return workDate;
 }
 
-function scope(periodKey: string, eventId: string): string {
-  return `${periodKey}:${eventId}`;
-}
-
-export function tickKey(periodKey: string, eventId: string, itemId: string): string {
-  return `${scope(periodKey, eventId)}:${itemId}`;
-}
+// รูปแบบคีย์อยู่ใน weekly-event-tasks.ts (server-safe) เพื่อให้ owner ops summary อ่านได้ตรงกัน
+export const tickKey = weeklyEventTickKey;
+export const submitKey = weeklyEventSubmitKey;
 
 export function fieldKey(periodKey: string, eventId: string, itemId: string, field: string): string {
-  return `${scope(periodKey, eventId)}:${itemId}.${field}`;
-}
-
-export function submitKey(periodKey: string, eventId: string): string {
-  return scope(periodKey, eventId);
+  return `${weeklyEventScopeKeyPart(periodKey, eventId)}:${itemId}.${field}`;
 }
 
 /** Weekly EVENT state lives beside the weekly stock record, under its own scope key. */

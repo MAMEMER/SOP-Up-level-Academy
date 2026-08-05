@@ -5131,6 +5131,8 @@ main .page > section, main > section { margin-top: 16px !important; }
 .owner-ops__list li { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .owner-ops__list small { color: var(--color-ink-soft); font-size: 12.5px; }
 
+.owner-ops__subhead { margin: 16px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-ink-soft); }
+.owner-ops__subhead:first-of-type { margin-top: 12px; }
 .owner-ops__empty { margin: 12px 0 0; color: var(--color-ink-soft); font-size: 14px; }
 .owner-ops__note { margin: 12px 0 0; color: #92400e; font-size: 13.5px; }
 .owner-ops__link { display: inline-block; margin-top: 14px; font-size: 13.5px; font-weight: 600; }

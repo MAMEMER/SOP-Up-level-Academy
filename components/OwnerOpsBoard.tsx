@@ -152,20 +152,33 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
             <p className="eyebrow">weekly</p>
             <h3>งานประจำสัปดาห์ · {weekly.periodKey}</h3>
           </div>
+
+          <p className="owner-ops__subhead">Weekly task · Stock / Sleeve</p>
           <ul className="owner-ops__list">
             <li>
               <strong>Stock อุปกรณ์ / Sleeve</strong>
               <small>ติ๊กแล้ว {weekly.stockTicks} ข้อ</small>
             </li>
-            <li>
-              <strong>งานวันกิจกรรม</strong>
-              <small>
-                {weekly.eventTotal > 0
-                  ? `ติ๊กแล้ว ${weekly.eventTicks}/${weekly.eventTotal} ข้อ`
-                  : "วันนี้ไม่มีกิจกรรม"}
-              </small>
-            </li>
           </ul>
+
+          <p className="owner-ops__subhead">Weekly event · งานวันกิจกรรม ({weekly.eventDate})</p>
+          {weekly.events.length ? (
+            <ul className="owner-ops__list">
+              {weekly.events.map((event) => {
+                const done = event.total > 0 && event.completed >= event.total;
+                const status = event.submitted ? "ส่งงานแล้ว" : done ? "ครบแล้ว (ยังไม่ส่ง)" : "กำลังทำ";
+                return (
+                  <li key={event.id}>
+                    <strong>{event.name}</strong>
+                    <small>{status} · ทำ {event.completed}/{event.total} ข้อ</small>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="owner-ops__empty">วันนี้ไม่มีกิจกรรม</p>
+          )}
+
           <Link href="/checklist-weekly" className="owner-ops__link">เปิด checklist สัปดาห์ →</Link>
         </section>
 
