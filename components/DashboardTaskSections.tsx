@@ -5,7 +5,9 @@ import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import { weeklyStockSleevePhase } from "../lib/weekly-stock-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
+import { groupAssignedWorkRecords } from "../lib/performance-service-records.ts";
 import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
+import { groupAssignedWorkFeed } from "../lib/assigned-work-feed.ts";
 import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
 import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 import {
@@ -53,6 +55,22 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   not_finished: "workflow-status-red"
 };
 
+type WorkflowStatusClass =
+  | "workflow-status-white"
+  | "workflow-status-orange"
+  | "workflow-status-green"
+  | "workflow-status-red";
+
+// Collapse the per-assignee colours of a team task into one card colour: green only when
+// everyone is done, red if anyone needs attention, orange while some are in progress,
+// white when nothing has started yet.
+function foldStatusClass(classes: string[]): WorkflowStatusClass {
+  if (classes.length > 0 && classes.every((c) => c === "workflow-status-green")) return "workflow-status-green";
+  if (classes.includes("workflow-status-red")) return "workflow-status-red";
+  if (classes.some((c) => c === "workflow-status-orange" || c === "workflow-status-green")) return "workflow-status-orange";
+  return "workflow-status-white";
+}
+
 export function DashboardTaskSections({
   phases,
   assignedWorkRecords = [],
@@ -72,6 +90,9 @@ export function DashboardTaskSections({
   const [weeklyTicks, setWeeklyTicks] = useState<Record<string, boolean>>({});
   const [weeklyPeriodKey, setWeeklyPeriodKey] = useState<string>("");
   const workDate = currentWorkDate || formatWorkDate();
+  // งานที่มอบหมาย: รวมงานเดียวกันที่มอบหลายคนให้เหลือหัวข้อเดียว (UI เท่านั้น — การให้คะแนนแยกตามเดิม)
+  const assignedRecordGroups = groupAssignedWorkRecords(assignedWorkRecords);
+  const assignedFeedGroups = groupAssignedWorkFeed(assignedWorkFeed);
   const stockPhase = phases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
 
@@ -137,43 +158,94 @@ export function DashboardTaskSections({
         <div className="daily-phase-grid">
           {assignedWorkRecords.length || assignedWorkFeed.length || activeWeeklyEvents.length ? (
             <>
-              {assignedWorkRecords.map((record, index) => {
-                const effectiveStatus = effectiveAssignedWorkStatus(record);
-                const canShowStatus = canManageAssignedWork || isAssignedWorkPastDeadline(record.workDate);
+              {assignedRecordGroups.map((group, index) => {
+                const canShowStatus = canManageAssignedWork || isAssignedWorkPastDeadline(group.workDate);
+                // งานเดี่ยว → การ์ดเดิม (คงรายละเอียด tracking/หลักฐาน ครบเหมือนก่อน)
+                if (!group.isTeam) {
+                  const record = group.members[0];
+                  const effectiveStatus = effectiveAssignedWorkStatus(record);
+                  return (
+                    <a
+                      key={group.key}
+                      href={`/assigned-work/${encodeURIComponent(record.id)}`}
+                      className={`daily-phase-card ${canShowStatus ? assignedStatusClass[effectiveStatus] : "workflow-status-white"}`}
+                    >
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <div>
+                        <small>{record.employeeName} · {record.workDate}</small>
+                        <strong>{record.title}</strong>
+                        <em>{canShowStatus ? assignedStatusText[effectiveStatus] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
+                        {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
+                        {record.imageEvidence?.length ? <em>รูปหลักฐาน: {record.imageEvidence.join(", ")}</em> : null}
+                        {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}
+                      </div>
+                    </a>
+                  );
+                }
+                // งานเดียวกันมอบหลายคน → รวมเป็นการ์ดเดียว + แสดงรายชื่อผู้รับด้านใน (แต่ละคนยังถูกให้คะแนนแยกตามเดิม)
+                const memberClasses = group.members.map((member) =>
+                  canShowStatus ? assignedStatusClass[effectiveAssignedWorkStatus(member)] : "workflow-status-white"
+                );
+                const overallClass = foldStatusClass(memberClasses);
+                const doneCount = memberClasses.filter((c) => c === "workflow-status-green").length;
                 return (
                   <a
-                    key={record.id}
-                    href={`/assigned-work/${encodeURIComponent(record.id)}`}
-                    className={`daily-phase-card ${canShowStatus ? assignedStatusClass[effectiveStatus] : "workflow-status-white"}`}
+                    key={group.key}
+                    href={`/assigned-work/${encodeURIComponent(group.primaryId)}`}
+                    className={`daily-phase-card ${overallClass}`}
                   >
                     <span>{String(index + 1).padStart(2, "0")}</span>
                     <div>
-                      <small>{record.employeeName} · {record.workDate}</small>
-                      <strong>{record.title}</strong>
-                      <em>{canShowStatus ? assignedStatusText[effectiveStatus] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
-                      {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
-                      {record.imageEvidence?.length ? <em>รูปหลักฐาน: {record.imageEvidence.join(", ")}</em> : null}
-                      {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}
+                      <small>งานทีม · {group.members.length} คน · {group.workDate}</small>
+                      <strong>{group.title}</strong>
+                      <em>{canShowStatus ? `เสร็จ ${doneCount}/${group.members.length}` : "รอส่งงาน"}</em>
+                      <em>
+                        {group.members
+                          .map((member) => `${member.employeeName} (${canShowStatus ? assignedStatusText[effectiveAssignedWorkStatus(member)] : "รอส่งงาน"})`)
+                          .join(" · ")}
+                      </em>
                     </div>
                   </a>
                 );
               })}
-              {assignedWorkFeed.map((item, index) => (
-                <a key={item.id} href={item.href} className={`daily-phase-card ${item.statusClass}`}>
-                  <span>{String(assignedWorkRecords.length + index + 1).padStart(2, "0")}</span>
-                  <div>
-                    <small>{item.assigneeLabel} · {item.workDate}</small>
-                    <strong>{item.title}</strong>
-                    <em>{item.originLabel} · {item.statusText}</em>
-                    {item.detail ? <em>{item.detail}</em> : null}
-                  </div>
-                </a>
-              ))}
+              {assignedFeedGroups.map((group, index) => {
+                const seq = assignedRecordGroups.length + index + 1;
+                // งานเดี่ยว / งานส่งต่อ → การ์ดเดิม
+                if (!group.isTeam) {
+                  const member = group.members[0];
+                  return (
+                    <a key={group.key} href={group.href} className={`daily-phase-card ${member.statusClass}`}>
+                      <span>{String(seq).padStart(2, "0")}</span>
+                      <div>
+                        <small>{member.label} · {group.workDate}</small>
+                        <strong>{group.title}</strong>
+                        <em>{group.originLabel} · {member.statusText}</em>
+                        {group.detail ? <em>{group.detail}</em> : null}
+                      </div>
+                    </a>
+                  );
+                }
+                // งานเดียวกันมอบหลายคน → รวมเป็นการ์ดเดียว
+                const overallClass = foldStatusClass(group.members.map((member) => member.statusClass));
+                const doneCount = group.members.filter((member) => member.statusClass === "workflow-status-green").length;
+                return (
+                  <a key={group.key} href={group.href} className={`daily-phase-card ${overallClass}`}>
+                    <span>{String(seq).padStart(2, "0")}</span>
+                    <div>
+                      <small>งานทีม · {group.members.length} คน · {group.workDate}</small>
+                      <strong>{group.title}</strong>
+                      <em>{group.originLabel} · เสร็จ {doneCount}/{group.members.length}</em>
+                      <em>{group.members.map((member) => `${member.label} (${member.statusText})`).join(" · ")}</em>
+                      {group.detail ? <em>{group.detail}</em> : null}
+                    </div>
+                  </a>
+                );
+              })}
               {activeWeeklyEvents.map((event, index) => {
                 const completed = weeklyEventCompleted(event, weeklyEventTickedMap(event));
                 const total = event.checklist.length;
                 const done = completed === total && completed > 0;
-                const seq = assignedWorkRecords.length + assignedWorkFeed.length + index + 1;
+                const seq = assignedRecordGroups.length + assignedFeedGroups.length + index + 1;
                 return (
                   <a
                     key={`weekly-${event.id}`}

@@ -30,11 +30,25 @@ describe("dashboard task sections UI", () => {
 
     // component accepts + renders the merged feed alongside the KPI records
     assert.equal(source.includes("assignedWorkFeed"), true);
-    assert.equal(source.includes("item.originLabel"), true);
+    assert.equal(source.includes("group.originLabel"), true);
     assert.equal(source.includes("assignedWorkRecords.length || assignedWorkFeed.length"), true);
     // dashboard page wires the two real-time sources through the viewer filter
     assert.equal(pageSource.includes("fetchAssignedWorkFeed"), true);
     assert.equal(pageSource.includes("assignedWorkFeedForViewer"), true);
+  });
+
+  it("folds a task assigned to several people into one team card with a member roster", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+
+    // groups the two duplicate-prone sources before rendering
+    assert.equal(source.includes("groupAssignedWorkRecords"), true);
+    assert.equal(source.includes("groupAssignedWorkFeed"), true);
+    assert.equal(source.includes("assignedRecordGroups"), true);
+    assert.equal(source.includes("assignedFeedGroups"), true);
+    // team task collapses to a single header labelled งานทีม with the assignee count
+    assert.equal(source.includes("งานทีม · "), true);
+    assert.equal(source.includes("group.isTeam"), true);
+    assert.equal(source.includes("foldStatusClass"), true);
   });
 
   it("requires a StoreHub Stock Take status (In Progress or Completed) before stock submission", () => {
