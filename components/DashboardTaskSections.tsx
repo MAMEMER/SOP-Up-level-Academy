@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
-import { weeklyStockSleevePhase } from "../lib/weekly-stock-workflow.ts";
+import { weeklyStockTasks } from "../lib/weekly-stock-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
 import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
@@ -245,22 +245,29 @@ export function DashboardTaskSections({
         </div>
       </article>
 
-      {stockPhase ? (
-        <article className="task-section stock-task">
-          <div className="task-section-head">
-            <div>
-              <p className="eyebrow">Stock</p>
-              <h3>Stock work</h3>
-            </div>
+      {/* Stock work: Daily / Weekly / Monthly เป็นกลุ่มงานแยกชัดเจน ใช้ pattern เดียวกับแถบงานอื่น
+          Weekly + Monthly stock แสดงเสมอ (ไม่ผูกกับกะรายวัน) ส่วน Daily stock ขึ้นเฉพาะเมื่อกะมี stock-work */}
+      <article className="task-section stock-task">
+        <div className="task-section-head">
+          <div>
+            <p className="eyebrow">Stock</p>
+            <h3>Stock work</h3>
           </div>
-          <div className="daily-phase-grid">
-            {(() => {
+        </div>
+        <div className="daily-phase-grid">
+          {(() => {
+            const cards: ReactNode[] = [];
+            let seq = 0;
+
+            // 01 · Daily stock (น้ำ/ขนม) — เฉพาะกะที่มีงาน stock-work วันนี้
+            if (stockPhase) {
+              seq += 1;
               const visualStatus = workflowVisualStatus(records, workDate, stockPhase.id);
               const record = records.find((item) => item.workDate === workDate && item.phaseId === stockPhase.id);
               const submitted = record?.status === "submitted";
-              return (
-                <a href="/checklist#stock-work" className={`daily-phase-card workflow-status-${visualStatus}`}>
-                  <span>{submitted ? "✓" : "01"}</span>
+              cards.push(
+                <a key="stock-daily" href="/checklist#stock-work" className={`daily-phase-card workflow-status-${visualStatus}`} id="stock-daily">
+                  <span>{submitted ? "✓" : String(seq).padStart(2, "0")}</span>
                   <div>
                     <small>{stockWorkSummaryCards[0].kicker}</small>
                     <strong>{stockWorkSummaryCards[0].title}</strong>
@@ -268,26 +275,45 @@ export function DashboardTaskSections({
                   </div>
                 </a>
               );
-            })()}
-            <a href="/checklist-weekly#stock-sleeve-work" className="daily-phase-card workflow-status-white" id="stock-weekly">
-              <span>02</span>
-              <div>
-                <small>{stockWorkSummaryCards[1].kicker}</small>
-                <strong>{stockWorkSummaryCards[1].title}</strong>
-                <em>ยังไม่เริ่ม · 0/{weeklyStockSleevePhase.checklist.length}</em>
-              </div>
-            </a>
-            <a href="/checklist-monthly#stock-single-card-work" className="daily-phase-card workflow-status-white" id="stock-monthly">
-              <span>03</span>
-              <div>
-                <small>{stockWorkSummaryCards[2].kicker}</small>
-                <strong>{stockWorkSummaryCards[2].title}</strong>
-                <em>ยังไม่เริ่ม · 0/{monthlyStockTasks.length}</em>
-              </div>
-            </a>
-          </div>
-        </article>
-      ) : null}
+            }
+
+            // Weekly stock — data-driven จาก weeklyStockTasks (แก้/เพิ่ม/ลบ ที่ lib ได้เลย)
+            weeklyStockTasks.forEach((task, index) => {
+              seq += 1;
+              cards.push(
+                <a
+                  key={task.id}
+                  href={task.href}
+                  className="daily-phase-card workflow-status-white"
+                  id={index === 0 ? "stock-weekly" : undefined}
+                >
+                  <span>{String(seq).padStart(2, "0")}</span>
+                  <div>
+                    <small>{stockWorkSummaryCards[1].kicker}</small>
+                    <strong>{task.name}</strong>
+                    <em>{task.note ? `ยังไม่เริ่ม · ${task.note}` : "ยังไม่เริ่ม"}</em>
+                  </div>
+                </a>
+              );
+            });
+
+            // Monthly stock — สรุปเป็นการ์ดเดียว ลิงก์ไป checklist งานประจำเดือน (Single card)
+            seq += 1;
+            cards.push(
+              <a key="stock-monthly" href="/checklist-monthly#stock-single-card-work" className="daily-phase-card workflow-status-white" id="stock-monthly">
+                <span>{String(seq).padStart(2, "0")}</span>
+                <div>
+                  <small>{stockWorkSummaryCards[2].kicker}</small>
+                  <strong>{stockWorkSummaryCards[2].title}</strong>
+                  <em>ยังไม่เริ่ม · 0/{monthlyStockTasks.length}</em>
+                </div>
+              </a>
+            );
+
+            return cards;
+          })()}
+        </div>
+      </article>
 
       <article id="weekly-task" className="task-section weekly-task">
         <div className="task-section-head">

@@ -59,7 +59,7 @@ describe("dashboard task sections UI", () => {
 
     assert.equal(source.includes("supplyNeedsUrl"), true);
     assert.equal(source.includes("https://uplevel.storehubhq.com/stocks/supplyNeeds/v2/web"), true);
-    assert.equal(source.includes("สรุปรายวันจาก StoreHub Supply Needs"), true);
+    assert.equal(source.includes("แจ้งเตือนสินค้าใกล้หมด"), true);
     assert.equal(source.includes("ชื่อสินค้า | จำนวนที่เหลือ"), true);
   });
 
@@ -126,6 +126,22 @@ describe("dashboard task sections UI", () => {
     // checklist page renders staff/owner submission UI
     assert.equal(pageSource.includes("MonthlyEventChecklist"), true);
     assert.equal(pageSource.includes("requireUser"), true);
+  });
+
+  it("renders Stock work weekly as data-driven cards and shows the group even without a daily stock phase", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+    const lib = readFileSync(new URL("../lib/weekly-stock-workflow.ts", import.meta.url), "utf8");
+
+    // weekly stock cards come from the shared array (admin edits lib, not UI)
+    assert.equal(source.includes("weeklyStockTasks.forEach"), true);
+    assert.equal(lib.includes("export const weeklyStockTasks"), true);
+
+    // stock section is no longer gated behind the daily stock phase — weekly/monthly always show
+    assert.equal(source.includes("{stockPhase ? (\n        <article className=\"task-section stock-task\""), false);
+
+    // both stock groups still link to their dedicated checklists
+    assert.equal(lib.includes("/checklist-weekly#"), true);
+    assert.equal(source.includes("/checklist-monthly#stock-single-card-work"), true);
   });
 
   it("shows only the viewer's shift daily หัวข้อ so a กะ2 staffer is not flagged late for เปิดร้าน", () => {
