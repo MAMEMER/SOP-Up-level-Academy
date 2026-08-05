@@ -225,7 +225,7 @@ export const cardStoreWorkflow: WorkflowPhase[] = [
     checklist: [
       "ดึงข้อมูลการนับจาก StoreHub Stock Take และ approve เมื่อสถานะ Completed",
       "นับจำนวนจริงหน้าร้านและห้อง Stock",
-      "สรุปรายวันสินค้าใกล้หมดจาก StoreHub Supply Needs เฉพาะชื่อและจำนวนที่เหลือ",
+      "แจ้งเตือนสินค้าใกล้หมดจาก StoreHub Supply Needs — แนบรูปหน้าจอหรือสรุปชื่อและจำนวนที่เหลือ",
       "เติมสินค้าบนชั้น",
       "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
     ]

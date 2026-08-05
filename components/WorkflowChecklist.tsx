@@ -743,7 +743,7 @@ function StockTaskDetails({
       <div className="detail-panel">
         <div className="detail-panel-head">
           <strong>แจ้งเตือนสินค้าใกล้หมด</strong>
-          <small>สรุปรายวันจาก StoreHub Supply Needs เฉพาะชื่อสินค้าและจำนวนที่เหลือ</small>
+          <small>แนบรูปหน้าจอ StoreHub Supply Needs ได้เลย (เร็วและแม่นกว่า) หรือจะพิมพ์สรุปเองก็ได้</small>
         </div>
         <SupplyNeedsAlert canEdit={canEdit} onUseSummary={(summary) => updateDetail("supply-needs-summary", summary)} />
         <a href={supplyNeedsUrl} target="_blank" rel="noreferrer" className="detail-action-link">
@@ -758,8 +758,17 @@ function StockTaskDetails({
           />
           <span>ไม่มี</span>
         </label>
+        <div className="detail-upload">
+          <span>แนบรูปหน้าจอสินค้าใกล้หมด (สูงสุด 3 รูป)</span>
+          <EvidencePhotosInput
+            value={details[detailKey(workDate, "supply-needs-photos")] || ""}
+            onChange={(value) => updateDetail("supply-needs-photos", value)}
+            disabled={!canEdit}
+            max={3}
+          />
+        </div>
         <label className="workflow-note-field compact">
-          <span>สรุปรายวัน: ชื่อสินค้า | จำนวนที่เหลือ</span>
+          <span>หรือพิมพ์สรุป: ชื่อสินค้า | จำนวนที่เหลือ (ไม่บังคับถ้าแนบรูปแล้ว)</span>
           <textarea
             value={details[detailKey(workDate, "supply-needs-summary")] || ""}
             disabled={!canEdit}
