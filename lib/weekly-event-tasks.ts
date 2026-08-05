@@ -137,10 +137,12 @@ function buildChecklist(game: string, lineGroup: string): WeeklyEventChecklistIt
       requiredData: [
         { key: "final_rank", label: "อันดับสุดท้าย", type: "textarea", placeholder: "อันดับ 1: ___\nอันดับ 2: ___\nอันดับ 3: ___" },
         { key: "awards_given", label: "รายการรางวัลที่แจก", type: "textarea", placeholder: "รางวัลตามอันดับ" },
+        { key: "post_event_url", label: "ลิงก์โพสต์กิจกรรม (Facebook/IG)", type: "url", placeholder: "https:// วางลิงก์โพสต์ที่โพสต์แล้ว" },
+        { key: "post_thanks_url", label: "ลิงก์โพสต์ขอบคุณ (Facebook/IG)", type: "url", placeholder: "https:// วางลิงก์โพสต์ขอบคุณ" },
         { key: "followup", label: "งานที่ต้อง follow up", type: "textarea", placeholder: "ถ้าไม่มีให้ใส่ - " }
       ],
-      evidence: ["รูปภาพรวมกิจกรรม", "รูปผู้ชนะหรือของรางวัล", "แคปประกาศรางวัล"],
-      hint: "ต้องประกาศผลและของรางวัลตามลำดับที่จัดไว้"
+      evidence: ["รูปภาพรวมกิจกรรม", "รูปผู้ชนะหรือของรางวัล", "แคปประกาศรางวัล", "รูปโพสต์กิจกรรม / โพสต์ขอบคุณ (ถ้าไม่มีลิงก์ ให้อัปโหลดรูปโพสต์ที่ทำแทนได้)"],
+      hint: "ต้องประกาศผลและของรางวัลตามลำดับที่จัดไว้ · วางลิงก์โพสต์กิจกรรม/โพสต์ขอบคุณ หรืออัปโหลดรูปโพสต์เป็นหลักฐานได้"
     }
   ];
 }
