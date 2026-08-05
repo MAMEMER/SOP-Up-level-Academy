@@ -28,6 +28,9 @@ export type OwnerAssignmentInput = {
   assignedBy?: string;
   note?: string;
   submittedAt?: string;
+  // AssignWork stamps every doc of one multi-person batch with the SAME createdAt, so
+  // createdAt + title identifies "งานเดียวกันมอบหลายคน" (same as /admin/ops grouping).
+  createdAt?: string;
 };
 
 export type HandoffInput = {
@@ -40,6 +43,7 @@ export type HandoffInput = {
   toStaff: string; // staff code or "any"
   status: "open" | "claimed" | "done";
   claimedBy?: string;
+  createdAt?: string;
 };
 
 export type AssignedWorkFeedItem = {
@@ -53,6 +57,9 @@ export type AssignedWorkFeedItem = {
   statusClass: "workflow-status-white" | "workflow-status-orange" | "workflow-status-green" | "workflow-status-red";
   statusText: string;
   href: string;
+  // Shared across every assignee of one multi-person task — used to fold duplicate rows
+  // into a single "งานทีม" card on the dashboard. Empty on legacy docs without a stamp.
+  createdAt: string;
   // raw fields used only for viewer filtering
   staffCode: string | null;
   toStaff: string | null;
@@ -84,6 +91,7 @@ export function ownerAssignmentToFeedItem(assignment: OwnerAssignmentInput): Ass
     statusText: meta.statusText,
     // Click straight into the staff submit/detail page — staff ส่งงาน, เจ้าของร้านตรวจได้ที่นี่.
     href: `/assigned-work/task/${encodeURIComponent(assignment.id)}`,
+    createdAt: assignment.createdAt ?? "",
     staffCode: assignment.staffCode,
     toStaff: null,
     fromStaff: null,
@@ -106,6 +114,7 @@ export function handoffToFeedItem(handoff: HandoffInput): AssignedWorkFeedItem {
     statusClass: done ? "workflow-status-green" : claimed ? "workflow-status-orange" : "workflow-status-white",
     statusText: done ? "เสร็จแล้ว" : claimed ? `รับแล้ว${handoff.claimedBy ? ` · ${displayNameFor(handoff.claimedBy)}` : ""}` : "รอรับงาน",
     href: "/handoff",
+    createdAt: handoff.createdAt ?? "",
     staffCode: null,
     toStaff: handoff.toStaff,
     fromStaff: handoff.fromStaff,
@@ -130,6 +139,73 @@ export function assignedWorkFeedForViewer(
     if (item.origin === "owner") return item.staffCode === code;
     return item.toStaff === code || item.toStaff === "any" || item.claimedBy === code || item.fromStaff === code;
   });
+}
+
+// A single task on the dashboard, folded from the flat feed (one row PER assignee).
+export type AssignedWorkFeedGroupMember = {
+  id: string;
+  label: string;
+  statusText: string;
+  statusClass: AssignedWorkFeedItem["statusClass"];
+};
+
+export type AssignedWorkFeedGroup = {
+  key: string;
+  title: string;
+  detail?: string;
+  workDate: string;
+  origin: AssignedWorkFeedItem["origin"];
+  originLabel: string;
+  href: string;
+  isTeam: boolean;
+  members: AssignedWorkFeedGroupMember[];
+};
+
+/**
+ * Fold the flat feed back into the task the owner handed out so a task given to several
+ * people shows as ONE row with its member roster — mirroring the /admin/ops panel. Owner
+ * rows sharing createdAt + title are the same task (AssignWork writes one doc per person
+ * with a shared createdAt); each such row without a createdAt, and every handoff, stays
+ * on its own. This is display-only — it does not touch how work is scored. First-seen
+ * order is preserved so due-time ordering upstream is respected.
+ */
+export function groupAssignedWorkFeed(items: AssignedWorkFeedItem[]): AssignedWorkFeedGroup[] {
+  const map = new Map<string, AssignedWorkFeedGroup>();
+  const order: string[] = [];
+  for (const item of items) {
+    const key =
+      item.origin === "owner" && item.createdAt
+        ? `owner__${item.createdAt}__${item.title}`
+        : `${item.origin}__${item.id}`;
+    let group = map.get(key);
+    if (!group) {
+      group = {
+        key,
+        title: item.title,
+        detail: item.detail,
+        workDate: item.workDate,
+        origin: item.origin,
+        originLabel: item.originLabel,
+        href: item.href,
+        isTeam: false,
+        members: []
+      };
+      map.set(key, group);
+      order.push(key);
+    }
+    group.members.push({
+      id: item.id,
+      label: item.assigneeLabel,
+      statusText: item.statusText,
+      statusClass: item.statusClass
+    });
+  }
+  const groups = order.map((key) => map.get(key)!);
+  for (const group of groups) {
+    group.isTeam = group.members.length > 1;
+    group.members.sort((a, b) => a.label.localeCompare(b.label, "th"));
+  }
+  return groups;
 }
 
 /** Reads both collections for a branch+date and maps them to unified feed items. */

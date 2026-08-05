@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   assignedWorkFeedForViewer,
+  groupAssignedWorkFeed,
   handoffToFeedItem,
   ownerAssignmentToFeedItem,
   type HandoffInput,
@@ -107,5 +108,43 @@ describe("assigned-work feed viewer filtering", () => {
   it("Leo sees the any-handoff and the handoff targeted at Leo, but not Boom's owner task", () => {
     const leo = assignedWorkFeedForViewer(items, { isAdmin: false, employeeCode: "Leo" });
     assert.deepEqual(leo.map((i) => i.id).sort(), ["ho2", "ho__2026-07-27__Boom__x"].sort());
+  });
+});
+
+describe("groupAssignedWorkFeed (fold duplicate rows into one task)", () => {
+  it("folds a task assigned to several people (same createdAt + title) into one team group", () => {
+    const items = [
+      ownerAssignmentToFeedItem({ ...ownerAssignment, id: "wa-ice", staffCode: "ICE", createdAt: "2026-07-27T03:00:00.000Z" }),
+      ownerAssignmentToFeedItem({ ...ownerAssignment, id: "wa-boom", staffCode: "Boom", createdAt: "2026-07-27T03:00:00.000Z" })
+    ];
+    const groups = groupAssignedWorkFeed(items);
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0].isTeam, true);
+    assert.equal(groups[0].members.length, 2);
+    assert.equal(groups[0].title, "ส่งเสื้อให้ลูกค้าคุณ A");
+    // members sorted by Thai display name
+    assert.deepEqual(groups[0].members.map((m) => m.label), ["Boom", "ICE"]);
+  });
+
+  it("keeps two same-title tasks handed out at different times as separate groups", () => {
+    const items = [
+      ownerAssignmentToFeedItem({ ...ownerAssignment, id: "a", staffCode: "ICE", createdAt: "2026-07-27T03:00:00.000Z" }),
+      ownerAssignmentToFeedItem({ ...ownerAssignment, id: "b", staffCode: "Boom", createdAt: "2026-07-27T09:00:00.000Z" })
+    ];
+    const groups = groupAssignedWorkFeed(items);
+    assert.equal(groups.length, 2);
+    assert.equal(groups.every((g) => g.isTeam === false), true);
+  });
+
+  it("keeps handoffs individual and does not merge owner rows without a createdAt stamp", () => {
+    const items = [
+      ownerAssignmentToFeedItem({ ...ownerAssignment, id: "legacy-1", staffCode: "ICE" }),
+      ownerAssignmentToFeedItem({ ...ownerAssignment, id: "legacy-2", staffCode: "Boom" }),
+      handoffToFeedItem({ ...handoff, id: "ho-a" }),
+      handoffToFeedItem({ ...handoff, id: "ho-b" })
+    ];
+    const groups = groupAssignedWorkFeed(items);
+    assert.equal(groups.length, 4);
+    assert.equal(groups.every((g) => g.members.length === 1), true);
   });
 });

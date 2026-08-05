@@ -141,6 +141,46 @@ export function assignedWorkRecordById(records: AssignedWorkRecord[], id: string
   return records.find((record) => record.id === id) || null;
 }
 
+// One assigned task on the dashboard, folded from the per-person KPI records.
+export type AssignedWorkRecordGroup = {
+  key: string;
+  title: string;
+  workDate: string;
+  /** the record the grouped card links to (first member) */
+  primaryId: string;
+  members: AssignedWorkRecord[];
+  isTeam: boolean;
+};
+
+/**
+ * Fold per-person assigned-work records into the task that was handed out. Records sharing
+ * a groupId are one task given to several staff at once (ticket S3JjyiwLxyHLpPn6uOyX) — each
+ * keeps its OWN record and is still scored independently; this only collapses the DISPLAY so
+ * the dashboard shows one row per task instead of N. Records without a groupId stay on their
+ * own. First-seen order is preserved.
+ */
+export function groupAssignedWorkRecords(records: AssignedWorkRecord[]): AssignedWorkRecordGroup[] {
+  const map = new Map<string, AssignedWorkRecordGroup>();
+  const order: string[] = [];
+  for (const record of records) {
+    const key = record.groupId ? `grp__${record.groupId}` : `one__${record.id}`;
+    let group = map.get(key);
+    if (!group) {
+      group = { key, title: record.title, workDate: record.workDate, primaryId: record.id, members: [], isTeam: false };
+      map.set(key, group);
+      order.push(key);
+    }
+    group.members.push(record);
+  }
+  const groups = order.map((key) => map.get(key)!);
+  for (const group of groups) {
+    group.isTeam = group.members.length > 1;
+    group.members.sort((a, b) => a.employeeName.localeCompare(b.employeeName, "th"));
+    group.primaryId = group.members[0]?.id ?? group.primaryId;
+  }
+  return groups;
+}
+
 export function customerServiceRecordsToEvents(records: CustomerServiceRecord[]) {
   const grouped = new Map<string, { employeeName: string; event: ServiceEvent }>();
   records.forEach((record) => {
