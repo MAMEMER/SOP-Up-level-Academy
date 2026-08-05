@@ -40,3 +40,27 @@ export const weeklyStockSleevePhase: WeeklyStockPhase = {
 export function weeklyStockManualHref() {
   return `/training#${weeklyStockSleevePhase.id}`;
 }
+
+// งาน Stock รายสัปดาห์ที่แสดงเป็นกลุ่มบน dashboard (หมวด Stock work)
+// เก็บเป็น array เพื่อให้แอดมินแก้/เพิ่ม/ลบ ได้ง่าย โดยไม่ต้องแก้ UI
+export type WeeklyStockTask = {
+  id: string;
+  name: string;
+  href: string;
+  note?: string;
+};
+
+export const weeklyStockTasks: WeeklyStockTask[] = [
+  {
+    id: "weekly-stock-sleeve",
+    name: "Sleeve / อุปกรณ์ทั้งหมด",
+    href: `/checklist-weekly#${weeklyStockSleevePhase.id}`,
+    note: "นับ Sleeve และอุปกรณ์เสริมทั้งหมดประจำสัปดาห์"
+  },
+  {
+    id: "weekly-stock-booster-box",
+    name: "Booster box / Box all cards",
+    href: `/checklist-weekly#${weeklyStockSleevePhase.id}`,
+    note: "นับ Booster box และกล่องการ์ดทั้งหมดประจำสัปดาห์"
+  }
+];
