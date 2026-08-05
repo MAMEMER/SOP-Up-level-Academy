@@ -1267,19 +1267,21 @@ export function WorkflowChecklist({
                   <p>{previousHandoff}</p>
                 </div>
               ) : null}
-              <p className="phase-window">
-                {schedule.hasOpenTime
-                  ? `ส่งได้ตั้งแต่ ${schedule.startLabel} ถึง ${schedule.dueLabel}`
-                  : `กำหนดส่ง ${schedule.dueLabel} — ทำหัวข้อไหนก่อนก็ได้`}
-                {notYetOpen ? ` · ยังไม่ถึงเวลา เริ่มได้ ${schedule.startLabel}` : ""}
-                {isLate && !dayClosed ? " · เลยเวลาแล้ว ส่งได้อยู่ แต่หัก 2 คะแนน" : ""}
-                {dayClosed && !isSubmitted ? " · หมดวันแล้ว ส่งไม่ได้" : ""}
-                {record?.submittedAt && record.dueAt && Date.parse(record.submittedAt) > Date.parse(record.dueAt)
-                  ? " · ส่งสาย หัก 2 คะแนน"
-                  : ""}
-                {adminUnlocked ? " · admin ปลดล็อคให้แก้ไข" : ""}
-                {!withinWorkHours ? " · นอกเวลาทำงาน 09:00-23:59" : ""}
-              </p>
+              {readOnly ? null : (
+                <p className="phase-window">
+                  {schedule.hasOpenTime
+                    ? `ส่งได้ตั้งแต่ ${schedule.startLabel} ถึง ${schedule.dueLabel}`
+                    : `กำหนดส่ง ${schedule.dueLabel} — ทำหัวข้อไหนก่อนก็ได้`}
+                  {notYetOpen ? ` · ยังไม่ถึงเวลา เริ่มได้ ${schedule.startLabel}` : ""}
+                  {isLate && !dayClosed ? " · เลยเวลาแล้ว ส่งได้อยู่ แต่หัก 2 คะแนน" : ""}
+                  {dayClosed && !isSubmitted ? " · หมดวันแล้ว ส่งไม่ได้" : ""}
+                  {record?.submittedAt && record.dueAt && Date.parse(record.submittedAt) > Date.parse(record.dueAt)
+                    ? " · ส่งสาย หัก 2 คะแนน"
+                    : ""}
+                  {adminUnlocked ? " · admin ปลดล็อคให้แก้ไข" : ""}
+                  {!withinWorkHours ? " · นอกเวลาทำงาน 09:00-23:59" : ""}
+                </p>
+              )}
               <div className="checklist-tick-list">
                 {phase.checklist.map((item, index) => {
                   const key = itemKey(phase.id, index);
