@@ -23,6 +23,9 @@ export async function fetchAttendanceSource(branch: string): Promise<AttendanceS
   const schedules: ShiftSchedule[] = [];
   const clockEvents: ClockEvent[] = [];
   const leaves: LeaveRecord[] = [];
+  // Days the person is rostered but scheduled OFF. Lets attendance tell an off-day clock-in
+  // (came in / covered a shift) apart from a truly unattributable one (see performance-score).
+  const offDays: { employeeName: string; workDate: string }[] = [];
 
   // Swapped shifts: the original isn't expected to work (someone else covers), so drop
   // their scheduled shift that day = no missing-clock-in penalty.
@@ -48,6 +51,8 @@ export async function fetchAttendanceSource(branch: string): Promise<AttendanceS
       leaves.push({ employeeName: s.staffCode, workDate: s.workDate, type: "personal", source: "live" });
     } else if (s.assignment === "leave_sick") {
       leaves.push({ employeeName: s.staffCode, workDate: s.workDate, type: "sick", source: "live" });
+    } else if (s.assignment === "off") {
+      offDays.push({ employeeName: s.staffCode, workDate: s.workDate });
     }
   }
 
@@ -91,5 +96,5 @@ export async function fetchAttendanceSource(branch: string): Promise<AttendanceS
     });
   }
 
-  return { schedules, clockEvents, leaves, annualSchedules };
+  return { schedules, clockEvents, leaves, annualSchedules, offDays };
 }

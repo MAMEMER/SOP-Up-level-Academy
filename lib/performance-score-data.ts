@@ -308,6 +308,9 @@ export type AttendanceSource = {
   // (ticket bP6dfamNSqXQb7TAWVD3: Boom's June sick leave was planned and never counted).
   // fetchAttendanceSource fills this with work shifts + synthetic entries for every leave day.
   annualSchedules?: ShiftSchedule[];
+  // Rostered-but-off days (assignment "off"). Used so a StoreHub clock-in on a scheduled day
+  // off is labelled as a real "came in on a day off" event instead of "Unmatched clock-in".
+  offDays?: { employeeName: string; workDate: string }[];
 };
 
 /** หัวข้อ checklist ที่ส่งช้ากว่าเวลาที่กำหนด — 2 คะแนนต่อหัวข้อ */
@@ -339,6 +342,7 @@ export function getPerformanceScoreRowsForRange(
   const srcClock = attendance?.clockEvents ?? [];
   const srcLeaves = attendance?.leaves ?? [];
   const srcAnnualSchedules = attendance?.annualSchedules ?? srcSchedules;
+  const srcOffDays = attendance?.offDays ?? [];
   // Stock comes entirely from the owner's entries at /admin/stock-check. A day with no
   // entry is not scored: the KPI no longer derives a "not counted" penalty from the roster,
   // because the owner now states that outcome explicitly (and deriving it as well charged
@@ -378,7 +382,8 @@ export function getPerformanceScoreRowsForRange(
       attendance: {
         schedules: employeePeriodSchedules,
         clockEvents: employeePeriodClockEvents,
-        leaveRecords: srcLeaves.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
+        leaveRecords: srcLeaves.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period)),
+        offDays: srcOffDays.filter((item) => item.employeeName === employeeName && inPeriod(item.workDate, period))
       },
       annualLeave: {
         schedules: srcAnnualSchedules.filter((item) => item.employeeName === employeeName && inYear(item.workDate, year)),
