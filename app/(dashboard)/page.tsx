@@ -44,13 +44,15 @@ export default async function HomePage() {
 
       {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
 
-      <DashboardChecklistStatus phases={cardStoreWorkflow} />
+      <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={staffCode} branch={branch} />
       <DashboardTaskSections
         phases={cardStoreWorkflow}
         assignedWorkRecords={assignedWorkRecords}
         assignedWorkFeed={assignedWorkFeed}
         workDate={workDate}
         canManageAssignedWork={user.role === "admin"}
+        staffCode={staffCode}
+        branch={branch}
       />
     </main>
   );

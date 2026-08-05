@@ -8,6 +8,7 @@ import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
 import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
 import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
+import { useShiftPhases } from "../lib/use-shift-phases.ts";
 import {
   bangkokMonthKey,
   monthlyStockTasks,
@@ -58,13 +59,18 @@ export function DashboardTaskSections({
   assignedWorkRecords = [],
   assignedWorkFeed = [],
   workDate: currentWorkDate,
-  canManageAssignedWork = false
+  canManageAssignedWork = false,
+  staffCode = null,
+  branch
 }: {
   phases: WorkflowPhase[];
   assignedWorkRecords?: AssignedWorkRecord[];
   assignedWorkFeed?: AssignedWorkFeedItem[];
   workDate?: string;
   canManageAssignedWork?: boolean;
+  /** The staffer this dashboard belongs to — used to show only their กะ's daily หัวข้อ. */
+  staffCode?: string | null;
+  branch?: string;
 }) {
   const { records } = useWorkflowRecords();
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, MonthlyTaskStatus>>({});
@@ -72,8 +78,11 @@ export function DashboardTaskSections({
   const [weeklyTicks, setWeeklyTicks] = useState<Record<string, boolean>>({});
   const [weeklyPeriodKey, setWeeklyPeriodKey] = useState<string>("");
   const workDate = currentWorkDate || formatWorkDate();
-  const stockPhase = phases.find((phase) => phase.id === "stock-work");
-  const dailyTaskPhases = phases.filter((phase) => phase.id !== "stock-work");
+  // เฉพาะ หัวข้อ ของกะที่พนักงานคนนี้เข้าวันนี้ — กะ2 จะไม่เห็น เปิดร้าน (ของกะ1) ขึ้นว่าเลยเวลา
+  // Admin / วันหยุด → คืนทุก หัวข้อ (hook ไม่กรอง)
+  const shiftPhases = useShiftPhases(phases, staffCode, branch, workDate);
+  const stockPhase = shiftPhases.find((phase) => phase.id === "stock-work");
+  const dailyTaskPhases = shiftPhases.filter((phase) => phase.id !== "stock-work");
 
   // งานประจำเดือน: คำนวณสถานะฝั่ง client เท่านั้น (กัน hydration mismatch จาก new Date())
   // สถานะมาจาก server record เดียวกับหน้า /monthly-tasks
