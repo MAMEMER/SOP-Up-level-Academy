@@ -74,6 +74,21 @@ export function resolvePhaseWindow(
   };
 }
 
+/**
+ * A หัวข้อใหญ่ the owner created. The built-in ones live in card-store-workflow.ts with
+ * their manual text and their per-item detail panels; a custom one is just a titled list
+ * of ticks, which is what most new routines need.
+ */
+export type CustomPhase = {
+  id: string;
+  title: string;
+  /** two-letter badge on the card */
+  icon?: string;
+  /** drives the card colour — same set the built-in phases use */
+  category?: WorkflowPhase["category"];
+  goal?: string;
+};
+
 export type ChecklistConfig = {
   overrides: ChecklistOverrides;
   windows: PhaseWindows;
@@ -82,9 +97,39 @@ export type ChecklistConfig = {
   shifts: PhaseShifts;
   /** long-form manual text per phase (rendered at /training) — see lib/work-manual.ts */
   manual: ManualOverrides;
+  /** หัวข้อใหญ่ the owner added */
+  customPhases: CustomPhase[];
+  /** built-in หัวข้อใหญ่ the owner switched off (they cannot be deleted from code) */
+  hiddenPhases: string[];
+  /** renamed หัวข้อใหญ่ — phaseId → new title */
+  titles: Record<string, string>;
 };
 
-export const emptyChecklistConfig: ChecklistConfig = { overrides: {}, windows: {}, order: [], shifts: {}, manual: {} };
+export const emptyChecklistConfig: ChecklistConfig = {
+  overrides: {},
+  windows: {},
+  order: [],
+  shifts: {},
+  manual: {},
+  customPhases: [],
+  hiddenPhases: [],
+  titles: {}
+};
+
+/** Turns an owner-created หัวข้อ into the shape the checklist renders. */
+export function customPhaseToWorkflowPhase(phase: CustomPhase, checklist: string[]): WorkflowPhase {
+  return {
+    id: phase.id,
+    title: phase.title,
+    timeLabel: "",
+    category: phase.category || "online",
+    icon: (phase.icon || phase.title.slice(0, 2)).toUpperCase(),
+    goal: phase.goal || phase.title,
+    caution: "",
+    sections: [],
+    checklist
+  };
+}
 
 /**
  * Returns phases with their checklist replaced where an override exists. An empty
@@ -130,9 +175,64 @@ export function applyPhaseShifts(phases: WorkflowPhase[], shifts: PhaseShifts): 
 
 /** Everything the owner configured, applied to the built-in phases in one call. */
 export function applyChecklistConfig(phases: WorkflowPhase[], config: Partial<ChecklistConfig>): WorkflowPhase[] {
-  const withItems = applyChecklistOverrides(phases, config.overrides || {});
+  const hidden = new Set(config.hiddenPhases || []);
+  const titles = config.titles || {};
+  const overrides = config.overrides || {};
+
+  const builtIn = phases
+    .filter((phase) => !hidden.has(phase.id))
+    .map((phase) => (titles[phase.id]?.trim() ? { ...phase, title: titles[phase.id].trim() } : phase));
+
+  // A custom หัวข้อ has no code behind it, so its items ARE its override entry.
+  const custom = (config.customPhases || [])
+    .filter((phase) => phase.id && phase.title && !hidden.has(phase.id))
+    .map((phase) =>
+      customPhaseToWorkflowPhase(
+        titles[phase.id]?.trim() ? { ...phase, title: titles[phase.id].trim() } : phase,
+        overrides[phase.id] || []
+      )
+    );
+
+  const withItems = applyChecklistOverrides([...builtIn, ...custom], overrides);
   const withShifts = applyPhaseShifts(withItems, config.shifts || {});
   return applyPhaseOrder(withShifts, config.order || []);
+}
+
+/** A slug that is safe as a phaseId and as a Firestore map key. */
+export function customPhaseId(title: string, existing: string[] = []): string {
+  const base = `custom-${title.trim()}`.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9ก-๙-]/g, "").toLowerCase() || "custom-phase";
+  if (!existing.includes(base)) return base;
+  let suffix = 2;
+  while (existing.includes(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+/**
+ * Moves one item from one หัวข้อ to another. Both lists are rewritten, so the caller saves
+ * the whole override map — this is what the "ย้ายไป" picker in the editor runs.
+ */
+export function moveChecklistItem(
+  overrides: ChecklistOverrides,
+  from: { phaseId: string; index: number },
+  toPhaseId: string
+): ChecklistOverrides {
+  const source = overrides[from.phaseId] || [];
+  const item = source[from.index];
+  if (item === undefined || from.phaseId === toPhaseId) return overrides;
+  return {
+    ...overrides,
+    [from.phaseId]: source.filter((_, index) => index !== from.index),
+    [toPhaseId]: [...(overrides[toPhaseId] || []), item]
+  };
+}
+
+/** Reorders one item inside its own หัวข้อ. */
+export function moveChecklistItemWithin(overrides: ChecklistOverrides, phaseId: string, index: number, direction: -1 | 1): ChecklistOverrides {
+  const items = [...(overrides[phaseId] || [])];
+  const target = index + direction;
+  if (target < 0 || target >= items.length) return overrides;
+  [items[index], items[target]] = [items[target], items[index]];
+  return { ...overrides, [phaseId]: items };
 }
 
 /** Seeds an editable override map from the built-in checklists (for the editor UI). */

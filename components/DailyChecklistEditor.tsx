@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import type { WorkflowPhase } from "../lib/card-store-workflow.ts";
 import {
   CHECKLIST_DAY_END,
+  customPhaseId,
+  customPhaseToWorkflowPhase,
   emptyChecklistConfig,
   isHhMm,
+  moveChecklistItem,
+  moveChecklistItemWithin,
   seedOverridesFromPhases,
   seedShiftsFromPhases,
   seedWindowsFromPhases,
@@ -34,6 +38,7 @@ export function DailyChecklistEditor({
   editedBy: string;
 }) {
   const [draft, setDraft] = useState<ChecklistConfig>(emptyChecklistConfig);
+  const [newPhaseTitle, setNewPhaseTitle] = useState("");
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -51,20 +56,93 @@ export function DailyChecklistEditor({
   }, [branch]);
 
   function seedConfig(source: WorkflowPhase[], config: ChecklistConfig): ChecklistConfig {
-    const ordered = config.order.filter((phaseId) => source.some((phase) => phase.id === phaseId));
+    // The editor works on every หัวข้อ that exists — built-in plus the owner's own — so a
+    // custom one is seeded from its stored items just like a built-in one is from code.
+    const all = [
+      ...source,
+      ...config.customPhases.map((phase) => customPhaseToWorkflowPhase(phase, config.overrides[phase.id] || []))
+    ];
+    const ordered = config.order.filter((phaseId) => all.some((phase) => phase.id === phaseId));
     return {
-      manual: config.manual,
-      overrides: seedOverridesFromPhases(source, config.overrides),
-      windows: seedWindowsFromPhases(source, config.windows),
-      shifts: seedShiftsFromPhases(source, config.shifts),
-      order: [...ordered, ...source.map((phase) => phase.id).filter((phaseId) => !ordered.includes(phaseId))]
+      ...config,
+      overrides: seedOverridesFromPhases(all, config.overrides),
+      windows: seedWindowsFromPhases(all, config.windows),
+      shifts: seedShiftsFromPhases(all, config.shifts),
+      order: [...ordered, ...all.map((phase) => phase.id).filter((phaseId) => !ordered.includes(phaseId))]
     };
   }
 
-  /** Phases in the order the owner arranged them (falls back to the built-in order). */
+  /** Every หัวข้อ the editor shows: built-in first, then the owner's, in the saved order. */
+  const allPhases: WorkflowPhase[] = [
+    ...phases,
+    ...draft.customPhases.map((phase) => customPhaseToWorkflowPhase(phase, draft.overrides[phase.id] || []))
+  ];
   const orderedPhases = draft.order.length
-    ? draft.order.map((phaseId) => phases.find((phase) => phase.id === phaseId)).filter(Boolean as unknown as (p: WorkflowPhase | undefined) => p is WorkflowPhase)
-    : phases;
+    ? draft.order
+        .map((phaseId) => allPhases.find((phase) => phase.id === phaseId))
+        .filter(Boolean as unknown as (p: WorkflowPhase | undefined) => p is WorkflowPhase)
+    : allPhases;
+
+  const isCustom = (phaseId: string) => draft.customPhases.some((phase) => phase.id === phaseId);
+  const isHidden = (phaseId: string) => draft.hiddenPhases.includes(phaseId);
+  const titleOf = (phase: WorkflowPhase) => draft.titles[phase.id] ?? phase.title;
+
+  function renamePhase(phaseId: string, value: string) {
+    setDraft((prev) => ({ ...prev, titles: { ...prev.titles, [phaseId]: value } }));
+  }
+
+  /** Built-in หัวข้อ cannot be deleted (they live in code) — they are switched off instead. */
+  function toggleHidden(phaseId: string) {
+    setDraft((prev) => ({
+      ...prev,
+      hiddenPhases: prev.hiddenPhases.includes(phaseId)
+        ? prev.hiddenPhases.filter((id) => id !== phaseId)
+        : [...prev.hiddenPhases, phaseId]
+    }));
+  }
+
+  function removeCustomPhase(phaseId: string) {
+    setDraft((prev) => {
+      const { [phaseId]: _items, ...overrides } = prev.overrides;
+      const { [phaseId]: _title, ...titles } = prev.titles;
+      const { [phaseId]: _window, ...windows } = prev.windows;
+      return {
+        ...prev,
+        overrides,
+        titles,
+        windows,
+        customPhases: prev.customPhases.filter((phase) => phase.id !== phaseId),
+        order: prev.order.filter((id) => id !== phaseId),
+        hiddenPhases: prev.hiddenPhases.filter((id) => id !== phaseId)
+      };
+    });
+  }
+
+  function addCustomPhase(title: string) {
+    const clean = title.trim();
+    if (!clean) return;
+    setDraft((prev) => {
+      const id = customPhaseId(clean, [...allPhases.map((phase) => phase.id), ...prev.customPhases.map((phase) => phase.id)]);
+      return {
+        ...prev,
+        customPhases: [...prev.customPhases, { id, title: clean }],
+        overrides: { ...prev.overrides, [id]: [] },
+        windows: { ...prev.windows, [id]: { dueTime: CHECKLIST_DAY_END } },
+        shifts: { ...prev.shifts, [id]: [] },
+        order: [...prev.order, id]
+      };
+    });
+    setNewPhaseTitle("");
+  }
+
+  function moveItemToPhase(phaseId: string, index: number, toPhaseId: string) {
+    if (!toPhaseId || toPhaseId === phaseId) return;
+    setDraft((prev) => ({ ...prev, overrides: moveChecklistItem(prev.overrides, { phaseId, index }, toPhaseId) }));
+  }
+
+  function moveItemWithin(phaseId: string, index: number, direction: -1 | 1) {
+    setDraft((prev) => ({ ...prev, overrides: moveChecklistItemWithin(prev.overrides, phaseId, index, direction) }));
+  }
 
   function updateItem(phaseId: string, index: number, value: string) {
     setDraft((prev) => ({
@@ -139,9 +217,15 @@ export function DailyChecklistEditor({
       return;
     }
 
+    // A renamed หัวข้อ that was cleared back to blank should fall back to its built-in name.
+    const titles = Object.fromEntries(
+      Object.entries(draft.titles).filter(([, title]) => title.trim()).map(([phaseId, title]) => [phaseId, title.trim()])
+    );
+    const customPhases = draft.customPhases.filter((phase) => phase.title.trim()).map((phase) => ({ ...phase, title: (titles[phase.id] || phase.title).trim() }));
+
     setStatus("กำลังบันทึก…");
     try {
-      await saveChecklistConfig({ branch, config: { ...draft, overrides }, updatedBy: editedBy });
+      await saveChecklistConfig({ branch, config: { ...draft, overrides, titles, customPhases }, updatedBy: editedBy });
       setStatus("บันทึกแล้ว — checklist ของ staff อัปเดตแล้ว");
     } catch {
       setStatus("บันทึกไม่สำเร็จ");
@@ -156,14 +240,27 @@ export function DailyChecklistEditor({
         const window = draft.windows[phase.id] || { dueTime: CHECKLIST_DAY_END };
         const shifts = draft.shifts[phase.id] || [];
         return (
-          <section key={phase.id} className="checklist-config__phase soft-card">
+          <section key={phase.id} className={`checklist-config__phase soft-card${isHidden(phase.id) ? " is-hidden" : ""}`}>
             <div className="checklist-config__phase-head">
-              <strong>{phase.title}</strong>
+              <input
+                className="checklist-config__title"
+                value={titleOf(phase)}
+                onChange={(e) => renamePhase(phase.id, e.target.value)}
+                aria-label="ชื่อหัวข้อใหญ่"
+              />
               <div className="checklist-config__move">
                 <button type="button" onClick={() => movePhase(phase.id, -1)} disabled={index === 0} aria-label="เลื่อนขึ้น">↑</button>
                 <button type="button" onClick={() => movePhase(phase.id, 1)} disabled={index === orderedPhases.length - 1} aria-label="เลื่อนลง">↓</button>
+                {isCustom(phase.id) ? (
+                  <button type="button" onClick={() => removeCustomPhase(phase.id)} aria-label="ลบหัวข้อใหญ่">ลบ</button>
+                ) : (
+                  <button type="button" onClick={() => toggleHidden(phase.id)}>
+                    {isHidden(phase.id) ? "เปิดใช้" : "ปิดหัวข้อนี้"}
+                  </button>
+                )}
               </div>
             </div>
+            {isHidden(phase.id) ? <p className="checklist-config__hint">ปิดอยู่ — พนักงานไม่เห็นหัวข้อนี้ และไม่ถูกหักคะแนนจากมัน</p> : null}
 
             <div className="checklist-config__window">
               <label>
@@ -195,9 +292,26 @@ export function DailyChecklistEditor({
             </div>
 
             <ul className="checklist-config__items">
-              {(draft.overrides[phase.id] ?? []).map((item, itemIndex) => (
+              {(draft.overrides[phase.id] ?? []).map((item, itemIndex, items) => (
                 <li key={itemIndex}>
                   <input value={item} onChange={(e) => updateItem(phase.id, itemIndex, e.target.value)} placeholder="รายการ checklist" />
+                  <div className="checklist-config__move">
+                    <button type="button" onClick={() => moveItemWithin(phase.id, itemIndex, -1)} disabled={itemIndex === 0} aria-label="เลื่อนขึ้น">↑</button>
+                    <button type="button" onClick={() => moveItemWithin(phase.id, itemIndex, 1)} disabled={itemIndex === items.length - 1} aria-label="เลื่อนลง">↓</button>
+                  </div>
+                  {/* ย้ายข้ามหัวข้อใหญ่: เลือกปลายทางแล้วรายการเด้งไปต่อท้ายหัวข้อนั้นทันที */}
+                  <select
+                    value=""
+                    onChange={(e) => moveItemToPhase(phase.id, itemIndex, e.target.value)}
+                    aria-label="ย้ายไปหัวข้ออื่น"
+                  >
+                    <option value="">ย้ายไป…</option>
+                    {orderedPhases
+                      .filter((target) => target.id !== phase.id)
+                      .map((target) => (
+                        <option key={target.id} value={target.id}>{titleOf(target)}</option>
+                      ))}
+                  </select>
                   <button type="button" onClick={() => removeItem(phase.id, itemIndex)} aria-label="ลบ">✕</button>
                 </li>
               ))}
@@ -206,6 +320,24 @@ export function DailyChecklistEditor({
           </section>
         );
       })}
+
+      <section className="checklist-config__phase soft-card">
+        <div className="checklist-config__phase-head">
+          <strong>เพิ่มหัวข้อใหญ่</strong>
+        </div>
+        <p className="checklist-config__hint">
+          หัวข้อที่เพิ่มเองเป็นรายการติ๊กล้วนๆ (ไม่มีช่องกรอกรายละเอียดเฉพาะทางแบบหัวข้อเดิม) ·
+          ตั้งเวลาส่งและกะได้เหมือนกัน · ย้ายรายการเดิมเข้ามาได้ด้วยปุ่ม &quot;ย้ายไป…&quot;
+        </p>
+        <div className="checklist-config__new-phase">
+          <input
+            value={newPhaseTitle}
+            onChange={(e) => setNewPhaseTitle(e.target.value)}
+            placeholder="ชื่อหัวข้อใหญ่ เช่น งานคลังหลังร้าน"
+          />
+          <button type="button" className="checklist-config__add" onClick={() => addCustomPhase(newPhaseTitle)}>+ เพิ่มหัวข้อ</button>
+        </div>
+      </section>
 
       <div className="checklist-config__bar">
         <button type="button" className="primary-action" onClick={save}>บันทึกทั้งหมด</button>

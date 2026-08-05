@@ -4,6 +4,9 @@ import { cardStoreWorkflow, phasesForShift } from "../lib/card-store-workflow.ts
 import {
   applyChecklistConfig,
   applyPhaseOrder,
+  customPhaseId,
+  moveChecklistItem,
+  moveChecklistItemWithin,
   applyPhaseShifts,
   resolvePhaseWindow,
   seedShiftsFromPhases,
@@ -74,5 +77,61 @@ describe("owner checklist config", () => {
     assert.equal(result.deductions[0].points, 6);
     assert.equal(result.flags.length, 0);
     assert.match(result.deductions[0].detail, /2026-08-03/);
+  });
+});
+
+describe("owner-managed หัวข้อใหญ่", () => {
+  it("adds a หัวข้อ the code never had, with its own items", () => {
+    const applied = applyChecklistConfig(cardStoreWorkflow, {
+      customPhases: [{ id: "custom-back-room", title: "งานคลังหลังร้าน" }],
+      overrides: { "custom-back-room": ["เช็คกล่องพัสดุ", "จัดชั้นสต็อก"] },
+      order: ["custom-back-room"]
+    });
+
+    assert.equal(phaseIds(applied)[0], "custom-back-room");
+    assert.deepEqual(applied[0].checklist, ["เช็คกล่องพัสดุ", "จัดชั้นสต็อก"]);
+    // the built-in ones are still there behind it
+    assert.equal(applied.length, cardStoreWorkflow.length + 1);
+  });
+
+  it("hides a built-in หัวข้อ instead of pretending it can be deleted", () => {
+    const applied = applyChecklistConfig(cardStoreWorkflow, { hiddenPhases: ["guild-chat-exp"] });
+
+    assert.equal(phaseIds(applied).includes("guild-chat-exp"), false);
+    assert.equal(applied.length, cardStoreWorkflow.length - 1);
+  });
+
+  it("renames a หัวข้อ without touching its items", () => {
+    const applied = applyChecklistConfig(cardStoreWorkflow, { titles: { "open-store": "เปิดร้าน (กะเช้า)" } });
+    const phase = applied.find((item) => item.id === "open-store")!;
+
+    assert.equal(phase.title, "เปิดร้าน (กะเช้า)");
+    assert.deepEqual(phase.checklist, cardStoreWorkflow.find((item) => item.id === "open-store")!.checklist);
+  });
+
+  it("moves one item from one หัวข้อ to another", () => {
+    const before = { "open-store": ["ก", "ข", "ค"], "close-store": ["ง"] };
+    const after = moveChecklistItem(before, { phaseId: "open-store", index: 1 }, "close-store");
+
+    assert.deepEqual(after["open-store"], ["ก", "ค"]);
+    assert.deepEqual(after["close-store"], ["ง", "ข"]);
+    // moving onto itself, or from an empty slot, changes nothing
+    assert.equal(moveChecklistItem(before, { phaseId: "open-store", index: 1 }, "open-store"), before);
+    assert.equal(moveChecklistItem(before, { phaseId: "open-store", index: 9 }, "close-store"), before);
+  });
+
+  it("reorders an item inside its own หัวข้อ", () => {
+    const before = { "open-store": ["ก", "ข", "ค"] };
+
+    assert.deepEqual(moveChecklistItemWithin(before, "open-store", 2, -1)["open-store"], ["ก", "ค", "ข"]);
+    assert.equal(moveChecklistItemWithin(before, "open-store", 0, -1), before);
+  });
+
+  it("keeps a custom phase id unique and url-safe", () => {
+    const first = customPhaseId("งานคลัง หลังร้าน");
+    const second = customPhaseId("งานคลัง หลังร้าน", [first]);
+
+    assert.match(first, /^custom-/);
+    assert.notEqual(first, second);
   });
 });
