@@ -59,7 +59,7 @@ describe("dashboard task sections UI", () => {
 
     assert.equal(source.includes("supplyNeedsUrl"), true);
     assert.equal(source.includes("https://uplevel.storehubhq.com/stocks/supplyNeeds/v2/web"), true);
-    assert.equal(source.includes("สรุปรายวันจาก StoreHub Supply Needs"), true);
+    assert.equal(source.includes("แจ้งเตือนสินค้าใกล้หมด"), true);
     assert.equal(source.includes("ชื่อสินค้า | จำนวนที่เหลือ"), true);
   });
 
@@ -126,6 +126,44 @@ describe("dashboard task sections UI", () => {
     // checklist page renders staff/owner submission UI
     assert.equal(pageSource.includes("MonthlyEventChecklist"), true);
     assert.equal(pageSource.includes("requireUser"), true);
+  });
+
+  it("renders Stock work weekly as data-driven cards and shows the group even without a daily stock phase", () => {
+    const source = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+    const lib = readFileSync(new URL("../lib/weekly-stock-workflow.ts", import.meta.url), "utf8");
+
+    // weekly stock cards come from the shared array (admin edits lib, not UI)
+    assert.equal(source.includes("weeklyStockTasks.forEach"), true);
+    assert.equal(lib.includes("export const weeklyStockTasks"), true);
+
+    // stock section is no longer gated behind the daily stock phase — weekly/monthly always show
+    assert.equal(source.includes("{stockPhase ? (\n        <article className=\"task-section stock-task\""), false);
+
+    // both stock groups still link to their dedicated checklists
+    assert.equal(lib.includes("/checklist-weekly#"), true);
+    assert.equal(source.includes("/checklist-monthly#stock-single-card-work"), true);
+  });
+
+  it("shows only the viewer's shift daily หัวข้อ so a กะ2 staffer is not flagged late for เปิดร้าน", () => {
+    const sections = readFileSync(new URL("../components/DashboardTaskSections.tsx", import.meta.url), "utf8");
+    const status = readFileSync(new URL("../components/DashboardChecklistStatus.tsx", import.meta.url), "utf8");
+    const hook = readFileSync(new URL("../lib/use-shift-phases.ts", import.meta.url), "utf8");
+    const homePage = readFileSync(new URL("../app/(dashboard)/page.tsx", import.meta.url), "utf8");
+    const myViewPage = readFileSync(new URL("../app/(dashboard)/my-view/page.tsx", import.meta.url), "utf8");
+
+    // both dashboard surfaces derive their daily phases from the shift-aware hook
+    assert.equal(sections.includes("useShiftPhases(phases, staffCode, branch, workDate)"), true);
+    assert.equal(sections.includes("shiftPhases.filter((phase) => phase.id !== \"stock-work\")"), true);
+    assert.equal(status.includes("useShiftPhases(phases, staffCode, branch, workDate)"), true);
+    assert.equal(status.includes("shiftPhases.map"), true);
+
+    // the hook applies the owner config then filters by the rostered shift (matches ChecklistView)
+    assert.equal(hook.includes("applyChecklistConfig(phases, config)"), true);
+    assert.equal(hook.includes("shift ? phasesForShift(configured, shift) : configured"), true);
+
+    // both pages pass the viewer's staff code + branch so the hook can resolve their shift
+    assert.equal(homePage.includes("staffCode={staffCode} branch={branch}"), true);
+    assert.equal(myViewPage.includes("staffCode={selectedCode} branch={branch}"), true);
   });
 
   it("removes close-store phase helper text and adds closing proof fields", () => {

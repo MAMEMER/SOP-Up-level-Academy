@@ -41,6 +41,15 @@ export type AttendanceInput = {
   schedules: ShiftSchedule[];
   clockEvents: ClockEvent[];
   leaveRecords?: LeaveRecord[];
+  /**
+   * Days the person IS on the roster but is NOT scheduled to work (assignment "off").
+   * A StoreHub clock-in on one of these days is a real, attributable event — someone
+   * came in on their day off (usually covering a shift) — NOT an unmatched/unknown
+   * clock-in. Without this the attendance scorer can't tell an off-day clock-in apart
+   * from a clock-in by a code that isn't on the roster at all, and mislabels both as
+   * "Unmatched StoreHub clock-in" (ticket HodsWVdPj0tdfNQvoWIV — UP-003 on 2026-08-01).
+   */
+  offDays?: { employeeName: string; workDate: string }[];
 };
 
 export type LeaveType = "sick" | "personal";
@@ -246,6 +255,7 @@ export function calculateAttendanceScore(input: AttendanceInput, now: number = D
   const clocks = new Map(input.clockEvents.map((event) => [dateKey(event.employeeName, event.workDate), event]));
   const schedules = new Set(input.schedules.map((schedule) => dateKey(schedule.employeeName, schedule.workDate)));
   const approvedLeave = new Set((input.leaveRecords || []).map((record) => dateKey(record.employeeName, record.workDate)));
+  const offDays = new Set((input.offDays || []).map((off) => dateKey(off.employeeName, off.workDate)));
 
   input.schedules.forEach((schedule) => {
     if (approvedLeave.has(dateKey(schedule.employeeName, schedule.workDate))) return;
@@ -288,11 +298,21 @@ export function calculateAttendanceScore(input: AttendanceInput, now: number = D
   });
 
   input.clockEvents.forEach((clock) => {
-    if (approvedLeave.has(dateKey(clock.employeeName, clock.workDate))) return;
+    const key = dateKey(clock.employeeName, clock.workDate);
+    if (approvedLeave.has(key)) return;
+    if (schedules.has(key)) return; // matched a scheduled working shift → already scored above
 
-    if (!schedules.has(dateKey(clock.employeeName, clock.workDate))) {
-      warnings.push(`Unmatched StoreHub clock-in for ${clock.employeeName} on ${clock.workDate}`);
+    // Clocked in on a day the person is rostered but scheduled OFF: a real event (came in
+    // on a day off / covered a shift), not a data error. Surface it clearly so the admin can
+    // decide whether it should count, instead of the alarming "Unmatched ... clock-in".
+    if (offDays.has(key)) {
+      warnings.push(`${clock.employeeName} ลงเวลาเข้างานวันที่ ${clock.workDate} ทั้งที่เป็นวันหยุด (อาจมาแทนกะ — ตรวจสอบ/ปรับกะถ้าถูกต้อง)`);
+      return;
     }
+
+    // Clock-in for a code with no roster presence that day at all → genuine data problem
+    // (e.g. a stale StoreHub code that no longer maps to anyone on the shift plan).
+    warnings.push(`Unmatched StoreHub clock-in for ${clock.employeeName} on ${clock.workDate}`);
   });
 
   const totalDeduction = deductions.reduce((sum, deduction) => sum + deduction.points, 0);

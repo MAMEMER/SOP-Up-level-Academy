@@ -80,11 +80,11 @@ export const monthlyStockTasks: MonthlyEventTask[] = [
     note: "นับ Single card กลุ่ม Lorcana"
   },
   {
-    id: "monthly-stock-single-lift-bound",
-    name: "นับ Single card - Lift Bound",
+    id: "monthly-stock-single-rift-bound",
+    name: "นับ Single card - Rift Bound",
     category: "stock",
     schedule: "กำหนดก่อนสิ้นเดือน",
-    note: "นับ Single card กลุ่ม Lift Bound"
+    note: "นับ Single card กลุ่ม Rift Bound"
   },
   {
     id: "monthly-stock-discrepancy",

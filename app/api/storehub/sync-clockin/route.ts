@@ -5,6 +5,7 @@ import { sopUserForEmail } from "../../../../lib/sop-users.ts";
 import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
 import { fetchEmployeeNames, fetchTimesheets, hasStoreHubCreds, toBangkok } from "../../../../lib/storehub-api.ts";
 import { resolveEmployeeCode } from "../../../../lib/employee-directory.ts";
+import { ensureStaffLoaded } from "../../../../lib/staff-store.ts";
 import { restUpsertDoc } from "../../../../lib/firestore-rest.ts";
 
 // Pulls StoreHub timesheets for a month and writes the earliest clock-in per staff-day
@@ -34,6 +35,13 @@ function monthRange(month: string): { fromIso: string; toIso: string } {
 export async function GET(request: Request) {
   if (!(await isAllowed(request))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   if (!hasStoreHubCreds()) return NextResponse.json({ error: "storehub_not_configured" }, { status: 503 });
+
+  // Hydrate the LIVE staff roster (sop_staff) before resolving StoreHub names to codes.
+  // The Vercel cron calls this route with the CRON_SECRET and NO user session, so
+  // requireUser()/ensureStaffLoaded() never ran — resolveEmployeeCode would fall back to the
+  // compiled-in seed (Boom/Leo/ICE...) and write clock-ins under stale codes that no longer
+  // exist on the shift plan (UP-003...), producing orphan "Unmatched StoreHub clock-in" rows.
+  await ensureStaffLoaded();
 
   const url = new URL(request.url);
   const month = url.searchParams.get("month") || new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 7);

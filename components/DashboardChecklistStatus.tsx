@@ -3,6 +3,7 @@
 import type { WorkflowPhase } from "../lib/card-store-workflow.ts";
 import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
 import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
+import { useShiftPhases } from "../lib/use-shift-phases.ts";
 
 const statusText = {
   white: "ยังไม่เริ่ม",
@@ -12,13 +13,25 @@ const statusText = {
   purple: "ต่อเนื่อง 3 วัน"
 };
 
-export function DashboardChecklistStatus({ phases }: { phases: WorkflowPhase[] }) {
+export function DashboardChecklistStatus({
+  phases,
+  staffCode = null,
+  branch
+}: {
+  phases: WorkflowPhase[];
+  /** The staffer this dashboard belongs to — used to show only their กะ's daily หัวข้อ. */
+  staffCode?: string | null;
+  branch?: string;
+}) {
   const { records } = useWorkflowRecords();
   const workDate = formatWorkDate();
+  // Only the หัวข้อ for this person's rostered กะ — so a กะ2 staffer never sees เปิดร้าน
+  // (กะ1-only) flagged late. Admin / off-day → all phases (hook returns them unfiltered).
+  const shiftPhases = useShiftPhases(phases, staffCode, branch, workDate);
 
   return (
     <div className="hero-metrics checklist-status-cards">
-      {phases.map((phase) => {
+      {shiftPhases.map((phase) => {
         const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
         const color = workflowVisualStatus(records, workDate, phase.id);
         return (

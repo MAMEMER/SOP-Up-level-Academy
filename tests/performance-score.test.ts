@@ -146,6 +146,29 @@ describe("performance score engine", () => {
     assert.equal(result.warnings.length, 0);
   });
 
+  it("labels a clock-in on a scheduled OFF day as came-in-on-day-off, not Unmatched (ticket HodsWVdPj0tdfNQvoWIV)", () => {
+    const result = calculateAttendanceScore({
+      schedules: [],
+      clockEvents: [{ employeeName: "UP-003", workDate: "2026-08-01", clockIn: "2026-08-01T10:24:00+07:00", source: "storehub" }],
+      offDays: [{ employeeName: "UP-003", workDate: "2026-08-01" }]
+    });
+
+    assert.equal(result.deductions.length, 0);
+    assert.equal(result.warnings.length, 1);
+    assert.match(result.warnings[0], /วันหยุด/);
+    assert.doesNotMatch(result.warnings[0], /Unmatched/);
+  });
+
+  it("still flags a clock-in with no roster presence at all as Unmatched", () => {
+    const result = calculateAttendanceScore({
+      schedules: [],
+      clockEvents: [{ employeeName: "Ghost", workDate: "2026-08-01", clockIn: "2026-08-01T10:24:00+07:00", source: "storehub" }]
+    });
+
+    assert.equal(result.warnings.length, 1);
+    assert.match(result.warnings[0], /Unmatched StoreHub clock-in for Ghost/);
+  });
+
   it("summarizes annual leave allowance separately from score", () => {
     const summary = summarizeLeave([
       { employeeName: "ICE", workDate: "2026-07-01", type: "sick", source: "google-sheet" },
