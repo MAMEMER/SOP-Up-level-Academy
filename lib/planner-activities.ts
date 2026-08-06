@@ -20,6 +20,50 @@ export function gamePreset(key: string | undefined): GamePreset | undefined {
   return key ? gamePresets.find((g) => g.key === key) : undefined;
 }
 
+// Recurring WORK tasks (Stock งานประจำ) the owner can drop onto the shift grid the same
+// way as a game event. Unlike a game chip, a task chip links to its checklist page so the
+// checklist "ขึ้นในวันที่กำหนด" — assign it on a date, staff open the checklist from there.
+// The task key is stored in DayActivity.game (shared slot) — taskPreset() resolves it.
+export type TaskPreset = {
+  key: string;
+  label: string;
+  badge: string; // short text badge (editorial, no logo image)
+  defaultTime: string; // HH:MM or "" (stock work has no fixed time)
+  href: string; // checklist link shown on the assigned date
+  cadence: "weekly" | "monthly";
+};
+
+export const taskPresets: TaskPreset[] = [
+  {
+    key: "stock-sleeve-work",
+    label: "Stock Sleeve/อุปกรณ์",
+    badge: "SL",
+    defaultTime: "",
+    href: "/checklist-weekly#stock-sleeve-work",
+    cadence: "weekly"
+  },
+  {
+    key: "stock-single-card-work",
+    label: "Stock Single card",
+    badge: "SC",
+    defaultTime: "",
+    href: "/checklist-monthly#stock-single-card-work",
+    cadence: "monthly"
+  }
+];
+
+export function taskPreset(key: string | undefined): TaskPreset | undefined {
+  return key ? taskPresets.find((t) => t.key === key) : undefined;
+}
+
+/** Clamp a day-of-month to a valid date string in the given month (handles 28–31). */
+export function dateInMonth(month: string, day: number): string {
+  const [year, mon] = month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+  const clamped = Math.min(Math.max(day, 1), lastDay);
+  return `${month}-${String(clamped).padStart(2, "0")}`;
+}
+
 // Fixed-date Thai public holidays 2026 (solar dates — 100% correct). Lunar Buddhist
 // days (มาฆ/วิสาข/อาสาฬห) shift yearly and can be added by hand on the grid.
 export const thaiHolidays2026: Record<string, string> = {

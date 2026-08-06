@@ -4608,6 +4608,11 @@ main .page > section, main > section { margin-top: 16px !important; }
 .shift-planner__act img { width: 16px; height: 16px; object-fit: contain; }
 .shift-planner__act small { font-size: 8px; color: #6a5acd; }
 .shift-planner__act button { border: none; background: transparent; color: #b0343f; font-size: 10px; cursor: pointer; padding: 0 1px; line-height: 1; }
+/* Stock งานประจำ chip — orange accent (guild) so it reads apart from purple game chips */
+.shift-planner__act--task { background: rgba(255,140,66,0.16); }
+.shift-planner__act-badge { font-size: 8px; font-weight: 700; color: #fff; background: #FF8C42; border-radius: 4px; padding: 0 3px; line-height: 1.5; letter-spacing: 0.3px; flex: 0 0 auto; }
+.shift-planner__act-link { color: #c25a12; text-decoration: none; }
+.shift-planner__act-link:hover { text-decoration: underline; }
 .shift-planner__actual-sel { width: 70px; font-size: 9.5px; border-radius: 6px; border: 1px solid rgba(255,199,142,0.4); padding: 1px; margin-top: 2px; background: #fff; color: var(--color-ink-soft); cursor: pointer; }
 .shift-planner__actual-sel--flag { background: rgba(255,199,142,0.35); border-color: var(--color-sun); color: #a85a1a; font-weight: 600; }
 

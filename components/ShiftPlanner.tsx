@@ -10,7 +10,16 @@ import {
   type ShiftCode
 } from "../lib/shift-schedule.ts";
 import { generateMonthPlan } from "../lib/shift-auto.ts";
-import { gamePresets, gamePreset, datesForWeekday, holidayName } from "../lib/planner-activities.ts";
+import Link from "next/link";
+import {
+  gamePresets,
+  gamePreset,
+  taskPresets,
+  taskPreset,
+  datesForWeekday,
+  dateInMonth,
+  holidayName
+} from "../lib/planner-activities.ts";
 import {
   loadMonthPlan,
   savePlanCell,
@@ -124,9 +133,12 @@ export function ShiftPlanner({
   const [autoDaysOff, setAutoDaysOff] = useState<Record<string, number[]>>({});
   const [autoStart, setAutoStart] = useState<Record<string, ShiftCode | "">>({});
   const [autoBusy, setAutoBusy] = useState(false);
+  const [presetMode, setPresetMode] = useState<"game" | "task">("game");
   const [presetGame, setPresetGame] = useState(gamePresets[0].key);
+  const [presetTask, setPresetTask] = useState(taskPresets[0].key);
   const [presetWeekday, setPresetWeekday] = useState(2); // Tue default
   const [presetTime, setPresetTime] = useState("19:00");
+  const [presetMonthDay, setPresetMonthDay] = useState(1); // day-of-month for monthly tasks
   const [reloadNonce, setReloadNonce] = useState(0);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [density, setDensity] = useState<"compact" | "normal" | "large">("normal");
@@ -279,6 +291,40 @@ export function ShiftPlanner({
       await Promise.all(Object.entries(updated).map(([d, day]) => saveDayEvent({ branch, workDate: d, title: day.title, activities: day.activities, updatedBy: plannedBy })));
     } catch {
       setError("ลงกิจกรรมไม่สำเร็จ");
+    }
+  }
+
+  // Recurring WORK task: drop a Stock งานประจำ (Sleeve weekly / Single card monthly) onto
+  // the grid. Weekly → every matching weekday; monthly → one chosen day-of-month. The chip
+  // links to the task's checklist so it "ขึ้นในวันที่กำหนด". Dedupes exact task+time.
+  async function applyTaskPreset(taskKey: string, weekday: number, monthDay: number) {
+    const preset = taskPresets.find((t) => t.key === taskKey);
+    if (!preset) return;
+    const time = preset.defaultTime; // stock งานประจำ has no fixed time
+    const targetDates = preset.cadence === "weekly" ? datesForWeekday(month, weekday) : [dateInMonth(month, monthDay)];
+    setError(null);
+    const updated: Record<string, { title: string; activities: DayActivity[] }> = {};
+    setEvents((prev) => {
+      const next = { ...prev };
+      for (const d of targetDates) {
+        const existing = next[d] ?? { title: "", activities: [] };
+        const already = existing.activities.some((a) => a.game === preset.key);
+        const day = already
+          ? existing
+          : { ...existing, activities: [...existing.activities, { game: preset.key, time, title: preset.label }] };
+        next[d] = day;
+        updated[d] = day;
+      }
+      return next;
+    });
+    try {
+      await Promise.all(
+        Object.entries(updated).map(([d, day]) =>
+          saveDayEvent({ branch, workDate: d, title: day.title, activities: day.activities, updatedBy: plannedBy })
+        )
+      );
+    } catch {
+      setError("ลงงานในตารางไม่สำเร็จ");
     }
   }
 
@@ -457,21 +503,62 @@ export function ShiftPlanner({
 
       <div className="shift-planner__preset-bar">
         <span className="shift-planner__preset-label">ลงกิจกรรมประจำ:</span>
-        <select value={presetGame} onChange={(e) => setPresetGame(e.target.value)}>
-          {gamePresets.map((g) => (
-            <option key={g.key} value={g.key}>{g.label}</option>
-          ))}
+        <select value={presetMode} onChange={(e) => setPresetMode(e.target.value as "game" | "task")}>
+          <option value="game">อีเวนต์เกม</option>
+          <option value="task">งาน Stock</option>
         </select>
-        <span>ทุก</span>
-        <select value={presetWeekday} onChange={(e) => setPresetWeekday(Number(e.target.value))}>
-          {WEEKDAY_TH.map((w, wd) => (
-            <option key={wd} value={wd}>{w}</option>
-          ))}
-        </select>
-        <input type="time" value={presetTime} onChange={(e) => setPresetTime(e.target.value)} />
-        <button type="button" className="shift-planner__preset-apply" onClick={() => applyActivityPreset(presetGame, presetWeekday, presetTime)}>
-          ลงทั้งเดือน
-        </button>
+        {presetMode === "game" ? (
+          <>
+            <select value={presetGame} onChange={(e) => setPresetGame(e.target.value)}>
+              {gamePresets.map((g) => (
+                <option key={g.key} value={g.key}>{g.label}</option>
+              ))}
+            </select>
+            <span>ทุก</span>
+            <select value={presetWeekday} onChange={(e) => setPresetWeekday(Number(e.target.value))}>
+              {WEEKDAY_TH.map((w, wd) => (
+                <option key={wd} value={wd}>{w}</option>
+              ))}
+            </select>
+            <input type="time" value={presetTime} onChange={(e) => setPresetTime(e.target.value)} />
+            <button type="button" className="shift-planner__preset-apply" onClick={() => applyActivityPreset(presetGame, presetWeekday, presetTime)}>
+              ลงทั้งเดือน
+            </button>
+          </>
+        ) : (
+          <>
+            <select value={presetTask} onChange={(e) => setPresetTask(e.target.value)}>
+              {taskPresets.map((t) => (
+                <option key={t.key} value={t.key}>{t.label} ({t.cadence === "weekly" ? "รายสัปดาห์" : "รายเดือน"})</option>
+              ))}
+            </select>
+            {taskPreset(presetTask)?.cadence === "weekly" ? (
+              <>
+                <span>ทุก</span>
+                <select value={presetWeekday} onChange={(e) => setPresetWeekday(Number(e.target.value))}>
+                  {WEEKDAY_TH.map((w, wd) => (
+                    <option key={wd} value={wd}>{w}</option>
+                  ))}
+                </select>
+                <button type="button" className="shift-planner__preset-apply" onClick={() => applyTaskPreset(presetTask, presetWeekday, presetMonthDay)}>
+                  ลงทั้งเดือน
+                </button>
+              </>
+            ) : (
+              <>
+                <span>วันที่</span>
+                <select value={presetMonthDay} onChange={(e) => setPresetMonthDay(Number(e.target.value))}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                <button type="button" className="shift-planner__preset-apply" onClick={() => applyTaskPreset(presetTask, presetWeekday, presetMonthDay)}>
+                  ลงวันนี้
+                </button>
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {showAuto ? (
@@ -565,10 +652,17 @@ export function ShiftPlanner({
                         <div className="shift-planner__acts">
                           {ev.activities.map((act, i) => {
                             const preset = gamePreset(act.game);
+                            const task = taskPreset(act.game);
+                            const label = preset?.label ?? task?.label ?? act.title ?? act.game;
                             return (
-                              <span key={i} className="shift-planner__act" title={`${preset?.label ?? act.game}${act.time ? ` ${act.time}` : ""}`}>
+                              <span key={i} className={`shift-planner__act${task ? " shift-planner__act--task" : ""}`} title={`${label}${act.time ? ` ${act.time}` : ""}${task ? " — เปิด checklist" : ""}`}>
                                 {preset ? <img src={preset.logo} alt={preset.label} /> : null}
-                                <span className="shift-planner__act-name">{preset?.label ?? act.game}</span>
+                                {task ? <span className="shift-planner__act-badge">{task.badge}</span> : null}
+                                {task ? (
+                                  <Link href={task.href} className="shift-planner__act-name shift-planner__act-link">{label}</Link>
+                                ) : (
+                                  <span className="shift-planner__act-name">{label}</span>
+                                )}
                                 {act.time ? <span className="shift-planner__act-time">{act.time}</span> : null}
                                 <button type="button" onClick={() => removeActivity(date, i)} aria-label="ลบ">×</button>
                               </span>
