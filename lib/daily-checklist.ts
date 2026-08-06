@@ -26,6 +26,53 @@ export type PhaseWindows = Record<string, PhaseWindow>;
 /** Map of phaseId → the shift(s) that see it. An empty list means every shift. */
 export type PhaseShifts = Record<string, ShiftCode[]>;
 
+/**
+ * What proof a checklist item asks the staff to attach. A built-in หัวข้อ carries its own
+ * detail panels (รูปเงินสด, เลข track ฯลฯ) in code; this lets the owner require หลักฐาน on
+ * any item they add or edit at /admin/checklist-config — รูปภาพ และ/หรือ ลิงก์ — without a deploy.
+ */
+export type EvidenceKind = "photo" | "link";
+export type ItemEvidence = { kinds: EvidenceKind[]; note?: string };
+
+/**
+ * phaseId → (ข้อความรายการ → หลักฐานที่ต้องแนบ). Keyed by the item text (not its index) so the
+ * requirement follows the item when the owner reorders or moves it between หัวข้อ.
+ */
+export type ChecklistEvidence = Record<string, Record<string, ItemEvidence>>;
+
+const EVIDENCE_KINDS: EvidenceKind[] = ["photo", "link"];
+
+/** The requirement for one item, or undefined when it asks for nothing. */
+export function evidenceForItem(
+  evidence: ChecklistEvidence | undefined,
+  phaseId: string,
+  item: string
+): ItemEvidence | undefined {
+  const req = evidence?.[phaseId]?.[item.trim()];
+  const kinds = (req?.kinds || []).filter((kind): kind is EvidenceKind => EVIDENCE_KINDS.includes(kind));
+  if (!kinds.length) return undefined;
+  return req?.note?.trim() ? { kinds, note: req.note.trim() } : { kinds };
+}
+
+/**
+ * Drops evidence entries whose item text no longer exists in the phase (deleted/renamed) and
+ * whose kind list is empty, so a saved config never keeps orphaned requirements. Run at save.
+ */
+export function pruneEvidence(evidence: ChecklistEvidence, overrides: ChecklistOverrides): ChecklistEvidence {
+  const out: ChecklistEvidence = {};
+  for (const [phaseId, byItem] of Object.entries(evidence || {})) {
+    const items = new Set((overrides[phaseId] || []).map((item) => item.trim()).filter(Boolean));
+    const kept: Record<string, ItemEvidence> = {};
+    for (const [item, req] of Object.entries(byItem || {})) {
+      const clean = item.trim();
+      const resolved = evidenceForItem({ [phaseId]: { [clean]: req } }, phaseId, clean);
+      if (clean && items.has(clean) && resolved) kept[clean] = resolved;
+    }
+    if (Object.keys(kept).length) out[phaseId] = kept;
+  }
+  return out;
+}
+
 /** Nothing may be submitted after the business day closes, whatever the หัวข้อ deadline is. */
 export const CHECKLIST_DAY_END = "23:59";
 
@@ -103,6 +150,8 @@ export type ChecklistConfig = {
   hiddenPhases: string[];
   /** renamed หัวข้อใหญ่ — phaseId → new title */
   titles: Record<string, string>;
+  /** หลักฐาน (รูป/ลิงก์) ที่แต่ละรายการบังคับให้แนบ — keyed by phaseId then item text */
+  evidence: ChecklistEvidence;
 };
 
 export const emptyChecklistConfig: ChecklistConfig = {
@@ -113,7 +162,8 @@ export const emptyChecklistConfig: ChecklistConfig = {
   manual: {},
   customPhases: [],
   hiddenPhases: [],
-  titles: {}
+  titles: {},
+  evidence: {}
 };
 
 /** Turns an owner-created หัวข้อ into the shape the checklist renders. */

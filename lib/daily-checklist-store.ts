@@ -21,6 +21,7 @@ export type DailyChecklistDoc = {
   customPhases?: ChecklistConfig["customPhases"];
   hiddenPhases?: ChecklistConfig["hiddenPhases"];
   titles?: ChecklistConfig["titles"];
+  evidence?: ChecklistConfig["evidence"];
   updatedAt: string;
   updatedBy: string;
 };
@@ -38,7 +39,8 @@ export async function fetchChecklistConfig(branch: string): Promise<ChecklistCon
     manual: data.manual ?? {},
     customPhases: data.customPhases ?? [],
     hiddenPhases: data.hiddenPhases ?? [],
-    titles: data.titles ?? {}
+    titles: data.titles ?? {},
+    evidence: data.evidence ?? {}
   };
 }
 
@@ -57,6 +59,7 @@ export async function saveChecklistConfig(input: {
     customPhases: input.config.customPhases,
     hiddenPhases: input.config.hiddenPhases,
     titles: input.config.titles,
+    evidence: input.config.evidence,
     updatedAt: new Date().toISOString(),
     updatedBy: input.updatedBy
   };

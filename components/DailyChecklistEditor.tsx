@@ -10,10 +10,13 @@ import {
   isHhMm,
   moveChecklistItem,
   moveChecklistItemWithin,
+  pruneEvidence,
   seedOverridesFromPhases,
   seedShiftsFromPhases,
   seedWindowsFromPhases,
-  type ChecklistConfig
+  type ChecklistConfig,
+  type EvidenceKind,
+  type ItemEvidence
 } from "../lib/daily-checklist.ts";
 import { fetchChecklistConfig, saveChecklistConfig } from "../lib/daily-checklist-store.ts";
 import type { ShiftCode } from "../lib/shift-schedule.ts";
@@ -106,11 +109,13 @@ export function DailyChecklistEditor({
       const { [phaseId]: _items, ...overrides } = prev.overrides;
       const { [phaseId]: _title, ...titles } = prev.titles;
       const { [phaseId]: _window, ...windows } = prev.windows;
+      const { [phaseId]: _evidence, ...evidence } = prev.evidence;
       return {
         ...prev,
         overrides,
         titles,
         windows,
+        evidence,
         customPhases: prev.customPhases.filter((phase) => phase.id !== phaseId),
         order: prev.order.filter((id) => id !== phaseId),
         hiddenPhases: prev.hiddenPhases.filter((id) => id !== phaseId)
@@ -135,9 +140,35 @@ export function DailyChecklistEditor({
     setNewPhaseTitle("");
   }
 
+  /** Moves the หลักฐาน requirement for `item` between phases/items (or drops it when target is null). */
+  function rekeyEvidence(
+    evidence: ChecklistConfig["evidence"],
+    from: { phaseId: string; item: string },
+    to: { phaseId: string; item: string } | null
+  ): ChecklistConfig["evidence"] {
+    const fromItem = from.item.trim();
+    const req = evidence[from.phaseId]?.[fromItem];
+    if (!req) return evidence;
+    const next: ChecklistConfig["evidence"] = { ...evidence };
+    const fromPhase = { ...(next[from.phaseId] || {}) };
+    delete fromPhase[fromItem];
+    if (Object.keys(fromPhase).length) next[from.phaseId] = fromPhase;
+    else delete next[from.phaseId];
+    const toItem = to?.item.trim();
+    if (to && toItem) next[to.phaseId] = { ...(next[to.phaseId] || {}), [toItem]: req };
+    return next;
+  }
+
   function moveItemToPhase(phaseId: string, index: number, toPhaseId: string) {
     if (!toPhaseId || toPhaseId === phaseId) return;
-    setDraft((prev) => ({ ...prev, overrides: moveChecklistItem(prev.overrides, { phaseId, index }, toPhaseId) }));
+    setDraft((prev) => {
+      const item = (prev.overrides[phaseId] || [])[index] ?? "";
+      return {
+        ...prev,
+        overrides: moveChecklistItem(prev.overrides, { phaseId, index }, toPhaseId),
+        evidence: rekeyEvidence(prev.evidence, { phaseId, item }, { phaseId: toPhaseId, item })
+      };
+    });
   }
 
   function moveItemWithin(phaseId: string, index: number, direction: -1 | 1) {
@@ -145,10 +176,17 @@ export function DailyChecklistEditor({
   }
 
   function updateItem(phaseId: string, index: number, value: string) {
-    setDraft((prev) => ({
-      ...prev,
-      overrides: { ...prev.overrides, [phaseId]: (prev.overrides[phaseId] || []).map((item, i) => (i === index ? value : item)) }
-    }));
+    setDraft((prev) => {
+      const previousText = (prev.overrides[phaseId] || [])[index] ?? "";
+      return {
+        ...prev,
+        overrides: { ...prev.overrides, [phaseId]: (prev.overrides[phaseId] || []).map((item, i) => (i === index ? value : item)) },
+        // Keep the หลักฐาน requirement attached to the item as its text is edited.
+        evidence: previousText.trim() === value.trim()
+          ? prev.evidence
+          : rekeyEvidence(prev.evidence, { phaseId, item: previousText }, value.trim() ? { phaseId, item: value } : null)
+      };
+    });
   }
 
   function addItem(phaseId: string) {
@@ -156,10 +194,47 @@ export function DailyChecklistEditor({
   }
 
   function removeItem(phaseId: string, index: number) {
-    setDraft((prev) => ({
-      ...prev,
-      overrides: { ...prev.overrides, [phaseId]: (prev.overrides[phaseId] || []).filter((_, i) => i !== index) }
-    }));
+    setDraft((prev) => {
+      const item = (prev.overrides[phaseId] || [])[index] ?? "";
+      return {
+        ...prev,
+        overrides: { ...prev.overrides, [phaseId]: (prev.overrides[phaseId] || []).filter((_, i) => i !== index) },
+        evidence: rekeyEvidence(prev.evidence, { phaseId, item }, null)
+      };
+    });
+  }
+
+  function itemEvidence(phaseId: string, item: string): ItemEvidence | undefined {
+    return draft.evidence[phaseId]?.[item.trim()];
+  }
+
+  /** ตั้ง/ปิด ว่ารายการนี้ต้องแนบ รูป หรือ ลิงก์. เก็บ requirement โดย key ด้วยข้อความรายการ. */
+  function toggleEvidenceKind(phaseId: string, item: string, kind: EvidenceKind) {
+    const key = item.trim();
+    if (!key) return;
+    setDraft((prev) => {
+      const current = prev.evidence[phaseId]?.[key];
+      const kinds = current?.kinds || [];
+      const nextKinds = kinds.includes(kind) ? kinds.filter((value) => value !== kind) : [...kinds, kind];
+      const phaseMap = { ...(prev.evidence[phaseId] || {}) };
+      if (nextKinds.length) phaseMap[key] = { ...current, kinds: nextKinds };
+      else delete phaseMap[key];
+      const evidence = { ...prev.evidence };
+      if (Object.keys(phaseMap).length) evidence[phaseId] = phaseMap;
+      else delete evidence[phaseId];
+      return { ...prev, evidence };
+    });
+  }
+
+  function updateEvidenceNote(phaseId: string, item: string, note: string) {
+    const key = item.trim();
+    if (!key) return;
+    setDraft((prev) => {
+      const current = prev.evidence[phaseId]?.[key];
+      if (!current) return prev;
+      const phaseMap = { ...(prev.evidence[phaseId] || {}), [key]: { ...current, note } };
+      return { ...prev, evidence: { ...prev.evidence, [phaseId]: phaseMap } };
+    });
   }
 
   function updateWindow(phaseId: string, field: "openTime" | "dueTime", value: string) {
@@ -223,9 +298,12 @@ export function DailyChecklistEditor({
     );
     const customPhases = draft.customPhases.filter((phase) => phase.title.trim()).map((phase) => ({ ...phase, title: (titles[phase.id] || phase.title).trim() }));
 
+    // Evidence is keyed by item text — drop any requirement whose item was deleted or blanked.
+    const evidence = pruneEvidence(draft.evidence, overrides);
+
     setStatus("กำลังบันทึก…");
     try {
-      await saveChecklistConfig({ branch, config: { ...draft, overrides, titles, customPhases }, updatedBy: editedBy });
+      await saveChecklistConfig({ branch, config: { ...draft, overrides, titles, customPhases, evidence }, updatedBy: editedBy });
       setStatus("บันทึกแล้ว — checklist ของ staff อัปเดตแล้ว");
     } catch {
       setStatus("บันทึกไม่สำเร็จ");
@@ -292,7 +370,11 @@ export function DailyChecklistEditor({
             </div>
 
             <ul className="checklist-config__items">
-              {(draft.overrides[phase.id] ?? []).map((item, itemIndex, items) => (
+              {(draft.overrides[phase.id] ?? []).map((item, itemIndex, items) => {
+                const evidence = itemEvidence(phase.id, item);
+                const kinds = evidence?.kinds || [];
+                const hasText = Boolean(item.trim());
+                return (
                 <li key={itemIndex}>
                   <input value={item} onChange={(e) => updateItem(phase.id, itemIndex, e.target.value)} placeholder="รายการ checklist" />
                   <div className="checklist-config__move">
@@ -313,8 +395,39 @@ export function DailyChecklistEditor({
                       ))}
                   </select>
                   <button type="button" onClick={() => removeItem(phase.id, itemIndex)} aria-label="ลบ">✕</button>
+                  {/* หลักฐานที่บังคับให้พนักงานแนบตอนทำรายการนี้ (รูป/ลิงก์) */}
+                  <div className="checklist-config__evidence">
+                    <span className="checklist-config__evidence-label">ต้องส่งหลักฐาน</span>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={kinds.includes("photo")}
+                        disabled={!hasText}
+                        onChange={() => toggleEvidenceKind(phase.id, item, "photo")}
+                      />
+                      รูปภาพ
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={kinds.includes("link")}
+                        disabled={!hasText}
+                        onChange={() => toggleEvidenceKind(phase.id, item, "link")}
+                      />
+                      ลิงก์
+                    </label>
+                    {kinds.length ? (
+                      <input
+                        className="checklist-config__evidence-note"
+                        value={evidence?.note || ""}
+                        onChange={(e) => updateEvidenceNote(phase.id, item, e.target.value)}
+                        placeholder="คำอธิบายหลักฐาน (ไม่บังคับ) เช่น รูปโพสต์กิจกรรม"
+                      />
+                    ) : null}
+                  </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
             <button type="button" className="checklist-config__add" onClick={() => addItem(phase.id)}>+ เพิ่มรายการ</button>
           </section>
@@ -326,7 +439,7 @@ export function DailyChecklistEditor({
           <strong>เพิ่มหัวข้อใหญ่</strong>
         </div>
         <p className="checklist-config__hint">
-          หัวข้อที่เพิ่มเองเป็นรายการติ๊กล้วนๆ (ไม่มีช่องกรอกรายละเอียดเฉพาะทางแบบหัวข้อเดิม) ·
+          หัวข้อที่เพิ่มเองเป็นรายการติ๊ก · ตั้งให้แต่ละรายการต้องแนบหลักฐาน (รูปภาพ/ลิงก์) ได้ที่ช่อง &quot;ต้องส่งหลักฐาน&quot; ใต้รายการ ·
           ตั้งเวลาส่งและกะได้เหมือนกัน · ย้ายรายการเดิมเข้ามาได้ด้วยปุ่ม &quot;ย้ายไป…&quot;
         </p>
         <div className="checklist-config__new-phase">
