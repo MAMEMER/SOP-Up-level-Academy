@@ -1,9 +1,26 @@
-// Minimal server-side Firestore access via the REST API + public API key. Used for the
-// SOP manual-entry records (complaint / assigned work) so they PERSIST on Vercel — the
-// old local-JSON store is wiped on every serverless cold start. These collections are
-// open (`if true`) in firestore.rules, matching the other internal SOP tools, so the
-// public API key is sufficient (app-level gated by the SOP login). Only primitive
-// field types (string / number / boolean) are needed here.
+// Minimal server-side Firestore access for the SOP manual-entry records (complaint /
+// assigned work / attendance) so they PERSIST on Vercel — the old local-JSON store is
+// wiped on every serverless cold start.
+//
+// SECURITY (fix 1): these run server-side, so when the service account is configured
+// (production) they go through the Admin SDK, which bypasses Firestore rules. That lets
+// the rules for these collections be locked to server-only (`if false`) instead of the
+// old world-open `if true`. When no admin credentials are present (local `npm run dev`)
+// they fall back to the public-key REST API so the app still runs without a key. The
+// Admin SDK is imported dynamically so `firebase-admin` never enters any client bundle.
+
+// True only when the service-account env is present (production). Checked without
+// importing firebase-admin so this module stays safe to pull into any server file.
+function hasAdmin(): boolean {
+  return Boolean(
+    process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY
+  );
+}
+
+async function admin() {
+  const { adminDb } = await import("./firebase-admin.ts");
+  return adminDb();
+}
 
 const PROJECT = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "up-level-guild";
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAKxWv3FI7HrdrRlnJhsQbJ-97Pb_sdiOQ";
@@ -55,6 +72,14 @@ function decodeDoc(doc: { fields?: Record<string, Record<string, unknown>> }): R
 
 /** Reads every document in a collection (small collections only). Returns [] on error. */
 export async function restListCollection<T>(collection: string): Promise<T[]> {
+  if (hasAdmin()) {
+    try {
+      const snap = await (await admin()).collection(collection).get();
+      return snap.docs.map((d) => d.data() as T);
+    } catch {
+      return [];
+    }
+  }
   const docs: T[] = [];
   let pageToken = "";
   try {
@@ -78,6 +103,14 @@ export async function restListCollection<T>(collection: string): Promise<T[]> {
  * wipe a leave record already on the same schedule_actual doc. Creates the doc if new.
  */
 export async function restUpsertDoc(collection: string, docId: string, data: Record<string, FieldValue | undefined>): Promise<void> {
+  if (hasAdmin()) {
+    // set(..., { merge: true }) mirrors the field-scoped updateMask: only the provided
+    // fields are written, so a clock-in sync won't wipe a leave record on the same doc.
+    const clean: Record<string, FieldValue> = {};
+    for (const [key, value] of Object.entries(data)) if (value !== undefined) clean[key] = value;
+    await (await admin()).collection(collection).doc(docId).set(clean, { merge: true });
+    return;
+  }
   const fields = encodeFields(data);
   const mask = Object.keys(fields)
     .map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`)
@@ -94,6 +127,10 @@ export async function restUpsertDoc(collection: string, docId: string, data: Rec
 
 /** Removes a document. Used by the manual KPI inputs so a mis-typed record can be undone. */
 export async function restDeleteDoc(collection: string, docId: string): Promise<void> {
+  if (hasAdmin()) {
+    await (await admin()).collection(collection).doc(docId).delete();
+    return;
+  }
   const url = `${BASE}/${collection}/${encodeURIComponent(docId)}?key=${API_KEY}`;
   const res = await fetch(url, { method: "DELETE", cache: "no-store" });
   if (!res.ok && res.status !== 404) throw new Error(`Firestore delete failed: ${res.status}`);
