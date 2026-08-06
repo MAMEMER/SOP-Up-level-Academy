@@ -22,7 +22,7 @@ import {
   type WorkflowDayPayload,
   type WorkflowRecordStatus
 } from "../lib/workflow-records.ts";
-import type { PhaseWindows } from "../lib/daily-checklist.ts";
+import { evidenceForItem, type ChecklistEvidence, type PhaseWindows } from "../lib/daily-checklist.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 import { useWorkRecordWindow } from "../lib/work-records-client.ts";
 import { SaveIndicator } from "./SaveIndicator.tsx";
@@ -32,6 +32,21 @@ import { dailyScopeKey, shiftWorkDate } from "../lib/work-records.ts";
 function itemKey(phaseId: string, index: number) {
   return `${phaseId}:${index}`;
 }
+
+// รายการของหัวข้อ built-in บางข้อมี detail panel เฉพาะทาง (รูปเงินสด, เลข track ฯลฯ) เขียนไว้ในโค้ด
+// อยู่แล้ว — หลักฐานที่ owner ตั้งเองจะแสดงเฉพาะรายการที่ยังไม่มี panel พวกนี้ เพื่อไม่ให้ซ้ำซ้อน
+function itemHasHardcodedDetail(phaseId: string, index: number) {
+  return (
+    phaseId === "open-store" ||
+    phaseId === "guild-chat-exp" ||
+    phaseId === "stock-work" ||
+    (phaseId === "daytime-work" && index <= 2) ||
+    (phaseId === "close-store" && index <= 4)
+  );
+}
+
+const evidencePhotoKey = (phaseId: string, index: number) => `evidence:${phaseId}:${index}:photos`;
+const evidenceLinkKey = (phaseId: string, index: number) => `evidence:${phaseId}:${index}:link`;
 
 function noOrderKeyForPhase(phase: WorkflowPhase) {
   const index = phase.checklist.findIndex((item) => item === "ไม่มีออเดอร์");
@@ -874,6 +889,7 @@ export function WorkflowChecklist({
   userRole,
   shift = null,
   windows,
+  evidence,
   readOnly = false
 }: {
   phases: WorkflowPhase[];
@@ -883,6 +899,8 @@ export function WorkflowChecklist({
   shift?: "s1" | "s2" | null;
   /** Owner-configured submit window per หัวข้อ (/admin/checklist-config). */
   windows?: PhaseWindows;
+  /** Owner-configured หลักฐาน (รูป/ลิงก์) that a checklist item must attach (/admin/checklist-config). */
+  evidence?: ChecklistEvidence;
   /** Admin previewing another account — render everything, save nothing. */
   readOnly?: boolean;
 }) {
@@ -1194,6 +1212,23 @@ export function WorkflowChecklist({
     return !details[detailKey(workDate, "closing-handoff-summary")]?.trim();
   }
 
+  /** Owner-required หลักฐาน (รูป/ลิงก์) ที่ยังไม่ได้แนบในหัวข้อนี้ — บล็อกปุ่มส่งงานจนกว่าจะครบ. */
+  function missingEvidenceItems(phase: WorkflowPhase): string[] {
+    return phase.checklist
+      .map((item, index) => ({ item, index }))
+      .filter(({ item, index }) => {
+        if (itemHasHardcodedDetail(phase.id, index)) return false;
+        const req = evidenceForItem(evidence, phase.id, item);
+        if (!req) return false;
+        const photoMissing =
+          req.kinds.includes("photo") && !(details[detailKey(workDate, evidencePhotoKey(phase.id, index))] || "").trim();
+        const linkMissing =
+          req.kinds.includes("link") && !(details[detailKey(workDate, evidenceLinkKey(phase.id, index))] || "").trim();
+        return photoMissing || linkMissing;
+      })
+      .map(({ item }) => item);
+  }
+
   return (
     <section className="workflow-panel">
       <ChecklistCompleteOverlay show={redirecting} />
@@ -1234,6 +1269,7 @@ export function WorkflowChecklist({
           const missingStockReorderList = stockReorderListMissing(phase);
           const missingStockTakeStatus = missingStockTakeApproval(phase);
           const missingHandoff = missingHandoffSummary(phase);
+          const missingEvidence = missingEvidenceItems(phase);
           const previousHandoff =
             phase.id === "open-store"
               ? (details[detailKey(previousWorkDateKey(workDate), "closing-handoff-summary")] || "").trim()
@@ -1243,7 +1279,8 @@ export function WorkflowChecklist({
             done === phase.checklist.length &&
             !missingStockReorderList &&
             !missingStockTakeStatus &&
-            !missingHandoff;
+            !missingHandoff &&
+            missingEvidence.length === 0;
           const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now, scheduleContext) && !adminUnlocked && !locked;
           const schedule = phaseScheduleForWorkDate(phase.id, workDate, scheduleContext);
           return (
@@ -1294,14 +1331,11 @@ export function WorkflowChecklist({
                     Boolean(noOrderKey && checked[noOrderKey] && key !== noOrderKey) ||
                     (closeNoOrderActive && index === 0) ||
                     daytimeNoOrderActive;
-                  const hasDetail =
-                    phase.id === "open-store" ||
-                    phase.id === "guild-chat-exp" ||
-                    phase.id === "stock-work" ||
-                    (phase.id === "daytime-work" && index <= 2) ||
-                    (phase.id === "close-store" && index <= 4);
+                  const hasDetail = itemHasHardcodedDetail(phase.id, index);
+                  // หลักฐานที่ owner ตั้งไว้ที่ /admin/checklist-config — แสดงเฉพาะรายการที่ไม่มี panel เฉพาะทางอยู่แล้ว
+                  const itemEvidence = hasDetail ? undefined : evidenceForItem(evidence, phase.id, item);
                   return (
-                    <div key={key} className={hasDetail ? "tick-group has-detail" : "tick-group"}>
+                    <div key={key} className={hasDetail || itemEvidence ? "tick-group has-detail" : "tick-group"}>
                       <label
                         className={`${checked[key] ? "tick-row done" : "tick-row"}${canEdit && !disabledByNoOrder ? "" : " locked"}`}
                       >
@@ -1359,6 +1393,37 @@ export function WorkflowChecklist({
                             />
                           ) : null}
                         </>
+                      ) : itemEvidence ? (
+                        <div className="detail-panel">
+                          <div className="detail-panel-head">
+                            <strong>หลักฐาน</strong>
+                            <small>{itemEvidence.note?.trim() || "แนบหลักฐานหลังทำรายการนี้เสร็จ"}</small>
+                          </div>
+                          {itemEvidence.kinds.includes("photo") ? (
+                            <div className="detail-upload">
+                              <span>อัปโหลดรูป (สูงสุด 3 รูป)</span>
+                              <EvidencePhotosInput
+                                value={details[detailKey(workDate, evidencePhotoKey(phase.id, index))] || ""}
+                                onChange={(value) => updateDetail(evidencePhotoKey(phase.id, index), value)}
+                                disabled={!canEdit || disabledByNoOrder}
+                                max={3}
+                              />
+                            </div>
+                          ) : null}
+                          {itemEvidence.kinds.includes("link") ? (
+                            <label className="workflow-note-field compact">
+                              <span>แนบลิงก์</span>
+                              <input
+                                type="url"
+                                inputMode="url"
+                                value={details[detailKey(workDate, evidenceLinkKey(phase.id, index))] || ""}
+                                disabled={!canEdit || disabledByNoOrder}
+                                onChange={(event) => updateDetail(evidenceLinkKey(phase.id, index), event.target.value)}
+                                placeholder="วางลิงก์ เช่น ลิงก์โพสต์กิจกรรม"
+                              />
+                            </label>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   );
@@ -1372,6 +1437,9 @@ export function WorkflowChecklist({
               ) : null}
               {missingHandoff ? (
                 <p className="phase-warning">กรอกสรุปงานส่งต่อให้กะเปิดร้านวันถัดไปก่อนส่งงาน</p>
+              ) : null}
+              {missingEvidence.length ? (
+                <p className="phase-warning">แนบหลักฐานให้ครบก่อนส่งงาน: {missingEvidence.join(", ")}</p>
               ) : null}
               <div className="workflow-record-actions">
                 <button type="button" className="soft-button" onClick={() => recordPhase(phase, "saved")} disabled={!canEdit}>

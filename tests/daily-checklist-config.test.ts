@@ -5,9 +5,11 @@ import {
   applyChecklistConfig,
   applyPhaseOrder,
   customPhaseId,
+  evidenceForItem,
   moveChecklistItem,
   moveChecklistItemWithin,
   applyPhaseShifts,
+  pruneEvidence,
   resolvePhaseWindow,
   seedShiftsFromPhases,
   seedWindowsFromPhases
@@ -125,6 +127,38 @@ describe("owner-managed หัวข้อใหญ่", () => {
 
     assert.deepEqual(moveChecklistItemWithin(before, "open-store", 2, -1)["open-store"], ["ก", "ค", "ข"]);
     assert.equal(moveChecklistItemWithin(before, "open-store", 0, -1), before);
+  });
+
+  it("requires หลักฐาน (รูป/ลิงก์) on the items the owner marks", () => {
+    const evidence = {
+      "custom-activity": {
+        "โพสต์กิจกรรมลงเพจ": { kinds: ["photo", "link"] as ("photo" | "link")[], note: "แนบรูปโพสต์" }
+      }
+    };
+
+    const req = evidenceForItem(evidence, "custom-activity", "โพสต์กิจกรรมลงเพจ");
+    assert.deepEqual(req?.kinds, ["photo", "link"]);
+    assert.equal(req?.note, "แนบรูปโพสต์");
+    // whitespace on the lookup text still matches (editor stores trimmed keys)
+    assert.ok(evidenceForItem(evidence, "custom-activity", "  โพสต์กิจกรรมลงเพจ  "));
+    // an item with no requirement, or an empty kind list, asks for nothing
+    assert.equal(evidenceForItem(evidence, "custom-activity", "อย่างอื่น"), undefined);
+    assert.equal(evidenceForItem({ "p": { "x": { kinds: [] } } }, "p", "x"), undefined);
+  });
+
+  it("drops evidence for items that were deleted or renamed on save", () => {
+    const evidence = {
+      "custom-activity": {
+        "โพสต์กิจกรรม": { kinds: ["photo"] as ("photo" | "link")[] },
+        "ข้อที่ลบไปแล้ว": { kinds: ["link"] as ("photo" | "link")[] },
+        "ว่างเปล่า": { kinds: [] as ("photo" | "link")[] }
+      }
+    };
+    const overrides = { "custom-activity": ["โพสต์กิจกรรม", "ทำอย่างอื่น"] };
+
+    const pruned = pruneEvidence(evidence, overrides);
+    assert.deepEqual(Object.keys(pruned["custom-activity"]), ["โพสต์กิจกรรม"]);
+    assert.deepEqual(pruned["custom-activity"]["โพสต์กิจกรรม"].kinds, ["photo"]);
   });
 
   it("keeps a custom phase id unique and url-safe", () => {
