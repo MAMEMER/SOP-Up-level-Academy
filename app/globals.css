@@ -5338,3 +5338,9 @@ main .page > section, main > section { margin-top: 16px !important; }
   color: var(--color-orange);
 }
 .admin-hub__tool small { font-size: 13px; line-height: 1.55; color: var(--color-ink-soft); }
+
+/* งานวันนี้ทั้งหมด — กระดานรวมบนสุดของ dashboard พนักงาน */
+.today-work .status-pill.is-late {
+  background: rgba(255, 140, 66, 0.16);
+  color: var(--color-orange);
+}

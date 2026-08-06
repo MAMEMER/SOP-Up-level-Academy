@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DashboardChecklistStatus } from "../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../components/DashboardTaskSections.tsx";
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
+import { TodayWorkBoard } from "../../components/TodayWorkBoard.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../lib/employee-directory.ts";
@@ -43,6 +44,17 @@ export default async function HomePage() {
       </section>
 
       {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
+
+      {/* ทุกอย่างที่ต้องทำวันนี้ในกระดานเดียว — รายวัน/สัปดาห์/เดือน/มอบหมาย/ส่งต่อ */}
+      <TodayWorkBoard
+        phases={cardStoreWorkflow}
+        assignedWorkRecords={assignedWorkRecords}
+        assignedWorkFeed={assignedWorkFeed}
+        workDate={workDate}
+        canManageAssignedWork={user.role === "admin"}
+        staffCode={staffCode}
+        branch={branch}
+      />
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={staffCode} branch={branch} />
       <DashboardTaskSections
