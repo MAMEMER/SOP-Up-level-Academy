@@ -142,6 +142,17 @@ export async function fetchDayEvent(branch: string, workDate: string): Promise<E
   return snap.exists() ? (snap.data() as EventDoc) : null;
 }
 
+/** Loads every day annotation for the given months (an ISO week can straddle two). */
+export async function fetchDayEventsForMonths(branch: string, months: string[]): Promise<EventDoc[]> {
+  const unique = [...new Set(months)];
+  const snaps = await Promise.all(
+    unique.map((month) =>
+      getDocs(query(collection(db, EVENTS), where("branch", "==", branch), where("month", "==", month)))
+    )
+  );
+  return snaps.flatMap((snap) => snap.docs.map((d) => d.data() as EventDoc));
+}
+
 /** Upserts one plan cell. Pass assignment "off" to blank a working day. */
 export async function savePlanCell(input: {
   branch: string;

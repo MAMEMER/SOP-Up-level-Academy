@@ -9,8 +9,8 @@ import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
 import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
 import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 import { useShiftPhases } from "../lib/use-shift-phases.ts";
-import { usePlannedDayTasks } from "../lib/use-planned-day-tasks.ts";
-import { isPlannedHref, plannedCadenceLabel } from "../lib/planned-day-tasks.ts";
+import { usePlannedStockWork } from "../lib/use-planned-day-tasks.ts";
+import { plannedStatusText, plannedTaskForHref, type DuePlannedTask } from "../lib/planned-day-tasks.ts";
 import {
   bangkokMonthKey,
   monthlyStockTasks,
@@ -56,6 +56,14 @@ const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
   not_finished: "workflow-status-red"
 };
 
+/** Stock card colour: ส่งแล้ว = เขียว · เลยกำหนด = ส้ม · ยังไม่ถึงกำหนด = เทา */
+function plannedCardClass(planned: DuePlannedTask | undefined, submitted: boolean): string {
+  if (submitted) return "workflow-status-green";
+  if (!planned) return "workflow-status-white";
+  if (planned.upcoming) return "workflow-status-white is-muted";
+  return planned.overdueDays > 0 ? "workflow-status-orange" : "workflow-status-white";
+}
+
 export function DashboardTaskSections({
   phases,
   assignedWorkRecords = [],
@@ -83,8 +91,12 @@ export function DashboardTaskSections({
   // เฉพาะ หัวข้อ ของกะที่พนักงานคนนี้เข้าวันนี้ — กะ2 จะไม่เห็น เปิดร้าน (ของกะ1) ขึ้นว่าเลยเวลา
   // Admin / วันหยุด → คืนทุก หัวข้อ (hook ไม่กรอง)
   const shiftPhases = useShiftPhases(phases, staffCode, branch, workDate);
-  // งาน Stock ที่เจ้าของลงไว้ในตารางกะของวันนี้ → เด้งมาเป็นงานที่ต้องทำบน dashboard
-  const plannedTasks = usePlannedDayTasks(branch, workDate);
+  // งาน Stock ที่เจ้าของลงไว้ในตารางกะ → เด้งมาเป็นงานที่ต้องทำบน dashboard และค้างอยู่
+  // จนกว่าทีมจะส่ง checklist ของสัปดาห์/เดือนนั้น
+  const plannedStock = usePlannedStockWork(branch, workDate);
+  const plannedTasks = plannedStock.tasks;
+  // ที่ต้องทำจริงวันนี้ = ถึงกำหนดแล้ว (หรือเลยกำหนด) และยังไม่ส่ง
+  const openPlannedTasks = plannedTasks.filter((task) => !task.upcoming && !plannedStock.submitted[task.key]);
   const stockPhase = shiftPhases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = shiftPhases.filter((phase) => phase.id !== "stock-work");
 
@@ -148,7 +160,7 @@ export function DashboardTaskSections({
           ) : null}
         </div>
         <div className="daily-phase-grid">
-          {assignedWorkRecords.length || assignedWorkFeed.length || activeWeeklyEvents.length || plannedTasks.length ? (
+          {assignedWorkRecords.length || assignedWorkFeed.length || activeWeeklyEvents.length || openPlannedTasks.length ? (
             <>
               {assignedWorkRecords.map((record, index) => {
                 const effectiveStatus = effectiveAssignedWorkStatus(record);
@@ -202,21 +214,22 @@ export function DashboardTaskSections({
                   </a>
                 );
               })}
-              {/* งาน Stock ที่ลงไว้ในตารางกะวันนี้ (Sleeve รายสัปดาห์ / Single card รายเดือน) */}
-              {plannedTasks.map((task, index) => {
+              {/* งาน Stock ที่ลงไว้ในตารางกะ (Sleeve รายสัปดาห์ / Single card รายเดือน)
+                  ค้างอยู่จนกว่าจะส่ง checklist — เลยกำหนดแล้วขึ้นสีส้ม */}
+              {openPlannedTasks.map((task, index) => {
                 const seq =
                   assignedWorkRecords.length + assignedWorkFeed.length + activeWeeklyEvents.length + index + 1;
                 return (
                   <a
                     key={`planned-${task.key}`}
                     href={task.href}
-                    className="daily-phase-card workflow-status-white"
+                    className={`daily-phase-card ${task.overdueDays > 0 ? "workflow-status-orange" : "workflow-status-white"}`}
                   >
                     <span>{String(seq).padStart(2, "0")}</span>
                     <div>
-                      <small>Stock · ตามตารางกะ · {workDate}</small>
+                      <small>Stock · ตามตารางกะ · {task.dueDate}</small>
                       <strong>{task.label}</strong>
-                      <em>ถึงกำหนดวันนี้ · {plannedCadenceLabel(task)}{task.time ? ` · ${task.time}` : ""}</em>
+                      <em>{plannedStatusText(task, false)}{task.time ? ` · ${task.time}` : ""}</em>
                     </div>
                   </a>
                 );
@@ -303,19 +316,20 @@ export function DashboardTaskSections({
             // Weekly stock — data-driven จาก weeklyStockTasks (แก้/เพิ่ม/ลบ ที่ lib ได้เลย)
             weeklyStockTasks.forEach((task, index) => {
               seq += 1;
-              const dueToday = isPlannedHref(plannedTasks, task.href);
+              const planned = plannedTaskForHref(plannedTasks, task.href);
+              const submitted = planned ? Boolean(plannedStock.submitted[planned.key]) : false;
               cards.push(
                 <a
                   key={task.id}
                   href={task.href}
-                  className="daily-phase-card workflow-status-white"
+                  className={`daily-phase-card ${plannedCardClass(planned, submitted)}`}
                   id={index === 0 ? "stock-weekly" : undefined}
                 >
-                  <span>{String(seq).padStart(2, "0")}</span>
+                  <span>{submitted ? "✓" : String(seq).padStart(2, "0")}</span>
                   <div>
-                    <small>{stockWorkSummaryCards[1].kicker}{dueToday ? " · ถึงกำหนดวันนี้" : ""}</small>
+                    <small>{stockWorkSummaryCards[1].kicker}</small>
                     <strong>{task.name}</strong>
-                    <em>{task.note ? `ยังไม่เริ่ม · ${task.note}` : "ยังไม่เริ่ม"}</em>
+                    <em>{planned ? plannedStatusText(planned, submitted) : task.note ? `ยังไม่เริ่ม · ${task.note}` : "ยังไม่เริ่ม"}</em>
                   </div>
                 </a>
               );
@@ -323,16 +337,25 @@ export function DashboardTaskSections({
 
             // Monthly stock — สรุปเป็นการ์ดเดียว ลิงก์ไป checklist งานประจำเดือน (Single card)
             seq += 1;
+            const monthlyHref = "/checklist-monthly#stock-single-card-work";
+            const monthlyPlanned = plannedTaskForHref(plannedTasks, monthlyHref);
+            const monthlySubmitted = monthlyPlanned ? Boolean(plannedStock.submitted[monthlyPlanned.key]) : false;
             cards.push(
-              <a key="stock-monthly" href="/checklist-monthly#stock-single-card-work" className="daily-phase-card workflow-status-white" id="stock-monthly">
-                <span>{String(seq).padStart(2, "0")}</span>
+              <a
+                key="stock-monthly"
+                href={monthlyHref}
+                className={`daily-phase-card ${plannedCardClass(monthlyPlanned, monthlySubmitted)}`}
+                id="stock-monthly"
+              >
+                <span>{monthlySubmitted ? "✓" : String(seq).padStart(2, "0")}</span>
                 <div>
-                  <small>
-                    {stockWorkSummaryCards[2].kicker}
-                    {isPlannedHref(plannedTasks, "/checklist-monthly#stock-single-card-work") ? " · ถึงกำหนดวันนี้" : ""}
-                  </small>
+                  <small>{stockWorkSummaryCards[2].kicker}</small>
                   <strong>{stockWorkSummaryCards[2].title}</strong>
-                  <em>ยังไม่เริ่ม · 0/{monthlyStockTasks.length}</em>
+                  <em>
+                    {monthlyPlanned
+                      ? plannedStatusText(monthlyPlanned, monthlySubmitted)
+                      : `ยังไม่เริ่ม · 0/${monthlyStockTasks.length}`}
+                  </em>
                 </div>
               </a>
             );

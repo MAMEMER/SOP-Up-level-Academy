@@ -31,6 +31,8 @@ export type TaskPreset = {
   defaultTime: string; // HH:MM or "" (stock work has no fixed time)
   href: string; // checklist link shown on the assigned date
   cadence: "weekly" | "monthly";
+  /** work-record scope the task's checklist saves under (used to tell "ส่งแล้ว" apart) */
+  recordScope: "weekly" | "monthly";
 };
 
 export const taskPresets: TaskPreset[] = [
@@ -40,7 +42,8 @@ export const taskPresets: TaskPreset[] = [
     badge: "SL",
     defaultTime: "",
     href: "/checklist-weekly#stock-sleeve-work",
-    cadence: "weekly"
+    cadence: "weekly",
+    recordScope: "weekly"
   },
   {
     key: "stock-single-card-work",
@@ -48,7 +51,9 @@ export const taskPresets: TaskPreset[] = [
     badge: "SC",
     defaultTime: "",
     href: "/checklist-monthly#stock-single-card-work",
-    cadence: "monthly"
+    cadence: "monthly",
+    // the Single card checklist saves under scope "monthly" but keys by ISO week
+    recordScope: "monthly"
   }
 ];
 
