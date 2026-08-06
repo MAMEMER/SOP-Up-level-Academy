@@ -89,8 +89,8 @@ export function DashboardTaskSections({
   const [weeklyPeriodKey, setWeeklyPeriodKey] = useState<string>("");
   const workDate = currentWorkDate || formatWorkDate();
   // เฉพาะ หัวข้อ ของกะที่พนักงานคนนี้เข้าวันนี้ — กะ2 จะไม่เห็น เปิดร้าน (ของกะ1) ขึ้นว่าเลยเวลา
-  // Admin / วันหยุด → คืนทุก หัวข้อ (hook ไม่กรอง)
-  const shiftPhases = useShiftPhases(phases, staffCode, branch, workDate);
+  // Admin → ทุก หัวข้อ. วันหยุด/ไม่มีกะ → ทุก หัวข้อ แต่ offDay=true (โชว์จางๆ ไม่นับเลยเวลา)
+  const { phases: shiftPhases, offDay, offLabel } = useShiftPhases(phases, staffCode, branch, workDate);
   // งาน Stock ที่เจ้าของลงไว้ในตารางกะ → เด้งมาเป็นงานที่ต้องทำบน dashboard และค้างอยู่
   // จนกว่าทีมจะส่ง checklist ของสัปดาห์/เดือนนั้น
   const plannedStock = usePlannedStockWork(branch, workDate);
@@ -258,22 +258,27 @@ export function DashboardTaskSections({
             <h3>Daily task</h3>
           </div>
         </div>
+        {offDay && offLabel ? (
+          <p className="daily-offday-note">{offLabel} · แสดงเป็นข้อมูลอ้างอิง ไม่นับว่าเลยเวลา</p>
+        ) : null}
         <div className="daily-phase-grid">
           {dailyTaskPhases.map((phase, index) => {
-            const visualStatus = workflowVisualStatus(records, workDate, phase.id);
+            // On a day off, never colour from records — that produced the false เลยเวลา
+            // alerts. Show the phase muted and neutral for reference only.
+            const visualStatus = offDay ? "white" : workflowVisualStatus(records, workDate, phase.id);
             const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
-            const submitted = record?.status === "submitted";
+            const submitted = !offDay && record?.status === "submitted";
             return (
               <a
                 key={phase.id}
                 href={`/checklist#${phase.id}`}
-                className={`daily-phase-card workflow-status-${visualStatus}`}
+                className={`daily-phase-card workflow-status-${visualStatus}${offDay ? " is-muted" : ""}`}
               >
                 <span>{submitted ? "✓" : String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <small>{phase.timeLabel}</small>
                   <strong>{phase.title}</strong>
-                  <em>{statusText[visualStatus]} · {record ? `${record.completed}/${record.total}` : `0/${phase.checklist.length}`}</em>
+                  <em>{offDay ? "วันหยุด" : `${statusText[visualStatus]} · ${record ? `${record.completed}/${record.total}` : `0/${phase.checklist.length}`}`}</em>
                 </div>
               </a>
             );
@@ -298,16 +303,16 @@ export function DashboardTaskSections({
             // 01 · Daily stock (น้ำ/ขนม) — เฉพาะกะที่มีงาน stock-work วันนี้
             if (stockPhase) {
               seq += 1;
-              const visualStatus = workflowVisualStatus(records, workDate, stockPhase.id);
+              const visualStatus = offDay ? "white" : workflowVisualStatus(records, workDate, stockPhase.id);
               const record = records.find((item) => item.workDate === workDate && item.phaseId === stockPhase.id);
-              const submitted = record?.status === "submitted";
+              const submitted = !offDay && record?.status === "submitted";
               cards.push(
-                <a key="stock-daily" href="/checklist#stock-work" className={`daily-phase-card workflow-status-${visualStatus}`} id="stock-daily">
+                <a key="stock-daily" href="/checklist#stock-work" className={`daily-phase-card workflow-status-${visualStatus}${offDay ? " is-muted" : ""}`} id="stock-daily">
                   <span>{submitted ? "✓" : String(seq).padStart(2, "0")}</span>
                   <div>
                     <small>{stockWorkSummaryCards[0].kicker}</small>
                     <strong>{stockWorkSummaryCards[0].title}</strong>
-                    <em>{statusText[visualStatus]} · {record ? `${record.completed}/${record.total}` : `0/${stockPhase.checklist.length}`}</em>
+                    <em>{offDay ? "วันหยุด" : `${statusText[visualStatus]} · ${record ? `${record.completed}/${record.total}` : `0/${stockPhase.checklist.length}`}`}</em>
                   </div>
                 </a>
               );
