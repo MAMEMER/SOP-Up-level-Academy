@@ -1,48 +1,12 @@
 "use client";
 
-// Firestore store for the shift planner. Three collections in the shared
-// up-level-guild project (see firebase-client.ts):
-//
-//   schedule_shifts  — the PLAN: one doc per (branch, workDate, staff) with the
-//                      assigned shift + chosen entry time. Written by owners only.
-//   schedule_events  — per-day annotation (tournament / special activity).
-//   schedule_actual  — what ACTUALLY happened: StoreHub clock-in (synced in) and
-//                      leave taken via the web (written by the leave button). The
-//                      planner overlays this under each plan cell so the owner can
-//                      see plan vs reality in one grid.
-//
-// Doc ids are deterministic (`branch__date__staff`) so a repeated edit upserts the
-// same row instead of piling up duplicates. Every doc carries a `month` (YYYY-MM)
-// field so a whole month loads with one indexed query.
+// Client store for the shift planner. Fix 1: these four collections (schedule_shifts,
+// schedule_events, schedule_actual, store_audit) used to be world read/write via the
+// Firebase client SDK. They now go through the authenticated /api/schedule route (Admin
+// SDK, session-verified) so the Firestore rules can be locked server-only. The exported
+// types and function signatures are unchanged — callers did not have to change.
 
-import {
-  collection,
-  deleteField,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  where
-} from "firebase/firestore";
-import { db } from "./firebase-client.ts";
 import type { ShiftAssignment } from "./shift-schedule.ts";
-
-const SHIFTS = "schedule_shifts";
-const EVENTS = "schedule_events";
-const ACTUAL = "schedule_actual";
-
-function monthOf(workDate: string): string {
-  return workDate.slice(0, 7);
-}
-
-function shiftDocId(branch: string, workDate: string, staffCode: string): string {
-  return `${branch}__${workDate}__${staffCode}`;
-}
-
-function eventDocId(branch: string, workDate: string): string {
-  return `${branch}__${workDate}`;
-}
 
 export type PlanDoc = {
   branch: string;
@@ -63,9 +27,7 @@ export type EventDoc = {
   workDate: string;
   title: string;
   note?: string;
-  /** multiple activities can share a day/time — the store has space for parallel events */
   activities?: DayActivity[];
-  /** legacy single-activity fields (kept for backward-compat reads) */
   game?: string;
   time?: string;
   updatedAt: string;
@@ -77,15 +39,11 @@ export type ActualDoc = {
   month: string;
   workDate: string;
   staffCode: string;
-  /** first StoreHub clock-in of the day, HH:MM (synced) */
   clockIn?: string;
   clockInSource?: "storehub" | "manual";
-  /** leave logged through the web SOP leave button */
   leaveType?: "personal" | "sick";
   leaveNote?: string;
-  /** planned to work but no clock-in and no leave */
   absent?: boolean;
-  /** shift swapped to another staff (they work + clock in instead); excused for KPI */
   swappedTo?: string;
   swapNote?: string;
   updatedAt: string;
@@ -100,30 +58,37 @@ export type StoreAuditDoc = {
   closeTime?: string;
 };
 
-/** Store open/close audit (from the Uplevel Academy store account), separate from staff. */
-export async function fetchStoreAudit(branch: string, month: string): Promise<StoreAuditDoc[]> {
-  const snap = await getDocs(query(collection(db, "store_audit"), where("branch", "==", branch), where("month", "==", month)));
-  return snap.docs.map((d) => d.data() as StoreAuditDoc).sort((a, b) => a.workDate.localeCompare(b.workDate));
-}
-
 export type MonthPlan = {
   plans: PlanDoc[];
   events: EventDoc[];
   actuals: ActualDoc[];
 };
 
+async function getJson<T>(params: Record<string, string>): Promise<T> {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`/api/schedule?${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`schedule read failed: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+async function post(body: Record<string, unknown>): Promise<void> {
+  const res = await fetch("/api/schedule", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`schedule write failed: ${res.status}`);
+}
+
+/** Store open/close audit (from the Uplevel Academy store account), separate from staff. */
+export async function fetchStoreAudit(branch: string, month: string): Promise<StoreAuditDoc[]> {
+  const { rows } = await getJson<{ rows: StoreAuditDoc[] }>({ action: "storeAudit", branch, month });
+  return rows;
+}
+
 /** Loads every plan / event / actual doc for a branch-month. */
 export async function loadMonthPlan(branch: string, month: string): Promise<MonthPlan> {
-  const byMonth = (name: string) =>
-    getDocs(query(collection(db, name), where("branch", "==", branch), where("month", "==", month)));
-
-  const [shiftSnap, eventSnap, actualSnap] = await Promise.all([byMonth(SHIFTS), byMonth(EVENTS), byMonth(ACTUAL)]);
-
-  return {
-    plans: shiftSnap.docs.map((d) => d.data() as PlanDoc),
-    events: eventSnap.docs.map((d) => d.data() as EventDoc),
-    actuals: actualSnap.docs.map((d) => d.data() as ActualDoc)
-  };
+  return getJson<MonthPlan>({ action: "monthPlan", branch, month });
 }
 
 /** Loads a single staff-day plan cell (for the staff "my shift today" view). */
@@ -132,25 +97,22 @@ export async function fetchShiftForStaffDate(
   workDate: string,
   staffCode: string
 ): Promise<PlanDoc | null> {
-  const snap = await getDoc(doc(db, SHIFTS, shiftDocId(branch, workDate, staffCode)));
-  return snap.exists() ? (snap.data() as PlanDoc) : null;
+  const { plan } = await getJson<{ plan: PlanDoc | null }>({ action: "shiftForStaffDate", branch, workDate, staffCode });
+  return plan;
 }
 
 /** Loads the day annotation (title + activities) for one branch-day, or null when blank. */
 export async function fetchDayEvent(branch: string, workDate: string): Promise<EventDoc | null> {
-  const snap = await getDoc(doc(db, EVENTS, eventDocId(branch, workDate)));
-  return snap.exists() ? (snap.data() as EventDoc) : null;
+  const { event } = await getJson<{ event: EventDoc | null }>({ action: "dayEvent", branch, workDate });
+  return event;
 }
 
 /** Loads every day annotation for the given months (an ISO week can straddle two). */
 export async function fetchDayEventsForMonths(branch: string, months: string[]): Promise<EventDoc[]> {
   const unique = [...new Set(months)];
-  const snaps = await Promise.all(
-    unique.map((month) =>
-      getDocs(query(collection(db, EVENTS), where("branch", "==", branch), where("month", "==", month)))
-    )
-  );
-  return snaps.flatMap((snap) => snap.docs.map((d) => d.data() as EventDoc));
+  if (!unique.length) return [];
+  const { events } = await getJson<{ events: EventDoc[] }>({ action: "dayEventsForMonths", branch, months: unique.join(",") });
+  return events;
 }
 
 /** Upserts one plan cell. Pass assignment "off" to blank a working day. */
@@ -162,18 +124,7 @@ export async function savePlanCell(input: {
   startTime?: string;
   updatedBy: string;
 }): Promise<void> {
-  const nowIso = new Date().toISOString();
-  const record: PlanDoc = {
-    branch: input.branch,
-    month: monthOf(input.workDate),
-    workDate: input.workDate,
-    staffCode: input.staffCode,
-    assignment: input.assignment,
-    ...(input.startTime ? { startTime: input.startTime } : {}),
-    updatedAt: nowIso,
-    updatedBy: input.updatedBy
-  };
-  await setDoc(doc(db, SHIFTS, shiftDocId(input.branch, input.workDate, input.staffCode)), record);
+  await post({ action: "savePlanCell", ...input });
 }
 
 /** Upserts the per-day activity annotation. */
@@ -185,18 +136,7 @@ export async function saveDayEvent(input: {
   activities?: DayActivity[];
   updatedBy: string;
 }): Promise<void> {
-  const nowIso = new Date().toISOString();
-  const record: EventDoc = {
-    branch: input.branch,
-    month: monthOf(input.workDate),
-    workDate: input.workDate,
-    title: input.title,
-    ...(input.note ? { note: input.note } : {}),
-    ...(input.activities && input.activities.length ? { activities: input.activities } : {}),
-    updatedAt: nowIso,
-    updatedBy: input.updatedBy
-  };
-  await setDoc(doc(db, EVENTS, eventDocId(input.branch, input.workDate)), record);
+  await post({ action: "saveDayEvent", ...input });
 }
 
 /** Logs leave through the web (feeds the ACTUAL row). Used by the leave button. */
@@ -208,25 +148,13 @@ export async function logLeave(input: {
   note?: string;
   updatedBy: string;
 }): Promise<void> {
-  const nowIso = new Date().toISOString();
-  const record: ActualDoc = {
-    branch: input.branch,
-    month: monthOf(input.workDate),
-    workDate: input.workDate,
-    staffCode: input.staffCode,
-    leaveType: input.leaveType,
-    ...(input.note ? { leaveNote: input.note } : {}),
-    updatedAt: nowIso,
-    updatedBy: input.updatedBy
-  };
-  await setDoc(doc(db, ACTUAL, shiftDocId(input.branch, input.workDate, input.staffCode)), record, { merge: true });
+  await post({ action: "logLeave", ...input });
 }
 
 /**
  * Sets the ACTUAL day status the owner records for a staff-day — leave/absent is a real
- * event, not part of the plan, so it lives here (same cell as clock-in), not the plan
- * dropdown. Merges so a StoreHub clock-in on the same doc is preserved; "normal" clears
- * any leave/absent override so the clock-in shows through again.
+ * event, not part of the plan. Merges so a StoreHub clock-in on the same doc is preserved;
+ * "normal" clears any leave/absent override so the clock-in shows through again.
  */
 export async function setActualStatus(input: {
   branch: string;
@@ -235,21 +163,7 @@ export async function setActualStatus(input: {
   status: "normal" | "leave_personal" | "leave_sick" | "absent";
   updatedBy: string;
 }): Promise<void> {
-  const nowIso = new Date().toISOString();
-  const record: Record<string, unknown> = {
-    branch: input.branch,
-    month: monthOf(input.workDate),
-    workDate: input.workDate,
-    staffCode: input.staffCode,
-    updatedAt: nowIso,
-    updatedBy: input.updatedBy,
-    leaveType: input.status === "leave_personal" ? "personal" : input.status === "leave_sick" ? "sick" : deleteField(),
-    absent: input.status === "absent" ? true : deleteField(),
-    // any explicit status clears a prior swap
-    swappedTo: deleteField(),
-    swapNote: deleteField()
-  };
-  await setDoc(doc(db, ACTUAL, shiftDocId(input.branch, input.workDate, input.staffCode)), record, { merge: true });
+  await post({ action: "setActualStatus", ...input });
 }
 
 /** Records a shift swap: this staff's shift is covered by `swappedTo` (who clocks in
@@ -262,18 +176,5 @@ export async function setSwap(input: {
   note?: string;
   updatedBy: string;
 }): Promise<void> {
-  const nowIso = new Date().toISOString();
-  const record: Record<string, unknown> = {
-    branch: input.branch,
-    month: monthOf(input.workDate),
-    workDate: input.workDate,
-    staffCode: input.staffCode,
-    updatedAt: nowIso,
-    updatedBy: input.updatedBy,
-    swappedTo: input.swappedTo,
-    swapNote: input.note || deleteField(),
-    leaveType: deleteField(),
-    absent: deleteField()
-  };
-  await setDoc(doc(db, ACTUAL, shiftDocId(input.branch, input.workDate, input.staffCode)), record, { merge: true });
+  await post({ action: "setSwap", ...input });
 }

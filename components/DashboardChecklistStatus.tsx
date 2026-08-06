@@ -26,18 +26,27 @@ export function DashboardChecklistStatus({
   const { records } = useWorkflowRecords();
   const workDate = formatWorkDate();
   // Only the หัวข้อ for this person's rostered กะ — so a กะ2 staffer never sees เปิดร้าน
-  // (กะ1-only) flagged late. Admin / off-day → all phases (hook returns them unfiltered).
-  const shiftPhases = useShiftPhases(phases, staffCode, branch, workDate);
+  // (กะ1-only) flagged late. Admin → all phases. Off day → all phases but muted (offDay).
+  const { phases: shiftPhases, offDay, offLabel } = useShiftPhases(phases, staffCode, branch, workDate);
 
   return (
-    <div className="hero-metrics checklist-status-cards">
+    <div className={`hero-metrics checklist-status-cards${offDay ? " is-off-day" : ""}`}>
+      {offDay && offLabel ? (
+        <p className="checklist-offday-note">{offLabel} · แสดงเป็นข้อมูลอ้างอิง ไม่นับว่าเลยเวลา</p>
+      ) : null}
       {shiftPhases.map((phase) => {
         const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
-        const color = workflowVisualStatus(records, workDate, phase.id);
+        // On a day off, don't colour the card from the records (that is what caused the
+        // false "เกินเวลา / เลยเวลา" alerts) — show it muted and neutral instead.
+        const color = offDay ? "white" : workflowVisualStatus(records, workDate, phase.id);
         return (
-          <a key={phase.id} href={`/checklist#${phase.id}`} className={`board-stat checklist-status status-${color}`}>
+          <a
+            key={phase.id}
+            href={`/checklist#${phase.id}`}
+            className={`board-stat checklist-status status-${color}${offDay ? " is-muted" : ""}`}
+          >
             <span>{phase.title}</span>
-            <strong>{statusText[color]}</strong>
+            <strong>{offDay ? "วันหยุด" : statusText[color]}</strong>
             <small>{record ? `${record.completed}/${record.total}` : `0/${phase.checklist.length}`}</small>
           </a>
         );

@@ -157,9 +157,13 @@ describe("dashboard task sections UI", () => {
     assert.equal(status.includes("useShiftPhases(phases, staffCode, branch, workDate)"), true);
     assert.equal(status.includes("shiftPhases.map"), true);
 
-    // the hook applies the owner config then filters by the rostered shift (matches ChecklistView)
+    // the hook applies the owner config then resolves the shift-aware view (filter by shift,
+    // or flag an off day so a staffer on leave/off is not shown the whole board as เลยเวลา)
     assert.equal(hook.includes("applyChecklistConfig(phases, config)"), true);
-    assert.equal(hook.includes("shift ? phasesForShift(configured, shift) : configured"), true);
+    assert.equal(hook.includes("resolveShiftPhaseView(configured, roster)"), true);
+    // off-day handling: both dashboards mute phases instead of flagging them late
+    assert.equal(sections.includes("offDay"), true);
+    assert.equal(status.includes("offDay"), true);
 
     // both pages pass the viewer's staff code + branch so the hook can resolve their shift
     assert.equal(homePage.includes("staffCode={staffCode} branch={branch}"), true);

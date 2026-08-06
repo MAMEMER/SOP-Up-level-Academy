@@ -3016,6 +3016,19 @@ a {
   opacity: 0.75;
 }
 
+/* วันหยุด/ไม่มีกะ → การ์ดสถานะ checklist โชว์จางๆ เป็นข้อมูลอ้างอิง ไม่นับว่าเลยเวลา */
+.checklist-status.is-muted {
+  opacity: 0.5;
+}
+
+.checklist-offday-note,
+.daily-offday-note {
+  grid-column: 1 / -1;
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  color: #86868b;
+}
+
 /* การ์ด weekly ที่ยังไม่ถึงวันจัด → ปิดการกด (ไม่ใช่ลิงก์ ห้ามเข้าไปทำ) */
 .daily-phase-card.is-locked {
   cursor: not-allowed;

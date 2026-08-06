@@ -1,67 +1,32 @@
 "use client";
 
-// Firestore store for owner→staff task assignments and staff↔staff handoffs.
-// Both feed the staff "วันนี้ของฉัน" alert so a staff member sees, on login, what
-// was assigned to them and what a teammate handed off across shifts.
-//
-//   work_assignments — owner assigns a task to a staff member for a date. Real-time
-//                      replacement for the old local-JSON assignedWorkRecords.
-//   work_handoffs    — a staff member parks a task for someone on another shift
-//                      ("ลูกค้าฝากของ"), optionally targeted at a specific person.
-//
-// App-level gated by Supabase login (Firestore rules are open for this collection,
-// matching the other internal-ops tools — see firestore.rules).
+// Client store for owner→staff task assignments and staff↔staff handoffs.
+// Fix 1: work_assignments + work_handoffs used to be world read/write via the Firebase
+// client SDK; they now go through the authenticated /api/work-tasks route (Admin SDK,
+// session-verified, ownership-checked). Exported types and signatures are unchanged.
 
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  updateDoc,
-  where
-} from "firebase/firestore";
-import { db } from "./firebase-client.ts";
-
-const ASSIGNMENTS = "work_assignments";
-const HANDOFFS = "work_handoffs";
-
-// Assignment lifecycle (separate from the KPI "performance status"):
-//   open           — มอบหมายแล้ว ยังไม่ส่งงาน
-//   submitted      — staff ส่งงานพร้อมหลักฐานแล้ว รอเจ้าของร้านตรวจ
-//   needs_revision — เจ้าของร้านขอให้แก้ไข → staff ต้องแก้แล้วส่งใหม่
-//   done           — เจ้าของร้านรับงานแล้ว จบ
 export type AssignmentStatus = "open" | "submitted" | "needs_revision" | "done";
 
 export type WorkAssignment = {
   id: string;
   branch: string;
-  workDate: string; // YYYY-MM-DD — the day it's due
-  staffCode: string; // who it's for
+  workDate: string;
+  staffCode: string;
   title: string;
-  detail?: string; // ต้องทำอะไร — รายละเอียดขั้นตอน
-  // Clarity fields (ticket McMb5SCrbKBp24VZN1vu): make an assignment unambiguous
-  // before the staff even starts. Together with staffCode (หน้าที่ใคร) + title (ต้องทำอะไร)
-  // these answer ที่ไหน / ส่งผลลัพธ์แบบไหน / ต้องสำเร็จเมื่อไหร่.
-  location?: string; // ที่ไหน — สถานที่/โซน/ที่อยู่จัดส่ง
-  expectedResult?: string; // ส่งผลลัพธ์แบบไหน — งานเสร็จหน้าตาเป็นยังไง + ต้องแนบหลักฐานอะไร (definition of done)
-  dueTime?: string; // ต้องสำเร็จเมื่อไหร่ — เวลา HH:MM ภายใน workDate (ถ้ามี)
-  // Reference material the owner attaches when handing the task out (แนบตอนสั่งงาน) —
-  // e.g. รูปสินค้า / ใบปะหน้า / สลิป. Separate from staff-submitted imageEvidence below.
-  attachments?: string[]; // ไฟล์/รูปแนบจากเจ้าของร้าน (URL)
-  trackingNumber?: string; // เลขแทค/เลขพัสดุ สำหรับงานส่งสินค้า
+  detail?: string;
+  location?: string;
+  expectedResult?: string;
+  dueTime?: string;
+  attachments?: string[];
+  trackingNumber?: string;
   status: AssignmentStatus;
   assignedBy: string;
   createdAt: string;
-  // Submission fields — filled by the staff member when they send the work in.
-  note?: string; // สรุปสิ่งที่ทำ (staff แก้ไขได้)
-  evidence?: string; // ลิงก์/URL รูปหลักฐาน (จาก Firebase Storage หรือแปะลิงก์เอง)
-  imageEvidence?: string[]; // เผื่อแนบหลายรูป
+  note?: string;
+  evidence?: string;
+  imageEvidence?: string[];
   submittedAt?: string;
-  // Review fields — filled by the owner when they accept or bounce it back.
-  revisionNote?: string; // เหตุผลที่ขอให้แก้
+  revisionNote?: string;
   reviewedAt?: string;
   doneAt?: string;
 };
@@ -73,7 +38,6 @@ export type WorkHandoff = {
   title: string;
   detail?: string;
   fromStaff: string;
-  /** target staff code, or "any" for whoever picks it up on the next shift */
   toStaff: string;
   status: "open" | "claimed" | "done";
   createdAt: string;
@@ -82,10 +46,26 @@ export type WorkHandoff = {
   doneAt?: string;
 };
 
-function newId(prefix: string, ...parts: string[]): string {
-  // Deterministic-ish id without Math.random (unavailable in some sandboxes): the
-  // caller passes enough parts (date + staff + title) to stay unique per intent.
-  return `${prefix}__${parts.join("__").replace(/\s+/g, "-").slice(0, 120)}`;
+async function getJson<T>(params: Record<string, string>): Promise<T> {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`/api/work-tasks?${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`work-tasks read failed: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+async function post(body: Record<string, unknown>): Promise<void> {
+  const res = await fetch("/api/work-tasks", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const detail = await res
+      .json()
+      .then((d) => (d as { detail?: string }).detail)
+      .catch(() => undefined);
+    throw new Error(detail || `work-tasks write failed: ${res.status}`);
+  }
 }
 
 // ── Assignments ─────────────────────────────────────────────────────────────
@@ -104,114 +84,59 @@ export async function assignWork(input: {
   assignedBy: string;
   createdAtIso: string;
 }): Promise<void> {
-  const id = newId("wa", input.workDate, input.staffCode, input.createdAtIso);
-  const record: WorkAssignment = {
-    id,
-    branch: input.branch,
-    workDate: input.workDate,
-    staffCode: input.staffCode,
-    title: input.title,
-    ...(input.detail ? { detail: input.detail } : {}),
-    ...(input.location ? { location: input.location } : {}),
-    ...(input.expectedResult ? { expectedResult: input.expectedResult } : {}),
-    ...(input.dueTime ? { dueTime: input.dueTime } : {}),
-    ...(input.attachments && input.attachments.length ? { attachments: input.attachments } : {}),
-    ...(input.trackingNumber ? { trackingNumber: input.trackingNumber } : {}),
-    status: "open",
-    assignedBy: input.assignedBy,
-    createdAt: input.createdAtIso
-  };
-  await setDoc(doc(db, ASSIGNMENTS, id), record);
+  await post({ action: "assignWork", ...input });
 }
 
-/** Assignments for one staff member on one date (the login alert). */
 export async function fetchMyAssignments(branch: string, workDate: string, staffCode: string): Promise<WorkAssignment[]> {
-  const snap = await getDocs(
-    query(
-      collection(db, ASSIGNMENTS),
-      where("branch", "==", branch),
-      where("workDate", "==", workDate),
-      where("staffCode", "==", staffCode)
-    )
-  );
-  return snap.docs.map((d) => d.data() as WorkAssignment);
+  const { assignments } = await getJson<{ assignments: WorkAssignment[] }>({ action: "myAssignments", branch, workDate, staffCode });
+  return assignments;
 }
 
-/** All assignments for a date (owner review). */
 export async function fetchAssignmentsForDate(branch: string, workDate: string): Promise<WorkAssignment[]> {
-  const snap = await getDocs(
-    query(collection(db, ASSIGNMENTS), where("branch", "==", branch), where("workDate", "==", workDate))
-  );
-  return snap.docs.map((d) => d.data() as WorkAssignment);
+  const { assignments } = await getJson<{ assignments: WorkAssignment[] }>({ action: "assignmentsForDate", branch, workDate });
+  return assignments;
 }
 
-/** Every assignment ever given to one staff member (feeds the grouped "งานของฉัน" list). */
 export async function fetchAssignmentsForStaff(branch: string, staffCode: string): Promise<WorkAssignment[]> {
-  const snap = await getDocs(
-    query(collection(db, ASSIGNMENTS), where("branch", "==", branch), where("staffCode", "==", staffCode))
-  );
-  return snap.docs.map((d) => d.data() as WorkAssignment);
+  const { assignments } = await getJson<{ assignments: WorkAssignment[] }>({ action: "assignmentsForStaff", branch, staffCode });
+  return assignments;
 }
 
-/** One assignment by id (the staff submit/detail page). */
 export async function fetchAssignmentById(id: string): Promise<WorkAssignment | null> {
-  const snap = await getDoc(doc(db, ASSIGNMENTS, id));
-  return snap.exists() ? (snap.data() as WorkAssignment) : null;
+  const { assignment } = await getJson<{ assignment: WorkAssignment | null }>({ action: "assignmentById", id });
+  return assignment;
 }
 
-/**
- * Staff submits the work with evidence. Requires at least one piece of evidence
- * (an image URL or a written note) — enforced by the caller UI. Clears any prior
- * revision request so the record reads clean on resubmission.
- */
 export async function submitAssignment(
   id: string,
   input: { note: string; evidence?: string; imageEvidence?: string[]; submittedAtIso: string }
 ): Promise<void> {
-  // Guard: never record a submission (status "submitted" + submittedAt) unless the
-  // staff actually filled in what they did AND attached at least one piece of evidence.
-  // This is the last line of defence against blank "งานเปล่า" submits even if the UI
-  // validation is bypassed. See ticket OqnaLeJC4NkP7qCFFVY1.
+  // Keep the same client-side guard for immediate UX; the server re-checks it too.
   const note = input.note.trim();
   const hasEvidence =
-    (input.imageEvidence?.some((u) => u.trim().length > 0) ?? false) ||
-    Boolean(input.evidence?.trim());
-  if (!note) {
-    throw new Error("ต้องกรอกรายละเอียดสิ่งที่ทำก่อนส่งงาน");
-  }
-  if (!hasEvidence) {
-    throw new Error("ต้องแนบหลักฐานอย่างน้อย 1 อย่างก่อนส่งงาน");
-  }
-  await updateDoc(doc(db, ASSIGNMENTS, id), {
-    status: "submitted",
-    note,
-    evidence: input.evidence ?? "",
-    imageEvidence: input.imageEvidence ?? [],
-    submittedAt: input.submittedAtIso,
-    revisionNote: ""
-  });
+    (input.imageEvidence?.some((u) => u.trim().length > 0) ?? false) || Boolean(input.evidence?.trim());
+  if (!note) throw new Error("ต้องกรอกรายละเอียดสิ่งที่ทำก่อนส่งงาน");
+  if (!hasEvidence) throw new Error("ต้องแนบหลักฐานอย่างน้อย 1 อย่างก่อนส่งงาน");
+  await post({ action: "submitAssignment", id, note, evidence: input.evidence ?? "", imageEvidence: input.imageEvidence ?? [] });
 }
 
-/** Owner bounces a submission back for changes. */
 export async function requestAssignmentRevision(id: string, note: string, reviewedAtIso: string): Promise<void> {
-  await updateDoc(doc(db, ASSIGNMENTS, id), {
-    status: "needs_revision",
-    revisionNote: note,
-    reviewedAt: reviewedAtIso
-  });
+  void reviewedAtIso;
+  await post({ action: "requestAssignmentRevision", id, note });
 }
 
-/** Owner accepts a submission — final. */
 export async function acceptAssignment(id: string, reviewedAtIso: string): Promise<void> {
-  await updateDoc(doc(db, ASSIGNMENTS, id), { status: "done", doneAt: reviewedAtIso, reviewedAt: reviewedAtIso });
+  void reviewedAtIso;
+  await post({ action: "acceptAssignment", id });
 }
 
 export async function markAssignmentDone(id: string, doneAtIso: string): Promise<void> {
-  await updateDoc(doc(db, ASSIGNMENTS, id), { status: "done", doneAt: doneAtIso });
+  void doneAtIso;
+  await post({ action: "markAssignmentDone", id });
 }
 
 export async function deleteAssignment(id: string): Promise<void> {
-  await deleteDoc(doc(db, ASSIGNMENTS, id));
+  await post({ action: "deleteAssignment", id });
 }
 
 // ── Handoffs ────────────────────────────────────────────────────────────────
@@ -222,38 +147,25 @@ export async function createHandoff(input: {
   title: string;
   detail?: string;
   fromStaff: string;
-  toStaff: string; // code or "any"
+  toStaff: string;
   createdAtIso: string;
 }): Promise<void> {
-  const id = newId("ho", input.workDate, input.fromStaff, input.createdAtIso);
-  const record: WorkHandoff = {
-    id,
-    branch: input.branch,
-    workDate: input.workDate,
-    title: input.title,
-    ...(input.detail ? { detail: input.detail } : {}),
-    fromStaff: input.fromStaff,
-    toStaff: input.toStaff,
-    status: "open",
-    createdAt: input.createdAtIso
-  };
-  await setDoc(doc(db, HANDOFFS, id), record);
+  await post({ action: "createHandoff", ...input });
 }
 
-/** Open handoffs relevant to a staff member: targeted at them or open to anyone. */
 export async function fetchOpenHandoffs(branch: string): Promise<WorkHandoff[]> {
-  const snap = await getDocs(
-    query(collection(db, HANDOFFS), where("branch", "==", branch), where("status", "in", ["open", "claimed"]))
-  );
-  return snap.docs.map((d) => d.data() as WorkHandoff);
+  const { handoffs } = await getJson<{ handoffs: WorkHandoff[] }>({ action: "openHandoffs", branch });
+  return handoffs;
 }
 
 export async function claimHandoff(id: string, staffCode: string, claimedAtIso: string): Promise<void> {
-  await updateDoc(doc(db, HANDOFFS, id), { status: "claimed", claimedBy: staffCode, claimedAt: claimedAtIso });
+  void claimedAtIso;
+  await post({ action: "claimHandoff", id, staffCode });
 }
 
 export async function completeHandoff(id: string, doneAtIso: string): Promise<void> {
-  await updateDoc(doc(db, HANDOFFS, id), { status: "done", doneAt: doneAtIso });
+  void doneAtIso;
+  await post({ action: "completeHandoff", id });
 }
 
 /** Handoffs a staff member should act on: addressed to them or unassigned ("any"). */

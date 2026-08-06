@@ -1,14 +1,9 @@
 "use client";
 
-// Firestore store for the shared weekly/monthly checklist. One doc per
-// (branch, period, periodKey) holds a map of taskId → who ticked it and when, so the
-// whole team sees the same state and can finish the list together across shifts.
-// Stored in sop_daily_checklist? No — separate `sop_shared_tasks` collection.
-
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "./firebase-client.ts";
-
-const SHARED = "sop_shared_tasks";
+// Client store for the shared weekly/monthly checklist. Fix 1: sop_shared_tasks used to be
+// world read/write via the Firebase client SDK; it now goes through the authenticated
+// /api/shared-tasks route (Admin SDK, session-verified). The "by" stamp is set from the
+// session server-side. Exported types and signatures are unchanged.
 
 export type SharedTick = { by: string; at: string };
 export type SharedTaskDoc = {
@@ -19,20 +14,19 @@ export type SharedTaskDoc = {
   updatedAt: string;
 };
 
-function docId(branch: string, period: string, periodKey: string): string {
-  return `${branch}__${period}__${periodKey}`;
-}
-
 export async function fetchSharedTicks(
   branch: string,
   period: "weekly" | "monthly",
   periodKey: string
 ): Promise<Record<string, SharedTick>> {
-  const snap = await getDoc(doc(db, SHARED, docId(branch, period, periodKey)));
-  return snap.exists() ? ((snap.data() as SharedTaskDoc).ticks ?? {}) : {};
+  const qs = new URLSearchParams({ branch, period, periodKey }).toString();
+  const res = await fetch(`/api/shared-tasks?${qs}`, { cache: "no-store" });
+  if (!res.ok) return {};
+  const { ticks } = (await res.json()) as { ticks: Record<string, SharedTick> };
+  return ticks ?? {};
 }
 
-/** Toggles a task's tick. Pass the full current tick map so the merge stays simple. */
+/** Toggles a task's tick. The server applies the toggle and returns the fresh map. */
 export async function setSharedTick(input: {
   branch: string;
   period: "weekly" | "monthly";
@@ -43,17 +37,18 @@ export async function setSharedTick(input: {
   atIso: string;
   currentTicks: Record<string, SharedTick>;
 }): Promise<Record<string, SharedTick>> {
-  const nextTicks = { ...input.currentTicks };
-  if (input.ticked) nextTicks[input.taskId] = { by: input.by, at: input.atIso };
-  else delete nextTicks[input.taskId];
-
-  const record: SharedTaskDoc = {
-    branch: input.branch,
-    period: input.period,
-    periodKey: input.periodKey,
-    ticks: nextTicks,
-    updatedAt: input.atIso
-  };
-  await setDoc(doc(db, SHARED, docId(input.branch, input.period, input.periodKey)), record);
-  return nextTicks;
+  const res = await fetch("/api/shared-tasks", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      branch: input.branch,
+      period: input.period,
+      periodKey: input.periodKey,
+      taskId: input.taskId,
+      ticked: input.ticked
+    })
+  });
+  if (!res.ok) throw new Error(`shared-tasks write failed: ${res.status}`);
+  const { ticks } = (await res.json()) as { ticks: Record<string, SharedTick> };
+  return ticks ?? {};
 }

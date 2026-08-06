@@ -1,15 +1,11 @@
 "use client";
 
-// Firestore store for the owner-edited daily checklist config. One doc per branch in
-// sop_daily_checklist holds the per-phase item overrides, submit windows, phase order and
-// shift assignment. Read by the checklist page (to render the tailored routine) and the
-// owner editor (to edit it).
+// Client store for the owner-edited daily checklist config. Fix 1: sop_daily_checklist
+// used to be world read/write via the Firebase client SDK; it now goes through the
+// authenticated /api/checklist-config route (Admin SDK, session-verified). The exported
+// type and function signatures are unchanged.
 
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "./firebase-client.ts";
 import { emptyChecklistConfig, type ChecklistConfig, type ChecklistOverrides } from "./daily-checklist.ts";
-
-const COLLECTION = "sop_daily_checklist";
 
 export type DailyChecklistDoc = {
   branch: string;
@@ -28,20 +24,10 @@ export type DailyChecklistDoc = {
 
 /** Reads the whole config. Docs written before windows/order/shifts existed still load. */
 export async function fetchChecklistConfig(branch: string): Promise<ChecklistConfig> {
-  const snap = await getDoc(doc(db, COLLECTION, branch));
-  if (!snap.exists()) return emptyChecklistConfig;
-  const data = snap.data() as DailyChecklistDoc;
-  return {
-    overrides: data.overrides ?? {},
-    windows: data.windows ?? {},
-    order: data.order ?? [],
-    shifts: data.shifts ?? {},
-    manual: data.manual ?? {},
-    customPhases: data.customPhases ?? [],
-    hiddenPhases: data.hiddenPhases ?? [],
-    titles: data.titles ?? {},
-    evidence: data.evidence ?? {}
-  };
+  const res = await fetch(`/api/checklist-config?branch=${encodeURIComponent(branch)}`, { cache: "no-store" });
+  if (!res.ok) return emptyChecklistConfig;
+  const { config } = (await res.json()) as { config: ChecklistConfig };
+  return config ?? emptyChecklistConfig;
 }
 
 export async function saveChecklistConfig(input: {
@@ -49,19 +35,10 @@ export async function saveChecklistConfig(input: {
   config: ChecklistConfig;
   updatedBy: string;
 }): Promise<void> {
-  const record: DailyChecklistDoc = {
-    branch: input.branch,
-    overrides: input.config.overrides,
-    windows: input.config.windows,
-    order: input.config.order,
-    shifts: input.config.shifts,
-    manual: input.config.manual,
-    customPhases: input.config.customPhases,
-    hiddenPhases: input.config.hiddenPhases,
-    titles: input.config.titles,
-    evidence: input.config.evidence,
-    updatedAt: new Date().toISOString(),
-    updatedBy: input.updatedBy
-  };
-  await setDoc(doc(db, COLLECTION, input.branch), record);
+  const res = await fetch("/api/checklist-config", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ branch: input.branch, config: input.config })
+  });
+  if (!res.ok) throw new Error(`checklist-config write failed: ${res.status}`);
 }

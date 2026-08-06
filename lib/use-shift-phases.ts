@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { phasesForShift, type WorkflowPhase } from "./card-store-workflow.ts";
+import { type WorkflowPhase } from "./card-store-workflow.ts";
 import { applyChecklistConfig, emptyChecklistConfig, type ChecklistConfig } from "./daily-checklist.ts";
 import { fetchChecklistConfig } from "./daily-checklist-store.ts";
 import { fetchShiftForStaffDate } from "./shift-schedule-store.ts";
-import type { ShiftCode } from "./shift-schedule.ts";
+import {
+  resolveShiftPhaseView,
+  rosterFromAssignment,
+  type RosterState,
+  type ShiftPhaseView
+} from "./shift-phase-visibility.ts";
 
 /**
  * The daily หัวข้อ a staffer should see today, filtered to the กะ they are rostered to work.
@@ -13,34 +18,41 @@ import type { ShiftCode } from "./shift-schedule.ts";
  * กะ 2 / ทุกกะ), THEN the shift filter — filtering before the config would use the built-in
  * tags and ignore the owner's move.
  *
- * When there is no staffCode (admin) or no working shift today (off / leave / unrostered)
- * every phase is returned, so nothing is ever hidden by accident.
+ * Returns not just the phase list but WHETHER today is an off day for this staffer, so the
+ * dashboard can show the phases muted (reference only) instead of flagging them all late.
+ *
+ * - No staffCode (admin) → every phase, offDay=false (admins must see the whole board).
+ * - Working (s1/s2) → only that shift's phases (a กะ2 staffer never sees เปิดร้าน).
+ * - staffCode present but off / not rostered → every phase, offDay=true (never late).
  *
  * Fixes: a กะ2 staffer (e.g. Leo) saw เปิดร้าน — a กะ1-only หัวข้อ — flagged "เกินเวลา /
- * ยังไม่เสร็จ" on the dashboard status cards, a false late/missed alert for work that was
- * never his. (ticket bpFv3UQCXImuSOejAptz)
+ * ยังไม่เสร็จ"; and a staffer on a day off saw the entire board flagged เลยเวลา.
+ * (tickets bpFv3UQCXImuSOejAptz + วันหยุดเด้งเตือนผิด)
  */
 export function useShiftPhases(
   phases: WorkflowPhase[],
   staffCode: string | null | undefined,
   branch: string | undefined,
   workDate: string
-): WorkflowPhase[] {
-  const [shift, setShift] = useState<ShiftCode | null>(null);
+): ShiftPhaseView {
+  // "neutral" = admin / still loading / fetch error → show all phases, not an off day.
+  const [roster, setRoster] = useState<RosterState>("neutral");
   const [config, setConfig] = useState<ChecklistConfig>(emptyChecklistConfig);
 
   useEffect(() => {
     if (!staffCode || !branch) {
-      setShift(null);
+      setRoster("neutral");
       return;
     }
     let alive = true;
+    setRoster("neutral");
     fetchShiftForStaffDate(branch, workDate, staffCode)
       .then((plan) => {
         if (!alive) return;
-        setShift(plan?.assignment === "s1" || plan?.assignment === "s2" ? plan.assignment : null);
+        setRoster(rosterFromAssignment(plan?.assignment));
       })
-      .catch(() => alive && setShift(null));
+      // On error we do NOT claim it's an off day (that would hide real work) — stay neutral.
+      .catch(() => alive && setRoster("neutral"));
     return () => {
       alive = false;
     };
@@ -59,6 +71,6 @@ export function useShiftPhases(
 
   return useMemo(() => {
     const configured = applyChecklistConfig(phases, config);
-    return shift ? phasesForShift(configured, shift) : configured;
-  }, [phases, shift, config]);
+    return resolveShiftPhaseView(configured, roster);
+  }, [phases, roster, config]);
 }

@@ -1001,7 +1001,10 @@ describe("performance score engine", () => {
     assert.equal(source.includes("href={sourceHref(source.key, activePeriod, basePath)}"), true);
     assert.equal(adminSource.includes('basePath="/admin/performance-score"'), true);
     assert.equal(publicSource.includes('basePath="/performance-score"'), true);
-    assert.equal(publicSource.includes("import { requireUser"), false);
+    // Security: the public /performance-score page must require sign-in and send a
+    // non-admin to their own dashboard instead of exposing the whole team's KPI board.
+    assert.equal(publicSource.includes("import { requireUser"), true);
+    assert.equal(publicSource.includes('redirect("/my-view")'), true);
     assert.equal(source.includes("ดูแหล่งที่มา"), true);
     assert.equal(source.includes("Source detail"), true);
   });
