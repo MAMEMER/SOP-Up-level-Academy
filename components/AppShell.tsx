@@ -9,6 +9,7 @@ import { VIEW_AS_COOKIE } from "../lib/impersonation.ts";
 const mainLinks = [
   { href: "/", label: "หน้าหลัก" },
   { href: "/my-view", label: "งานของฉัน" },
+  { href: "/schedule", label: "ตารางกะ" },
   { href: "/checklist", label: "เช็คลิสต์" },
   { href: "/handoff", label: "งานส่งต่อ" },
   { href: "/training", label: "คู่มืองาน" }
