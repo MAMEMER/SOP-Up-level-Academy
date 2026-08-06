@@ -1,6 +1,43 @@
 // Help chatbot for the SOP site — answers "อะไรคืออะไร / กดตรงไหน".
 // Uses Claude when ANTHROPIC_API_KEY is set; otherwise falls back to a built-in
 // keyword-matched site guide so the widget is useful out of the box.
+//
+// SECURITY: this endpoint proxies a paid Anthropic call. It requires a valid SOP
+// session (same cookie as every page — staff are always logged in when the widget is
+// reachable) and is rate-limited per session so nobody can drain ANTHROPIC_API_KEY once
+// it is set. The tickets/bug-report path (BugReportFab) is separate and stays open.
+
+import { cookies } from "next/headers";
+import { verifySession } from "../../../lib/session-jwt.ts";
+import { SOP_SESSION_COOKIE } from "../../../lib/auth-session.ts";
+
+async function sessionEmail(): Promise<string | null> {
+  const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
+  if (!cookie) return null;
+  const claims = await verifySession(cookie);
+  return claims?.email ?? null;
+}
+
+// In-memory sliding-window limiter. Per serverless instance (best-effort — the whole
+// point is to blunt a drain attack, not to be a perfect global counter): 20 requests per
+// 10 minutes per session, keyed by session email, falling back to the client IP.
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX = 20;
+const rateHits = new Map<string, number[]>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const recent = (rateHits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+  recent.push(now);
+  rateHits.set(key, recent);
+  // Bound memory: drop stale keys once the map grows large.
+  if (rateHits.size > 5000) {
+    for (const [k, times] of rateHits) {
+      if (times.every((t) => now - t >= RATE_WINDOW_MS)) rateHits.delete(k);
+    }
+  }
+  return recent.length > RATE_MAX;
+}
 
 const SITE_GUIDE = `เว็บ SOP Up Level — คู่มืองาน + KPI พนักงาน Up Level Academy. หน้าและปุ่มหลัก:
 - หน้าหลัก (เมนู "หน้าหลัก") — ภาพรวมงานวันนี้: สถานะ checklist (เปิดร้าน/stock/จัดส่ง/ปิดร้าน) + งาน daily/weekly/monthly.
@@ -27,6 +64,18 @@ function fallbackAnswer(q: string): string {
 }
 
 export async function POST(req: Request) {
+  const email = await sessionEmail();
+  if (!email) {
+    return Response.json({ error: "unauthorized", reply: "กรุณาเข้าสู่ระบบก่อนใช้ผู้ช่วย" }, { status: 401 });
+  }
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "";
+  if (isRateLimited(email || ip || "anon")) {
+    return Response.json(
+      { error: "rate_limited", reply: "ถามถี่เกินไป พักสักครู่แล้วลองใหม่นะ" },
+      { status: 429 }
+    );
+  }
+
   let body: { messages?: Array<{ role: string; content: string }> } = {};
   try { body = await req.json(); } catch { /* ignore */ }
   const messages = Array.isArray(body.messages) ? body.messages.slice(-8) : [];
