@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { fetchChecklistConfig } from "../../../lib/daily-checklist-store.ts";
-import { applyManualOverrides, type ManualOverrides } from "../../../lib/work-manual.ts";
+import { applyChecklistConfig, emptyChecklistConfig, type ChecklistConfig } from "../../../lib/daily-checklist.ts";
+import { applyManualOverrides } from "../../../lib/work-manual.ts";
 import { storehubStocktakesUrl, weeklyStockSleevePhase } from "../../../lib/weekly-stock-workflow.ts";
 import { monthlyStockSinglePhase } from "../../../lib/monthly-stock-single-workflow.ts";
 import { seatingTableRules, weeklyEvents } from "../../../lib/weekly-event-tasks.ts";
@@ -84,19 +85,24 @@ const manualMedia: Record<string, {
 export default function TrainingPage() {
   // The manual text is owner-editable at /admin/manual-config; the code below is the
   // fallback that ships with the app. Fetched client-side, same as the checklist config.
-  const [manualOverrides, setManualOverrides] = useState<ManualOverrides>({});
+  const [config, setConfig] = useState<ChecklistConfig>(emptyChecklistConfig);
 
   useEffect(() => {
     let alive = true;
     fetchChecklistConfig("bangkae")
-      .then((config) => alive && setManualOverrides(config.manual))
-      .catch(() => alive && setManualOverrides({}));
+      .then((data) => alive && setConfig(data))
+      .catch(() => alive && setConfig(emptyChecklistConfig));
     return () => {
       alive = false;
     };
   }, []);
 
-  const manualPhases = applyManualOverrides(cardStoreWorkflow, manualOverrides);
+  // Build the same หัวข้อ list the checklist shows — built-in phases plus any custom
+  // หัวข้อ the owner added, renamed titles applied, hidden ones dropped — then layer the
+  // owner's manual text on top. Without the custom phases here, a หัวข้อ added at
+  // /admin/checklist-config appeared in the checklist but never in this staff manual.
+  const configuredPhases = applyChecklistConfig(cardStoreWorkflow, config);
+  const manualPhases = applyManualOverrides(configuredPhases, config.manual);
 
   return (
     <main className="page">
@@ -154,21 +160,23 @@ export default function TrainingPage() {
                   </div>
                 </section>
 
-                <section>
-                  <h4>ขั้นตอนการปฏิบัติงาน</h4>
-                  <div className="wi-step-list">
-                    {phase.sections.map((section, sectionIndex) => (
-                      <div key={section.title} className="wi-step-section">
-                        <strong>{sectionIndex + 1}. {section.title}</strong>
-                        <ol>
-                          {section.tasks.map((task) => (
-                            <li key={task}>{task}</li>
-                          ))}
-                        </ol>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                {phase.sections.length ? (
+                  <section>
+                    <h4>ขั้นตอนการปฏิบัติงาน</h4>
+                    <div className="wi-step-list">
+                      {phase.sections.map((section, sectionIndex) => (
+                        <div key={section.title} className="wi-step-section">
+                          <strong>{sectionIndex + 1}. {section.title}</strong>
+                          <ol>
+                            {section.tasks.map((task) => (
+                              <li key={task}>{task}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
 
                 <section className="wi-summary-grid">
                   <div>

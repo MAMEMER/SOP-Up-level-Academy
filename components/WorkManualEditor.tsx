@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { WorkflowPhase } from "../lib/card-store-workflow.ts";
-import { emptyChecklistConfig, type ChecklistConfig } from "../lib/daily-checklist.ts";
+import { applyChecklistConfig, emptyChecklistConfig, type ChecklistConfig } from "../lib/daily-checklist.ts";
 import { fetchChecklistConfig, saveChecklistConfig } from "../lib/daily-checklist-store.ts";
 import { cleanManualOverrides, seedManualFromPhases, type ManualOverrides } from "../lib/work-manual.ts";
 
@@ -21,6 +21,10 @@ export function WorkManualEditor({
 }) {
   const [config, setConfig] = useState<ChecklistConfig>(emptyChecklistConfig);
   const [draft, setDraft] = useState<ManualOverrides>({});
+  // The หัวข้อ list actually shown at /training: built-in phases + custom หัวข้อ the owner
+  // added, minus hidden, titles applied. Seeded here so the owner can also write manual
+  // text (วัตถุประสงค์ / ขั้นตอน / ระวัง) for a custom หัวข้อ, not just the built-in ones.
+  const [manualPhases, setManualPhases] = useState<WorkflowPhase[]>(phases);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -30,12 +34,15 @@ export function WorkManualEditor({
     fetchChecklistConfig(branch)
       .then((data) => {
         if (!alive) return;
+        const effective = applyChecklistConfig(phases, data);
         setConfig(data);
-        setDraft(seedManualFromPhases(phases, data.manual));
+        setManualPhases(effective);
+        setDraft(seedManualFromPhases(effective, data.manual));
       })
       .catch(() => {
         if (!alive) return;
         setConfig(emptyChecklistConfig);
+        setManualPhases(phases);
         setDraft(seedManualFromPhases(phases, {}));
       })
       .finally(() => alive && setLoading(false));
@@ -137,7 +144,7 @@ export function WorkManualEditor({
 
   return (
     <div className="checklist-config">
-      {phases.map((phase) => {
+      {manualPhases.map((phase) => {
         const entry = draft[phase.id] || {};
         return (
           <section key={phase.id} className="checklist-config__phase soft-card">
