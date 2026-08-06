@@ -9,6 +9,8 @@ import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
 import { formatWorkDate, workflowVisualStatus } from "../lib/workflow-records.ts";
 import { useWorkflowRecords } from "../lib/workflow-records-client.ts";
 import { useShiftPhases } from "../lib/use-shift-phases.ts";
+import { usePlannedDayTasks } from "../lib/use-planned-day-tasks.ts";
+import { isPlannedHref, plannedCadenceLabel } from "../lib/planned-day-tasks.ts";
 import {
   bangkokMonthKey,
   monthlyStockTasks,
@@ -81,6 +83,8 @@ export function DashboardTaskSections({
   // เฉพาะ หัวข้อ ของกะที่พนักงานคนนี้เข้าวันนี้ — กะ2 จะไม่เห็น เปิดร้าน (ของกะ1) ขึ้นว่าเลยเวลา
   // Admin / วันหยุด → คืนทุก หัวข้อ (hook ไม่กรอง)
   const shiftPhases = useShiftPhases(phases, staffCode, branch, workDate);
+  // งาน Stock ที่เจ้าของลงไว้ในตารางกะของวันนี้ → เด้งมาเป็นงานที่ต้องทำบน dashboard
+  const plannedTasks = usePlannedDayTasks(branch, workDate);
   const stockPhase = shiftPhases.find((phase) => phase.id === "stock-work");
   const dailyTaskPhases = shiftPhases.filter((phase) => phase.id !== "stock-work");
 
@@ -144,7 +148,7 @@ export function DashboardTaskSections({
           ) : null}
         </div>
         <div className="daily-phase-grid">
-          {assignedWorkRecords.length || assignedWorkFeed.length || activeWeeklyEvents.length ? (
+          {assignedWorkRecords.length || assignedWorkFeed.length || activeWeeklyEvents.length || plannedTasks.length ? (
             <>
               {assignedWorkRecords.map((record, index) => {
                 const effectiveStatus = effectiveAssignedWorkStatus(record);
@@ -194,6 +198,25 @@ export function DashboardTaskSections({
                       <small>Weekly event · {event.game} · {workDate}</small>
                       <strong>{event.name}</strong>
                       <em>ถึงกำหนดวันนี้ · ส่งงาน/หลักฐาน · {completed}/{total}</em>
+                    </div>
+                  </a>
+                );
+              })}
+              {/* งาน Stock ที่ลงไว้ในตารางกะวันนี้ (Sleeve รายสัปดาห์ / Single card รายเดือน) */}
+              {plannedTasks.map((task, index) => {
+                const seq =
+                  assignedWorkRecords.length + assignedWorkFeed.length + activeWeeklyEvents.length + index + 1;
+                return (
+                  <a
+                    key={`planned-${task.key}`}
+                    href={task.href}
+                    className="daily-phase-card workflow-status-white"
+                  >
+                    <span>{String(seq).padStart(2, "0")}</span>
+                    <div>
+                      <small>Stock · ตามตารางกะ · {workDate}</small>
+                      <strong>{task.label}</strong>
+                      <em>ถึงกำหนดวันนี้ · {plannedCadenceLabel(task)}{task.time ? ` · ${task.time}` : ""}</em>
                     </div>
                   </a>
                 );
@@ -280,6 +303,7 @@ export function DashboardTaskSections({
             // Weekly stock — data-driven จาก weeklyStockTasks (แก้/เพิ่ม/ลบ ที่ lib ได้เลย)
             weeklyStockTasks.forEach((task, index) => {
               seq += 1;
+              const dueToday = isPlannedHref(plannedTasks, task.href);
               cards.push(
                 <a
                   key={task.id}
@@ -289,7 +313,7 @@ export function DashboardTaskSections({
                 >
                   <span>{String(seq).padStart(2, "0")}</span>
                   <div>
-                    <small>{stockWorkSummaryCards[1].kicker}</small>
+                    <small>{stockWorkSummaryCards[1].kicker}{dueToday ? " · ถึงกำหนดวันนี้" : ""}</small>
                     <strong>{task.name}</strong>
                     <em>{task.note ? `ยังไม่เริ่ม · ${task.note}` : "ยังไม่เริ่ม"}</em>
                   </div>
@@ -303,7 +327,10 @@ export function DashboardTaskSections({
               <a key="stock-monthly" href="/checklist-monthly#stock-single-card-work" className="daily-phase-card workflow-status-white" id="stock-monthly">
                 <span>{String(seq).padStart(2, "0")}</span>
                 <div>
-                  <small>{stockWorkSummaryCards[2].kicker}</small>
+                  <small>
+                    {stockWorkSummaryCards[2].kicker}
+                    {isPlannedHref(plannedTasks, "/checklist-monthly#stock-single-card-work") ? " · ถึงกำหนดวันนี้" : ""}
+                  </small>
                   <strong>{stockWorkSummaryCards[2].title}</strong>
                   <em>ยังไม่เริ่ม · 0/{monthlyStockTasks.length}</em>
                 </div>

@@ -136,6 +136,12 @@ export async function fetchShiftForStaffDate(
   return snap.exists() ? (snap.data() as PlanDoc) : null;
 }
 
+/** Loads the day annotation (title + activities) for one branch-day, or null when blank. */
+export async function fetchDayEvent(branch: string, workDate: string): Promise<EventDoc | null> {
+  const snap = await getDoc(doc(db, EVENTS, eventDocId(branch, workDate)));
+  return snap.exists() ? (snap.data() as EventDoc) : null;
+}
+
 /** Upserts one plan cell. Pass assignment "off" to blank a working day. */
 export async function savePlanCell(input: {
   branch: string;
