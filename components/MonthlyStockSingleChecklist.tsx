@@ -16,6 +16,8 @@ import {
   type MonthlyStockSinglePhase
 } from "../lib/monthly-stock-single-workflow.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
+import { applyStringPhaseOverride } from "../lib/checklist-overrides.ts";
+import { useChecklistOverrides } from "../lib/checklist-overrides-store.ts";
 
 // Shared branch task like the weekly count — scoped by ISO week (the completion scope of
 // this checklist), stored once for the team rather than per person.
@@ -369,12 +371,18 @@ function MonthlyStockSingleTaskDetails({
 }
 
 export function MonthlyStockSingleChecklist({
-  phase = monthlyStockSinglePhase,
+  phase: basePhase = monthlyStockSinglePhase,
   readOnly = false
 }: {
   phase?: MonthlyStockSinglePhase;
   readOnly?: boolean;
 }) {
+  // Owner may reword / add / remove the checklist items at /admin/checklist-config/monthly.
+  const overrides = useChecklistOverrides("monthly-stock");
+  const phase = useMemo(
+    () => applyStringPhaseOverride(basePhase, overrides[basePhase.id]),
+    [basePhase, overrides]
+  );
   const workScope = formatWorkWeek();
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
   const { data, loaded, status: saveStatus, update } = useWorkRecordWindow<MonthlySinglePayload>({

@@ -21,14 +21,21 @@ import {
 } from "../lib/weekly-event-store.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
+import { applyEventChecklistOverride, makeCustomEventItem } from "../lib/checklist-overrides.ts";
+import { useChecklistOverrides } from "../lib/checklist-overrides-store.ts";
 
 export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
+  // Owner may reword / add / remove the checklist steps at /admin/checklist-config/weekly.
+  const overrides = useChecklistOverrides("weekly-event");
   // แสดงเฉพาะกิจกรรมที่ระบุ (แยกหน้าละกิจกรรม) — ถ้าไม่ระบุ แสดงทั้งหมด
-  const events = useMemo(
-    () => (eventId ? weeklyEvents.filter((event) => event.id === eventId) : weeklyEvents),
-    [eventId]
-  );
+  const events = useMemo(() => {
+    const base = eventId ? weeklyEvents.filter((event) => event.id === eventId) : weeklyEvents;
+    return base.map((event) => ({
+      ...event,
+      checklist: applyEventChecklistOverride(event.checklist, overrides[event.id], makeCustomEventItem)
+    }));
+  }, [eventId, overrides]);
   // periodKey (วันทำงาน YYYY-MM-DD) คำนวณ client-side เท่านั้น กัน hydration mismatch จาก new Date()
   const [periodKey, setPeriodKey] = useState<string>("");
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
