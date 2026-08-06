@@ -48,7 +48,8 @@ export function TodayWorkBoard({
 }) {
   const workDate = currentWorkDate || formatWorkDate();
   const { records } = useWorkflowRecords();
-  const shiftPhases = useShiftPhases(phases, staffCode, branch, workDate);
+  // วันหยุด/ไม่มีกะ → หัวข้อรายวันไม่ใช่งานของเขาวันนั้น จึงไม่ขึ้นในกระดานนี้ (ดูได้ในหมวดด้านล่าง)
+  const { phases: shiftPhases, offDay, offLabel } = useShiftPhases(phases, staffCode, branch, workDate);
   const plannedStock = usePlannedStockWork(branch, workDate);
   const [monthlyOccurrences, setMonthlyOccurrences] = useState<MonthlyTaskOccurrence[]>([]);
   const [weeklyTicks, setWeeklyTicks] = useState<Record<string, boolean>>({});
@@ -80,7 +81,7 @@ export function TodayWorkBoard({
   }, [workDate]);
 
   const { items, summary } = buildTodayWorkBoard({
-    dailyPhases: shiftPhases.map((phase) => {
+    dailyPhases: (offDay ? [] : shiftPhases).map((phase) => {
       const record = records.find((item) => item.workDate === workDate && item.phaseId === phase.id);
       return {
         id: phase.id,
@@ -154,7 +155,10 @@ export function TodayWorkBoard({
           <p className="eyebrow">วันนี้</p>
           <h3>งานวันนี้ทั้งหมด</h3>
         </div>
-        <span className={`status-pill ${summary.overdue > 0 ? "is-late" : ""}`}>{todayWorkHeadline(summary)}</span>
+        <span className={`status-pill ${summary.overdue > 0 ? "is-late" : ""}`}>
+          {offDay && offLabel ? `${offLabel} · ` : ""}
+          {todayWorkHeadline(summary)}
+        </span>
       </div>
       <div className="daily-phase-grid">
         {items.length ? (
