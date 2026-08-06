@@ -13,3 +13,4 @@ dist/
 .vercel
 tsconfig.tsbuildinfo
 tsconfig.lint.tsbuildinfo
+.rules-backup/
