@@ -22,5 +22,11 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+// Always show the Google account chooser. Without this, signInWithPopup silently
+// reuses whatever account the browser already has signed in — so a staffer on a
+// shared/store device (or with a personal Gmail as the browser default) gets logged
+// in as the WRONG email and hits "access denied" with no way to pick their allow-
+// listed account. `prompt: select_account` forces the picker every time.
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 export const storage = getStorage(app);
