@@ -276,7 +276,10 @@ export function WeeklyStockChecklist({
               <em>{completed}/{total}</em>
             </div>
           </div>
-          <p className="phase-window">{phase.scheduleLabel} · {phase.timeLabel}</p>
+          <p className="phase-window">
+            {phase.scheduleLabel} · {phase.timeLabel}
+            {phase.shiftLabel ? ` · กะที่รับผิดชอบ: ${phase.shiftLabel}` : ""}
+          </p>
 
           <div className="checklist-tick-list">
             {phase.checklist.map((item, index) => {

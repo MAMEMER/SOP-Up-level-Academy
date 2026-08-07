@@ -19,6 +19,11 @@ export default async function AdminChecklistMonthlyPage() {
       editGoal: true,
       goalLabel: "รายละเอียดงาน (goal)",
       baseGoal: monthlyStockSinglePhase.goal,
+      editTime: true,
+      timeLabel: "เวลา (แสดงบนการ์ด)",
+      baseTimeLabel: monthlyStockSinglePhase.timeLabel,
+      editShift: true,
+      baseShiftLabel: monthlyStockSinglePhase.shiftLabel,
       baseItems: itemsFromStrings(monthlyStockSinglePhase.checklist)
     }
   ];

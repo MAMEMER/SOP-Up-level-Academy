@@ -4490,7 +4490,8 @@ main .page > section, main > section { margin-top: 16px !important; }
 .checklist-config__move button:disabled { opacity: 0.35; cursor: default; }
 .checklist-config__window { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin-bottom: 12px; }
 .checklist-config__window > label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); }
-.checklist-config__window input[type="time"] { border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 7px 10px; font-size: 13.5px; font-family: inherit; }
+.checklist-config__window input[type="time"], .checklist-config__window input[type="text"] { border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 7px 10px; font-size: 13.5px; font-family: inherit; }
+.checklist-config__window input[type="text"] { min-width: 240px; flex: 1 1 240px; }
 .checklist-config__shifts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; color: var(--color-ink-soft); }
 .checklist-config__shifts label { display: inline-flex; align-items: center; gap: 5px; }
 .checklist-config__shifts small { width: 100%; font-size: 11px; }

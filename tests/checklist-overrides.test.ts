@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   applyEventChecklistOverride,
+  applyEventMetaOverride,
   applyStringPhaseOverride,
   itemsFromStrings,
   makeCustomEventItem,
@@ -52,6 +53,44 @@ describe("checklist overrides — string phases (weekly/monthly stock)", () => {
     assert.equal(items.length, weeklyStockSleevePhase.checklist.length);
     assert.equal(items[0].title, weeklyStockSleevePhase.checklist[0]);
     assert.equal(items[0].id, "item-1");
+  });
+
+  it("overrides เวลา (timeLabel) and กะที่รับผิดชอบ (shiftLabel) without touching the rest", () => {
+    const next = applyStringPhaseOverride(weeklyStockSleevePhase, {
+      timeLabel: "ทุกวันจันทร์ 10:00-13:00",
+      shiftLabel: "กะ 1"
+    });
+    assert.equal(next.timeLabel, "ทุกวันจันทร์ 10:00-13:00");
+    assert.equal(next.shiftLabel, "กะ 1");
+    // untouched fields keep the built-in value, and the base object is not mutated
+    assert.equal(next.title, weeklyStockSleevePhase.title);
+    assert.deepEqual(next.checklist, weeklyStockSleevePhase.checklist);
+    assert.equal(weeklyStockSleevePhase.shiftLabel, undefined);
+  });
+
+  it("applies เวลา/กะ to the monthly phase too", () => {
+    const next = applyStringPhaseOverride(monthlyStockSinglePhase, { timeLabel: "11:00-20:00", shiftLabel: "ทุกกะ" });
+    assert.equal(next.timeLabel, "11:00-20:00");
+    assert.equal(next.shiftLabel, "ทุกกะ");
+  });
+});
+
+describe("checklist overrides — weekly event เวลา / กะ meta", () => {
+  const event = weeklyEvents.find((item) => item.key === "gym-pokemon");
+  assert.ok(event, "gym-pokemon event exists");
+
+  it("returns the event unchanged when no override is set", () => {
+    assert.deepEqual(applyEventMetaOverride(event, undefined), event);
+    assert.deepEqual(applyEventMetaOverride(event, {}), event);
+  });
+
+  it("replaces timeWindow from timeLabel and sets shiftLabel", () => {
+    const next = applyEventMetaOverride(event, { timeLabel: "17:00-23:00 ของวันกิจกรรม", shiftLabel: "กะ 2" });
+    assert.equal(next.timeWindow, "17:00-23:00 ของวันกิจกรรม");
+    assert.equal(next.shiftLabel, "กะ 2");
+    // base object untouched
+    assert.equal(event.shiftLabel, undefined);
+    assert.notEqual(event.timeWindow, next.timeWindow);
   });
 });
 
@@ -104,6 +143,12 @@ describe("checklist overrides — normalize", () => {
   it("returns undefined for a meaningless override", () => {
     assert.equal(normalizeUnitOverride({}), undefined);
     assert.equal(normalizeUnitOverride({ title: "  " }), undefined);
+    assert.equal(normalizeUnitOverride({ timeLabel: "   ", shiftLabel: "  " }), undefined);
     assert.equal(normalizeUnitOverride(undefined), undefined);
+  });
+
+  it("keeps and trims เวลา / กะ fields", () => {
+    const out = normalizeUnitOverride({ timeLabel: "  10:00-13:00  ", shiftLabel: "  กะ 1  " });
+    assert.deepEqual(out, { timeLabel: "10:00-13:00", shiftLabel: "กะ 1" });
   });
 });

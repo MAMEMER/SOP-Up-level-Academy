@@ -19,13 +19,13 @@ export default async function AdminChecklistConfigHubPage() {
       href: "/admin/checklist-config/weekly",
       eyebrow: "Weekly",
       title: "Checklist ประจำสัปดาห์",
-      detail: "งาน Stock อุปกรณ์ / Sleeve และ checklist วันจัดกิจกรรมของแต่ละเกม (Pokemon, Lorcana, Rift Bound, Eidolon)"
+      detail: "งาน Stock อุปกรณ์ / Sleeve และ checklist วันจัดกิจกรรมของแต่ละเกม (Pokemon, Lorcana, Rift Bound, Eidolon) — แก้รายการ เวลา และกะที่รับผิดชอบ"
     },
     {
       href: "/admin/checklist-config/monthly",
       eyebrow: "Monthly",
       title: "Checklist ประจำเดือน",
-      detail: "งาน Stock Single card ประจำเดือน — แก้รายการที่พนักงานต้องติ๊ก"
+      detail: "งาน Stock Single card ประจำเดือน — แก้รายการที่พนักงานต้องติ๊ก เวลา และกะที่รับผิดชอบ"
     }
   ];
 

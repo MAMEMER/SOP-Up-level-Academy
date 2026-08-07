@@ -8,6 +8,8 @@ export type MonthlyStockSinglePhase = {
   caution: string;
   scheduleLabel: string;
   checklist: string[];
+  /** กะที่รับผิดชอบ — ป้ายกะ (owner override at /admin/checklist-config/monthly). ว่าง = ไม่ระบุ */
+  shiftLabel?: string;
 };
 
 // ลิงก์ระบบ StoreHub Stock Take (นับ Single card แยกตามเกม/พื้นที่)

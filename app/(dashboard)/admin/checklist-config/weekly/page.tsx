@@ -20,6 +20,11 @@ export default async function AdminChecklistWeeklyPage() {
       editGoal: true,
       goalLabel: "รายละเอียดงาน (goal)",
       baseGoal: weeklyStockSleevePhase.goal,
+      editTime: true,
+      timeLabel: "เวลา (แสดงบนการ์ด)",
+      baseTimeLabel: weeklyStockSleevePhase.timeLabel,
+      editShift: true,
+      baseShiftLabel: weeklyStockSleevePhase.shiftLabel,
       baseItems: itemsFromStrings(weeklyStockSleevePhase.checklist)
     }
   ];
@@ -27,7 +32,12 @@ export default async function AdminChecklistWeeklyPage() {
   const eventUnits: EditableUnit[] = weeklyEvents.map((event) => ({
     id: event.id,
     heading: `Checklist วันจัดกิจกรรม · ${event.name} (${weeklyEventDaysLabel(event)})`,
-    note: "ขั้นตอนที่พนักงานติ๊กในหน้า /weekly-task ของกิจกรรมนี้ · แก้ชื่อขั้นตอน เพิ่ม/ลบ/สลับลำดับได้",
+    note: "ขั้นตอนที่พนักงานติ๊กในหน้า /weekly-task ของกิจกรรมนี้ · แก้ชื่อขั้นตอน เวลา กะที่รับผิดชอบ เพิ่ม/ลบ/สลับลำดับได้",
+    editTime: true,
+    timeLabel: "เวลา checklist (แสดงบนการ์ด)",
+    baseTimeLabel: event.timeWindow,
+    editShift: true,
+    baseShiftLabel: event.shiftLabel,
     baseItems: event.checklist.map((item) => ({ id: item.id, title: item.title }))
   }));
 

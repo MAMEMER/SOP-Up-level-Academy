@@ -29,6 +29,14 @@ export type UnitOverride = {
   goal?: string;
   /** full replacement of the tick items, in the order the owner wants them shown */
   items?: OverrideItem[];
+  /**
+   * เวลา — free-text time label shown on the card (e.g. "งานประจำสัปดาห์ · ตามเวลาเปิด-ปิดร้าน",
+   * "11:00-23:59"). Replaces the built-in timeLabel/timeWindow of the block. Free text (not a
+   * HH:MM window) because these blocks display a readable schedule, not a submit-gate clock.
+   */
+  timeLabel?: string;
+  /** กะที่รับผิดชอบ — free-text shift label (e.g. "กะ 1", "กะ 2", "ทุกกะ"). Empty = ไม่ระบุ. */
+  shiftLabel?: string;
 };
 
 /** unitId → override. This is the whole document body for one scope. */
@@ -42,6 +50,8 @@ export function normalizeUnitOverride(raw: UnitOverride | undefined): UnitOverri
   const out: UnitOverride = {};
   if (typeof raw.title === "string" && raw.title.trim()) out.title = raw.title.trim();
   if (typeof raw.goal === "string" && raw.goal.trim()) out.goal = raw.goal.trim();
+  if (typeof raw.timeLabel === "string" && raw.timeLabel.trim()) out.timeLabel = raw.timeLabel.trim();
+  if (typeof raw.shiftLabel === "string" && raw.shiftLabel.trim()) out.shiftLabel = raw.shiftLabel.trim();
   if (Array.isArray(raw.items)) {
     const items = raw.items
       .filter((item): item is OverrideItem => Boolean(item) && typeof item.title === "string")
@@ -81,16 +91,34 @@ export function itemsFromStrings(strings: string[]): OverrideItem[] {
  * Returns a new phase with the owner's title/goal/items applied; untouched fields fall back
  * to the built-in value.
  */
-export function applyStringPhaseOverride<T extends { title: string; goal?: string; checklist: string[] }>(
-  phase: T,
-  override: UnitOverride | undefined
-): T {
+export function applyStringPhaseOverride<
+  T extends { title: string; goal?: string; checklist: string[]; timeLabel?: string; shiftLabel?: string }
+>(phase: T, override: UnitOverride | undefined): T {
   const clean = normalizeUnitOverride(override);
   if (!clean) return phase;
   const next: T = { ...phase };
   if (clean.title) next.title = clean.title;
   if (clean.goal && "goal" in phase) (next as { goal?: string }).goal = clean.goal;
   if (clean.items) next.checklist = clean.items.map((item) => item.title);
+  if (clean.timeLabel) (next as { timeLabel?: string }).timeLabel = clean.timeLabel;
+  if (clean.shiftLabel) (next as { shiftLabel?: string }).shiftLabel = clean.shiftLabel;
+  return next;
+}
+
+/**
+ * Applies the owner's เวลา / กะ overrides to a weekly-event block. The event's timeWindow is the
+ * readable schedule shown on the card; shiftLabel is an optional "กะที่รับผิดชอบ" line. Checklist
+ * items are handled separately by applyEventChecklistOverride — this only touches the card meta.
+ */
+export function applyEventMetaOverride<T extends { timeWindow: string; shiftLabel?: string }>(
+  event: T,
+  override: UnitOverride | undefined
+): T {
+  const clean = normalizeUnitOverride(override);
+  if (!clean) return event;
+  const next: T = { ...event };
+  if (clean.timeLabel) next.timeWindow = clean.timeLabel;
+  if (clean.shiftLabel) next.shiftLabel = clean.shiftLabel;
   return next;
 }
 

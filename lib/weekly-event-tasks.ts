@@ -51,6 +51,8 @@ export type WeeklyEvent = {
    */
   activeDays: number[];
   timeWindow: string;
+  /** กะที่รับผิดชอบ — ป้ายกะ (owner override at /admin/checklist-config/weekly). ว่าง = ไม่ระบุ */
+  shiftLabel?: string;
   completionScope: typeof WEEKLY_EVENT_COMPLETION_SCOPE;
   trainingHref: string;
   checklist: WeeklyEventChecklistItem[];

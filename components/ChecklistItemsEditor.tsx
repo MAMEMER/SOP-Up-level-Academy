@@ -28,11 +28,18 @@ export type EditableUnit = {
   editGoal?: boolean;
   goalLabel?: string;
   baseGoal?: string;
+  /** allow editing เวลา (free-text time label shown on the staff card) */
+  editTime?: boolean;
+  timeLabel?: string;
+  baseTimeLabel?: string;
+  /** allow editing กะที่รับผิดชอบ (free-text shift label) */
+  editShift?: boolean;
+  baseShiftLabel?: string;
   /** built-in tick items, used as the starting point */
   baseItems: OverrideItem[];
 };
 
-type UnitDraft = { title: string; goal: string; items: OverrideItem[] };
+type UnitDraft = { title: string; goal: string; timeLabel: string; shiftLabel: string; items: OverrideItem[] };
 
 function sameItems(a: OverrideItem[], b: OverrideItem[]): boolean {
   if (a.length !== b.length) return false;
@@ -52,6 +59,8 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
         out[unit.id] = {
           title: ov.title ?? unit.baseTitle ?? "",
           goal: ov.goal ?? unit.baseGoal ?? "",
+          timeLabel: ov.timeLabel ?? unit.baseTimeLabel ?? "",
+          shiftLabel: ov.shiftLabel ?? unit.baseShiftLabel ?? "",
           items: (ov.items ?? unit.baseItems).map((item) => ({ ...item }))
         };
       }
@@ -121,6 +130,8 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
       const ov: UnitOverride = {};
       if (unit.editTitle && d.title.trim() && d.title.trim() !== (unit.baseTitle || "").trim()) ov.title = d.title.trim();
       if (unit.editGoal && d.goal.trim() && d.goal.trim() !== (unit.baseGoal || "").trim()) ov.goal = d.goal.trim();
+      if (unit.editTime && d.timeLabel.trim() && d.timeLabel.trim() !== (unit.baseTimeLabel || "").trim()) ov.timeLabel = d.timeLabel.trim();
+      if (unit.editShift && d.shiftLabel.trim() && d.shiftLabel.trim() !== (unit.baseShiftLabel || "").trim()) ov.shiftLabel = d.shiftLabel.trim();
       const cleanItems = d.items.map((item) => ({ id: item.id, title: item.title.trim() })).filter((item) => item.title);
       if (!sameItems(cleanItems, unit.baseItems)) ov.items = cleanItems;
       if (Object.keys(ov).length) overrides[unit.id] = ov;
@@ -141,6 +152,8 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
     updateUnit(unitId, {
       title: unit.baseTitle ?? "",
       goal: unit.baseGoal ?? "",
+      timeLabel: unit.baseTimeLabel ?? "",
+      shiftLabel: unit.baseShiftLabel ?? "",
       items: unit.baseItems.map((item) => ({ ...item }))
     });
   }
@@ -176,6 +189,33 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
                 {unit.goalLabel || "รายละเอียด"}
                 <textarea value={d.goal} onChange={(e) => updateUnit(unit.id, { goal: e.target.value })} rows={2} />
               </label>
+            ) : null}
+
+            {unit.editTime || unit.editShift ? (
+              <div className="checklist-config__window">
+                {unit.editTime ? (
+                  <label>
+                    {unit.timeLabel || "เวลา"}
+                    <input
+                      type="text"
+                      value={d.timeLabel}
+                      onChange={(e) => updateUnit(unit.id, { timeLabel: e.target.value })}
+                      placeholder="เช่น งานประจำสัปดาห์ · ตามเวลาเปิด-ปิดร้าน"
+                    />
+                  </label>
+                ) : null}
+                {unit.editShift ? (
+                  <label>
+                    กะที่รับผิดชอบ
+                    <input
+                      type="text"
+                      value={d.shiftLabel}
+                      onChange={(e) => updateUnit(unit.id, { shiftLabel: e.target.value })}
+                      placeholder="เช่น กะ 1, กะ 2, ทุกกะ"
+                    />
+                  </label>
+                ) : null}
+              </div>
             ) : null}
 
             <ul className="checklist-config__items">

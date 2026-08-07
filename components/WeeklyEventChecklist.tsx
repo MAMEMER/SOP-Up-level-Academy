@@ -21,7 +21,7 @@ import {
 } from "../lib/weekly-event-store.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
-import { applyEventChecklistOverride, makeCustomEventItem } from "../lib/checklist-overrides.ts";
+import { applyEventChecklistOverride, applyEventMetaOverride, makeCustomEventItem } from "../lib/checklist-overrides.ts";
 import { useChecklistOverrides } from "../lib/checklist-overrides-store.ts";
 
 export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
@@ -32,7 +32,8 @@ export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   const events = useMemo(() => {
     const base = eventId ? weeklyEvents.filter((event) => event.id === eventId) : weeklyEvents;
     return base.map((event) => ({
-      ...event,
+      // เวลา / กะที่รับผิดชอบ ที่ owner แก้ที่ /admin/checklist-config/weekly
+      ...applyEventMetaOverride(event, overrides[event.id]),
       checklist: applyEventChecklistOverride(event.checklist, overrides[event.id], makeCustomEventItem)
     }));
   }, [eventId, overrides]);
@@ -188,6 +189,12 @@ function WeeklyEventCard({
           <span>เวลา checklist</span>
           <strong>{event.timeWindow}</strong>
         </div>
+        {event.shiftLabel ? (
+          <div>
+            <span>กะที่รับผิดชอบ</span>
+            <strong>{event.shiftLabel}</strong>
+          </div>
+        ) : null}
       </div>
       <div className="runner-progress" aria-label={`ความคืบหน้า ${progress}%`}>
         <span style={{ width: `${progress}%` }} />

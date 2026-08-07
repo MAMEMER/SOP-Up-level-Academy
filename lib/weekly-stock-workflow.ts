@@ -8,6 +8,8 @@ export type WeeklyStockPhase = {
   caution: string;
   scheduleLabel: string;
   checklist: string[];
+  /** กะที่รับผิดชอบ — ป้ายกะ (owner override at /admin/checklist-config/weekly). ว่าง = ไม่ระบุ */
+  shiftLabel?: string;
 };
 
 // ลิงก์ระบบ StoreHub Stock Take (นับ Stock อุปกรณ์ / Sleeve)
