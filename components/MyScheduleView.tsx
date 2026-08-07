@@ -18,6 +18,7 @@ import {
   shiftMonth,
   summaryLine,
   workingOn,
+  type DayEventInput,
   type StaffEntry
 } from "../lib/schedule-view.ts";
 
@@ -37,6 +38,7 @@ export function MyScheduleView({
 }) {
   const [month, setMonth] = useState(initialMonth);
   const [plans, setPlans] = useState<PlanCell[]>([]);
+  const [events, setEvents] = useState<DayEventInput[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +57,14 @@ export function MyScheduleView({
             startTime: plan.startTime
           }))
         );
+        // กิจกรรมที่แอดมินลงไว้ในหน้าตารางกะ (อีเวนต์เกม + งาน Stock ประจำ)
+        setEvents(
+          data.events.map((event) => ({
+            workDate: event.workDate,
+            title: event.title,
+            activities: event.activities
+          }))
+        );
       })
       .catch(() => alive && setError("โหลดตารางกะไม่สำเร็จ ลองรีเฟรชอีกครั้ง"))
       .finally(() => alive && setLoading(false));
@@ -65,7 +75,7 @@ export function MyScheduleView({
 
   const days = monthDays(month);
   const rows = buildScheduleRows(staff, plans, days, myStaffCode);
-  const weeks = calendarWeeks(rows, days);
+  const weeks = calendarWeeks(rows, days, events);
   const myRow = rows.find((row) => row.isMe);
   const showsToday = today.startsWith(month);
   const todayCell = showsToday ? myRow?.cells.find((cell) => cell.workDate === today) : undefined;
@@ -146,6 +156,29 @@ export function MyScheduleView({
                   ) : cell.mine?.tone === "leave" ? (
                     <p className="staff-calendar__mine is-off">{cell.mine.label}</p>
                   ) : null}
+
+                  {cell.activities.length ? (
+                    <ul className="staff-calendar__acts">
+                      {cell.activities.map((activity) =>
+                        activity.href ? (
+                          <li key={activity.key} className="is-task">
+                            <a href={activity.href}>
+                              <b>{activity.badge}</b>
+                              <span>{activity.label}</span>
+                            </a>
+                          </li>
+                        ) : (
+                          <li key={activity.key}>
+                            {activity.logo ? <img src={activity.logo} alt="" /> : null}
+                            <span>{activity.label}</span>
+                            {activity.time ? <small>{activity.time}</small> : null}
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  ) : null}
+
+                  {cell.note ? <p className="staff-calendar__note">{cell.note}</p> : null}
 
                   <ul className="staff-calendar__team">
                     {cell.working

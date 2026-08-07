@@ -4,6 +4,7 @@ import {
   buildScheduleRows,
   calendarWeeks,
   monthDays,
+  dayActivityChips,
   monthLabel,
   scheduleCell,
   shiftMonth,
@@ -138,5 +139,58 @@ describe("staff schedule — calendar layout", () => {
     // the viewer has a cell for every day of the month; an unplanned day is "blank"
     assert.equal(empty?.mine?.tone, "blank");
     assert.equal(empty?.mine?.timeRange, null);
+  });
+});
+
+describe("staff schedule — day activities", () => {
+  it("shows a game event with its logo and time", () => {
+    const chips = dayActivityChips({
+      workDate: "2026-08-06",
+      activities: [{ game: "lorcana", time: "19:00", title: "Lorcana" }]
+    });
+    assert.equal(chips.length, 1);
+    assert.equal(chips[0].kind, "game");
+    assert.equal(chips[0].label, "Lorcana");
+    assert.equal(chips[0].logo, "/games/lorcana.png");
+    assert.equal(chips[0].time, "19:00");
+    assert.equal(chips[0].href, null);
+  });
+
+  it("shows a Stock งานประจำ as a linked badge, no time", () => {
+    const chips = dayActivityChips({
+      workDate: "2026-08-10",
+      activities: [{ game: "stock-sleeve-work", time: "" }]
+    });
+    assert.equal(chips[0].kind, "task");
+    assert.equal(chips[0].badge, "SL");
+    assert.equal(chips[0].href, "/checklist-weekly#stock-sleeve-work");
+    assert.equal(chips[0].time, null);
+  });
+
+  it("keeps a hand-typed activity that matches no preset", () => {
+    const chips = dayActivityChips({ workDate: "2026-08-11", activities: [{ game: "custom", title: "ประชุมทีม", time: "10:00" }] });
+    assert.equal(chips[0].label, "ประชุมทีม");
+    assert.equal(chips[0].kind, "game");
+    assert.equal(chips[0].logo, null);
+  });
+
+  it("returns nothing for a day with no activities", () => {
+    assert.deepEqual(dayActivityChips(undefined), []);
+    assert.deepEqual(dayActivityChips({ workDate: "2026-08-12", activities: [] }), []);
+  });
+
+  it("puts the day's activities and note on the calendar cell", () => {
+    const days = monthDays("2026-08");
+    const rows = buildScheduleRows(staff, [plan("ICE", "2026-08-06", "s1", "09:00")], days, "ICE");
+    const weeks = calendarWeeks(rows, days, [
+      { workDate: "2026-08-06", title: "ปิดร้านเร็ว 21:00", activities: [{ game: "lorcana", time: "19:00" }] }
+    ]);
+    const cell = weeks.flat().find((item) => item.day?.workDate === "2026-08-06");
+    assert.deepEqual(cell?.activities.map((chip) => chip.label), ["Lorcana"]);
+    assert.equal(cell?.note, "ปิดร้านเร็ว 21:00");
+
+    const other = weeks.flat().find((item) => item.day?.workDate === "2026-08-07");
+    assert.deepEqual(other?.activities, []);
+    assert.equal(other?.note, null);
   });
 });

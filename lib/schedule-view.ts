@@ -8,6 +8,7 @@
 //
 // Pure (no Firestore / no DOM) so the grid, the ordering and the labels are unit-tested.
 
+import { gamePreset, taskPreset } from "./planner-activities.ts";
 import {
   isLeaveAssignment,
   isWorkingAssignment,
@@ -134,10 +135,61 @@ export function buildScheduleRows(
   });
 }
 
+/** A day's activity as the calendar prints it: a game event or a Stock งานประจำ. */
+export type ActivityChip = {
+  key: string;
+  label: string;
+  kind: "game" | "task";
+  time: string | null;
+  /** game logo path, task chips have none */
+  logo: string | null;
+  /** short badge text for task chips */
+  badge: string | null;
+  /** checklist link for task chips */
+  href: string | null;
+};
+
+/** The day annotation the owner writes on the planner (schedule_events). */
+export type DayEventInput = {
+  workDate: string;
+  title?: string;
+  activities?: { game?: string; time?: string; title?: string }[];
+};
+
+/**
+ * Activities of one day, in the order the owner added them. Game keys resolve to their
+ * logo, Stock งานประจำ keys to their badge + checklist link; anything unknown still
+ * shows with whatever title was saved, so a hand-typed activity never disappears.
+ */
+export function dayActivityChips(event: DayEventInput | undefined): ActivityChip[] {
+  if (!event?.activities?.length) return [];
+  return event.activities.map((activity, index) => {
+    const game = gamePreset(activity.game);
+    const task = taskPreset(activity.game);
+    const time = activity.time?.trim() ? activity.time : null;
+    if (task) {
+      return { key: `${task.key}-${index}`, label: task.label, kind: "task", time, logo: null, badge: task.badge, href: task.href };
+    }
+    return {
+      key: `${activity.game || "activity"}-${index}`,
+      label: game?.label ?? activity.title ?? activity.game ?? "กิจกรรม",
+      kind: "game",
+      time,
+      logo: game?.logo ?? null,
+      badge: null,
+      href: null
+    };
+  });
+}
+
 export type CalendarCell = {
   day: ScheduleDay | null; // null = padding before the 1st / after the last
   /** everyone rostered that day, earliest entry time first */
   working: { staffCode: string; displayName: string; timeRange: string; isMe: boolean; tone: "s1" | "s2" }[];
+  /** events/งานประจำ the owner put on that date in the planner */
+  activities: ActivityChip[];
+  /** the free-text note typed on the planner's กิจกรรม row, if any */
+  note: string | null;
   /** the signed-in staffer's own cell that day — tone "blank" when nothing is planned;
    *  null only when the viewer is not on this branch's roster at all */
   mine: ScheduleCell | null;
@@ -148,8 +200,13 @@ export type CalendarCell = {
  * 1st lands under its weekday. Each day carries who works and what the viewer's own
  * shift is, which is what the calendar squares print.
  */
-export function calendarWeeks(rows: ScheduleRow[], days: ScheduleDay[]): CalendarCell[][] {
-  const blank = (): CalendarCell => ({ day: null, working: [], mine: null });
+export function calendarWeeks(
+  rows: ScheduleRow[],
+  days: ScheduleDay[],
+  events: DayEventInput[] = []
+): CalendarCell[][] {
+  const blank = (): CalendarCell => ({ day: null, working: [], activities: [], note: null, mine: null });
+  const eventByDate = new Map(events.map((event) => [event.workDate, event]));
   const cells: CalendarCell[] = [];
 
   for (let i = 0; i < (days[0]?.weekday ?? 0); i += 1) cells.push(blank());
@@ -171,9 +228,12 @@ export function calendarWeeks(rows: ScheduleRow[], days: ScheduleDay[]): Calenda
       .sort((a, b) => a.timeRange.localeCompare(b.timeRange));
 
     const myRow = rows.find((row) => row.isMe);
+    const event = eventByDate.get(day.workDate);
     cells.push({
       day,
       working,
+      activities: dayActivityChips(event),
+      note: event?.title?.trim() ? event.title.trim() : null,
       mine: myRow?.cells.find((item) => item.workDate === day.workDate) ?? null
     });
   }
