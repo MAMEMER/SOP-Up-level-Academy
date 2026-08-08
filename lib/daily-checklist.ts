@@ -20,7 +20,7 @@ export type ChecklistOverrides = Record<string, string[]>;
  * the closing shift, because a หัวข้อ shared by both กะ can be due at different times
  * (นับ stock: กะ1 ตอนเช้า, กะ2 ตอนเย็น).
  */
-export type PhaseWindow = { openTime?: string; dueTime: string; s2?: { openTime?: string; dueTime: string } };
+export type PhaseWindow = { openTime?: string; dueTime: string; s2?: { openTime?: string; dueTime?: string } };
 export type PhaseWindows = Record<string, PhaseWindow>;
 
 /** Map of phaseId → the shift(s) that see it. An empty list means every shift. */
@@ -104,7 +104,8 @@ export function isHhMm(value: string | undefined): value is string {
 /**
  * The window a หัวข้อ runs on for this shift: owner override first, built-in second,
  * end-of-day last. An owner-set window replaces the built-in for both กะ unless the owner
- * also set a กะ2 time.
+ * also set a กะ2 time. The กะ2 (`s2`) block is a PARTIAL override: any field it leaves blank
+ * inherits the กะ1 window (so the owner can set only a กะ2 start time and keep กะ1's deadline).
  */
 export function resolvePhaseWindow(
   phaseId: string,
@@ -114,11 +115,17 @@ export function resolvePhaseWindow(
   const configured = windows[phaseId];
   const fallback = defaultPhaseWindows[phaseId] || { dueTime: CHECKLIST_DAY_END };
   const source = configured && isHhMm(configured.dueTime) ? configured : fallback;
-  const forShift = shift === "s2" && source.s2 && isHhMm(source.s2.dueTime) ? source.s2 : source;
-  return {
-    dueTime: isHhMm(forShift.dueTime) ? forShift.dueTime : CHECKLIST_DAY_END,
-    openTime: isHhMm(forShift.openTime) ? forShift.openTime : undefined
+  const base = {
+    dueTime: isHhMm(source.dueTime) ? source.dueTime : CHECKLIST_DAY_END,
+    openTime: isHhMm(source.openTime) ? source.openTime : undefined
   };
+  if (shift === "s2" && source.s2) {
+    return {
+      dueTime: isHhMm(source.s2.dueTime) ? source.s2.dueTime : base.dueTime,
+      openTime: isHhMm(source.s2.openTime) ? source.s2.openTime : base.openTime
+    };
+  }
+  return base;
 }
 
 /**
@@ -309,8 +316,14 @@ export function editablePhaseWindow(phaseId: string, windows: PhaseWindows = {})
     dueTime: isHhMm(source.dueTime) ? source.dueTime : CHECKLIST_DAY_END,
     openTime: isHhMm(source.openTime) ? source.openTime : undefined
   };
-  if (source.s2 && isHhMm(source.s2.dueTime)) {
-    window.s2 = { dueTime: source.s2.dueTime, openTime: isHhMm(source.s2.openTime) ? source.s2.openTime : undefined };
+  // Keep the กะ2 block if it carries EITHER time — an owner may set only a กะ2 start time and
+  // leave the deadline blank ("ใช้เวลาเดียวกับกะ 1"). Dropping it on a blank dueTime is what
+  // made กะ2 edits vanish on reload.
+  if (source.s2 && (isHhMm(source.s2.dueTime) || isHhMm(source.s2.openTime))) {
+    window.s2 = {
+      dueTime: isHhMm(source.s2.dueTime) ? source.s2.dueTime : undefined,
+      openTime: isHhMm(source.s2.openTime) ? source.s2.openTime : undefined
+    };
   }
   return window;
 }

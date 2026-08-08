@@ -87,6 +87,25 @@ describe("owner checklist config", () => {
     assert.equal(seeded["open-store"].s2?.openTime, "19:30");
   });
 
+  it("keeps a กะ2 start time even when its deadline is left blank (ticket NwHVuEWPjKEFlNaOtFtX)", () => {
+    // Ticket case: owner sets only "กะ 2 · เริ่มกดได้ตั้งแต่" and leaves "กะ 2 · กำหนดส่ง" blank
+    // (blank = ใช้เวลาเดียวกับกะ 1). The s2 block must survive save → reload...
+    const saved = {
+      "stock-work": { openTime: "09:00", dueTime: "13:00", s2: { openTime: "20:00" } }
+    };
+    const seeded = seedWindowsFromPhases(cardStoreWorkflow, saved);
+    assert.equal(seeded["stock-work"].s2?.openTime, "20:00");
+    assert.equal(seeded["stock-work"].s2?.dueTime, undefined);
+
+    // ...and at render, a blank กะ2 deadline inherits กะ1's deadline while the กะ2 start applies.
+    const s2Window = resolvePhaseWindow("stock-work", saved, "s2");
+    assert.equal(s2Window.openTime, "20:00");
+    assert.equal(s2Window.dueTime, "13:00");
+    // กะ1 is untouched.
+    assert.equal(resolvePhaseWindow("stock-work", saved, "s1").dueTime, "13:00");
+    assert.equal(resolvePhaseWindow("stock-work", saved, "s1").openTime, "09:00");
+  });
+
   it("charges 2 points per หัวข้อ handed in late", () => {
     const result = calculateChecklistScore([
       { type: "late_submit", count: 3, dates: ["2026-08-03", "2026-08-04"], source: "live" }

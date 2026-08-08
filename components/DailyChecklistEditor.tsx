@@ -245,13 +245,17 @@ export function DailyChecklistEditor({
     });
   }
 
-  /** กะ2 time for a หัวข้อ both shifts do (เช่น นับ stock เช้า/เย็น). Cleared = ใช้เวลาเดียวกับกะ1. */
+  /**
+   * กะ2 time for a หัวข้อ both shifts do (เช่น นับ stock เช้า/เย็น). The กะ2 block is a partial
+   * override: a blank field inherits กะ1, so the owner can set only a start time (เริ่มกดได้)
+   * and leave the deadline blank. The block is cleared only when BOTH fields are empty.
+   */
   function updateShift2Window(phaseId: string, field: "openTime" | "dueTime", value: string) {
     setDraft((prev) => {
       const current = prev.windows[phaseId] || { dueTime: CHECKLIST_DAY_END };
-      const s2 = current.s2 || { dueTime: current.dueTime };
-      const nextS2 = field === "dueTime" ? { ...s2, dueTime: value } : { ...s2, openTime: value || undefined };
-      const cleared = !nextS2.dueTime;
+      const s2 = current.s2 || {};
+      const nextS2 = field === "dueTime" ? { ...s2, dueTime: value || undefined } : { ...s2, openTime: value || undefined };
+      const cleared = !nextS2.dueTime && !nextS2.openTime;
       return { ...prev, windows: { ...prev.windows, [phaseId]: { ...current, s2: cleared ? undefined : nextS2 } } };
     });
   }
@@ -282,10 +286,13 @@ export function DailyChecklistEditor({
     for (const [phaseId, items] of Object.entries(draft.overrides)) {
       overrides[phaseId] = items.map((item) => item.trim()).filter(Boolean);
     }
-    const validWindow = (window: { openTime?: string; dueTime: string }) =>
-      isHhMm(window.dueTime) && (window.openTime === undefined || window.openTime === "" || isHhMm(window.openTime));
+    const okTime = (value: string | undefined) => value === undefined || value === "" || isHhMm(value);
+    const validWindow = (window: { openTime?: string; dueTime: string }) => isHhMm(window.dueTime) && okTime(window.openTime);
+    // กะ2 is a partial override — a blank dueTime is valid (inherits กะ1), so only reject a
+    // malformed time, not an empty one.
+    const validShift2 = (window: { openTime?: string; dueTime?: string }) => okTime(window.dueTime) && okTime(window.openTime);
     const badTime = Object.entries(draft.windows).find(
-      ([, window]) => !validWindow(window) || (window.s2 !== undefined && !validWindow(window.s2))
+      ([, window]) => !validWindow(window) || (window.s2 !== undefined && !validShift2(window.s2))
     );
     if (badTime) {
       setStatus(`เวลาไม่ถูกต้องที่หัวข้อ ${badTime[0]} — ใช้รูปแบบ HH:MM`);
@@ -354,8 +361,8 @@ export function DailyChecklistEditor({
                 <input type="time" value={window.s2?.dueTime || ""} onChange={(e) => updateShift2Window(phase.id, "dueTime", e.target.value)} />
               </label>
               <label>
-                กะ 2 · เริ่มกดได้ตั้งแต่
-                <input type="time" value={window.s2?.openTime || ""} onChange={(e) => updateShift2Window(phase.id, "openTime", e.target.value)} disabled={!window.s2?.dueTime} />
+                กะ 2 · เริ่มกดได้ตั้งแต่ (เว้นว่าง = เหมือนกะ 1)
+                <input type="time" value={window.s2?.openTime || ""} onChange={(e) => updateShift2Window(phase.id, "openTime", e.target.value)} />
               </label>
               <div className="checklist-config__shifts">
                 <span>กะที่ต้องทำ</span>
