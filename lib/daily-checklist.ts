@@ -102,6 +102,22 @@ export function isHhMm(value: string | undefined): value is string {
 }
 
 /**
+ * "แก้ไขล่าสุด" line for the config editor. The server stamps every save with `updatedAt`
+ * (ISO) — this turns it into a Bangkok-time Thai string. Returns null for a missing or
+ * malformed value so the caller can simply hide the line (a config never saved yet).
+ */
+export function formatEditedAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "Asia/Bangkok"
+  }).format(date);
+}
+
+/**
  * The window a หัวข้อ runs on for this shift: owner override first, built-in second,
  * end-of-day last. An owner-set window replaces the built-in for both กะ unless the owner
  * also set a กะ2 time. The กะ2 (`s2`) block is a PARTIAL override: any field it leaves blank

@@ -7,6 +7,7 @@ import {
   customPhaseId,
   customPhaseToWorkflowPhase,
   emptyChecklistConfig,
+  formatEditedAt,
   isHhMm,
   moveChecklistItem,
   moveChecklistItemWithin,
@@ -18,7 +19,7 @@ import {
   type EvidenceKind,
   type ItemEvidence
 } from "../lib/daily-checklist.ts";
-import { fetchChecklistConfig, saveChecklistConfig } from "../lib/daily-checklist-store.ts";
+import { fetchChecklistConfigWithMeta, saveChecklistConfig, type ChecklistConfigMeta } from "../lib/daily-checklist-store.ts";
 import type { ShiftCode } from "../lib/shift-schedule.ts";
 
 // Owner editor for the daily checklist. Loads the current config (or seeds it from the
@@ -41,6 +42,7 @@ export function DailyChecklistEditor({
   editedBy: string;
 }) {
   const [draft, setDraft] = useState<ChecklistConfig>(emptyChecklistConfig);
+  const [meta, setMeta] = useState<ChecklistConfigMeta>({ updatedAt: null, updatedBy: null });
   const [newPhaseTitle, setNewPhaseTitle] = useState("");
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
@@ -48,8 +50,12 @@ export function DailyChecklistEditor({
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchChecklistConfig(branch)
-      .then((data) => alive && setDraft(seedConfig(phases, data)))
+    fetchChecklistConfigWithMeta(branch)
+      .then((data) => {
+        if (!alive) return;
+        setDraft(seedConfig(phases, data.config));
+        setMeta({ updatedAt: data.updatedAt, updatedBy: data.updatedBy });
+      })
       .catch(() => alive && setDraft(seedConfig(phases, emptyChecklistConfig)))
       .finally(() => alive && setLoading(false));
     return () => {
@@ -57,6 +63,9 @@ export function DailyChecklistEditor({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch]);
+
+  /** "แก้ไขล่าสุด ..." line — hidden until the config has been saved at least once. */
+  const editedAt = formatEditedAt(meta.updatedAt);
 
   function seedConfig(source: WorkflowPhase[], config: ChecklistConfig): ChecklistConfig {
     // The editor works on every หัวข้อ that exists — built-in plus the owner's own — so a
@@ -310,7 +319,10 @@ export function DailyChecklistEditor({
 
     setStatus("กำลังบันทึก…");
     try {
-      await saveChecklistConfig({ branch, config: { ...draft, overrides, titles, customPhases, evidence }, updatedBy: editedBy });
+      const saved = await saveChecklistConfig({ branch, config: { ...draft, overrides, titles, customPhases, evidence }, updatedBy: editedBy });
+      // Reflect the server-stamped time/editor immediately so the "แก้ไขล่าสุด" line is
+      // current without a reload (fallback to editedBy if the route returned no meta).
+      setMeta({ updatedAt: saved.updatedAt ?? meta.updatedAt, updatedBy: saved.updatedBy ?? editedBy });
       setStatus("บันทึกแล้ว — checklist ของ staff อัปเดตแล้ว");
     } catch {
       setStatus("บันทึกไม่สำเร็จ");
@@ -321,6 +333,13 @@ export function DailyChecklistEditor({
 
   return (
     <div className="checklist-config">
+      <p className="checklist-config__edited">
+        {editedAt ? (
+          <>แก้ไขล่าสุด {editedAt}{meta.updatedBy ? ` · โดย ${meta.updatedBy}` : ""}</>
+        ) : (
+          "ยังไม่เคยบันทึก — แก้แล้วกดบันทึกทั้งหมด ระบบจะจำค่าล่าสุดไว้จนกว่าจะแก้ใหม่"
+        )}
+      </p>
       {orderedPhases.map((phase, index) => {
         const window = draft.windows[phase.id] || { dueTime: CHECKLIST_DAY_END };
         const shifts = draft.shifts[phase.id] || [];

@@ -4451,6 +4451,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 /* ── Owner: ปรับ Checklist daily ──────────────────────────────────────────── */
 .checklist-config { display: flex; flex-direction: column; gap: 14px; }
 .checklist-config__loading { color: var(--color-ink-soft); }
+.checklist-config__edited { font-size: 12.5px; color: var(--color-ink-soft); margin: 0 0 4px; }
 .checklist-config__phase { padding: 16px; }
 .checklist-config__phase-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .checklist-config__phase-head strong { font-size: 16px; }

@@ -6,6 +6,7 @@ import {
   applyPhaseOrder,
   customPhaseId,
   evidenceForItem,
+  formatEditedAt,
   moveChecklistItem,
   moveChecklistItemWithin,
   applyPhaseShifts,
@@ -203,5 +204,19 @@ describe("owner-managed หัวข้อใหญ่", () => {
 
     assert.match(first, /^custom-/);
     assert.notEqual(first, second);
+  });
+
+  it("formats the last-edited timestamp and hides it when there is none", () => {
+    // A real save stamp round-trips to a non-empty Bangkok-time Thai string.
+    const shown = formatEditedAt("2026-08-08T05:30:00.000Z");
+    assert.ok(shown && shown.length > 0);
+    // 05:30 UTC = 12:30 Asia/Bangkok — the Buddhist year (2569) proves the th-TH locale.
+    assert.match(shown, /2569/);
+    assert.match(shown, /12:30/);
+    // Missing / malformed values return null so the editor can hide the line entirely.
+    assert.equal(formatEditedAt(null), null);
+    assert.equal(formatEditedAt(undefined), null);
+    assert.equal(formatEditedAt(""), null);
+    assert.equal(formatEditedAt("not-a-date"), null);
   });
 });

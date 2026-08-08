@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   if (!branch) return badRequest("missing_branch");
   try {
     const snap = await db().collection(COLLECTION).doc(branch).get();
-    if (!snap.exists) return NextResponse.json({ config: emptyChecklistConfig });
+    if (!snap.exists) return NextResponse.json({ config: emptyChecklistConfig, updatedAt: null, updatedBy: null });
     const data = snap.data() as Record<string, unknown>;
     const config: ChecklistConfig = {
       overrides: (data.overrides as ChecklistConfig["overrides"]) ?? {},
@@ -29,7 +29,13 @@ export async function GET(request: Request) {
       titles: (data.titles as ChecklistConfig["titles"]) ?? {},
       evidence: (data.evidence as ChecklistConfig["evidence"]) ?? {}
     };
-    return NextResponse.json({ config });
+    // Surface when/who last saved so the editor can show a "แก้ไขล่าสุด" line (older docs
+    // written before this field existed simply return null and the line stays hidden).
+    return NextResponse.json({
+      config,
+      updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
+      updatedBy: typeof data.updatedBy === "string" ? data.updatedBy : null
+    });
   } catch (error) {
     return NextResponse.json({ error: "read_failed", detail: String(error) }, { status: 500 });
   }
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
   };
   try {
     await db().collection(COLLECTION).doc(body.branch).set(record);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, updatedAt: record.updatedAt, updatedBy: record.updatedBy });
   } catch (error) {
     return NextResponse.json({ error: "write_failed", detail: String(error) }, { status: 500 });
   }
