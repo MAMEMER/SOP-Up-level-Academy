@@ -296,10 +296,29 @@ export function seedOverridesFromPhases(phases: WorkflowPhase[], overrides: Chec
   return seeded;
 }
 
+/**
+ * The full window a หัวข้อ shows in the editor: owner override first, built-in second,
+ * end-of-day last — but UNLIKE resolvePhaseWindow it keeps the กะ2 (`s2`) override intact
+ * instead of flattening to one shift. The editor needs the whole window so an edit to the
+ * กะ2 time round-trips (save → reload) instead of being dropped on every load.
+ */
+export function editablePhaseWindow(phaseId: string, windows: PhaseWindows = {}): PhaseWindow {
+  const configured = windows[phaseId];
+  const source = configured && isHhMm(configured.dueTime) ? configured : defaultPhaseWindows[phaseId] || { dueTime: CHECKLIST_DAY_END };
+  const window: PhaseWindow = {
+    dueTime: isHhMm(source.dueTime) ? source.dueTime : CHECKLIST_DAY_END,
+    openTime: isHhMm(source.openTime) ? source.openTime : undefined
+  };
+  if (source.s2 && isHhMm(source.s2.dueTime)) {
+    window.s2 = { dueTime: source.s2.dueTime, openTime: isHhMm(source.s2.openTime) ? source.s2.openTime : undefined };
+  }
+  return window;
+}
+
 /** Seeds the editable window map so every phase shows a real time in the editor. */
 export function seedWindowsFromPhases(phases: WorkflowPhase[], windows: PhaseWindows): PhaseWindows {
   const seeded: PhaseWindows = {};
-  for (const phase of phases) seeded[phase.id] = resolvePhaseWindow(phase.id, windows);
+  for (const phase of phases) seeded[phase.id] = editablePhaseWindow(phase.id, windows);
   return seeded;
 }
 
