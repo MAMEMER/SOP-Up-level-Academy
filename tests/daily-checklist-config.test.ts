@@ -68,6 +68,23 @@ describe("owner checklist config", () => {
     assert.equal(windows["close-store"].dueTime, "23:59");
     assert.equal(windows["open-store"].dueTime, "13:00");
     assert.deepEqual(shifts["open-store"], ["s1"]);
+    // the built-in กะ2 window shows in the editor (not dropped like resolvePhaseWindow flattens it)
+    assert.equal(windows["stock-work"].s2?.dueTime, "23:00");
+    assert.equal(windows["stock-work"].s2?.openTime, "19:00");
+  });
+
+  it("keeps an owner-edited กะ2 time when the config is reloaded into the editor", () => {
+    // Owner sets a กะ2 deadline, saves → Firestore keeps windows[phase].s2.
+    const saved = {
+      "open-store": { openTime: "09:00", dueTime: "13:00", s2: { openTime: "19:30", dueTime: "22:45" } }
+    };
+    // Reload path: the editor reseeds from the saved config. The กะ2 time must survive.
+    const seeded = seedWindowsFromPhases(cardStoreWorkflow, saved);
+
+    assert.equal(seeded["open-store"].dueTime, "13:00");
+    assert.equal(seeded["open-store"].openTime, "09:00");
+    assert.equal(seeded["open-store"].s2?.dueTime, "22:45");
+    assert.equal(seeded["open-store"].s2?.openTime, "19:30");
   });
 
   it("charges 2 points per หัวข้อ handed in late", () => {
