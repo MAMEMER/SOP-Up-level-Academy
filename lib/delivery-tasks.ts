@@ -4,9 +4,9 @@
 // เดิมทีมหน้าร้านต้องไปเปิดหน้า admin ของเว็บกิลด์เอง งานเลยตกหล่น. โมดูลนี้ตัดสินว่า
 // ออเดอร์ที่จ่ายแล้วควร "เด้ง" ขึ้นหน้า Dashboard ของกะไหน:
 //
-//   จ่ายก่อน 15:00  → ขึ้นเฉพาะ "กะปัจจุบัน" (กะที่กำลังทำงานอยู่ ยังมีเวลาส่งวันนี้)
-//   จ่ายตั้งแต่ 15:00 → ขึ้นทั้ง "กะปัจจุบัน" และ "กะถัดไป" (กะปัจจุบันอาจส่งไม่ทันรอบรถ)
-//   กะปัจจุบันส่งไม่ทัน  → กดปุ่ม "ส่งงานให้กะถัดไป" ย้ายงานไปกะถัดไปทั้งใบ
+//   จ่ายก่อน 15:00  → เป็นงานของทีมวันนี้ (ขึ้นทั้งสองกะ — สองกะอยู่ร้านคาบกันอยู่แล้ว)
+//   จ่ายตั้งแต่ 15:00 → ขึ้นให้ทีมพรุ่งนี้ด้วย (วันนี้อาจส่งไม่ทันรอบรถ)
+//   วันนี้ส่งไม่ทัน    → กดปุ่ม "ส่งงานให้พรุ่งนี้" ย้ายทั้งใบไปให้ทีมที่มาวันถัดไป
 //
 // pure (ไม่แตะ Firestore / DOM) เพื่อให้ unit-test ได้ — ตัวอ่าน/เขียนอยู่ที่
 // lib/delivery-tasks-server.ts.
@@ -172,53 +172,44 @@ function formatMinutes(total: number): string {
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-/**
- * กะปัจจุบัน = ทุกกะที่ช่วงเวลาครอบ `now` (บางช่วงกะเปิดร้านกับกะปิดร้านอยู่พร้อมกัน).
- * กะถัดไป = กะแรกของวันนี้ที่ยังไม่เข้า ถ้าหมดวันแล้วก็เป็นกะแรกของพรุ่งนี้.
- */
-export function resolveShiftRouting(
-  now: Date,
-  windows: ShiftWindows
-): { current: ShiftWindow[]; next: ShiftWindow | null } {
+/** ยังมีกะของวันนั้นที่ยังไม่เลิกงาน ณ เวลานี้หรือเปล่า */
+function stillOnDuty(now: Date, windows: ShiftWindow[]): boolean {
   const nowMinutes = bangkokMinutesOfDay(now);
-  const current = windows.today.filter((window) => {
-    const start = minutesOfDay(window.start);
-    const end = minutesOfDay(window.end);
-    if (start === null || end === null) return false;
-    return nowMinutes >= start && nowMinutes < end;
-  });
-  const laterToday = windows.today
-    .filter((window) => (minutesOfDay(window.start) ?? 0) > nowMinutes)
-    .sort((left, right) => (minutesOfDay(left.start) ?? 0) - (minutesOfDay(right.start) ?? 0));
-  const next =
-    laterToday[0] ??
-    [...windows.tomorrow].sort((left, right) => (minutesOfDay(left.start) ?? 0) - (minutesOfDay(right.start) ?? 0))[0] ??
-    null;
-  return { current, next };
+  return windows.some((window) => nowMinutes < (minutesOfDay(window.end) ?? 0));
+}
+
+function targetKeysFor(windows: ShiftWindow[]): string[] {
+  return windows.map((window) => shiftTargetKey(window.workDate, window.shift));
+}
+
+/**
+ * กะของวันถัดไป — ปลายทางของปุ่ม "ส่งงานให้พรุ่งนี้".
+ * ถ้ายังไม่ได้ลงตารางกะพรุ่งนี้ ก็ยิงไปที่ทั้งสองกะของวันนั้นไว้ก่อน พอลงตารางแล้วคนที่เข้า
+ * กะจะเห็นเอง — ดีกว่าปฏิเสธแล้วงานค้างอยู่กับกะที่ส่งไม่ทัน
+ */
+export function nextDayTargetsFor(windows: ShiftWindows, tomorrowDate: string): string[] {
+  const keys = targetKeysFor(windows.tomorrow);
+  return keys.length ? keys : [shiftTargetKey(tomorrowDate, "s1"), shiftTargetKey(tomorrowDate, "s2")];
 }
 
 /**
  * กะที่ต้องเห็นออเดอร์ใบนี้ ตามเวลาที่จ่ายเงิน.
- * ก่อน 15:00 → กะปัจจุบัน · ตั้งแต่ 15:00 → กะปัจจุบัน + กะถัดไป.
- * ถ้าจ่ายนอกเวลาทำการ (ดึก/ก่อนร้านเปิด) จะตกไปที่กะที่เข้างานเป็นกะแรกถัดจากนั้น.
+ *
+ * สองกะเข้างานเวลาใกล้กันและอยู่ร้านคาบกันเกือบทั้งวัน การแยกว่าใบไหนของกะไหนภายในวัน
+ * เดียวกันจึงไม่มีประโยชน์ — ออเดอร์ขึ้นทั้งสองกะของวันนั้นเลย. ตัวที่มีความหมายจริงคือ
+ * "วันนี้" กับ "พรุ่งนี้":
+ *   ก่อน 15:00        → ทีมวันนี้
+ *   ตั้งแต่ 15:00      → ทีมวันนี้ + ทีมพรุ่งนี้ (วันนี้อาจส่งไม่ทันรอบรถ)
+ *   ร้านปิดไปแล้ว      → ทีมพรุ่งนี้
  */
 export function deliveryTargetsFor(now: Date, windows: ShiftWindows): string[] {
-  const { current, next } = resolveShiftRouting(now, windows);
   const cutoff = minutesOfDay(DELIVERY_CUTOFF) ?? 15 * 60;
   const afterCutoff = bangkokMinutesOfDay(now) >= cutoff;
+  const today = targetKeysFor(windows.today);
+  const tomorrow = targetKeysFor(windows.tomorrow);
 
-  const picked = [...current];
-  if (afterCutoff && next) picked.push(next);
-  if (!picked.length && next) picked.push(next);
-
-  const keys = picked.map((window) => shiftTargetKey(window.workDate, window.shift));
-  return [...new Set(keys)];
-}
-
-/** คีย์กะถัดไป ณ เวลานี้ — ใช้ตอนกดปุ่ม "ส่งงานให้กะถัดไป" */
-export function nextShiftTargetFor(now: Date, windows: ShiftWindows): string | null {
-  const { next } = resolveShiftRouting(now, windows);
-  return next ? shiftTargetKey(next.workDate, next.shift) : null;
+  if (!stillOnDuty(now, windows.today)) return [...new Set(tomorrow)];
+  return [...new Set(afterCutoff ? [...today, ...tomorrow] : today)];
 }
 
 export type DeliveryViewer = {
@@ -272,7 +263,7 @@ export function deliveryStatusText(task: DeliveryTask, today: string): string {
   const late = today > task.dueDate;
   const prefix = late ? "เลยกำหนดส่ง" : `ส่งภายใน ${task.dueDate}`;
   if (task.status === "packing") return `${prefix} · กำลังแพ็ค`;
-  return task.handedOff ? `${prefix} · รับต่อจากกะก่อน` : prefix;
+  return task.handedOff ? `${prefix} · รับต่อจากเมื่อวาน` : prefix;
 }
 
 /** ป้ายบอกว่าใบนี้เป็นของกะไหนบ้าง เช่น "10 ส.ค. กะ 2 · 11 ส.ค. กะ 1" */

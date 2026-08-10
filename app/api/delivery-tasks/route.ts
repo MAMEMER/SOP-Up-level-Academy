@@ -60,8 +60,7 @@ export async function POST(request: Request) {
       case "handoffDelivery": {
         const branch = str(body.branch) || "bangkae";
         const result = await handoffDeliveryTask(id, branch, acting);
-        if (!result.ok) return badRequest("ยังไม่มีกะถัดไปในตาราง — ให้เจ้าของร้านลงตารางกะก่อน");
-        return NextResponse.json({ ok: true, target: result.target });
+        return NextResponse.json({ ok: true, targets: result.targets });
       }
       case "shipDelivery": {
         const trackingNumber = str(body.trackingNumber).trim();

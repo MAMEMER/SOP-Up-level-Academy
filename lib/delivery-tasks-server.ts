@@ -6,7 +6,7 @@ import {
   bangkokWorkDate,
   buildShiftWindows,
   deliveryTargetsFor,
-  nextShiftTargetFor,
+  nextDayTargetsFor,
   summariseOrderLines,
   DELIVERY_DUE_DAYS,
   type DeliveryTask,
@@ -240,27 +240,27 @@ export async function claimDeliveryTask(taskDocId: string, staffCode: string, no
 }
 
 /**
- * "ส่งงานให้กะถัดไป" — กะปัจจุบันส่งไม่ทันรอบรถ ย้ายทั้งใบไปกะถัดไป (คำนวณ ณ เวลาที่กด)
- * แล้วปลดคนที่รับไว้ออก งานจะกลับเป็นรอคนรับของกะใหม่
+ * "ส่งงานให้พรุ่งนี้" — วันนี้ส่งไม่ทันรอบรถ ย้ายทั้งใบไปให้ทีมที่มาวันถัดไป
+ * แล้วปลดคนที่รับไว้ออก งานกลับไปรอคนรับของวันใหม่
  */
 export async function handoffDeliveryTask(
   taskDocId: string,
   branch: string,
   staffCode: string,
   now = new Date()
-): Promise<{ ok: boolean; target?: string }> {
-  const windows = await fetchShiftWindows(branch, bangkokWorkDate(now));
-  const target = nextShiftTargetFor(now, windows);
-  if (!target) return { ok: false };
+): Promise<{ ok: boolean; targets: string[] }> {
+  const today = bangkokWorkDate(now);
+  const windows = await fetchShiftWindows(branch, today);
+  const targets = nextDayTargetsFor(windows, addWorkDays(today, 1));
   await adminDb().collection(TASKS).doc(taskDocId).update({
-    targets: [target],
+    targets,
     status: "open",
     claimedBy: "",
     handedOff: true,
     handedOffBy: staffCode,
     handedOffAt: now.toISOString()
   });
-  return { ok: true, target };
+  return { ok: true, targets };
 }
 
 /** ส่งของแล้ว — ต้องมีเลข tracking เสมอ (กติกาเดิมของหัวข้อ "จัดส่งสินค้า") */

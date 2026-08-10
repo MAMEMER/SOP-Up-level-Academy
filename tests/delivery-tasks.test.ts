@@ -11,9 +11,8 @@ import {
   deliveryTaskVisibleTo,
   isOwnShiftTask,
   minutesOfDay,
-  nextShiftTargetFor,
+  nextDayTargetsFor,
   parseShiftTarget,
-  resolveShiftRouting,
   shiftTargetKey,
   sortDeliveryTasks,
   summariseOrderLines,
@@ -113,80 +112,53 @@ describe("buildShiftWindows", () => {
   });
 });
 
-describe("resolveShiftRouting", () => {
-  it("before the closing shift arrives, only the opening shift is on duty", () => {
-    const { current, next } = resolveShiftRouting(bkk(`${TODAY}T10:00:00`), windows);
-    assert.deepEqual(current.map((window) => window.shift), ["s1"]);
-    assert.equal(next?.shift, "s2");
-    assert.equal(next?.workDate, TODAY);
+describe("deliveryTargetsFor — ทีมวันนี้ / ทีมพรุ่งนี้", () => {
+  const bothToday = [shiftTargetKey(TODAY, "s1"), shiftTargetKey(TODAY, "s2")];
+  const bothTomorrow = [shiftTargetKey(TOMORROW, "s1"), shiftTargetKey(TOMORROW, "s2")];
+
+  it("จ่ายก่อน 15:00 → ขึ้นทั้งสองกะของวันนี้ ไม่ลามไปพรุ่งนี้", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T10:00:00`), windows), bothToday);
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T14:59:00`), windows), bothToday);
   });
 
-  it("mid-afternoon both shifts are on duty and the next one is tomorrow morning", () => {
-    const { current, next } = resolveShiftRouting(bkk(`${TODAY}T16:00:00`), windows);
-    assert.deepEqual(current.map((window) => window.shift), ["s1", "s2"]);
-    assert.equal(next?.workDate, TOMORROW);
-    assert.equal(next?.shift, "s1");
+  it("กะ 2 ยังไม่เข้างานก็ยังเห็น — ไม่ต้องรอถึงเวลาเข้ากะ", () => {
+    assert.ok(deliveryTargetsFor(bkk(`${TODAY}T10:00:00`), windows).includes(shiftTargetKey(TODAY, "s2")));
   });
 
-  it("after closing nobody is on duty and the next shift is tomorrow morning", () => {
-    const { current, next } = resolveShiftRouting(bkk(`${TODAY}T23:30:00`), windows);
-    assert.deepEqual(current, []);
-    assert.equal(next?.workDate, TOMORROW);
-    assert.equal(next?.shift, "s1");
-  });
-});
-
-describe("deliveryTargetsFor — the 15:00 rule", () => {
-  it("จ่ายก่อน 15:00 → เข้ากะที่ทำงานอยู่เท่านั้น", () => {
-    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T10:00:00`), windows), [shiftTargetKey(TODAY, "s1")]);
+  it("จ่ายตั้งแต่ 15:00 → ทีมวันนี้ + ทีมพรุ่งนี้", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T15:00:00`), windows), [...bothToday, ...bothTomorrow]);
   });
 
-  it("จ่ายก่อน 15:00 ตอนสองกะทับกัน → ทั้งสองกะที่อยู่ร้าน แต่ยังไม่ลามไปพรุ่งนี้", () => {
-    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T14:00:00`), windows), [
-      shiftTargetKey(TODAY, "s1"),
-      shiftTargetKey(TODAY, "s2")
-    ]);
+  it("จ่ายตอนร้านปิดแล้ว → ทีมพรุ่งนี้อย่างเดียว", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T23:30:00`), windows), bothTomorrow);
   });
 
-  it("จ่ายตั้งแต่ 15:00 → กะปัจจุบัน + กะถัดไป", () => {
-    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T15:00:00`), windows), [
-      shiftTargetKey(TODAY, "s1"),
-      shiftTargetKey(TODAY, "s2"),
-      shiftTargetKey(TOMORROW, "s1")
-    ]);
+  it("จ่ายเช้ามืดก่อนร้านเปิด → ยังเป็นของทีมวันนี้", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T05:00:00`), windows), bothToday);
   });
 
-  it("จ่ายหลังกะ 1 เลิก แต่กะ 2 ยังอยู่ → กะ 2 + กะเช้าพรุ่งนี้", () => {
-    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T19:00:00`), windows), [
-      shiftTargetKey(TODAY, "s2"),
-      shiftTargetKey(TOMORROW, "s1")
-    ]);
+  it("วันนี้ไม่มีใครลงกะ → ตกไปทีมพรุ่งนี้", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T10:00:00`), { today: [], tomorrow: windows.tomorrow }), bothTomorrow);
   });
 
-  it("จ่ายตอนดึกก่อนร้านเปิด → ตกไปที่กะเช้าถัดไป ไม่หายไปเฉย ๆ", () => {
-    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T23:30:00`), windows), [shiftTargetKey(TOMORROW, "s1")]);
-  });
-
-  it("จ่ายเช้ามืดก่อนกะแรกเข้า → กะแรกของวันเดียวกัน", () => {
-    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T05:00:00`), windows), [shiftTargetKey(TODAY, "s1")]);
-  });
-
-  it("ยังไม่มีตารางกะเลย → ไม่มีกะไหนถูก target (จะไปโผล่ที่เจ้าของร้าน)", () => {
+  it("ไม่มีตารางกะเลยทั้งสองวัน → ไม่มี target (จะไปโผล่ให้ทุกคนเห็นแทน)", () => {
     assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T16:00:00`), { today: [], tomorrow: [] }), []);
   });
 });
 
-describe("nextShiftTargetFor — ปุ่มส่งงานให้กะถัดไป", () => {
-  it("กะเปิดร้านส่งไม่ทัน → ตกไปกะปิดร้านวันเดียวกัน", () => {
-    assert.equal(nextShiftTargetFor(bkk(`${TODAY}T11:00:00`), windows), shiftTargetKey(TODAY, "s2"));
+describe("nextDayTargetsFor — ปุ่มส่งงานให้พรุ่งนี้", () => {
+  it("ส่งต่อให้ทีมที่มาวันถัดไป ทั้งสองกะ", () => {
+    assert.deepEqual(nextDayTargetsFor(windows, TOMORROW), [
+      shiftTargetKey(TOMORROW, "s1"),
+      shiftTargetKey(TOMORROW, "s2")
+    ]);
   });
 
-  it("กะปิดร้านส่งไม่ทัน → ตกไปกะเช้าพรุ่งนี้ ยังอยู่ในกรอบ 1 วัน", () => {
-    assert.equal(nextShiftTargetFor(bkk(`${TODAY}T19:00:00`), windows), shiftTargetKey(TOMORROW, "s1"));
-  });
-
-  it("ไม่มีกะถัดไปในตาราง → คืน null ให้ route ตอบว่ายังลงตารางไม่ครบ", () => {
-    assert.equal(nextShiftTargetFor(bkk(`${TODAY}T19:00:00`), { today: windows.today, tomorrow: [] }), null);
+  it("พรุ่งนี้ยังไม่ได้ลงตารางกะ ก็ยังส่งต่อได้ ไม่ตีกลับ", () => {
+    assert.deepEqual(nextDayTargetsFor({ today: windows.today, tomorrow: [] }, TOMORROW), [
+      shiftTargetKey(TOMORROW, "s1"),
+      shiftTargetKey(TOMORROW, "s2")
+    ]);
   });
 });
 
@@ -269,8 +241,8 @@ describe("deliveryTaskState / deliveryStatusText", () => {
     assert.equal(deliveryStatusText(shipped, TODAY), "ส่งแล้ว · TH0001");
   });
 
-  it("บอกได้ว่าใบนี้รับต่อมาจากกะก่อน", () => {
-    assert.match(deliveryStatusText(task({ handedOff: true }), TODAY), /รับต่อจากกะก่อน/);
+  it("บอกได้ว่าใบนี้รับต่อมาจากเมื่อวาน", () => {
+    assert.match(deliveryStatusText(task({ handedOff: true }), TODAY), /รับต่อจากเมื่อวาน/);
   });
 });
 
