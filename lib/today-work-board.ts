@@ -9,7 +9,7 @@
 // Pure (no Firestore / no DOM): the component maps each source into the small input
 // shapes below and this decides state, wording and order.
 
-export type TodayWorkKind = "daily" | "stock" | "weekly" | "monthly" | "assigned" | "handoff";
+export type TodayWorkKind = "daily" | "stock" | "weekly" | "monthly" | "assigned" | "handoff" | "delivery";
 
 /** overdue = ต้องทำแต่เลยเวลา · due = ต้องทำวันนี้ · upcoming = ยังไม่ถึงกำหนด · done = เสร็จแล้ว */
 export type TodayWorkState = "overdue" | "due" | "upcoming" | "done";
@@ -32,17 +32,20 @@ export const kindLabels: Record<TodayWorkKind, string> = {
   weekly: "งานสัปดาห์",
   monthly: "งานเดือน",
   assigned: "งานที่มอบหมาย",
-  handoff: "งานส่งต่อ"
+  handoff: "งานส่งต่อ",
+  delivery: "งานส่งของ"
 };
 
 const stateOrder: Record<TodayWorkState, number> = { overdue: 0, due: 1, upcoming: 2, done: 3 };
 const kindOrder: Record<TodayWorkKind, number> = {
   assigned: 0,
-  daily: 1,
-  stock: 2,
-  weekly: 3,
-  monthly: 4,
-  handoff: 5
+  // ออเดอร์ลูกค้ามีกำหนดส่งภายใน 1 วัน — ต้องอยู่บนงานประจำที่ยืดหยุ่นกว่า
+  delivery: 1,
+  daily: 2,
+  stock: 3,
+  weekly: 4,
+  monthly: 5,
+  handoff: 6
 };
 
 const stateClass: Record<TodayWorkState, string> = {
@@ -105,6 +108,16 @@ export type AssignedRecordInput = {
   status: "early_quality" | "on_time" | "needs_revision" | "late_one_day" | "not_finished";
   /** admins see the verdict immediately; staff only after the deadline */
   showStatus: boolean;
+};
+
+/** ออเดอร์เว็บกิลด์ที่จ่ายเงินแล้วและยังต้องแพ็ค/ส่ง (see delivery-tasks.ts). */
+export type DeliveryTaskInput = {
+  id: string;
+  title: string;
+  detail?: string;
+  statusText: string;
+  /** as returned by deliveryTaskState */
+  state: TodayWorkState;
 };
 
 /** An owner assignment / cross-shift handoff from the live feed. */
@@ -181,6 +194,7 @@ export function buildTodayWorkBoard(input: {
   monthlyTasks?: MonthlyTaskInput[];
   assignedRecords?: AssignedRecordInput[];
   feedItems?: FeedItemInput[];
+  deliveryTasks?: DeliveryTaskInput[];
 }): TodayWorkBoard {
   const items: TodayWorkItem[] = [];
 
@@ -262,6 +276,20 @@ export function buildTodayWorkBoard(input: {
       state,
       statusText: record.showStatus ? assignedStatusText[record.status] : "รอส่งงาน",
       statusClass: record.showStatus ? stateClass[state] : stateClass.due
+    });
+  }
+
+  for (const task of input.deliveryTasks ?? []) {
+    items.push({
+      id: `delivery-${task.id}`,
+      kind: "delivery",
+      kindLabel: kindLabels.delivery,
+      title: task.title,
+      detail: task.detail,
+      href: "/#delivery-orders",
+      state: task.state,
+      statusText: task.statusText,
+      statusClass: stateClass[task.state]
     });
   }
 

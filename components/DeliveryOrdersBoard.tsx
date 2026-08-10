@@ -1,0 +1,176 @@
+"use client";
+
+// "งานส่งของ" บน Dashboard — ออเดอร์ที่ลูกค้าจ่ายเงินแล้วบนเว็บกิลด์จะเด้งมาที่กะที่
+// รับผิดชอบเอง ทีมหน้าร้านไม่ต้องเปิดหน้า admin ของเว็บกิลด์มานั่งไล่เอง.
+//
+// กติกา (lib/delivery-tasks.ts): จ่ายก่อน 15:00 เข้ากะปัจจุบัน · ตั้งแต่ 15:00 เข้าทั้ง
+// กะปัจจุบันและกะถัดไป · กะปัจจุบันส่งไม่ทันก็กด "ส่งงานให้กะถัดไป" เพื่อให้ยังส่งได้
+// ภายใน 1 วัน.
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  deliveryStatusText,
+  deliveryTargetLabel,
+  deliveryTaskState,
+  type DeliveryTask
+} from "../lib/delivery-tasks.ts";
+import { claimDelivery, fetchDeliveryFeed, handoffDelivery, shipDelivery } from "../lib/delivery-tasks-store.ts";
+import { displayNameFor } from "../lib/employee-directory.ts";
+
+const REFRESH_MS = 60_000;
+
+export function DeliveryOrdersBoard({
+  branch,
+  canAct = true,
+  initialTasks = [],
+  initialToday = ""
+}: {
+  branch: string;
+  canAct?: boolean;
+  /** งานที่ server render ไว้แล้ว — กัน sync ซ้ำรอบสองตอนหน้าโหลด */
+  initialTasks?: DeliveryTask[];
+  initialToday?: string;
+}) {
+  const [tasks, setTasks] = useState<DeliveryTask[]>(initialTasks);
+  const [today, setToday] = useState(initialToday);
+  const [loading, setLoading] = useState(!initialToday);
+  const [busyId, setBusyId] = useState("");
+  const [error, setError] = useState("");
+  const [tracking, setTracking] = useState<Record<string, string>>({});
+
+  const reload = useCallback(async () => {
+    try {
+      const feed = await fetchDeliveryFeed(branch);
+      setTasks(feed.tasks);
+      setToday(feed.today);
+      setError("");
+    } catch {
+      setError("โหลดออเดอร์ไม่สำเร็จ ลองรีเฟรชอีกครั้ง");
+    } finally {
+      setLoading(false);
+    }
+  }, [branch]);
+
+  // งานชุดแรกมาจาก server render แล้ว — รอบแรกจึงข้ามไป ไม่ต้อง sync ซ้ำทันทีที่โหลดหน้า
+  const hasServerData = useRef(Boolean(initialToday));
+  useEffect(() => {
+    if (hasServerData.current) hasServerData.current = false;
+    else void reload();
+    const timer = setInterval(() => void reload(), REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [reload]);
+
+  async function run(id: string, action: () => Promise<void>) {
+    setBusyId(id);
+    setError("");
+    try {
+      await action();
+      await reload();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "ทำรายการไม่สำเร็จ");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  const remaining = tasks.filter((task) => task.status !== "shipped");
+  const overdue = remaining.filter((task) => deliveryTaskState(task, today) === "overdue");
+  const headline = loading
+    ? "กำลังโหลด…"
+    : remaining.length === 0
+      ? "ไม่มีออเดอร์ค้างส่ง"
+      : `เหลือ ${remaining.length} ใบ${overdue.length ? ` · เลยกำหนด ${overdue.length}` : ""}`;
+
+  return (
+    <article id="delivery-orders" className="task-section delivery-board">
+      <div className="task-section-head">
+        <div>
+          <p className="eyebrow">ออเดอร์เว็บกิลด์</p>
+          <h3>งานส่งของ</h3>
+        </div>
+        <span className={`status-pill ${overdue.length > 0 ? "is-late" : ""}`}>{headline}</span>
+      </div>
+
+      {error ? <p className="delivery-board__error">{error}</p> : null}
+
+      {tasks.length === 0 && !loading ? (
+        <p className="delivery-board__empty">
+          ออเดอร์ที่ลูกค้าจ่ายเงินแล้วจะขึ้นที่นี่เอง — จ่ายก่อน 15:00 เข้ากะที่ทำงานอยู่ หลัง 15:00 ขึ้นทั้งกะนี้และกะถัดไป
+        </p>
+      ) : null}
+
+      <ul className="delivery-board__list">
+        {tasks.map((task) => {
+          const state = deliveryTaskState(task, today);
+          const busy = busyId === task.id;
+          return (
+            <li key={task.id} className={`delivery-item delivery-item--${state}`}>
+              <div className="delivery-item__main">
+                <p className="delivery-item__meta">
+                  #{task.orderCode} · {deliveryTargetLabel(task)}
+                  {task.handedOffBy ? ` · ส่งต่อโดย ${displayNameFor(task.handedOffBy)}` : ""}
+                </p>
+                <strong>{task.customerName || "ไม่ระบุชื่อผู้รับ"}</strong>
+                <p className="delivery-item__items">
+                  {task.itemsSummary || "ไม่มีรายละเอียดสินค้า"}
+                  {task.itemCount ? ` · ${task.itemCount} ชิ้น` : ""}
+                  {task.total ? ` · ${task.total.toLocaleString("th-TH")} บาท` : ""}
+                </p>
+                {task.customerAddress ? <p className="delivery-item__address">{task.customerAddress}</p> : null}
+                {task.customerPhone ? (
+                  <p className="delivery-item__phone">
+                    <a href={`tel:${task.customerPhone}`}>{task.customerPhone}</a>
+                  </p>
+                ) : null}
+                <em className="delivery-item__status">
+                  {deliveryStatusText(task, today)}
+                  {task.claimedBy ? ` · ${displayNameFor(task.claimedBy)}` : ""}
+                </em>
+              </div>
+
+              {canAct && task.status !== "shipped" ? (
+                <div className="delivery-item__actions">
+                  {task.status === "open" ? (
+                    <button type="button" disabled={busy} onClick={() => run(task.id, () => claimDelivery(task.id))}>
+                      รับงานแพ็ค
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="delivery-item__handoff"
+                    disabled={busy}
+                    onClick={() => run(task.id, () => handoffDelivery(task.id, branch))}
+                  >
+                    ส่งงานให้กะถัดไป
+                  </button>
+                  {/* ช่อง tracking โผล่หลังรับงานแล้วเท่านั้น — ลำดับตาม SOP จัดส่ง: แพ็ค → ส่ง → แจ้งเลข */}
+                  {task.status === "packing" ? (
+                    <>
+                      <label className="delivery-item__ship">
+                        <span>เลข tracking</span>
+                        <input
+                          value={tracking[task.id] ?? ""}
+                          onChange={(event) => setTracking((prev) => ({ ...prev, [task.id]: event.target.value }))}
+                          placeholder="เช่น TH01234567890"
+                          inputMode="text"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="delivery-item__done"
+                        disabled={busy || !(tracking[task.id] ?? "").trim()}
+                        onClick={() => run(task.id, () => shipDelivery(task.id, tracking[task.id] ?? ""))}
+                      >
+                        ส่งแล้ว
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </article>
+  );
+}

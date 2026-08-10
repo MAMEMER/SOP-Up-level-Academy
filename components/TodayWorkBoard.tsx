@@ -28,11 +28,13 @@ import { fetchMonthlyEventPayload } from "../lib/monthly-event-store.ts";
 import { isWeeklyEventActiveOn, weeklyEventCompleted, weeklyEventHref, weeklyEvents } from "../lib/weekly-event-tasks.ts";
 import { fetchWeeklyEventPayload, tickKey, weeklyEventPeriodKey } from "../lib/weekly-event-store.ts";
 import { buildTodayWorkBoard, todayWorkHeadline } from "../lib/today-work-board.ts";
+import { deliveryStatusText, deliveryTaskState, type DeliveryTask } from "../lib/delivery-tasks.ts";
 
 export function TodayWorkBoard({
   phases,
   assignedWorkRecords = [],
   assignedWorkFeed = [],
+  deliveryTasks = [],
   workDate: currentWorkDate,
   canManageAssignedWork = false,
   staffCode = null,
@@ -41,6 +43,8 @@ export function TodayWorkBoard({
   phases: WorkflowPhase[];
   assignedWorkRecords?: AssignedWorkRecord[];
   assignedWorkFeed?: AssignedWorkFeedItem[];
+  /** ออเดอร์เว็บกิลด์ที่ต้องส่ง — server render มาให้แล้ว (ดู DeliveryOrdersBoard) */
+  deliveryTasks?: DeliveryTask[];
   workDate?: string;
   canManageAssignedWork?: boolean;
   staffCode?: string | null;
@@ -136,6 +140,15 @@ export function TodayWorkBoard({
       status: effectiveAssignedWorkStatus(record),
       showStatus: canManageAssignedWork || isAssignedWorkPastDeadline(record.workDate)
     })),
+    deliveryTasks: deliveryTasks
+      .filter((task) => task.status !== "shipped")
+      .map((task) => ({
+        id: task.id,
+        title: `ส่งของ #${task.orderCode}${task.customerName ? ` · ${task.customerName}` : ""}`,
+        detail: task.itemsSummary || undefined,
+        statusText: deliveryStatusText(task, workDate),
+        state: deliveryTaskState(task, workDate)
+      })),
     feedItems: assignedWorkFeed.map((item) => ({
       id: item.id,
       origin: item.origin,

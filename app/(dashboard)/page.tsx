@@ -8,6 +8,9 @@ import { requireUser } from "../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../lib/employee-directory.ts";
 import { assignedWorkRecordsForDate } from "../../lib/performance-service-records.ts";
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assigned-work-feed.ts";
+import { DeliveryOrdersBoard } from "../../components/DeliveryOrdersBoard.tsx";
+import { fetchShiftForStaff, syncDeliveryTasks } from "../../lib/delivery-tasks-server.ts";
+import { deliveryTaskVisibleTo, sortDeliveryTasks } from "../../lib/delivery-tasks.ts";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
 import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../../lib/performance-daily-store.ts";
@@ -28,6 +31,24 @@ export default async function HomePage() {
     isAdmin: user.role === "admin",
     employeeCode
   });
+
+  // งานส่งของ: ออเดอร์ที่จ่ายเงินแล้วบนเว็บกิลด์ เด้งเข้ากะที่รับผิดชอบเอง
+  // (ก่อน 15:00 = กะปัจจุบัน · ตั้งแต่ 15:00 = กะปัจจุบัน + กะถัดไป)
+  const [deliveryAll, shiftToday] = await Promise.all([
+    syncDeliveryTasks(branch),
+    staffCode ? fetchShiftForStaff(branch, workDate, staffCode) : Promise.resolve(null)
+  ]);
+  const deliveryTasks = sortDeliveryTasks(
+    deliveryAll.filter((task) =>
+      deliveryTaskVisibleTo(task, {
+        isAdmin: user.role === "admin",
+        staffCode: staffCode ?? null,
+        shiftToday,
+        today: workDate
+      })
+    ),
+    workDate
+  );
 
   return (
     <main className="page">
@@ -50,11 +71,14 @@ export default async function HomePage() {
         phases={cardStoreWorkflow}
         assignedWorkRecords={assignedWorkRecords}
         assignedWorkFeed={assignedWorkFeed}
+        deliveryTasks={deliveryTasks}
         workDate={workDate}
         canManageAssignedWork={user.role === "admin"}
         staffCode={staffCode}
         branch={branch}
       />
+
+      <DeliveryOrdersBoard branch={branch} initialTasks={deliveryTasks} initialToday={workDate} canAct={!user.isImpersonating} />
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={staffCode} branch={branch} />
       <DashboardTaskSections

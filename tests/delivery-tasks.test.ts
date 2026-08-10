@@ -1,0 +1,287 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  addWorkDays,
+  bangkokWorkDate,
+  buildShiftWindows,
+  deliveryStatusText,
+  deliveryTargetLabel,
+  deliveryTargetsFor,
+  deliveryTaskState,
+  deliveryTaskVisibleTo,
+  minutesOfDay,
+  nextShiftTargetFor,
+  parseShiftTarget,
+  resolveShiftRouting,
+  shiftTargetKey,
+  sortDeliveryTasks,
+  type DeliveryTask,
+  type ShiftWindows
+} from "../lib/delivery-tasks.ts";
+
+// เวลาไทย → Date. ทุกเคสด้านล่างคิดเป็นเวลาหน้าร้าน (Asia/Bangkok) ไม่ใช่ UTC
+const bkk = (isoLocal: string) => new Date(`${isoLocal}+07:00`);
+
+const TODAY = "2026-08-10";
+const TOMORROW = "2026-08-11";
+
+// ตารางกะมาตรฐาน: กะ 1 เข้า 09:00 เลิก 18:00 · กะ 2 เข้า 13:00 เลิก 22:00
+const windows: ShiftWindows = {
+  today: buildShiftWindows(TODAY, [
+    { staffCode: "E01", shift: "s1", startTime: "09:00" },
+    { staffCode: "E02", shift: "s2", startTime: "13:00" }
+  ]),
+  tomorrow: buildShiftWindows(TOMORROW, [
+    { staffCode: "E03", shift: "s1", startTime: "09:00" },
+    { staffCode: "E04", shift: "s2", startTime: "13:00" }
+  ])
+};
+
+function task(overrides: Partial<DeliveryTask> = {}): DeliveryTask {
+  return {
+    id: "dt__order1",
+    branch: "bangkae",
+    orderId: "order1",
+    orderCode: "ORDER1",
+    source: "web",
+    customerName: "ลูกค้า ก",
+    customerPhone: "0800000000",
+    customerAddress: "123 ถนนเพชรเกษม",
+    itemsSummary: "Booster Box ×1",
+    itemCount: 1,
+    total: 3990,
+    paidAt: bkk(`${TODAY}T10:00:00`).toISOString(),
+    paidWorkDate: TODAY,
+    dueDate: TOMORROW,
+    detectedAt: bkk(`${TODAY}T10:01:00`).toISOString(),
+    targets: [shiftTargetKey(TODAY, "s1")],
+    status: "open",
+    ...overrides
+  };
+}
+
+describe("minutesOfDay / parseShiftTarget", () => {
+  it("parses a valid HH:MM", () => {
+    assert.equal(minutesOfDay("09:00"), 540);
+    assert.equal(minutesOfDay("15:00"), 900);
+  });
+
+  it("rejects junk rather than guessing", () => {
+    assert.equal(minutesOfDay("9am"), null);
+    assert.equal(minutesOfDay("24:70"), null);
+    assert.equal(parseShiftTarget("2026-08-10:s9"), null);
+    assert.equal(parseShiftTarget("nonsense"), null);
+  });
+
+  it("round-trips a target key", () => {
+    assert.deepEqual(parseShiftTarget(shiftTargetKey(TODAY, "s2")), { workDate: TODAY, shift: "s2" });
+  });
+});
+
+describe("addWorkDays", () => {
+  it("moves the Bangkok calendar day, including across a month end", () => {
+    assert.equal(addWorkDays("2026-08-10", 1), "2026-08-11");
+    assert.equal(addWorkDays("2026-08-31", 1), "2026-09-01");
+    assert.equal(addWorkDays("2026-08-01", -1), "2026-07-31");
+  });
+});
+
+describe("buildShiftWindows", () => {
+  it("spans from the earliest entry to the latest finish of that shift", () => {
+    const built = buildShiftWindows(TODAY, [
+      { staffCode: "E01", shift: "s1", startTime: "11:00" },
+      { staffCode: "E05", shift: "s1", startTime: "09:00" }
+    ]);
+    assert.equal(built.length, 1);
+    assert.equal(built[0].start, "09:00");
+    assert.equal(built[0].end, "20:00");
+    assert.deepEqual(built[0].staffCodes.sort(), ["E01", "E05"]);
+  });
+
+  it("falls back to the default entry time when the cell has none", () => {
+    const built = buildShiftWindows(TODAY, [{ staffCode: "E02", shift: "s2" }]);
+    assert.equal(built[0].start, "11:30");
+    assert.equal(built[0].end, "20:30");
+  });
+
+  it("skips a shift nobody is rostered on", () => {
+    const built = buildShiftWindows(TODAY, [{ staffCode: "E01", shift: "s1", startTime: "09:00" }]);
+    assert.deepEqual(built.map((window) => window.shift), ["s1"]);
+  });
+});
+
+describe("resolveShiftRouting", () => {
+  it("before the closing shift arrives, only the opening shift is on duty", () => {
+    const { current, next } = resolveShiftRouting(bkk(`${TODAY}T10:00:00`), windows);
+    assert.deepEqual(current.map((window) => window.shift), ["s1"]);
+    assert.equal(next?.shift, "s2");
+    assert.equal(next?.workDate, TODAY);
+  });
+
+  it("mid-afternoon both shifts are on duty and the next one is tomorrow morning", () => {
+    const { current, next } = resolveShiftRouting(bkk(`${TODAY}T16:00:00`), windows);
+    assert.deepEqual(current.map((window) => window.shift), ["s1", "s2"]);
+    assert.equal(next?.workDate, TOMORROW);
+    assert.equal(next?.shift, "s1");
+  });
+
+  it("after closing nobody is on duty and the next shift is tomorrow morning", () => {
+    const { current, next } = resolveShiftRouting(bkk(`${TODAY}T23:30:00`), windows);
+    assert.deepEqual(current, []);
+    assert.equal(next?.workDate, TOMORROW);
+    assert.equal(next?.shift, "s1");
+  });
+});
+
+describe("deliveryTargetsFor — the 15:00 rule", () => {
+  it("จ่ายก่อน 15:00 → เข้ากะที่ทำงานอยู่เท่านั้น", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T10:00:00`), windows), [shiftTargetKey(TODAY, "s1")]);
+  });
+
+  it("จ่ายก่อน 15:00 ตอนสองกะทับกัน → ทั้งสองกะที่อยู่ร้าน แต่ยังไม่ลามไปพรุ่งนี้", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T14:00:00`), windows), [
+      shiftTargetKey(TODAY, "s1"),
+      shiftTargetKey(TODAY, "s2")
+    ]);
+  });
+
+  it("จ่ายตั้งแต่ 15:00 → กะปัจจุบัน + กะถัดไป", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T15:00:00`), windows), [
+      shiftTargetKey(TODAY, "s1"),
+      shiftTargetKey(TODAY, "s2"),
+      shiftTargetKey(TOMORROW, "s1")
+    ]);
+  });
+
+  it("จ่ายหลังกะ 1 เลิก แต่กะ 2 ยังอยู่ → กะ 2 + กะเช้าพรุ่งนี้", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T19:00:00`), windows), [
+      shiftTargetKey(TODAY, "s2"),
+      shiftTargetKey(TOMORROW, "s1")
+    ]);
+  });
+
+  it("จ่ายตอนดึกก่อนร้านเปิด → ตกไปที่กะเช้าถัดไป ไม่หายไปเฉย ๆ", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T23:30:00`), windows), [shiftTargetKey(TOMORROW, "s1")]);
+  });
+
+  it("จ่ายเช้ามืดก่อนกะแรกเข้า → กะแรกของวันเดียวกัน", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T05:00:00`), windows), [shiftTargetKey(TODAY, "s1")]);
+  });
+
+  it("ยังไม่มีตารางกะเลย → ไม่มีกะไหนถูก target (จะไปโผล่ที่เจ้าของร้าน)", () => {
+    assert.deepEqual(deliveryTargetsFor(bkk(`${TODAY}T16:00:00`), { today: [], tomorrow: [] }), []);
+  });
+});
+
+describe("nextShiftTargetFor — ปุ่มส่งงานให้กะถัดไป", () => {
+  it("กะเปิดร้านส่งไม่ทัน → ตกไปกะปิดร้านวันเดียวกัน", () => {
+    assert.equal(nextShiftTargetFor(bkk(`${TODAY}T11:00:00`), windows), shiftTargetKey(TODAY, "s2"));
+  });
+
+  it("กะปิดร้านส่งไม่ทัน → ตกไปกะเช้าพรุ่งนี้ ยังอยู่ในกรอบ 1 วัน", () => {
+    assert.equal(nextShiftTargetFor(bkk(`${TODAY}T19:00:00`), windows), shiftTargetKey(TOMORROW, "s1"));
+  });
+
+  it("ไม่มีกะถัดไปในตาราง → คืน null ให้ route ตอบว่ายังลงตารางไม่ครบ", () => {
+    assert.equal(nextShiftTargetFor(bkk(`${TODAY}T19:00:00`), { today: windows.today, tomorrow: [] }), null);
+  });
+});
+
+describe("deliveryTaskVisibleTo", () => {
+  const admin = { isAdmin: true, staffCode: "E09", shiftToday: null, today: TODAY };
+  const opener = { isAdmin: false, staffCode: "E01", shiftToday: "s1" as const, today: TODAY };
+  const closer = { isAdmin: false, staffCode: "E02", shiftToday: "s2" as const, today: TODAY };
+  const dayOff = { isAdmin: false, staffCode: "E07", shiftToday: null, today: TODAY };
+
+  it("เจ้าของร้านเห็นทุกใบ แม้ไม่ได้ลงกะ", () => {
+    assert.equal(deliveryTaskVisibleTo(task(), admin), true);
+  });
+
+  it("พนักงานเห็นเฉพาะใบที่ target กะตัวเองวันนี้", () => {
+    assert.equal(deliveryTaskVisibleTo(task(), opener), true);
+    assert.equal(deliveryTaskVisibleTo(task(), closer), false);
+  });
+
+  it("ใบที่ target ทั้งสองกะ ทั้งคู่เห็น", () => {
+    const both = task({ targets: [shiftTargetKey(TODAY, "s1"), shiftTargetKey(TODAY, "s2")] });
+    assert.equal(deliveryTaskVisibleTo(both, opener), true);
+    assert.equal(deliveryTaskVisibleTo(both, closer), true);
+  });
+
+  it("คนที่รับงานไว้ยังเห็นแม้กะจะเปลี่ยนไปแล้ว", () => {
+    const claimed = task({ targets: [shiftTargetKey(TOMORROW, "s1")], claimedBy: "E01", status: "packing" });
+    assert.equal(deliveryTaskVisibleTo(claimed, opener), true);
+  });
+
+  it("วันหยุดไม่เห็นงานส่งของ", () => {
+    assert.equal(deliveryTaskVisibleTo(task(), dayOff), false);
+  });
+
+  it("ใบค้างจากเมื่อวานที่ยังไม่ส่ง ทุกคนที่เข้ากะวันนี้เห็น — ห้ามหายเงียบ", () => {
+    const stale = task({ targets: [shiftTargetKey("2026-08-09", "s2")], dueDate: TODAY });
+    assert.equal(deliveryTaskVisibleTo(stale, opener), true);
+    assert.equal(deliveryTaskVisibleTo(stale, closer), true);
+    assert.equal(deliveryTaskVisibleTo(stale, dayOff), false);
+  });
+
+  it("ใบเก่าที่ส่งไปแล้ว ไม่กลับมารกหน้ากะอื่น", () => {
+    const shipped = task({
+      targets: [shiftTargetKey("2026-08-09", "s2")],
+      status: "shipped",
+      trackingNumber: "TH123"
+    });
+    assert.equal(deliveryTaskVisibleTo(shipped, opener), false);
+  });
+});
+
+describe("deliveryTaskState / deliveryStatusText", () => {
+  it("ยังไม่ถึงกำหนดและ target วันนี้ = ต้องทำวันนี้", () => {
+    assert.equal(deliveryTaskState(task(), TODAY), "due");
+  });
+
+  it("เลย dueDate = เลยกำหนด", () => {
+    assert.equal(deliveryTaskState(task({ dueDate: "2026-08-09" }), TODAY), "overdue");
+    assert.match(deliveryStatusText(task({ dueDate: "2026-08-09" }), TODAY), /เลยกำหนดส่ง/);
+  });
+
+  it("target เฉพาะพรุ่งนี้ = ยังไม่ถึงคิว", () => {
+    assert.equal(deliveryTaskState(task({ targets: [shiftTargetKey(TOMORROW, "s1")] }), TODAY), "upcoming");
+  });
+
+  it("ส่งแล้วถือว่าเสร็จ และโชว์เลข tracking", () => {
+    const shipped = task({ status: "shipped", trackingNumber: "TH0001" });
+    assert.equal(deliveryTaskState(shipped, TODAY), "done");
+    assert.equal(deliveryStatusText(shipped, TODAY), "ส่งแล้ว · TH0001");
+  });
+
+  it("บอกได้ว่าใบนี้รับต่อมาจากกะก่อน", () => {
+    assert.match(deliveryStatusText(task({ handedOff: true }), TODAY), /รับต่อจากกะก่อน/);
+  });
+});
+
+describe("deliveryTargetLabel / sortDeliveryTasks", () => {
+  it("อ่านออกว่าเป็นของกะไหนบ้าง", () => {
+    const both = task({ targets: [shiftTargetKey(TODAY, "s2"), shiftTargetKey(TOMORROW, "s1")] });
+    assert.equal(deliveryTargetLabel(both), `${TODAY} กะ 2 · ${TOMORROW} กะ 1`);
+  });
+
+  it("เลยกำหนดขึ้นก่อน แล้วค่อยเรียงตามกำหนดส่ง ส่วนที่ส่งแล้วไปท้ายสุด", () => {
+    const late = task({ id: "late", dueDate: "2026-08-09" });
+    const soon = task({ id: "soon", dueDate: TOMORROW });
+    const later = task({ id: "later", dueDate: "2026-08-12", targets: [shiftTargetKey("2026-08-12", "s1")] });
+    const shipped = task({ id: "shipped", status: "shipped", dueDate: "2026-08-09" });
+    const sorted = sortDeliveryTasks([shipped, later, soon, late], TODAY);
+    assert.deepEqual(sorted.map((item) => item.id), ["late", "soon", "later", "shipped"]);
+  });
+});
+
+describe("bangkokWorkDate", () => {
+  it("ยังเป็นวันเดิมตอนตีหนึ่งบ้านเรา แม้ UTC จะยังเป็นเมื่อวาน", () => {
+    assert.equal(bangkokWorkDate(bkk(`${TODAY}T01:00:00`)), TODAY);
+  });
+
+  it("ข้ามวันตอนเที่ยงคืนไทย ไม่ใช่เที่ยงคืน UTC", () => {
+    assert.equal(bangkokWorkDate(bkk(`${TODAY}T23:59:00`)), TODAY);
+    assert.equal(bangkokWorkDate(bkk(`${TOMORROW}T00:01:00`)), TOMORROW);
+  });
+});
