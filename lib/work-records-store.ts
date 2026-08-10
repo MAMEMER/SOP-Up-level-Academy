@@ -34,6 +34,20 @@ async function writeLocalStore(store: Record<string, WorkRecordDoc>) {
   await writeFile(LOCAL_STORE, JSON.stringify(store, null, 2), "utf8");
 }
 
+/** One owner's document for one scope window, or null. Used to merge against what is already stored. */
+export async function readRecord(ownerKey: string, scopeKey: string): Promise<WorkRecordDoc | null> {
+  const docId = workRecordDocId(ownerKey, scopeKey);
+
+  if (storageMode() === "firestore") {
+    const snapshot = await adminDb().collection(WORK_RECORDS_COLLECTION).doc(docId).get();
+    return snapshot.exists ? (snapshot.data() as WorkRecordDoc) : null;
+  }
+  if (storageMode() === "unavailable") return null;
+
+  const store = await readLocalStore();
+  return store[docId] ?? null;
+}
+
 /** All documents for one owner whose scopeKey falls in [from, to]. */
 export async function listRecordsInRange(ownerKey: string, from: string, to: string): Promise<WorkRecordDoc[]> {
   const range = workRecordIdRange(ownerKey, from, to);

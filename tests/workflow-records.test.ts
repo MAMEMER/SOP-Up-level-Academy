@@ -13,6 +13,7 @@ import {
   isWorkflowRecordOnTime,
   mergeDayMaps,
   phaseScheduleForWorkDate,
+  preserveFirstSubmission,
   recordsFromDayPayloads,
   shouldAutoMissWorkflowRecord,
   summarizeMonthlyRecords,
@@ -314,5 +315,70 @@ describe("workflow daily records", () => {
       greenRecord
     ];
     assert.equal(workflowVisualStatus(purpleRecords, "2026-07-06", "open-store"), "purple");
+  });
+});
+
+describe("preserveFirstSubmission (กดส่งซ้ำต้องไม่กลายเป็นส่งช้า)", () => {
+  const base = {
+    workDate: "2026-08-10",
+    phaseId: "open-store",
+    phaseTitle: "เปิดร้าน",
+    completed: 7,
+    total: 7,
+    status: "submitted" as const,
+    dueAt: "2026-08-10T13:00:00+07:00"
+  };
+  const first = { ...base, recordedAt: "2026-08-10T12:40:00+07:00", startedAt: "2026-08-10T11:12:00+07:00", submittedAt: "2026-08-10T12:40:00+07:00" };
+  const second = { ...base, recordedAt: "2026-08-10T15:03:00+07:00", startedAt: "2026-08-10T11:12:00+07:00", submittedAt: "2026-08-10T15:03:00+07:00" };
+
+  it("เก็บเวลาส่งครั้งแรกไว้ ไม่ให้รอบหลังทับ", () => {
+    const [merged] = preserveFirstSubmission([first], [second]);
+    assert.equal(merged.submittedAt, first.submittedAt);
+    assert.equal(isWorkflowRecordOnTime(merged), true);
+  });
+
+  it("หัวข้อที่ส่งทันเวลา ไม่กลายเป็นส่งช้าเพราะการกดซ้ำ", () => {
+    assert.equal(isWorkflowRecordOnTime(second), false);
+    assert.equal(isWorkflowRecordOnTime(preserveFirstSubmission([first], [second])[0]), true);
+  });
+
+  it("ยังเก็บเวลาเริ่มงานครั้งแรก", () => {
+    const restarted = { ...second, startedAt: "2026-08-10T14:50:00+07:00" };
+    assert.equal(preserveFirstSubmission([first], [restarted])[0].startedAt, first.startedAt);
+  });
+
+  it("หัวข้อที่ยังไม่เคยส่ง บันทึกเวลาส่งตามปกติ", () => {
+    const draft = { ...first, status: "saved" as const, submittedAt: undefined };
+    assert.equal(preserveFirstSubmission([draft], [second])[0].submittedAt, second.submittedAt);
+  });
+
+  it("หัวข้อใหม่ที่ยังไม่มีของเดิม ผ่านไปตรงๆ", () => {
+    assert.deepEqual(preserveFirstSubmission([], [second]), [second]);
+  });
+
+  it("admin ปลดล็อกให้ทำใหม่ → เวลาส่งรอบใหม่คือของจริง", () => {
+    const unlocked = { ...second, adminUnlockedAt: "2026-08-10T14:00:00+07:00" };
+    assert.equal(preserveFirstSubmission([first], [unlocked])[0].submittedAt, second.submittedAt);
+  });
+
+  it("ปลดล็อกก่อนการส่งครั้งแรก ไม่ถือว่าเปิดให้ส่งใหม่", () => {
+    const early = { ...first, adminUnlockedAt: "2026-08-10T09:00:00+07:00" };
+    const again = { ...second, adminUnlockedAt: "2026-08-10T09:00:00+07:00" };
+    assert.equal(preserveFirstSubmission([early], [again])[0].submittedAt, first.submittedAt);
+  });
+
+
+  it("แท็บเก่าที่ส่งข้อมูลชุดเดิมมาทับ ต้องไม่ลบหัวข้อที่ส่งไปแล้ว", () => {
+    const stock = { ...base, phaseId: "stock-work", phaseTitle: "Stock", recordedAt: "2026-08-10T14:00:00+07:00", submittedAt: "2026-08-10T14:00:00+07:00" };
+    const merged = preserveFirstSubmission([first, stock], [second]);
+    assert.equal(merged.length, 2);
+    assert.equal(merged.find((r) => r.phaseId === "stock-work")?.submittedAt, stock.submittedAt);
+  });
+
+  it("จับคู่ตาม phaseId ไม่ปนข้ามหัวข้อ", () => {
+    const other = { ...second, phaseId: "stock-work", phaseTitle: "Stock" };
+    const merged = preserveFirstSubmission([first], [second, other]);
+    assert.equal(merged[0].submittedAt, first.submittedAt);
+    assert.equal(merged[1].submittedAt, second.submittedAt);
   });
 });

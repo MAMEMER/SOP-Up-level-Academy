@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "../../../lib/auth.ts";
 import { employeeCodeForEmail, employeeDirectory } from "../../../lib/employee-directory.ts";
-import { listRecordsForScopeKey, listRecordsInRange, storageMode, upsertRecord } from "../../../lib/work-records-store.ts";
+import { listRecordsForScopeKey, listRecordsInRange, readRecord, storageMode, upsertRecord } from "../../../lib/work-records-store.ts";
+import { preserveFirstSubmission, type WorkflowDailyRecord } from "../../../lib/workflow-records.ts";
 import {
   MAX_WORK_RECORD_BYTES,
   employeeKeyFromEmail,
@@ -85,14 +86,27 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
   }
 
+  const employeeKey = ownerKeyFor(user.email, body.owner ?? null);
+  let data = body.data;
+
+  // กดส่งซ้ำต้องไม่เลื่อนเวลาส่งให้ช้าลง — ตัดสินจากเอกสารที่เก็บอยู่จริง ไม่ใช่จากสิ่งที่
+  // เบราว์เซอร์ส่งมา (แท็บที่เปิดค้างไว้จะมีข้อมูลเก่าและส่งเวลาปัจจุบันมาทับ)
+  if (body.scope === "daily" && Array.isArray((data as { records?: unknown }).records)) {
+    const stored = await readRecord(employeeKey, body.scopeKey);
+    const before = (stored?.data as { records?: WorkflowDailyRecord[] } | undefined)?.records;
+    if (before?.length) {
+      data = { ...data, records: preserveFirstSubmission(before, (data as { records: WorkflowDailyRecord[] }).records) };
+    }
+  }
+
   const record: WorkRecordDoc = {
-    employeeKey: ownerKeyFor(user.email, body.owner ?? null),
+    employeeKey,
     employeeEmail: user.email,
     employeeName: user.name,
     branch: branchForEmail(user.email),
     scope: body.scope,
     scopeKey: body.scopeKey,
-    data: body.data,
+    data,
     updatedAt: new Date().toISOString(),
     updatedBy: user.actualEmail
   };

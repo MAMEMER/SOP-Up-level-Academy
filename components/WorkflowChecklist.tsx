@@ -1037,6 +1037,12 @@ export function WorkflowChecklist({
 
     const recordedAt = new Date().toISOString();
     const schedule = phaseScheduleForWorkDate(phase.id, workDate, scheduleContext);
+    // ส่งซ้ำต้องไม่เลื่อนเวลาส่งให้ช้าลง (server ก็บังคับอีกชั้นใน /api/work-records)
+    const reopened =
+      existing?.adminUnlockedAt &&
+      existing.submittedAt &&
+      Date.parse(existing.adminUnlockedAt) > Date.parse(existing.submittedAt);
+    const submittedAt = !reopened && existing?.submittedAt ? existing.submittedAt : recordedAt;
     const next = upsertWorkflowRecord(todayRecords, {
       workDate,
       phaseId: phase.id,
@@ -1050,7 +1056,7 @@ export function WorkflowChecklist({
       scheduleStartAt: schedule.startAt,
       scheduleEndAt: schedule.endAt,
       checkedKeys,
-      submittedAt: recordStatus === "submitted" ? recordedAt : undefined,
+      submittedAt: recordStatus === "submitted" ? submittedAt : undefined,
       adminUnlockedAt: existing?.adminUnlockedAt,
       adminUnlockedBy: existing?.adminUnlockedBy
     });

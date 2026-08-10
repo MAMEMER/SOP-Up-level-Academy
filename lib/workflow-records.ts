@@ -48,6 +48,54 @@ export function recordsFromDayPayloads(payloads: Array<Partial<WorkflowDayPayloa
     );
 }
 
+const recordKey = (record: Pick<WorkflowDailyRecord, "workDate" | "phaseId">) => `${record.workDate}:${record.phaseId}`;
+
+function earlier(left?: string, right?: string) {
+  if (!left) return right;
+  if (!right) return left;
+  return Date.parse(left) <= Date.parse(right) ? left : right;
+}
+
+/**
+ * เวลาส่งงานต้องเป็น "ครั้งแรกที่กดส่ง" เสมอ.
+ *
+ * เดิมทุกครั้งที่บันทึก client ส่ง submittedAt = เวลาปัจจุบันมาทับของเดิม. พอพนักงานกดส่ง
+ * ซ้ำอีกรอบ (เปิดค้างไว้อีกแท็บ/อีกเครื่อง ที่ข้อมูลในหน้ายังเป็นก่อนส่ง จึงไม่โดน
+ * canEditWorkflowRecord กัน) เวลารอบหลังจะชนะ — หัวข้อที่ส่งทันเวลากลายเป็น "ส่งช้า"
+ * และโดนหัก KPI ทั้งที่ส่งตรงเวลา (เคสจริง: เปิดร้าน 10 ส.ค. กำหนด 13:00 กลายเป็น 15:03).
+ *
+ * ยกเว้นกรณีเดียว: admin ปลดล็อกให้ทำใหม่หลังจากส่งไปแล้ว — รอบนั้นเวลาใหม่คือของจริง.
+ *
+ * เป็น pure function และบังคับฝั่ง server เพราะ client เชื่อไม่ได้.
+ */
+export function preserveFirstSubmission(
+  existing: WorkflowDailyRecord[],
+  incoming: WorkflowDailyRecord[]
+): WorkflowDailyRecord[] {
+  const previous = new Map(existing.map((record) => [recordKey(record), record]));
+  const seen = new Set(incoming.map(recordKey));
+  const merged = incoming.map((record) => {
+    const before = previous.get(recordKey(record));
+    if (!before) return record;
+
+    const unlockedAfterSubmit =
+      Boolean(record.adminUnlockedAt) &&
+      (!before.submittedAt || Date.parse(record.adminUnlockedAt!) > Date.parse(before.submittedAt));
+
+    return {
+      ...record,
+      // งานเริ่มเมื่อไหร่ก็ต้องเป็นครั้งแรกเช่นกัน ไม่งั้น "ใช้เวลากี่นาที" เพี้ยนตาม
+      startedAt: earlier(before.startedAt, record.startedAt),
+      submittedAt: unlockedAfterSubmit ? record.submittedAt : earlier(before.submittedAt, record.submittedAt)
+    };
+  });
+
+  // แท็บที่เปิดค้างไว้จะส่ง "รายการทั้งวัน" แบบเก่ามาทับ — หัวข้อที่ส่งไปหลังจากนั้นจะหาย
+  // ทั้งใบ. เก็บของเดิมที่ไม่ได้ถูกส่งมาด้วยไว้เสมอ (ไม่มี UI ไหนลบ record อยู่แล้ว)
+  const dropped = existing.filter((record) => !seen.has(recordKey(record)));
+  return [...merged, ...dropped];
+}
+
 /** Merges the string maps (notes / details) across days — their keys are date-scoped. */
 export function mergeDayMaps(maps: Array<Record<string, string> | undefined>) {
   return Object.assign({}, ...maps.filter(Boolean)) as Record<string, string>;
