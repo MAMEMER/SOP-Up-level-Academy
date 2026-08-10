@@ -4,6 +4,8 @@ import { requireUser } from "../../../lib/auth.ts";
 import { isOwner } from "../../../lib/owner.ts";
 import { getOpsSummary } from "../../../lib/ops-summary.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
+import { getAdminNotifications } from "../../../lib/admin-notifications-server.ts";
+import { AdminNotificationCenter } from "../../../components/AdminNotificationCenter.tsx";
 
 // The owner's home. Signed in as an admin, "/" is still the staff dashboard — a personal
 // checklist nobody in charge fills in — so running the day meant hunting through ten nav
@@ -19,12 +21,17 @@ type Tool = {
   ownerOnly?: boolean;
 };
 
+// ตัวเลขบนหน้านี้ต้องสดเสมอ — เจ้าของร้านใช้ตัดสินใจว่าจะไปตามเรื่องไหนก่อน
+export const dynamic = "force-dynamic";
+
 export default async function AdminHubPage() {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
   const workDate = formatWorkDate();
   const summary = await getOpsSummary(workDate);
+  // ทุกเรื่องค้างจากทุกหน้า รวมมาไว้บนสุดของ hub — ไม่ต้องไล่เปิดทีละหน้าถึงจะรู้
+  const notifications = await getAdminNotifications(summary, workDate);
   const owner = isOwner(user.email);
 
   const waitingReview = summary.assignments.filter((item) => item.status === "submitted").length;
@@ -113,6 +120,8 @@ export default async function AdminHubPage() {
         </div>
       </section>
 
+      <AdminNotificationCenter items={notifications} />
+
       <section className="admin-hub__pulse">
         <Link href="/manager-review" className="board-stat">
           <span>Checklist วันนี้</span>
@@ -135,12 +144,6 @@ export default async function AdminHubPage() {
           <small>ค้างข้ามกะ</small>
         </Link>
       </section>
-
-      {summary.noRecordStaff.length ? (
-        <p className="admin-hub__nudge">
-          ยังไม่เริ่ม checklist วันนี้: <strong>{summary.noRecordStaff.join(" · ")}</strong>
-        </p>
-      ) : null}
 
       {groups.map((group) => (
         <section key={group.title} className="admin-hub__group">

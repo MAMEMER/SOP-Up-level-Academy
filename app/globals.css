@@ -5357,6 +5357,24 @@ main .page > section, main > section { margin-top: 16px !important; }
 .admin-hub__pulse .board-stat small { display: block; margin-top: 3px; font-size: 12px; color: var(--color-ink-soft); }
 .admin-hub__pulse .is-alert { color: #b91c1c; }
 
+/* ศูนย์รวมแจ้งเตือนบน Admin Hub */
+.admin-noti { margin: 0 0 20px; }
+.admin-noti__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.admin-noti__head h3 { margin: 2px 0 0; font-size: 18px; }
+.admin-noti__clear { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+.admin-noti__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.admin-noti__item { border-bottom: 1px solid rgba(45,49,66,0.08); }
+.admin-noti__item:last-child { border-bottom: none; }
+.admin-noti__item a { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; text-decoration: none; color: inherit; }
+.admin-noti__level { flex: 0 0 auto; min-width: 58px; text-align: center; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700; border: 1px solid rgba(45,49,66,0.18); color: var(--color-ink-soft); }
+.admin-noti__item--urgent .admin-noti__level { border-color: rgba(192,57,43,0.45); background: #ffe9e5; color: #a12312; }
+.admin-noti__item--warning .admin-noti__level { border-color: #fcd34d; background: #fffbeb; color: #78350f; }
+.admin-noti__body { min-width: 0; }
+.admin-noti__body small { display: block; font-size: 11.5px; font-weight: 600; color: var(--color-orange); }
+.admin-noti__body strong { display: block; font-size: 15px; margin: 1px 0; }
+.admin-noti__body em { display: block; font-style: normal; font-size: 13px; color: var(--color-ink-soft); overflow-wrap: anywhere; }
+.admin-noti__item a:hover .admin-noti__body strong { color: var(--color-orange); }
+
 .admin-hub__nudge {
   margin: 0 0 18px;
   padding: 10px 16px;
