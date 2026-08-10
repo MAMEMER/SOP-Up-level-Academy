@@ -89,7 +89,7 @@ export function MyScheduleView({
           <strong>{monthLabel(month)}</strong>
           <button type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="เดือนถัดไป">›</button>
         </div>
-        <p className="staff-schedule__note">ดูอย่างเดียว · แก้ไขได้เฉพาะแอดมิน</p>
+        <p className="staff-schedule__note">ดูอย่างเดียว · แก้ไขได้เฉพาะผู้มีสิทธิ์จัดการ</p>
       </header>
 
       {myRow ? (

@@ -130,8 +130,8 @@ export default async function AdminHubPage() {
     <main className="page">
       <section className="board-hero">
         <div>
-          <p className="eyebrow">ADMIN HUB</p>
-          <h2>ศูนย์กลางเจ้าของร้าน</h2>
+          <p className="eyebrow">ศูนย์รวมงานจัดการ</p>
+          <h2>ศูนย์กลางงานจัดการ</h2>
           <p>ทุกอย่างที่ต้องใช้จัดการทีม อยู่ในหน้านี้ที่เดียว · {workDate}</p>
         </div>
         <div className="hero-actions">

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { DigitalClock } from "./DigitalClock.tsx";
 import type { CurrentUser } from "../lib/auth.ts";
+import { isOwner } from "../lib/owner.ts";
 import { SOP_SESSION_COOKIE } from "../lib/auth-session.ts";
 import { VIEW_AS_COOKIE } from "../lib/impersonation.ts";
 
@@ -34,8 +35,10 @@ const adminLinks = [
   { href: "/monthly-summary", label: "สรุปรายเดือน" }
 ];
 
+// คำเรียก "ระดับสิทธิ์" ที่พนักงานเห็น — เป็นชื่อระดับสิทธิ์ ไม่ใช่ตำแหน่งเจ้าของ.
+// "เจ้าของ" มีแค่ 2 คน (แชมป์ + เนม) ตัดสินจาก isOwner() ด้านล่าง ไม่ใช่จาก role.
 const roleLabels: Record<string, string> = {
-  admin: "แอดมิน",
+  admin: "สิทธิ์จัดการ",
   leader: "หัวหน้า",
   employee: "พนักงาน"
 };
@@ -79,7 +82,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
         </section>
         {user.role === "admin" ? (
           <section>
-            <p className="sidebar-label">แอดมิน</p>
+            <p className="sidebar-label">งานจัดการ</p>
             <nav className="nav-list">
               {adminLinks.map((item) => (
                 <Link key={item.href} href={item.href}>
@@ -105,7 +108,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
             <p className="eyebrow">พื้นที่ทำงาน</p>
             <h1>{user.name}</h1>
             <p>
-              {roleLabels[user.role] ?? user.role} · {user.departmentId ? user.departmentId : "ยังไม่ระบุแผนก"}
+              {isOwner(user.email) ? "เจ้าของ" : (roleLabels[user.role] ?? user.role)} · {user.departmentId ? user.departmentId : "ยังไม่ระบุแผนก"}
             </p>
           </div>
           <div className="topbar-actions">

@@ -251,13 +251,13 @@ export function AssignmentDetail({
 
       {record.trackingNumber || record.attachments?.length ? (
         <section className="assignment-detail__brief soft-card">
-          <p className="assign-work__label">ข้อมูล/ไฟล์ประกอบจากเจ้าของร้าน</p>
+          <p className="assign-work__label">ข้อมูล/ไฟล์ประกอบจากผู้สั่งงาน</p>
           {record.trackingNumber ? (
             <p><strong>เลขแทค / พัสดุ ส่งสินค้า:</strong> {record.trackingNumber}</p>
           ) : null}
           {record.attachments?.length ? (
             <div className="assignment-detail__attachments">
-              <p className="assign-work__label">ไฟล์แนบจากเจ้าของร้าน</p>
+              <p className="assign-work__label">ไฟล์แนบจากผู้สั่งงาน</p>
               <div className="assignment-detail__evidence-view">
                 {record.attachments.map((u) =>
                   isImageUrl(u) ? (
@@ -274,12 +274,12 @@ export function AssignmentDetail({
 
       {record.status === "needs_revision" && record.revisionNote ? (
         <section className="assignment-detail__revision soft-card">
-          <p className="assign-work__label">เจ้าของร้านขอให้แก้ไข</p>
+          <p className="assign-work__label">ผู้ตรวจงานขอให้แก้ไข</p>
           <p>{record.revisionNote}</p>
         </section>
       ) : null}
 
-      {saved ? <p className="assignment-detail__ok">✓ ส่งงานเรียบร้อย รอเจ้าของร้านตรวจ</p> : null}
+      {saved ? <p className="assignment-detail__ok">✓ ส่งงานเรียบร้อย รอผู้ตรวจงานตรวจ</p> : null}
 
       <section className="performance-manual-input-grid">
         {/* Submit / edit — available to the assigned staff (and owner) while still actionable */}

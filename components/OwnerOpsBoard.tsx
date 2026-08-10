@@ -65,7 +65,7 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
         <div className="board-stat">
           <span>ปัญหาบริการวันนี้</span>
           <strong className={summary.serviceIssues.length ? "is-alert" : undefined}>{summary.serviceIssues.length}</strong>
-          <small>จากที่แอดมินบันทึก</small>
+          <small>จากที่ทีมจัดการบันทึก</small>
         </div>
       </section>
 

@@ -175,7 +175,7 @@ export function AssignWork({
 
         {/* 1. หน้าที่ใคร — ผู้รับผิดชอบ */}
         <div className="assign-work__field">
-          <span className="assign-work__field-label">1. ผู้รับผิดชอบ <span className="assign-work__req">*</span> — ใครเป็นเจ้าของงานนี้</span>
+          <span className="assign-work__field-label">1. ผู้รับผิดชอบ <span className="assign-work__req">*</span> — ใครรับผิดชอบงานนี้</span>
           <div className="assign-work__staff-pick">
             {teams.length > 0 ? (
               <div className="assign-work__team-pick">

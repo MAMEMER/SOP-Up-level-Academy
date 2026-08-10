@@ -83,7 +83,7 @@ export function MyAssignedWork({
       {loading ? (
         <p className="my-shift__loading">กำลังโหลด…</p>
       ) : total === 0 ? (
-        <p className="my-shift__empty">ยังไม่มีงานที่เจ้าของร้านมอบหมายให้คุณ</p>
+        <p className="my-shift__empty">ยังไม่มีงานที่ได้รับมอบหมาย</p>
       ) : (
         <div className="my-assigned__groups">
           {renderGroup("ต้องแก้ไข", groups.revision, "is-red")}
