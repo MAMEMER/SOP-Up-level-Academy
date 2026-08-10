@@ -7,8 +7,10 @@ import {
   buildShiftWindows,
   deliveryTargetsFor,
   nextShiftTargetFor,
+  summariseOrderLines,
   DELIVERY_DUE_DAYS,
   type DeliveryTask,
+  type OrderLine,
   type ShiftWindows
 } from "./delivery-tasks.ts";
 
@@ -52,12 +54,11 @@ const ORDER_FIELDS = [
 ] as const;
 
 type OrderCustomer = { name?: string; phone?: string; address?: string; note?: string };
-type OrderItem = { sku?: string; name?: string; qty?: number };
 type OrderDoc = {
   status?: string;
   slipStatus?: string;
   customer?: OrderCustomer;
-  items?: OrderItem[];
+  items?: OrderLine[];
   total?: number;
   source?: string;
   createdAt?: unknown;
@@ -65,6 +66,7 @@ type OrderDoc = {
   manualPaidAt?: unknown;
   product?: string;
   qty?: number;
+  totalPieces?: number;
 };
 
 function toDate(value: unknown): Date | null {
@@ -95,18 +97,10 @@ function paidAtOf(order: OrderDoc): Date | null {
 }
 
 function summariseItems(order: OrderDoc): { summary: string; count: number } {
-  const items = Array.isArray(order.items) ? order.items : [];
-  if (!items.length) {
-    // ออเดอร์ shield ไม่มี items[] — เก็บชื่อสินค้ากับจำนวนไว้แทน
-    const qty = Number(order.qty) || 0;
-    return order.product ? { summary: qty ? `${order.product} ×${qty}` : order.product, count: qty || 1 } : { summary: "", count: 0 };
-  }
-  const count = items.reduce((total, item) => total + (Number(item.qty) || 0), 0);
-  const summary = items
-    .slice(0, 4)
-    .map((item) => `${item.name || item.sku || "สินค้า"}${Number(item.qty) > 1 ? ` ×${item.qty}` : ""}`)
-    .join(", ");
-  return { summary: items.length > 4 ? `${summary} …อีก ${items.length - 4} รายการ` : summary, count };
+  return summariseOrderLines(Array.isArray(order.items) ? order.items : [], {
+    product: order.product,
+    pieces: Number(order.totalPieces) || Number(order.qty) || 0
+  });
 }
 
 type ShiftCell = { staffCode: string; shift: ShiftCode; startTime?: string };
@@ -211,6 +205,7 @@ export async function syncDeliveryTasks(branch: string, now = new Date()): Promi
       customerName: customer.name || "",
       customerPhone: customer.phone || "",
       customerAddress: customer.address || "",
+      customerNote: customer.note || "",
       itemsSummary: summary,
       itemCount: count,
       total: Number(order.total) || 0,

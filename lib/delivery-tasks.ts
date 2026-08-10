@@ -49,7 +49,10 @@ export type DeliveryTask = {
   customerName: string;
   customerPhone: string;
   customerAddress: string;
+  /** หมายเหตุที่ลูกค้าฝากไว้ตอนสั่ง เช่น "โทรก่อน" — คนแพ็คต้องเห็น */
+  customerNote: string;
   itemsSummary: string;
+  /** จำนวนชิ้นที่ต้องหยิบใส่กล่องจริง (รวมของแถมแล้ว) ไม่ใช่จำนวนที่สั่ง */
   itemCount: number;
   total: number;
   /** ISO เวลาที่ยืนยันว่าจ่ายแล้ว */
@@ -268,6 +271,41 @@ export function deliveryTargetLabel(task: DeliveryTask): string {
     .filter((target): target is { workDate: string; shift: ShiftCode } => target !== null)
     .map((target) => `${target.workDate} ${target.shift === "s1" ? "กะ 1" : "กะ 2"}`)
     .join(" · ");
+}
+
+/** รายการสินค้าหนึ่งบรรทัดในออเดอร์เว็บกิลด์ */
+export type OrderLine = {
+  sku?: string;
+  name?: string;
+  /** จำนวนที่ลูกค้ากดสั่ง */
+  qty?: number;
+  /** จำนวนชิ้นจริงรวมของแถม (ออเดอร์ shield แถม 1 ทุก 10) */
+  pieces?: number;
+};
+
+export function orderLineLabel(item: OrderLine): string {
+  const name = item.name || item.sku || "สินค้า";
+  const qty = Number(item.qty) || 0;
+  // ชื่อสินค้าบางรายการใส่จำนวนมาในชื่อแล้ว (เช่น "Up Level Shield ×10 (+1 ฟรี = 11 ชิ้น)")
+  // ต่อท้ายซ้ำจะกลายเป็น "×10 … ×10" อ่านแล้วสับสนตอนแพ็ค
+  return qty > 1 && !name.includes(`×${qty}`) ? `${name} ×${qty}` : name;
+}
+
+/**
+ * สรุปของที่ต้องแพ็ค. จำนวนนับจาก `pieces` ก่อนเสมอ — คนแพ็คต้องหยิบตามจำนวนชิ้นจริง
+ * (รวมของแถม) ไม่ใช่จำนวนที่ลูกค้ากดสั่ง.
+ */
+export function summariseOrderLines(
+  lines: OrderLine[],
+  fallback?: { product?: string; pieces?: number }
+): { summary: string; count: number } {
+  if (!lines.length) {
+    const pieces = Number(fallback?.pieces) || 0;
+    return fallback?.product ? { summary: fallback.product, count: pieces } : { summary: "", count: 0 };
+  }
+  const count = lines.reduce((total, line) => total + (Number(line.pieces) || Number(line.qty) || 0), 0);
+  const summary = lines.slice(0, 4).map(orderLineLabel).join(", ");
+  return { summary: lines.length > 4 ? `${summary} …อีก ${lines.length - 4} รายการ` : summary, count };
 }
 
 /** เรียงงานที่ต้องส่ง: เลยกำหนดก่อน แล้วค่อยตามกำหนดส่ง */

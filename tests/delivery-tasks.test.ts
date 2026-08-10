@@ -15,6 +15,7 @@ import {
   resolveShiftRouting,
   shiftTargetKey,
   sortDeliveryTasks,
+  summariseOrderLines,
   type DeliveryTask,
   type ShiftWindows
 } from "../lib/delivery-tasks.ts";
@@ -47,6 +48,7 @@ function task(overrides: Partial<DeliveryTask> = {}): DeliveryTask {
     customerName: "ลูกค้า ก",
     customerPhone: "0800000000",
     customerAddress: "123 ถนนเพชรเกษม",
+    customerNote: "",
     itemsSummary: "Booster Box ×1",
     itemCount: 1,
     total: 3990,
@@ -278,6 +280,40 @@ describe("deliveryTargetLabel / sortDeliveryTasks", () => {
     const shipped = task({ id: "shipped", status: "shipped", dueDate: "2026-08-09" });
     const sorted = sortDeliveryTasks([shipped, later, soon, late], TODAY);
     assert.deepEqual(sorted.map((item) => item.id), ["late", "soon", "later", "shipped"]);
+  });
+});
+
+describe("summariseOrderLines", () => {
+  // ออเดอร์ shield จริง (2026-08-10): ชื่อสินค้ามีจำนวนอยู่ในตัวแล้ว และแถม 1 ทุก 10
+  const shieldLine = { sku: "SHIELD", name: "Up Level Shield ×10 (+1 ฟรี = 11 ชิ้น)", qty: 10, pieces: 11 };
+
+  it("นับตามจำนวนชิ้นจริงที่ต้องหยิบใส่กล่อง ไม่ใช่จำนวนที่ลูกค้ากดสั่ง", () => {
+    assert.equal(summariseOrderLines([shieldLine]).count, 11);
+  });
+
+  it("ไม่ต่อ ×10 ซ้ำเมื่อชื่อสินค้ามีอยู่แล้ว", () => {
+    assert.equal(summariseOrderLines([shieldLine]).summary, "Up Level Shield ×10 (+1 ฟรี = 11 ชิ้น)");
+  });
+
+  it("ยังต่อจำนวนให้สินค้าทั่วไปที่ชื่อไม่มีจำนวน", () => {
+    assert.equal(summariseOrderLines([{ name: "Booster Box", qty: 3 }]).summary, "Booster Box ×3");
+    assert.equal(summariseOrderLines([{ name: "Booster Box", qty: 1 }]).summary, "Booster Box");
+  });
+
+  it("ไม่มี pieces ก็นับจาก qty", () => {
+    assert.equal(summariseOrderLines([{ name: "Sleeve", qty: 2 }, { name: "Deck Box", qty: 1 }]).count, 3);
+  });
+
+  it("ย่อรายการยาวแทนที่จะพ่นทั้งหมด", () => {
+    const many = Array.from({ length: 6 }, (_, index) => ({ name: `สินค้า ${index + 1}`, qty: 1 }));
+    assert.match(summariseOrderLines(many).summary, /…อีก 2 รายการ$/);
+  });
+
+  it("ออเดอร์ที่ไม่มี items ตกไปใช้ชื่อสินค้ากับจำนวนชิ้นรวม", () => {
+    assert.deepEqual(summariseOrderLines([], { product: "up-level-shield", pieces: 11 }), {
+      summary: "up-level-shield",
+      count: 11
+    });
   });
 });
 

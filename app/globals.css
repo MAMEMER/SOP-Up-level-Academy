@@ -4366,6 +4366,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 .delivery-item__meta { margin: 0; font-size: 12px; color: var(--color-orange); font-weight: 600; }
 .delivery-item__items, .delivery-item__address, .delivery-item__phone { margin: 2px 0; font-size: 13px; color: var(--color-ink-soft); overflow-wrap: anywhere; }
 .delivery-item__phone a { color: var(--color-orange); text-decoration: none; }
+.delivery-item__note { margin: 4px 0 0; font-size: 13px; color: #8a4b00; font-weight: 600; overflow-wrap: anywhere; }
 .delivery-item__status { display: block; margin-top: 4px; font-size: 12.5px; font-style: normal; color: var(--color-ink-soft); }
 .delivery-item--overdue .delivery-item__status { color: #c0392b; font-weight: 600; }
 .delivery-item--done .delivery-item__status { color: #2e7d5b; }

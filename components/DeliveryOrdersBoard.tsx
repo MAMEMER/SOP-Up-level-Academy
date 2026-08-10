@@ -117,6 +117,7 @@ export function DeliveryOrdersBoard({
                   {task.total ? ` · ${task.total.toLocaleString("th-TH")} บาท` : ""}
                 </p>
                 {task.customerAddress ? <p className="delivery-item__address">{task.customerAddress}</p> : null}
+                {task.customerNote ? <p className="delivery-item__note">หมายเหตุลูกค้า: {task.customerNote}</p> : null}
                 {task.customerPhone ? (
                   <p className="delivery-item__phone">
                     <a href={`tel:${task.customerPhone}`}>{task.customerPhone}</a>
