@@ -82,12 +82,19 @@ export function preserveFirstSubmission(
       Boolean(record.adminUnlockedAt) &&
       (!before.submittedAt || Date.parse(record.adminUnlockedAt!) > Date.parse(before.submittedAt));
 
-    return {
-      ...record,
-      // งานเริ่มเมื่อไหร่ก็ต้องเป็นครั้งแรกเช่นกัน ไม่งั้น "ใช้เวลากี่นาที" เพี้ยนตาม
-      startedAt: earlier(before.startedAt, record.startedAt),
-      submittedAt: unlockedAfterSubmit ? record.submittedAt : earlier(before.submittedAt, record.submittedAt)
-    };
+    // งานเริ่มเมื่อไหร่ก็ต้องเป็นครั้งแรกเช่นกัน ไม่งั้น "ใช้เวลากี่นาที" เพี้ยนตาม
+    const startedAt = earlier(before.startedAt, record.startedAt);
+    const submittedAt = unlockedAfterSubmit ? record.submittedAt : earlier(before.submittedAt, record.submittedAt);
+
+    // ห้ามใส่คีย์ที่ค่าเป็น undefined: ฝั่ง client คีย์พวกนี้หายไปตอน JSON.stringify แต่ของที่
+    // ประกอบขึ้นบน server จะเหลือ undefined จริงๆ แล้ว Firestore ปฏิเสธทั้ง document
+    // (หัวข้อที่ยังไม่ได้ส่งจึงบันทึกไม่ได้เลยทั้งวัน)
+    const merged: WorkflowDailyRecord = { ...record };
+    if (startedAt) merged.startedAt = startedAt;
+    else delete merged.startedAt;
+    if (submittedAt) merged.submittedAt = submittedAt;
+    else delete merged.submittedAt;
+    return merged;
   });
 
   // แท็บที่เปิดค้างไว้จะส่ง "รายการทั้งวัน" แบบเก่ามาทับ — หัวข้อที่ส่งไปหลังจากนั้นจะหาย

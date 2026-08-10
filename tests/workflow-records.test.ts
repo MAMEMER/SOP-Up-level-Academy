@@ -401,3 +401,31 @@ describe("summarisePresses (ประวัติการกดส่งงา�
     assert.match(summarisePresses([press("2026-08-10T12:40", false)], at), /ไม่ถึงระบบ 1 ครั้ง/);
   });
 });
+
+describe("preserveFirstSubmission — ห้ามปล่อยค่า undefined ออกไป (Firestore ปฏิเสธทั้ง doc)", () => {
+  const draft = {
+    workDate: "2026-08-10",
+    phaseId: "stock-work",
+    phaseTitle: "Stock",
+    completed: 2,
+    total: 5,
+    status: "saved" as const,
+    recordedAt: "2026-08-10T16:01:00+07:00"
+  };
+
+  const undefinedKeys = (record: Record<string, unknown>) =>
+    Object.entries(record).filter(([, value]) => value === undefined).map(([key]) => key);
+
+  it("หัวข้อที่ยังไม่ส่ง (ไม่มี submittedAt/startedAt) ต้องไม่มีคีย์ค่า undefined หลุดไป", () => {
+    const [merged] = preserveFirstSubmission([draft], [draft]);
+    assert.deepEqual(undefinedKeys(merged as unknown as Record<string, unknown>), []);
+    assert.equal("submittedAt" in merged, false);
+    assert.equal("startedAt" in merged, false);
+  });
+
+  it("ของเดิมมีเวลา ของใหม่ไม่มี ก็ยังเก็บของเดิมไว้", () => {
+    const before = { ...draft, startedAt: "2026-08-10T11:12:00+07:00" };
+    const [merged] = preserveFirstSubmission([before], [draft]);
+    assert.equal(merged.startedAt, before.startedAt);
+  });
+});
