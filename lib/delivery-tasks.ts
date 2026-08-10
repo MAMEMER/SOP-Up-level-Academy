@@ -238,13 +238,24 @@ export function deliveryTaskVisibleTo(task: DeliveryTask, viewer: DeliveryViewer
   if (viewer.isAdmin) return true;
   if (!viewer.staffCode) return false;
   if (task.claimedBy === viewer.staffCode) return true;
-  if (viewer.shiftToday && task.targets.includes(shiftTargetKey(viewer.today, viewer.shiftToday))) return true;
+  // ส่งไปแล้วไม่ต้องกลับมารกหน้าคนอื่น (ต้องเช็คก่อนกฎงานตกค้างด้านล่าง)
   if (task.status === "shipped") return false;
-  // ยังไม่ได้ลงตารางกะวันที่ลูกค้าจ่ายเงิน → ไม่มีกะไหนถูก target. ห้ามให้ออเดอร์หายไป
-  // จากสายตาทุกคน ให้ staff ที่ล็อกอินเห็นไว้ก่อน
+  if (isOwnShiftTask(task, viewer)) return true;
+  // ไม่มีกะไหนถูกกำหนดเลย (วันนั้นยังไม่ได้ลงตารางกะ) → ห้ามให้ออเดอร์หายไปจากสายตาทุกคน
   if (!task.targets.length) return true;
-  const stale = task.targets.every((key) => (parseShiftTarget(key)?.workDate ?? "") < viewer.today);
-  return stale && Boolean(viewer.shiftToday);
+  // อยู่ร้านวันนี้ = เห็นออเดอร์ที่ยังไม่ได้ส่งทุกใบ ถึงจะไม่ใช่ของกะตัวเอง.
+  // กติกา 15:00 บอกว่าใบไหน "เป็นงานของกะไหน" ไม่ใช่ว่าใครห้ามเห็น — คนที่ยืนอยู่หน้าร้าน
+  // ต้องหยิบงานแทนกันได้ ไม่งั้นออเดอร์ที่กะเช้าทำไม่ทันจะหายไปจากสายตากะบ่ายทั้งใบ
+  return Boolean(viewer.shiftToday);
+}
+
+/** ใบนี้เป็นงานของกะที่คนดูเข้าวันนี้หรือเปล่า — ใช้จัดลำดับและติดป้าย ไม่ใช่ตัวกันการมองเห็น */
+export function isOwnShiftTask(task: DeliveryTask, viewer: DeliveryViewer): boolean {
+  if (!viewer.shiftToday) return false;
+  if (task.targets.includes(shiftTargetKey(viewer.today, viewer.shiftToday))) return true;
+  // ไม่มีกะไหนถูก target (ยังไม่ได้ลงตารางวันนั้น) หรือเลยวันที่กำหนดไว้แล้ว → ตกเป็นของคนที่อยู่วันนี้
+  if (!task.targets.length) return true;
+  return task.targets.every((key) => (parseShiftTarget(key)?.workDate ?? "") < viewer.today);
 }
 
 export function deliveryTaskState(task: DeliveryTask, today: string): DeliveryTaskState {

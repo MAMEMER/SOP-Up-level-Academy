@@ -78,7 +78,13 @@ export default async function HomePage() {
         branch={branch}
       />
 
-      <DeliveryOrdersBoard branch={branch} initialTasks={deliveryTasks} initialToday={workDate} canAct={!user.isImpersonating} />
+      <DeliveryOrdersBoard
+        branch={branch}
+        initialTasks={deliveryTasks}
+        initialToday={workDate}
+        initialShift={shiftToday}
+        canAct={!user.isImpersonating}
+      />
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={staffCode} branch={branch} />
       <DashboardTaskSections

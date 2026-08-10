@@ -9,6 +9,7 @@ import {
   deliveryTargetsFor,
   deliveryTaskState,
   deliveryTaskVisibleTo,
+  isOwnShiftTask,
   minutesOfDay,
   nextShiftTargetFor,
   parseShiftTarget,
@@ -199,9 +200,15 @@ describe("deliveryTaskVisibleTo", () => {
     assert.equal(deliveryTaskVisibleTo(task(), admin), true);
   });
 
-  it("พนักงานเห็นเฉพาะใบที่ target กะตัวเองวันนี้", () => {
+  it("คนที่เข้ากะวันนี้เห็นออเดอร์ที่ยังไม่ส่งทุกใบ แม้ไม่ใช่ของกะตัวเอง (หยิบแทนกันได้)", () => {
     assert.equal(deliveryTaskVisibleTo(task(), opener), true);
-    assert.equal(deliveryTaskVisibleTo(task(), closer), false);
+    assert.equal(deliveryTaskVisibleTo(task(), closer), true);
+  });
+
+  it("แต่ยังแยกออกว่าใบไหนเป็นงานของกะใคร", () => {
+    assert.equal(isOwnShiftTask(task(), opener), true);
+    assert.equal(isOwnShiftTask(task(), closer), false);
+    assert.equal(isOwnShiftTask(task(), dayOff), false);
   });
 
   it("ใบที่ target ทั้งสองกะ ทั้งคู่เห็น", () => {

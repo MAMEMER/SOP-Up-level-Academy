@@ -12,8 +12,10 @@ import {
   deliveryStatusText,
   deliveryTargetLabel,
   deliveryTaskState,
+  isOwnShiftTask,
   type DeliveryTask
 } from "../lib/delivery-tasks.ts";
+import type { ShiftCode } from "../lib/shift-schedule.ts";
 import { claimDelivery, fetchDeliveryFeed, handoffDelivery, shipDelivery } from "../lib/delivery-tasks-store.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 
@@ -23,16 +25,19 @@ export function DeliveryOrdersBoard({
   branch,
   canAct = true,
   initialTasks = [],
-  initialToday = ""
+  initialToday = "",
+  initialShift = null
 }: {
   branch: string;
   canAct?: boolean;
   /** งานที่ server render ไว้แล้ว — กัน sync ซ้ำรอบสองตอนหน้าโหลด */
   initialTasks?: DeliveryTask[];
   initialToday?: string;
+  initialShift?: ShiftCode | null;
 }) {
   const [tasks, setTasks] = useState<DeliveryTask[]>(initialTasks);
   const [today, setToday] = useState(initialToday);
+  const [shiftToday, setShiftToday] = useState<ShiftCode | null>(initialShift);
   const [loading, setLoading] = useState(!initialToday);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -43,6 +48,7 @@ export function DeliveryOrdersBoard({
       const feed = await fetchDeliveryFeed(branch);
       setTasks(feed.tasks);
       setToday(feed.today);
+      setShiftToday(feed.shiftToday);
       setError("");
     } catch {
       setError("โหลดออเดอร์ไม่สำเร็จ ลองรีเฟรชอีกครั้ง");
@@ -73,6 +79,11 @@ export function DeliveryOrdersBoard({
     }
   }
 
+  // งานของกะตัวเองขึ้นก่อน ที่เหลือเป็นงานของกะอื่นที่ยังค้าง — เห็นไว้เพื่อหยิบแทนกันได้
+  const viewer = { isAdmin: false, staffCode: "self", shiftToday, today };
+  const ordered = [...tasks].sort(
+    (left, right) => Number(isOwnShiftTask(right, viewer)) - Number(isOwnShiftTask(left, viewer))
+  );
   const remaining = tasks.filter((task) => task.status !== "shipped");
   const overdue = remaining.filter((task) => deliveryTaskState(task, today) === "overdue");
   const headline = loading
@@ -100,15 +111,17 @@ export function DeliveryOrdersBoard({
       ) : null}
 
       <ul className="delivery-board__list">
-        {tasks.map((task) => {
+        {ordered.map((task) => {
           const state = deliveryTaskState(task, today);
           const busy = busyId === task.id;
+          const mine = isOwnShiftTask(task, viewer);
           return (
             <li key={task.id} className={`delivery-item delivery-item--${state}`}>
               <div className="delivery-item__main">
                 <p className="delivery-item__meta">
                   #{task.orderCode} · {deliveryTargetLabel(task)}
                   {task.handedOffBy ? ` · ส่งต่อโดย ${displayNameFor(task.handedOffBy)}` : ""}
+                  {shiftToday && !mine ? <span className="delivery-item__other">ของกะอื่น</span> : null}
                 </p>
                 <strong>{task.customerName || "ไม่ระบุชื่อผู้รับ"}</strong>
                 <p className="delivery-item__items">
