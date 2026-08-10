@@ -237,6 +237,9 @@ export function deliveryTaskVisibleTo(task: DeliveryTask, viewer: DeliveryViewer
   if (task.claimedBy === viewer.staffCode) return true;
   if (viewer.shiftToday && task.targets.includes(shiftTargetKey(viewer.today, viewer.shiftToday))) return true;
   if (task.status === "shipped") return false;
+  // ยังไม่ได้ลงตารางกะวันที่ลูกค้าจ่ายเงิน → ไม่มีกะไหนถูก target. ห้ามให้ออเดอร์หายไป
+  // จากสายตาทุกคน ให้ staff ที่ล็อกอินเห็นไว้ก่อน
+  if (!task.targets.length) return true;
   const stale = task.targets.every((key) => (parseShiftTarget(key)?.workDate ?? "") < viewer.today);
   return stale && Boolean(viewer.shiftToday);
 }

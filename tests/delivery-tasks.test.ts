@@ -224,6 +224,12 @@ describe("deliveryTaskVisibleTo", () => {
     assert.equal(deliveryTaskVisibleTo(stale, dayOff), false);
   });
 
+  it("ยังไม่ได้ลงตารางกะ → ทุกคนที่ล็อกอินเห็น ห้ามให้ออเดอร์หายไปเงียบ", () => {
+    const unrostered = task({ targets: [] });
+    assert.equal(deliveryTaskVisibleTo(unrostered, opener), true);
+    assert.equal(deliveryTaskVisibleTo(unrostered, dayOff), true);
+  });
+
   it("ใบเก่าที่ส่งไปแล้ว ไม่กลับมารกหน้ากะอื่น", () => {
     const shipped = task({
       targets: [shiftTargetKey("2026-08-09", "s2")],
