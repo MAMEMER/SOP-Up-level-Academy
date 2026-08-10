@@ -5,7 +5,7 @@ import type { Role } from "./permissions.ts";
 // in with a Google account NOT on this list is denied. Keep emails lowercase.
 //
 // ทั้งสองค่าเป็น "ระดับสิทธิ์ของพนักงาน" ไม่มีค่าไหนแปลว่าเจ้าของร้าน:
-//   admin    = พนักงานที่จัดการงานได้ (วางแผน มอบหมาย ตรวจงาน) — Champ, เนม, ก้อง
+//   admin    = สิทธิ์จัดการงาน (วางแผน มอบหมาย ตรวจงาน) — มีแค่แชมป์กับเนม
 //   employee = พนักงานหน้าร้าน — ตารางกะของตัวเอง + checklist + งานส่งต่อ
 // เจ้าของร้านมีแค่แชมป์กับเนม เป็นคนละชั้นที่อยู่เหนือทั้งสองค่านี้ กำหนดที่ lib/owner.ts
 // และเป็นชั้นเดียวที่เห็นตัวเลขเงินเดือน/การหักเงิน.
@@ -25,7 +25,7 @@ export type SopUser = {
 export const sopUsers: SopUser[] = [
   { email: "champ.championest@gmail.com", name: "Champ Master", role: "admin", departmentId: "admin" },
   { email: "namenrw@gmail.com", name: "Namen RW", role: "admin", departmentId: "admin" },
-  { email: "thanakornjoeblack@gmail.com", name: "Kongh", role: "admin", departmentId: "front-store" },
+  { email: "thanakornjoeblack@gmail.com", name: "Kongh", role: "employee", departmentId: "front-store" },
   { email: "waranon4work@gmail.com", name: "Non", role: "employee", departmentId: "front-store" },
   { email: "wipop.tho@gmail.com", name: "Pee", role: "employee", departmentId: "front-store" },
   { email: "boomboom08755@gmail.com", name: "บูม", role: "employee", departmentId: "front-store" },
