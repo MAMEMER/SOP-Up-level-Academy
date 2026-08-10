@@ -12,6 +12,8 @@
 // หมายเหตุ: โพสต์ประกาศกิจกรรม + โพสต์ขอบคุณ "ไม่อยู่" ใน checklist นี้ — แยกไปเป็น Assigned work
 // บน Dashboard (ที่นี่มีแค่ช่องกรอกลิงก์โพสต์ไว้อ้างอิงในใบสรุป)
 
+import type { ItemLink } from "./checklist-links.ts";
+
 export const WEEKLY_EVENT_COMPLETION_SCOPE = "weekly-event" as const;
 
 export type WeeklyEventFieldType = "text" | "number" | "time" | "url" | "textarea";
@@ -33,6 +35,10 @@ export type WeeklyEventChecklistItem = {
   hint?: string;
   /** บล็อกช่วยเหลือพิเศษใต้ item */
   extra?: "table-rule" | "pairing-link";
+  /** เจ้าของแนบ: คำอธิบายว่าต้องทำอะไร (/admin/checklist-config/weekly) */
+  note?: string;
+  /** เจ้าของแนบ: ปุ่มกดไปหน้างานจริง (/admin/checklist-config/weekly) */
+  links?: ItemLink[];
 };
 
 export type WeeklyEvent = {

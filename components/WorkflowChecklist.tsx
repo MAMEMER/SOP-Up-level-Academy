@@ -22,7 +22,8 @@ import {
   type WorkflowDayPayload,
   type WorkflowRecordStatus
 } from "../lib/workflow-records.ts";
-import { evidenceForItem, type ChecklistEvidence, type PhaseWindows } from "../lib/daily-checklist.ts";
+import { evidenceForItem, guideForItem, type ChecklistEvidence, type ChecklistGuides, type PhaseWindows } from "../lib/daily-checklist.ts";
+import { ChecklistItemGuide } from "./ChecklistItemGuide.tsx";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 import { useWorkRecordWindow } from "../lib/work-records-client.ts";
 import { SaveIndicator } from "./SaveIndicator.tsx";
@@ -891,6 +892,7 @@ export function WorkflowChecklist({
   shift = null,
   windows,
   evidence,
+  guides,
   readOnly = false
 }: {
   phases: WorkflowPhase[];
@@ -902,6 +904,8 @@ export function WorkflowChecklist({
   windows?: PhaseWindows;
   /** Owner-configured หลักฐาน (รูป/ลิงก์) that a checklist item must attach (/admin/checklist-config). */
   evidence?: ChecklistEvidence;
+  /** Owner-configured รายละเอียด + ปุ่มลิงก์ shown under a checklist item (/admin/checklist-config). */
+  guides?: ChecklistGuides;
   /** Admin previewing another account — render everything, save nothing. */
   readOnly?: boolean;
 }) {
@@ -1361,8 +1365,10 @@ export function WorkflowChecklist({
                   const hasDetail = itemHasHardcodedDetail(phase.id, index);
                   // หลักฐานที่ owner ตั้งไว้ที่ /admin/checklist-config — แสดงเฉพาะรายการที่ไม่มี panel เฉพาะทางอยู่แล้ว
                   const itemEvidence = hasDetail ? undefined : evidenceForItem(evidence, phase.id, item);
+                  // รายละเอียด + ปุ่มลิงก์ ที่ owner ตั้งไว้ — แสดงได้กับทุกรายการ (ไม่ชนกับ panel เฉพาะทาง)
+                  const itemGuide = guideForItem(guides, phase.id, item);
                   return (
-                    <div key={key} className={hasDetail || itemEvidence ? "tick-group has-detail" : "tick-group"}>
+                    <div key={key} className={hasDetail || itemEvidence || itemGuide ? "tick-group has-detail" : "tick-group"}>
                       <label
                         className={`${checked[key] ? "tick-row done" : "tick-row"}${canEdit && !disabledByNoOrder ? "" : " locked"}`}
                       >
@@ -1452,6 +1458,7 @@ export function WorkflowChecklist({
                           ) : null}
                         </div>
                       ) : null}
+                      <ChecklistItemGuide note={itemGuide?.note} links={itemGuide?.links} />
                     </div>
                   );
                 })}

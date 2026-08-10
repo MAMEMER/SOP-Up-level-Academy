@@ -12,13 +12,16 @@ import {
   moveChecklistItem,
   moveChecklistItemWithin,
   pruneEvidence,
+  pruneGuides,
   seedOverridesFromPhases,
   seedShiftsFromPhases,
   seedWindowsFromPhases,
   type ChecklistConfig,
   type EvidenceKind,
-  type ItemEvidence
+  type ItemEvidence,
+  type ItemGuide
 } from "../lib/daily-checklist.ts";
+import { firstInvalidLink, linkHostname, type ItemLink } from "../lib/checklist-links.ts";
 import { fetchChecklistConfigWithMeta, saveChecklistConfig, type ChecklistConfigMeta } from "../lib/daily-checklist-store.ts";
 import type { ShiftCode } from "../lib/shift-schedule.ts";
 
@@ -119,12 +122,14 @@ export function DailyChecklistEditor({
       const { [phaseId]: _title, ...titles } = prev.titles;
       const { [phaseId]: _window, ...windows } = prev.windows;
       const { [phaseId]: _evidence, ...evidence } = prev.evidence;
+      const { [phaseId]: _guides, ...guides } = prev.guides;
       return {
         ...prev,
         overrides,
         titles,
         windows,
         evidence,
+        guides,
         customPhases: prev.customPhases.filter((phase) => phase.id !== phaseId),
         order: prev.order.filter((id) => id !== phaseId),
         hiddenPhases: prev.hiddenPhases.filter((id) => id !== phaseId)
@@ -168,6 +173,25 @@ export function DailyChecklistEditor({
     return next;
   }
 
+  /** Same as rekeyEvidence, for the รายละเอียด/ลิงก์ guide attached to an item. */
+  function rekeyGuides(
+    guides: ChecklistConfig["guides"],
+    from: { phaseId: string; item: string },
+    to: { phaseId: string; item: string } | null
+  ): ChecklistConfig["guides"] {
+    const fromItem = from.item.trim();
+    const guide = guides[from.phaseId]?.[fromItem];
+    if (!guide) return guides;
+    const next: ChecklistConfig["guides"] = { ...guides };
+    const fromPhase = { ...(next[from.phaseId] || {}) };
+    delete fromPhase[fromItem];
+    if (Object.keys(fromPhase).length) next[from.phaseId] = fromPhase;
+    else delete next[from.phaseId];
+    const toItem = to?.item.trim();
+    if (to && toItem) next[to.phaseId] = { ...(next[to.phaseId] || {}), [toItem]: guide };
+    return next;
+  }
+
   function moveItemToPhase(phaseId: string, index: number, toPhaseId: string) {
     if (!toPhaseId || toPhaseId === phaseId) return;
     setDraft((prev) => {
@@ -175,7 +199,8 @@ export function DailyChecklistEditor({
       return {
         ...prev,
         overrides: moveChecklistItem(prev.overrides, { phaseId, index }, toPhaseId),
-        evidence: rekeyEvidence(prev.evidence, { phaseId, item }, { phaseId: toPhaseId, item })
+        evidence: rekeyEvidence(prev.evidence, { phaseId, item }, { phaseId: toPhaseId, item }),
+        guides: rekeyGuides(prev.guides, { phaseId, item }, { phaseId: toPhaseId, item })
       };
     });
   }
@@ -193,7 +218,11 @@ export function DailyChecklistEditor({
         // Keep the หลักฐาน requirement attached to the item as its text is edited.
         evidence: previousText.trim() === value.trim()
           ? prev.evidence
-          : rekeyEvidence(prev.evidence, { phaseId, item: previousText }, value.trim() ? { phaseId, item: value } : null)
+          : rekeyEvidence(prev.evidence, { phaseId, item: previousText }, value.trim() ? { phaseId, item: value } : null),
+        // Keep the รายละเอียด/ลิงก์ guide attached to the item as its text is edited.
+        guides: previousText.trim() === value.trim()
+          ? prev.guides
+          : rekeyGuides(prev.guides, { phaseId, item: previousText }, value.trim() ? { phaseId, item: value } : null)
       };
     });
   }
@@ -208,13 +237,58 @@ export function DailyChecklistEditor({
       return {
         ...prev,
         overrides: { ...prev.overrides, [phaseId]: (prev.overrides[phaseId] || []).filter((_, i) => i !== index) },
-        evidence: rekeyEvidence(prev.evidence, { phaseId, item }, null)
+        evidence: rekeyEvidence(prev.evidence, { phaseId, item }, null),
+        guides: rekeyGuides(prev.guides, { phaseId, item }, null)
       };
     });
   }
 
   function itemEvidence(phaseId: string, item: string): ItemEvidence | undefined {
     return draft.evidence[phaseId]?.[item.trim()];
+  }
+
+  function itemGuide(phaseId: string, item: string): ItemGuide | undefined {
+    return draft.guides[phaseId]?.[item.trim()];
+  }
+
+  /** Immutably replace the guide for one item; a null next removes it (keeps the map clean). */
+  function setGuide(phaseId: string, item: string, next: ItemGuide | null) {
+    const key = item.trim();
+    if (!key) return;
+    setDraft((prev) => {
+      const phaseMap = { ...(prev.guides[phaseId] || {}) };
+      // Keep the entry only while it carries a note or at least one (even half-typed) link row —
+      // clearing both drops it so an empty guide never lingers in the draft.
+      const keep = Boolean(next && ((next.note && next.note.length) || (next.links && next.links.length)));
+      if (keep && next) phaseMap[key] = next;
+      else delete phaseMap[key];
+      const guides = { ...prev.guides };
+      if (Object.keys(phaseMap).length) guides[phaseId] = phaseMap;
+      else delete guides[phaseId];
+      return { ...prev, guides };
+    });
+  }
+
+  function updateGuideNote(phaseId: string, item: string, note: string) {
+    const current = itemGuide(phaseId, item);
+    setGuide(phaseId, item, { note, links: current?.links });
+  }
+
+  function addGuideLink(phaseId: string, item: string) {
+    const current = itemGuide(phaseId, item);
+    setGuide(phaseId, item, { note: current?.note, links: [...(current?.links || []), { label: "", url: "" }] });
+  }
+
+  function updateGuideLink(phaseId: string, item: string, index: number, field: keyof ItemLink, value: string) {
+    const current = itemGuide(phaseId, item);
+    const links = (current?.links || []).map((link, i) => (i === index ? { ...link, [field]: value } : link));
+    setGuide(phaseId, item, { note: current?.note, links });
+  }
+
+  function removeGuideLink(phaseId: string, item: string, index: number) {
+    const current = itemGuide(phaseId, item);
+    const links = (current?.links || []).filter((_, i) => i !== index);
+    setGuide(phaseId, item, { note: current?.note, links });
   }
 
   /** ตั้ง/ปิด ว่ารายการนี้ต้องแนบ รูป หรือ ลิงก์. เก็บ requirement โดย key ด้วยข้อความรายการ. */
@@ -317,9 +391,22 @@ export function DailyChecklistEditor({
     // Evidence is keyed by item text — drop any requirement whose item was deleted or blanked.
     const evidence = pruneEvidence(draft.evidence, overrides);
 
+    // Refuse a bad link before persisting — a staffer must never tap a button that goes nowhere.
+    for (const [phaseId, byItem] of Object.entries(draft.guides)) {
+      for (const [item, guide] of Object.entries(byItem)) {
+        const bad = firstInvalidLink(guide.links);
+        if (bad) {
+          setStatus(`ลิงก์ไม่ถูกต้องที่รายการ "${item.trim() || phaseId}" — ต้องขึ้นต้นด้วย https:// หรือ /`);
+          return;
+        }
+      }
+    }
+    // Guides are keyed by item text too — drop any guide whose item was deleted or blanked.
+    const guides = pruneGuides(draft.guides, overrides);
+
     setStatus("กำลังบันทึก…");
     try {
-      const saved = await saveChecklistConfig({ branch, config: { ...draft, overrides, titles, customPhases, evidence }, updatedBy: editedBy });
+      const saved = await saveChecklistConfig({ branch, config: { ...draft, overrides, titles, customPhases, evidence, guides }, updatedBy: editedBy });
       // Reflect the server-stamped time/editor immediately so the "แก้ไขล่าสุด" line is
       // current without a reload (fallback to editedBy if the route returned no meta).
       setMeta({ updatedAt: saved.updatedAt ?? meta.updatedAt, updatedBy: saved.updatedBy ?? editedBy });
@@ -400,6 +487,8 @@ export function DailyChecklistEditor({
                 const evidence = itemEvidence(phase.id, item);
                 const kinds = evidence?.kinds || [];
                 const hasText = Boolean(item.trim());
+                const guide = itemGuide(phase.id, item);
+                const guideLinks = guide?.links || [];
                 return (
                 <li key={itemIndex}>
                   <input value={item} onChange={(e) => updateItem(phase.id, itemIndex, e.target.value)} placeholder="รายการ checklist" />
@@ -450,6 +539,46 @@ export function DailyChecklistEditor({
                         placeholder="คำอธิบายหลักฐาน (ไม่บังคับ) เช่น รูปโพสต์กิจกรรม"
                       />
                     ) : null}
+                  </div>
+                  {/* รายละเอียด + ปุ่มลิงก์ ที่ช่วยอธิบายรายการนี้ให้พนักงาน (ไม่บังคับ) */}
+                  <div className="checklist-config__guide">
+                    <span className="checklist-config__guide-label">รายละเอียด / ปุ่มลิงก์ (ไม่บังคับ)</span>
+                    <textarea
+                      className="checklist-config__guide-note"
+                      rows={2}
+                      value={guide?.note || ""}
+                      disabled={!hasText}
+                      onChange={(e) => updateGuideNote(phase.id, item, e.target.value)}
+                      placeholder="อธิบายว่าต้องทำอะไร / ทำยังไง เช่น เช็คยอดใน StoreHub ก่อนเปิดร้าน"
+                    />
+                    {guideLinks.map((link, linkIndex) => (
+                      <div key={linkIndex} className="checklist-config__guide-link">
+                        <input
+                          value={link.label}
+                          disabled={!hasText}
+                          onChange={(e) => updateGuideLink(phase.id, item, linkIndex, "label", e.target.value)}
+                          placeholder={`ชื่อปุ่ม (เว้นว่าง = ${linkHostname(link.url) || "ชื่อเว็บ"})`}
+                          aria-label="ชื่อปุ่มลิงก์"
+                        />
+                        <input
+                          value={link.url}
+                          disabled={!hasText}
+                          onChange={(e) => updateGuideLink(phase.id, item, linkIndex, "url", e.target.value)}
+                          placeholder="https://… หรือ /path ภายในเว็บ"
+                          aria-label="ลิงก์ปลายทาง"
+                          inputMode="url"
+                        />
+                        <button type="button" onClick={() => removeGuideLink(phase.id, item, linkIndex)} aria-label="ลบลิงก์">✕</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="checklist-config__guide-add"
+                      disabled={!hasText}
+                      onClick={() => addGuideLink(phase.id, item)}
+                    >
+                      + เพิ่มปุ่มลิงก์
+                    </button>
                   </div>
                 </li>
                 );

@@ -18,6 +18,7 @@ export type DailyChecklistDoc = {
   hiddenPhases?: ChecklistConfig["hiddenPhases"];
   titles?: ChecklistConfig["titles"];
   evidence?: ChecklistConfig["evidence"];
+  guides?: ChecklistConfig["guides"];
   updatedAt: string;
   updatedBy: string;
 };

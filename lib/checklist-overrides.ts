@@ -13,13 +13,18 @@
 //   - weekly-event  : each event's 6-step checklist (one unit per event, id = event.id)
 
 import type { WeeklyEventChecklistItem } from "./weekly-event-tasks.ts";
+import { type ItemLink, normalizeLinks } from "./checklist-links.ts";
 
 export type ChecklistScope = "weekly-stock" | "monthly-stock" | "weekly-event";
 
 export const CHECKLIST_SCOPES: ChecklistScope[] = ["weekly-stock", "monthly-stock", "weekly-event"];
 
-/** One tick item in the editor. `id` keeps a renamed/reordered item tied to its saved ticks. */
-export type OverrideItem = { id: string; title: string };
+/**
+ * One tick item in the editor. `id` keeps a renamed/reordered item tied to its saved ticks.
+ * `note` (คำอธิบายว่าต้องทำอะไร) and `links` (ปุ่มกดไปหน้างานจริง) are optional — an item saved
+ * before these fields existed simply omits them, and every reader treats missing as empty.
+ */
+export type OverrideItem = { id: string; title: string; note?: string; links?: ItemLink[] };
 
 /** What the owner changed for one checklist block. Missing fields = keep built-in. */
 export type UnitOverride = {
@@ -55,11 +60,21 @@ export function normalizeUnitOverride(raw: UnitOverride | undefined): UnitOverri
   if (Array.isArray(raw.items)) {
     const items = raw.items
       .filter((item): item is OverrideItem => Boolean(item) && typeof item.title === "string")
-      .map((item, index) => ({ id: slugItemId(item.id, index), title: item.title.trim() }))
+      .map((item, index) => normalizeOverrideItem(item, index))
       .filter((item) => item.title.length > 0);
     out.items = items;
   }
   return Object.keys(out).length ? out : undefined;
+}
+
+/** Trims one item and attaches its cleaned note + valid links (dropping empties). */
+export function normalizeOverrideItem(item: OverrideItem, index: number): OverrideItem {
+  const out: OverrideItem = { id: slugItemId(item.id, index), title: (item.title || "").trim() };
+  const note = typeof item.note === "string" ? item.note.trim() : "";
+  if (note) out.note = note;
+  const links = normalizeLinks(item.links);
+  if (links.length) out.links = links;
+  return out;
 }
 
 /** Cleans a whole overrides map, dropping units that ended up empty. Run at save. */
@@ -106,6 +121,17 @@ export function applyStringPhaseOverride<
 }
 
 /**
+ * The editable items (with note/links) that line up 1:1 with the string[] `checklist` produced by
+ * applyStringPhaseOverride: the owner's items when they set any, else the built-in items. Staff
+ * stock views use this to render each item's รายละเอียด/ปุ่มลิงก์ by the same index they tick.
+ */
+export function resolvePhaseChecklistItems(baseItems: OverrideItem[], override: UnitOverride | undefined): OverrideItem[] {
+  const clean = normalizeUnitOverride(override);
+  if (clean?.items) return clean.items;
+  return baseItems;
+}
+
+/**
  * Applies the owner's เวลา / กะ overrides to a weekly-event block. The event's timeWindow is the
  * readable schedule shown on the card; shiftLabel is an optional "กะที่รับผิดชอบ" line. Checklist
  * items are handled separately by applyEventChecklistOverride — this only touches the card meta.
@@ -141,12 +167,13 @@ export function applyEventChecklistOverride(
   const byId = new Map(checklist.map((item) => [item.id, item]));
   return clean.items.map((item) => {
     const base = byId.get(item.id);
-    if (base) return { ...base, title: item.title };
+    // Owner's note/links win; a base item keeps its own only if the override left them unset.
+    if (base) return { ...base, title: item.title, note: item.note ?? base.note, links: item.links ?? base.links };
     return makeCustomItem(item);
   });
 }
 
-/** Default factory for an owner-added event tick item: a plain title with no data to fill. */
+/** Default factory for an owner-added event tick item: a plain title carrying its note/links. */
 export function makeCustomEventItem(item: OverrideItem): WeeklyEventChecklistItem {
-  return { id: item.id, title: item.title, requiredData: [], evidence: [] };
+  return { id: item.id, title: item.title, requiredData: [], evidence: [], note: item.note, links: item.links };
 }

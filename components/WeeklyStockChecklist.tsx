@@ -14,8 +14,9 @@ import {
   type WeeklyStockPhase
 } from "../lib/weekly-stock-workflow.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
-import { applyStringPhaseOverride } from "../lib/checklist-overrides.ts";
+import { applyStringPhaseOverride, itemsFromStrings, resolvePhaseChecklistItems } from "../lib/checklist-overrides.ts";
 import { useChecklistOverrides } from "../lib/checklist-overrides-store.ts";
+import { ChecklistItemGuide } from "./ChecklistItemGuide.tsx";
 
 // Weekly stock is a shared branch task ("ทั้งทีมช่วยกันทำให้ครบในรอบ"), so it is stored
 // once per branch per ISO week rather than per person.
@@ -188,6 +189,11 @@ export function WeeklyStockChecklist({
     () => applyStringPhaseOverride(basePhase, overrides[basePhase.id]),
     [basePhase, overrides]
   );
+  // รายละเอียด/ปุ่มลิงก์ ต่อรายการ (เรียงตรงกับ phase.checklist ที่พนักงานติ๊ก)
+  const guideItems = useMemo(
+    () => resolvePhaseChecklistItems(itemsFromStrings(basePhase.checklist), overrides[basePhase.id]),
+    [basePhase, overrides]
+  );
   const workWeek = formatWorkWeek();
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
   const { data, loaded, status: saveStatus, update } = useWorkRecordWindow<WeeklyStockPayload>({
@@ -303,6 +309,7 @@ export function WeeklyStockChecklist({
                     details={details}
                     updateDetail={updateDetail}
                   />
+                  <ChecklistItemGuide note={guideItems[index]?.note} links={guideItems[index]?.links} />
                 </div>
               );
             })}

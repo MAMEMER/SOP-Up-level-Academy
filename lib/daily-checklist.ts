@@ -7,6 +7,7 @@
 import type { WorkflowPhase } from "./card-store-workflow.ts";
 import type { ShiftCode } from "./shift-schedule.ts";
 import type { ManualOverrides } from "./work-manual.ts";
+import { type ItemLink, normalizeLinks } from "./checklist-links.ts";
 
 /** Map of phaseId → replacement checklist items. */
 export type ChecklistOverrides = Record<string, string[]>;
@@ -41,6 +42,58 @@ export type ItemEvidence = { kinds: EvidenceKind[]; note?: string };
 export type ChecklistEvidence = Record<string, Record<string, ItemEvidence>>;
 
 const EVIDENCE_KINDS: EvidenceKind[] = ["photo", "link"];
+
+/**
+ * รายละเอียด + ปุ่มลิงก์ ที่เจ้าของแนบให้แต่ละรายการ checklist เพื่อให้พนักงานเข้าใจว่าต้องทำอะไร
+ * และกดไปหน้างานจริงได้ (ต่างจาก `evidence` ที่บังคับให้แนบหลักฐานก่อนส่งงาน — guide ไม่บังคับอะไร
+ * แค่ช่วยอธิบายและลัดไปหน้างาน). Keyed by item text just like evidence, so it follows the item
+ * when the owner reorders it or moves it between หัวข้อ.
+ */
+export type ItemGuide = { note?: string; links?: ItemLink[] };
+
+/** phaseId → (ข้อความรายการ → รายละเอียด/ลิงก์ของรายการนั้น). */
+export type ChecklistGuides = Record<string, Record<string, ItemGuide>>;
+
+/**
+ * The guide for one item, cleaned (note trimmed, links validated), or undefined when the item has
+ * neither a note nor any valid link. Callers render nothing when this is undefined, so an item
+ * with no guide looks exactly as it did before this feature existed.
+ */
+export function guideForItem(
+  guides: ChecklistGuides | undefined,
+  phaseId: string,
+  item: string
+): ItemGuide | undefined {
+  const raw = guides?.[phaseId]?.[item.trim()];
+  if (!raw) return undefined;
+  const note = typeof raw.note === "string" ? raw.note.trim() : "";
+  const links = normalizeLinks(raw.links);
+  if (!note && links.length === 0) return undefined;
+  const out: ItemGuide = {};
+  if (note) out.note = note;
+  if (links.length) out.links = links;
+  return out;
+}
+
+/**
+ * Drops guide entries whose item text no longer exists in the phase (deleted/renamed) or that
+ * ended up empty, so a saved config never keeps an orphaned รายละเอียด/ลิงก์. Run at save.
+ */
+export function pruneGuides(guides: ChecklistGuides, overrides: ChecklistOverrides): ChecklistGuides {
+  const out: ChecklistGuides = {};
+  for (const [phaseId, byItem] of Object.entries(guides || {})) {
+    const items = new Set((overrides[phaseId] || []).map((item) => item.trim()).filter(Boolean));
+    const kept: Record<string, ItemGuide> = {};
+    for (const [item, guide] of Object.entries(byItem || {})) {
+      const clean = item.trim();
+      if (!clean || !items.has(clean)) continue;
+      const resolved = guideForItem({ [phaseId]: { [clean]: guide } }, phaseId, clean);
+      if (resolved) kept[clean] = resolved;
+    }
+    if (Object.keys(kept).length) out[phaseId] = kept;
+  }
+  return out;
+}
 
 /** The requirement for one item, or undefined when it asks for nothing. */
 export function evidenceForItem(
@@ -175,6 +228,8 @@ export type ChecklistConfig = {
   titles: Record<string, string>;
   /** หลักฐาน (รูป/ลิงก์) ที่แต่ละรายการบังคับให้แนบ — keyed by phaseId then item text */
   evidence: ChecklistEvidence;
+  /** รายละเอียด + ปุ่มลิงก์ ที่ช่วยอธิบายแต่ละรายการ (ไม่บังคับ) — keyed by phaseId then item text */
+  guides: ChecklistGuides;
 };
 
 export const emptyChecklistConfig: ChecklistConfig = {
@@ -186,7 +241,8 @@ export const emptyChecklistConfig: ChecklistConfig = {
   customPhases: [],
   hiddenPhases: [],
   titles: {},
-  evidence: {}
+  evidence: {},
+  guides: {}
 };
 
 /** Turns an owner-created หัวข้อ into the shape the checklist renders. */

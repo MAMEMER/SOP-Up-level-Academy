@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  normalizeOverrideItem,
   type ChecklistScope,
   type ChecklistOverrides,
   type OverrideItem,
   type UnitOverride
 } from "../lib/checklist-overrides.ts";
 import { fetchChecklistOverrides, saveChecklistOverrides } from "../lib/checklist-overrides-store.ts";
+import { firstInvalidLink, linkHostname, type ItemLink } from "../lib/checklist-links.ts";
 
 // Owner editor for a WEEKLY or MONTHLY checklist scope. Simpler sibling of DailyChecklistEditor:
 // it edits the tick items (add / reword / delete / reorder) of each block, plus the block title
@@ -41,9 +43,22 @@ export type EditableUnit = {
 
 type UnitDraft = { title: string; goal: string; timeLabel: string; shiftLabel: string; items: OverrideItem[] };
 
+function sameLinks(a: ItemLink[] | undefined, b: ItemLink[] | undefined): boolean {
+  const la = a || [];
+  const lb = b || [];
+  if (la.length !== lb.length) return false;
+  return la.every((link, index) => link.label.trim() === lb[index].label.trim() && link.url.trim() === lb[index].url.trim());
+}
+
 function sameItems(a: OverrideItem[], b: OverrideItem[]): boolean {
   if (a.length !== b.length) return false;
-  return a.every((item, index) => item.id === b[index].id && item.title.trim() === b[index].title.trim());
+  return a.every(
+    (item, index) =>
+      item.id === b[index].id &&
+      item.title.trim() === b[index].title.trim() &&
+      (item.note || "").trim() === (b[index].note || "").trim() &&
+      sameLinks(item.links, b[index].links)
+  );
 }
 
 export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; units: EditableUnit[] }) {
@@ -94,6 +109,36 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
     }));
   }
 
+  /** Immutably patch one item's guide fields (note / links) in the draft. */
+  function patchItem(unitId: string, index: number, patch: Partial<OverrideItem>) {
+    setDraft((prev) => ({
+      ...prev,
+      [unitId]: {
+        ...prev[unitId],
+        items: prev[unitId].items.map((item, i) => (i === index ? { ...item, ...patch } : item))
+      }
+    }));
+  }
+
+  function updateItemNote(unitId: string, index: number, note: string) {
+    patchItem(unitId, index, { note });
+  }
+
+  function addItemLink(unitId: string, index: number) {
+    const links = [...(draft[unitId]?.items[index]?.links || []), { label: "", url: "" }];
+    patchItem(unitId, index, { links });
+  }
+
+  function updateItemLink(unitId: string, index: number, linkIndex: number, field: keyof ItemLink, value: string) {
+    const links = (draft[unitId]?.items[index]?.links || []).map((link, i) => (i === linkIndex ? { ...link, [field]: value } : link));
+    patchItem(unitId, index, { links });
+  }
+
+  function removeItemLink(unitId: string, index: number, linkIndex: number) {
+    const links = (draft[unitId]?.items[index]?.links || []).filter((_, i) => i !== linkIndex);
+    patchItem(unitId, index, { links });
+  }
+
   function moveItem(unitId: string, index: number, direction: -1 | 1) {
     setDraft((prev) => {
       const items = [...prev[unitId].items];
@@ -123,6 +168,19 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
   async function save() {
     // Persist only what the owner actually changed, so an untouched block keeps falling back to
     // its built-in value (and future edits in code still reach staff).
+    // Refuse a bad link before persisting — a staffer must never tap a button that goes nowhere.
+    for (const unit of units) {
+      const d = draft[unit.id];
+      if (!d) continue;
+      for (const item of d.items) {
+        const bad = firstInvalidLink(item.links);
+        if (bad) {
+          setStatus(`ลิงก์ไม่ถูกต้องที่รายการ "${item.title.trim() || unit.heading}" — ต้องขึ้นต้นด้วย https:// หรือ /`);
+          return;
+        }
+      }
+    }
+
     const overrides: ChecklistOverrides = {};
     for (const unit of units) {
       const d = draft[unit.id];
@@ -132,7 +190,8 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
       if (unit.editGoal && d.goal.trim() && d.goal.trim() !== (unit.baseGoal || "").trim()) ov.goal = d.goal.trim();
       if (unit.editTime && d.timeLabel.trim() && d.timeLabel.trim() !== (unit.baseTimeLabel || "").trim()) ov.timeLabel = d.timeLabel.trim();
       if (unit.editShift && d.shiftLabel.trim() && d.shiftLabel.trim() !== (unit.baseShiftLabel || "").trim()) ov.shiftLabel = d.shiftLabel.trim();
-      const cleanItems = d.items.map((item) => ({ id: item.id, title: item.title.trim() })).filter((item) => item.title);
+      // normalizeOverrideItem trims the title and attaches the item's cleaned note + valid links.
+      const cleanItems = d.items.map((item, index) => normalizeOverrideItem(item, index)).filter((item) => item.title);
       if (!sameItems(cleanItems, unit.baseItems)) ov.items = cleanItems;
       if (Object.keys(ov).length) overrides[unit.id] = ov;
     }
@@ -219,7 +278,10 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
             ) : null}
 
             <ul className="checklist-config__items">
-              {d.items.map((item, index, items) => (
+              {d.items.map((item, index, items) => {
+                const hasText = Boolean(item.title.trim());
+                const links = item.links || [];
+                return (
                 <li key={item.id}>
                   <input
                     value={item.title}
@@ -231,8 +293,49 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
                     <button type="button" onClick={() => moveItem(unit.id, index, 1)} disabled={index === items.length - 1} aria-label="เลื่อนลง">↓</button>
                   </div>
                   <button type="button" onClick={() => removeItem(unit.id, index)} aria-label="ลบ">✕</button>
+                  {/* รายละเอียด + ปุ่มลิงก์ ที่ช่วยอธิบายรายการนี้ให้พนักงาน (ไม่บังคับ) */}
+                  <div className="checklist-config__guide">
+                    <span className="checklist-config__guide-label">รายละเอียด / ปุ่มลิงก์ (ไม่บังคับ)</span>
+                    <textarea
+                      className="checklist-config__guide-note"
+                      rows={2}
+                      value={item.note || ""}
+                      disabled={!hasText}
+                      onChange={(e) => updateItemNote(unit.id, index, e.target.value)}
+                      placeholder="อธิบายว่าต้องทำอะไร / ทำยังไง"
+                    />
+                    {links.map((link, linkIndex) => (
+                      <div key={linkIndex} className="checklist-config__guide-link">
+                        <input
+                          value={link.label}
+                          disabled={!hasText}
+                          onChange={(e) => updateItemLink(unit.id, index, linkIndex, "label", e.target.value)}
+                          placeholder={`ชื่อปุ่ม (เว้นว่าง = ${linkHostname(link.url) || "ชื่อเว็บ"})`}
+                          aria-label="ชื่อปุ่มลิงก์"
+                        />
+                        <input
+                          value={link.url}
+                          disabled={!hasText}
+                          onChange={(e) => updateItemLink(unit.id, index, linkIndex, "url", e.target.value)}
+                          placeholder="https://… หรือ /path ภายในเว็บ"
+                          aria-label="ลิงก์ปลายทาง"
+                          inputMode="url"
+                        />
+                        <button type="button" onClick={() => removeItemLink(unit.id, index, linkIndex)} aria-label="ลบลิงก์">✕</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="checklist-config__guide-add"
+                      disabled={!hasText}
+                      onClick={() => addItemLink(unit.id, index)}
+                    >
+                      + เพิ่มปุ่มลิงก์
+                    </button>
+                  </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
             <button type="button" className="checklist-config__add" onClick={() => addItem(unit.id)}>+ เพิ่มรายการ</button>
           </section>

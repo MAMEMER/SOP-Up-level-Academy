@@ -23,6 +23,7 @@ import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./Checkl
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import { applyEventChecklistOverride, applyEventMetaOverride, makeCustomEventItem } from "../lib/checklist-overrides.ts";
 import { useChecklistOverrides } from "../lib/checklist-overrides-store.ts";
+import { ChecklistItemGuide } from "./ChecklistItemGuide.tsx";
 
 export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
@@ -277,6 +278,8 @@ function WeeklyEventItem({
             <small>{item.hint}</small>
           </div>
         ) : null}
+
+        <ChecklistItemGuide note={item.note} links={item.links} />
 
         <div className="weekly-event-fields">
           {item.requiredData.map((field) => (

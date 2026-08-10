@@ -101,7 +101,7 @@ export function ChecklistView({
           {staffCode && shiftLoaded && !shift ? (
             <p className="checklist-view__note">วันนี้คุณไม่ได้ลงกะ — แสดง checklist ทั้งหมดไว้อ้างอิง</p>
           ) : null}
-          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} shift={shift} windows={config.windows} evidence={config.evidence} readOnly={readOnly} />
+          <WorkflowChecklist phases={dailyPhases} userEmail={userEmail} userRole={userRole} shift={shift} windows={config.windows} evidence={config.evidence} guides={config.guides} readOnly={readOnly} />
         </>
       ) : (
         <SharedPeriodicChecklist period={tab} branch={branch} workDate={workDate} staffCode={staffCode ?? "-"} readOnly={readOnly} />

@@ -27,7 +27,8 @@ export async function GET(request: Request) {
       customPhases: (data.customPhases as ChecklistConfig["customPhases"]) ?? [],
       hiddenPhases: (data.hiddenPhases as ChecklistConfig["hiddenPhases"]) ?? [],
       titles: (data.titles as ChecklistConfig["titles"]) ?? {},
-      evidence: (data.evidence as ChecklistConfig["evidence"]) ?? {}
+      evidence: (data.evidence as ChecklistConfig["evidence"]) ?? {},
+      guides: (data.guides as ChecklistConfig["guides"]) ?? {}
     };
     // Surface when/who last saved so the editor can show a "แก้ไขล่าสุด" line (older docs
     // written before this field existed simply return null and the line stays hidden).
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
     hiddenPhases: c.hiddenPhases ?? [],
     titles: c.titles ?? {},
     evidence: c.evidence ?? {},
+    guides: c.guides ?? {},
     updatedAt: new Date().toISOString(),
     updatedBy: user.actualEmail
   };
