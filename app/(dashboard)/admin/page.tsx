@@ -6,6 +6,13 @@ import { getOpsSummary } from "../../../lib/ops-summary.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
 import { getAdminNotifications } from "../../../lib/admin-notifications-server.ts";
 import { AdminNotificationCenter } from "../../../components/AdminNotificationCenter.tsx";
+import { DeliveryOrdersBoard } from "../../../components/DeliveryOrdersBoard.tsx";
+import { WorkflowReviewRecords } from "../../../components/WorkflowReviewRecords.tsx";
+import { syncDeliveryTasks } from "../../../lib/delivery-tasks-server.ts";
+import { deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-tasks.ts";
+import type { DeliveryTask } from "../../../lib/delivery-tasks.ts";
+
+const ADMIN_BRANCH = "bangkae";
 
 // The owner's home. Signed in as an admin, "/" is still the staff dashboard — a personal
 // checklist nobody in charge fills in — so running the day meant hunting through ten nav
@@ -30,8 +37,17 @@ export default async function AdminHubPage() {
 
   const workDate = formatWorkDate();
   const summary = await getOpsSummary(workDate);
+  // งานส่งของ: sync ครั้งเดียวตรงนี้ แล้วส่งต่อให้ทั้งบอร์ดและศูนย์แจ้งเตือน —
+  // ไม่ให้หน้าเดียวยิง syncDeliveryTasks ซ้ำสองรอบ. admin เห็นทุกใบ (visibleTo คืน true).
+  const deliveryAll = await syncDeliveryTasks(ADMIN_BRANCH).catch(() => [] as DeliveryTask[]);
+  const deliveryTasks = sortDeliveryTasks(
+    deliveryAll.filter((task) =>
+      deliveryTaskVisibleTo(task, { isAdmin: true, staffCode: null, shiftToday: null, today: workDate })
+    ),
+    workDate
+  );
   // ทุกเรื่องค้างจากทุกหน้า รวมมาไว้บนสุดของ hub — ไม่ต้องไล่เปิดทีละหน้าถึงจะรู้
-  const notifications = await getAdminNotifications(summary, workDate);
+  const notifications = await getAdminNotifications(summary, workDate, ADMIN_BRANCH, deliveryTasks);
   const owner = isOwner(user.email);
 
   const waitingReview = summary.assignments.filter((item) => item.status === "submitted").length;
@@ -45,8 +61,8 @@ export default async function AdminHubPage() {
       tools: [
         {
           href: "/admin/ops",
-          title: "สรุปเจ้าของร้าน",
-          detail: "ภาพรวมวันนี้ทั้งร้าน — ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม",
+          title: "รายละเอียดรายคน",
+          detail: "เจาะดูรายคน — ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม (ตัวเลขสรุปรวมอยู่บนหน้านี้แล้ว)",
           badge: summary.daily.latePhases ? { count: summary.daily.latePhases, label: "เกินกำหนด" } : undefined
         },
         {
@@ -144,6 +160,18 @@ export default async function AdminHubPage() {
           <small>ค้างข้ามกะ</small>
         </Link>
       </section>
+
+      {/* งานส่งของ — ยกออเดอร์เว็บกิลด์มาไว้บน hub เพื่อไม่ต้องออกไปหน้าพนักงาน */}
+      <DeliveryOrdersBoard
+        branch={ADMIN_BRANCH}
+        initialTasks={deliveryTasks}
+        initialToday={workDate}
+        initialShift={null}
+        canAct={!user.isImpersonating}
+      />
+
+      {/* คิวตรวจงาน — ยกจาก /manager-review มาไว้บน hub ตรงนี้ด้วย */}
+      <WorkflowReviewRecords />
 
       {groups.map((group) => (
         <section key={group.title} className="admin-hub__group">

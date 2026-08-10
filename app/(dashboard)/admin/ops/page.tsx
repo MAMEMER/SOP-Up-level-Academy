@@ -29,12 +29,12 @@ export default async function AdminOpsPage({ searchParams }: PageProps) {
 
   return (
     <main className="page">
-      <Link href="/" className="back-link">← กลับ Dashboard</Link>
+      <Link href="/admin" className="back-link">← กลับ Admin Hub</Link>
       <section className="board-hero">
         <div>
           <p className="eyebrow">OPERATION MONITOR</p>
-          <h2>สรุปเจ้าของร้าน</h2>
-          <p>ภาพรวมงานหน้าร้านของวันที่เลือก — checklist, งานที่มอบหมาย, งานส่งต่อ, งานสัปดาห์/เดือน และปัญหาบริการ</p>
+          <h2>รายละเอียดรายคน</h2>
+          <p>เจาะดูงานหน้าร้านรายคนของวันที่เลือก — checklist, งานที่มอบหมาย, งานส่งต่อ, งานสัปดาห์/เดือน และปัญหาบริการ · ตัวเลขสรุปรวมดูได้ที่ Admin Hub</p>
         </div>
         <form className="owner-ops__date">
           <label>

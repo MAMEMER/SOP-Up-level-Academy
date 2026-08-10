@@ -131,14 +131,19 @@ async function assignmentCounts(branch: string, today: string): Promise<Notifica
 /**
  * ทุกเรื่องที่เจ้าของร้านต้องดูวันนี้ รวมมาเป็นรายการเดียว.
  * `summary` ส่งเข้ามาจากหน้า admin ที่เรียก getOpsSummary อยู่แล้ว — จะได้ไม่อ่านซ้ำ.
+ * `deliveryTasks` ส่งเข้ามาได้ถ้าหน้าเรียก syncDeliveryTasks ไปแล้ว (เช่น /admin ที่โชว์
+ * บอร์ดงานส่งของด้วย) — จะได้ไม่ยิง query ซ้ำในหน้าเดียว.
  */
 export async function getAdminNotifications(
   summary: OpsSummary,
   workDate: string,
-  branch = "bangkae"
+  branch = "bangkae",
+  deliveryTasks?: DeliveryTask[]
 ): Promise<AdminNotification[]> {
   const [deliveries, lostPresses, tickets, assignments, guild] = await Promise.all([
-    safe(() => syncDeliveryTasks(branch), [] as DeliveryTask[]),
+    deliveryTasks
+      ? Promise.resolve(deliveryTasks)
+      : safe(() => syncDeliveryTasks(branch), [] as DeliveryTask[]),
     safe(() => pressesWithoutRecord(workDate), [] as Array<{ staffName: string; phaseTitle: string }>),
     safe(() => openTicketCount(), 0),
     safe(() => assignmentCounts(branch, workDate), { waitingReview: 0, overdue: 0 }),
