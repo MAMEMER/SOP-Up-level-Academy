@@ -2,6 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "../../../../lib/auth.ts";
+import { canManageStaffAccounts } from "../../../../lib/owner.ts";
 import { StaffManager } from "../../../../components/StaffManager.tsx";
 import { ensureEmployeeIds, listStaff, removeStaff, saveStaff, seedStaffIfEmpty } from "../../../../lib/staff-store.ts";
 import type { StaffRecord } from "../../../../lib/staff-records.ts";
@@ -22,7 +23,7 @@ function redirectWithStatus(status: string) {
 async function saveStaffAction(formData: FormData) {
   "use server";
   const user = await requireUser();
-  if (user.role !== "admin" || user.isImpersonating) redirectWithStatus("denied");
+  if (!canManageStaffAccounts(user.actualEmail) || user.isImpersonating) redirectWithStatus("denied");
 
   const email = stringValue(formData, "email");
   if (!email.includes("@")) redirectWithStatus("invalid_email");
@@ -57,7 +58,7 @@ async function saveStaffAction(formData: FormData) {
 async function removeStaffAction(formData: FormData) {
   "use server";
   const user = await requireUser();
-  if (user.role !== "admin" || user.isImpersonating) redirectWithStatus("denied");
+  if (!canManageStaffAccounts(user.actualEmail) || user.isImpersonating) redirectWithStatus("denied");
 
   const email = stringValue(formData, "email");
   // never let an admin delete the account they are signed in with
@@ -76,7 +77,7 @@ async function removeStaffAction(formData: FormData) {
 const statusMessages: Record<string, { tone: "success" | "warning"; text: string }> = {
   saved: { tone: "success", text: "บันทึกแล้ว — สิทธิ์เข้าระบบและตารางกะอัปเดตทันที" },
   removed: { tone: "success", text: "ลบออกจากระบบแล้ว — อีเมลนี้ login ไม่ได้อีก" },
-  denied: { tone: "warning", text: "ไม่มีสิทธิ์แก้ไข (ต้องมีสิทธิ์จัดการ และไม่ได้อยู่ในโหมดดูแทนพนักงาน)" },
+  denied: { tone: "warning", text: "หน้านี้แก้ได้เฉพาะบัญชีของ Champ และแก้ระหว่างดูแทนพนักงานไม่ได้" },
   invalid_email: { tone: "warning", text: "อีเมลไม่ถูกต้อง" },
   code_required: { tone: "warning", text: "ถ้าอยู่ในตารางกะ ต้องกรอกรหัสพนักงาน" },
   self: { tone: "warning", text: "ลบบัญชีตัวเองไม่ได้" },
@@ -86,7 +87,8 @@ const statusMessages: Record<string, { tone: "success" | "warning"; text: string
 
 export default async function AdminStaffPage({ searchParams }: PageProps) {
   const user = await requireUser();
-  if (user.role !== "admin") redirect("/");
+  // หน้านี้เปิดประตูเข้าระบบให้คนอื่น จึงจำกัดไว้ที่บัญชีเดียวตามที่ Champ กำหนด
+  if (!canManageStaffAccounts(user.actualEmail)) redirect("/admin");
 
   await seedStaffIfEmpty();
   await ensureEmployeeIds();

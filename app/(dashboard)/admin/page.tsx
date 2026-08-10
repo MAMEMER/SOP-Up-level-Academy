@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "../../../lib/auth.ts";
-import { isOwner } from "../../../lib/owner.ts";
+import { isOwner, canManageStaffAccounts } from "../../../lib/owner.ts";
 import { getOpsSummary } from "../../../lib/ops-summary.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
 import { getAdminNotifications } from "../../../lib/admin-notifications-server.ts";
@@ -26,6 +26,8 @@ type Tool = {
   /** live number worth acting on, shown as a badge */
   badge?: { count: number; label: string };
   ownerOnly?: boolean;
+  /** หน้าที่เปิด/ปิดสิทธิ์เข้าระบบให้คนอื่น — เห็นเฉพาะบัญชีที่ดูแลรายชื่อ */
+  staffAdminOnly?: boolean;
 };
 
 // ตัวเลขบนหน้านี้ต้องสดเสมอ — เจ้าของร้านใช้ตัดสินใจว่าจะไปตามเรื่องไหนก่อน
@@ -116,7 +118,8 @@ export default async function AdminHubPage() {
         {
           href: "/admin/staff",
           title: "จัดการพนักงาน",
-          detail: "เพิ่ม / แก้ / ปิดบัญชี · รหัสพนักงาน · ชื่อใน StoreHub",
+          detail: "เพิ่ม / แก้ / ปิดบัญชี · อีเมลที่ login ได้ · รหัสพนักงาน · ชื่อใน StoreHub",
+          staffAdminOnly: true,
           badge: { count: summary.staff.length + summary.noRecordStaff.length, label: "คน" }
         }
       ]
@@ -180,7 +183,9 @@ export default async function AdminHubPage() {
             <h3>{group.title}</h3>
           </div>
           <div className="admin-hub__tools">
-            {group.tools.map((tool) => (
+            {group.tools
+              .filter((tool) => !tool.staffAdminOnly || canManageStaffAccounts(user.actualEmail))
+              .map((tool) => (
               <Link key={tool.href} href={tool.href} className="admin-hub__tool">
                 <div>
                   <strong>{tool.title}</strong>
