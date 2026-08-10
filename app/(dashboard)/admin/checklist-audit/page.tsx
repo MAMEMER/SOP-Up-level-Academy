@@ -88,7 +88,7 @@ async function deleteAction(formData: FormData) {
 const statusMessages: Record<string, { tone: "success" | "warning"; text: string }> = {
   saved: { tone: "success", text: "บันทึกแล้ว — คะแนน Checklist อัปเดตทันที" },
   removed: { tone: "success", text: "ลบรายการแล้ว — คะแนนที่หักไปคืนให้ทันที" },
-  denied: { tone: "warning", text: "ไม่มีสิทธิ์แก้ไข (ต้องเป็นแอดมิน และไม่ได้อยู่ในโหมดดูแทนพนักงาน)" },
+  denied: { tone: "warning", text: "ไม่มีสิทธิ์แก้ไข (ต้องมีสิทธิ์จัดการ และไม่ได้อยู่ในโหมดดูแทนพนักงาน)" },
   missing_staff: { tone: "warning", text: "ต้องเลือกพนักงานที่ส่ง checklist วันนั้น" },
   missing_note: { tone: "warning", text: "ต้องเขียนว่าตรวจข้อไหน และไม่ตรงยังไง" },
   error: { tone: "warning", text: "บันทึกไม่สำเร็จ" }

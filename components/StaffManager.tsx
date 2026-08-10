@@ -10,10 +10,13 @@ type StaffManagerProps = {
   removeAction: (formData: FormData) => Promise<void>;
 };
 
+// ทุกตัวเลือกที่นี่คือ "ระดับสิทธิ์ของพนักงาน" ไม่ใช่ตำแหน่งเจ้าของ.
+// เจ้าของร้านมีแค่ 2 คน (แชมป์ + เนม) กำหนดไว้ใน lib/owner.ts เปลี่ยนที่นี่ไม่ได้ —
+// เดิมตัวเลือกนี้เขียนว่า "แอดมิน" เฉยๆ เลยอ่านเหมือนเป็นเจ้าของอีกคน
 const roleOptions: Array<{ value: StaffRecord["role"]; label: string; hint: string }> = [
   { value: "employee", label: "พนักงาน", hint: "เห็นเฉพาะงานของตัวเอง" },
-  { value: "leader", label: "หัวหน้า", hint: "เห็นงานในแผนกตัวเอง" },
-  { value: "admin", label: "แอดมิน", hint: "เห็นทุกอย่าง + จัดการระบบ" }
+  { value: "leader", label: "พนักงาน · หัวหน้าแผนก", hint: "เห็นงานในแผนกตัวเอง" },
+  { value: "admin", label: "พนักงาน · สิทธิ์จัดการ", hint: "เห็นงานทุกคน มอบหมายและตรวจงานได้ · ไม่เห็นตัวเลขเงินเดือน" }
 ];
 
 function StaffForm({

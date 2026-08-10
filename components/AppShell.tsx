@@ -18,7 +18,7 @@ const mainLinks = [
 const staffLinks = mainLinks;
 
 const adminLinks = [
-  { href: "/admin", label: "หน้ารวมแอดมิน" },
+  { href: "/admin", label: "หน้ารวมงานจัดการ" },
   { href: "/admin/schedule", label: "ตารางกะ" },
   { href: "/admin/assign", label: "มอบหมายงาน" },
   { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
@@ -27,7 +27,7 @@ const adminLinks = [
   { href: "/admin/manual-config", label: "แก้คู่มืองาน" },
   { href: "/admin/stock-check", label: "ลงคะแนน Stock" },
   { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist" },
-  { href: "/admin/ops", label: "สรุปเจ้าของร้าน" },
+  { href: "/admin/ops", label: "สรุปทั้งร้าน รายคน" },
   { href: "/admin/performance-score", label: "คะแนนพนักงาน" },
   { href: "/admin/kpi-rules", label: "กติกาให้คะแนน" },
   { href: "/manager-review", label: "ตรวจงาน" },

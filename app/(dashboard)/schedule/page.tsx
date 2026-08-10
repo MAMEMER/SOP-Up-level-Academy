@@ -25,11 +25,11 @@ export default async function SchedulePage() {
         <div>
           <p className="eyebrow">Schedule</p>
           <h2>ตารางกะ</h2>
-          <p>ดูว่าวันไหนเข้ากี่โมง และวันนั้นใครเข้างานด้วย · แก้ไขได้เฉพาะแอดมิน</p>
+          <p>ดูว่าวันไหนเข้ากี่โมง และวันนั้นใครเข้างานด้วย · แก้ไขได้เฉพาะคนที่มีสิทธิ์จัดการ</p>
         </div>
         {user.role === "admin" ? (
           <div className="hero-actions">
-            <Link href="/admin/schedule" className="btn-soft">จัดกะ (แอดมิน)</Link>
+            <Link href="/admin/schedule" className="btn-soft">จัดกะ</Link>
           </div>
         ) : null}
       </section>

@@ -126,7 +126,7 @@ export function MonthlyEventChecklist({ canManage = false }: { canManage?: boole
     <section className="workflow-panel">
       {canManage ? (
         <div className="trial-banner">
-          <strong>โหมดเจ้าของร้าน</strong>
+          <strong>โหมดสิทธิ์จัดการ</strong>
           <span>
             มอบหมายงาน ตรวจงาน และปิดงานเป็น &quot;เสร็จสิ้น&quot; ได้ ·{" "}
             <a href="/monthly-summary" className="detail-inline-link">

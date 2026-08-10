@@ -76,7 +76,7 @@ async function removeStaffAction(formData: FormData) {
 const statusMessages: Record<string, { tone: "success" | "warning"; text: string }> = {
   saved: { tone: "success", text: "บันทึกแล้ว — สิทธิ์เข้าระบบและตารางกะอัปเดตทันที" },
   removed: { tone: "success", text: "ลบออกจากระบบแล้ว — อีเมลนี้ login ไม่ได้อีก" },
-  denied: { tone: "warning", text: "ไม่มีสิทธิ์แก้ไข (ต้องเป็นแอดมิน และไม่ได้อยู่ในโหมดดูแทนพนักงาน)" },
+  denied: { tone: "warning", text: "ไม่มีสิทธิ์แก้ไข (ต้องมีสิทธิ์จัดการ และไม่ได้อยู่ในโหมดดูแทนพนักงาน)" },
   invalid_email: { tone: "warning", text: "อีเมลไม่ถูกต้อง" },
   code_required: { tone: "warning", text: "ถ้าอยู่ในตารางกะ ต้องกรอกรหัสพนักงาน" },
   self: { tone: "warning", text: "ลบบัญชีตัวเองไม่ได้" },
