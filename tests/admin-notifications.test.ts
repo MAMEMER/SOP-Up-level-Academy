@@ -9,6 +9,16 @@ import {
   type NotificationInput
 } from "../lib/admin-notifications.ts";
 
+const noGuild: NotificationInput["guild"] = {
+  expClaims: 0,
+  questSubmissions: 0,
+  shopRequests: 0,
+  coinTopups: 0,
+  mergeRequests: 0,
+  guildShopOrders: 0,
+  pendingMembers: 0
+};
+
 const quiet: NotificationInput = {
   storageReady: true,
   deliveries: { overdue: 0, unshipped: 0, unclaimed: 0 },
@@ -16,7 +26,8 @@ const quiet: NotificationInput = {
   assignments: { waitingReview: 0, overdue: 0 },
   handoffs: { open: 0 },
   checklist: { latePhases: 0, notStartedStaff: [] },
-  bugReports: { open: 0 }
+  bugReports: { open: 0 },
+  guild: noGuild
 };
 
 const ids = (items: AdminNotification[]) => items.map((item) => item.id);
@@ -64,7 +75,8 @@ describe("buildAdminNotifications", () => {
       assignments: { waitingReview: 2, overdue: 3 },
       handoffs: { open: 1 },
       checklist: { latePhases: 4, notStartedStaff: ["Leo"] },
-      bugReports: { open: 5 }
+      bugReports: { open: 5 },
+      guild: noGuild
     });
     const levels = items.map((item) => item.level);
     assert.deepEqual([...levels].sort((a, b) => levels.indexOf(a) - levels.indexOf(b)), levels);
@@ -81,7 +93,8 @@ describe("buildAdminNotifications", () => {
       assignments: { waitingReview: 1, overdue: 1 },
       handoffs: { open: 1 },
       checklist: { latePhases: 1, notStartedStaff: ["C"] },
-      bugReports: { open: 1 }
+      bugReports: { open: 1 },
+      guild: noGuild
     });
     for (const item of items) {
       assert.ok(item.href.length > 1, `${item.id} ต้องมี href`);
@@ -94,6 +107,77 @@ describe("buildAdminNotifications", () => {
     const items = buildAdminNotifications({ ...quiet, storageReady: false, handoffs: { open: 3 } });
     assert.equal(items[0].id, "storage-down");
     assert.equal(items[0].level, "urgent");
+  });
+
+  it("เว็บกิลด์ทุกหมวดเป็น 0 ไม่ออกแจ้งเตือนกิลด์เลย", () => {
+    assert.deepEqual(buildAdminNotifications({ ...quiet, guild: noGuild }), []);
+  });
+
+  it("เว็บกิลด์ออกแจ้งเตือนครบทุกหมวดที่มีค่า พร้อม href กิลด์และ count", () => {
+    const items = buildAdminNotifications({
+      ...quiet,
+      guild: {
+        expClaims: 3,
+        questSubmissions: 2,
+        shopRequests: 1,
+        coinTopups: 4,
+        mergeRequests: 1,
+        guildShopOrders: 5,
+        pendingMembers: 2
+      }
+    });
+    assert.deepEqual(new Set(ids(items)), new Set([
+      "guild-exp-claims",
+      "guild-quest-submissions",
+      "guild-shop-requests",
+      "guild-coin-topups",
+      "guild-merge-requests",
+      "guild-shop-orders",
+      "guild-pending-members"
+    ]));
+    for (const item of items) {
+      assert.equal(item.source, "เว็บกิลด์");
+      assert.equal(item.level, "warning");
+      assert.equal(item.href, "https://guild.uplevelguild.com/admin");
+      assert.ok((item.count ?? 0) > 0, `${item.id} ต้องมี count`);
+    }
+    // id ต้องไม่ซ้ำ แม้รวมกับแหล่งอื่น
+    assert.equal(new Set(ids(items)).size, items.length);
+  });
+
+  it("เว็บกิลด์ออกเฉพาะหมวดที่ > 0 เท่านั้น", () => {
+    const items = buildAdminNotifications({
+      ...quiet,
+      guild: { ...noGuild, expClaims: 2, guildShopOrders: 3 }
+    });
+    assert.deepEqual(ids(items).sort(), ["guild-exp-claims", "guild-shop-orders"]);
+    const exp = items.find((item) => item.id === "guild-exp-claims");
+    assert.match(exp?.title || "", /ขอเพิ่ม EXP รออนุมัติ 2/);
+  });
+
+  it("รวม SOP + เว็บกิลด์ ในหน้าเดียว id ไม่ซ้ำและทุกอันมี href", () => {
+    const items = buildAdminNotifications({
+      storageReady: true,
+      deliveries: { overdue: 1, unshipped: 1, unclaimed: 0 },
+      pressesWithoutRecord: [{ staffName: "Kongh", phaseTitle: "เปิดร้าน" }],
+      assignments: { waitingReview: 2, overdue: 3 },
+      handoffs: { open: 1 },
+      checklist: { latePhases: 4, notStartedStaff: ["Leo"] },
+      bugReports: { open: 5 },
+      guild: {
+        expClaims: 1,
+        questSubmissions: 1,
+        shopRequests: 1,
+        coinTopups: 1,
+        mergeRequests: 1,
+        guildShopOrders: 1,
+        pendingMembers: 1
+      }
+    });
+    // 8 SOP + 7 กิลด์
+    assert.equal(items.length, 15);
+    assert.equal(new Set(ids(items)).size, items.length, "id ต้องไม่ซ้ำข้ามแหล่ง");
+    for (const item of items) assert.ok(item.href.length > 1, `${item.id} ต้องมี href`);
   });
 });
 

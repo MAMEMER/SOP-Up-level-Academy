@@ -52,6 +52,56 @@ async function openTicketCount(): Promise<number> {
   return snapshot.docs.filter((doc) => (doc.data() as { source?: string }).source === "sop").length;
 }
 
+/**
+ * นับงานค้างในเว็บกิลด์ (โปรเจกต์ Firebase เดียวกัน อ่านตรงด้วย adminDb() ได้เลย).
+ * ใช้ aggregate .count() ทุกหมวด — ได้แค่ตัวเลข ไม่ดึงตัว document ลงมา จึงไม่แตะฟิลด์
+ * slip ของ shop_orders (เป็น base64 รูปหลาย MB) และไม่เปิด users ทั้ง collection.
+ * ⚠️ shop_orders (ขีดล่าง) = ร้านค้าในเว็บกิลด์ คนละอันกับ shop-orders (ขีดกลาง) ของ SOP.
+ */
+async function countWhereEq(collection: string, field: string, value: string): Promise<number> {
+  const snapshot = await adminDb().collection(collection).where(field, "==", value).count().get();
+  return snapshot.data().count;
+}
+
+async function countWhereIn(collection: string, field: string, values: string[]): Promise<number> {
+  const snapshot = await adminDb().collection(collection).where(field, "in", values).count().get();
+  return snapshot.data().count;
+}
+
+async function guildCounts(): Promise<NotificationInput["guild"]> {
+  const empty: NotificationInput["guild"] = {
+    expClaims: 0,
+    questSubmissions: 0,
+    shopRequests: 0,
+    coinTopups: 0,
+    mergeRequests: 0,
+    guildShopOrders: 0,
+    pendingMembers: 0
+  };
+  if (!hasAdminCredentials()) return empty;
+
+  // ห่อ safe() ทีละหมวด — หมวดใดพัง (เช่นยังไม่มี collection) ต้องไม่ทำให้ทั้งหน้าพัง
+  const [
+    expClaims,
+    questSubmissions,
+    shopRequests,
+    coinTopups,
+    mergeRequests,
+    guildShopOrders,
+    pendingMembers
+  ] = await Promise.all([
+    safe(() => countWhereEq("activity_claims", "status", "pending"), 0),
+    safe(() => countWhereEq("quest_submissions", "status", "pending"), 0),
+    safe(() => countWhereEq("shop_requests", "status", "pending"), 0),
+    safe(() => countWhereEq("coin_topups", "status", "pending_manual"), 0),
+    safe(() => countWhereEq("merge_requests", "status", "pending"), 0),
+    safe(() => countWhereIn("shop_orders", "status", ["pending", "processing"]), 0),
+    safe(() => countWhereEq("users", "status", "pending_manual"), 0)
+  ]);
+
+  return { expClaims, questSubmissions, shopRequests, coinTopups, mergeRequests, guildShopOrders, pendingMembers };
+}
+
 function deliveryCounts(tasks: DeliveryTask[], today: string): NotificationInput["deliveries"] {
   const unshippedTasks = tasks.filter((task) => task.status !== "shipped");
   return {
@@ -87,11 +137,20 @@ export async function getAdminNotifications(
   workDate: string,
   branch = "bangkae"
 ): Promise<AdminNotification[]> {
-  const [deliveries, lostPresses, tickets, assignments] = await Promise.all([
+  const [deliveries, lostPresses, tickets, assignments, guild] = await Promise.all([
     safe(() => syncDeliveryTasks(branch), [] as DeliveryTask[]),
     safe(() => pressesWithoutRecord(workDate), [] as Array<{ staffName: string; phaseTitle: string }>),
     safe(() => openTicketCount(), 0),
-    safe(() => assignmentCounts(branch, workDate), { waitingReview: 0, overdue: 0 })
+    safe(() => assignmentCounts(branch, workDate), { waitingReview: 0, overdue: 0 }),
+    safe(() => guildCounts(), {
+      expClaims: 0,
+      questSubmissions: 0,
+      shopRequests: 0,
+      coinTopups: 0,
+      mergeRequests: 0,
+      guildShopOrders: 0,
+      pendingMembers: 0
+    })
   ]);
 
   return buildAdminNotifications({
@@ -101,6 +160,7 @@ export async function getAdminNotifications(
     assignments,
     handoffs: { open: summary.handoffs.filter((item) => item.status === "open").length },
     checklist: { latePhases: summary.daily.latePhases, notStartedStaff: summary.noRecordStaff },
-    bugReports: { open: tickets }
+    bugReports: { open: tickets },
+    guild
   });
 }

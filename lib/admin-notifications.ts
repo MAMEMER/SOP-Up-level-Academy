@@ -85,7 +85,45 @@ export type NotificationInput = {
   checklist: { latePhases: number; notStartedStaff: string[] };
   /** แจ้งบัค / ข้อเสนอแนะที่ยังไม่ได้อ่าน */
   bugReports: { open: number };
+  /**
+   * งานที่ค้างอยู่ในเว็บกิลด์ (guild.uplevelguild.com) — คนละระบบกับ SOP แต่เจ้าของร้าน
+   * คนเดียวกันต้องอนุมัติ. เดิมต้องเปิดเว็บกิลด์แยกถึงจะเห็นว่ามีอะไรรอ — พลาดง่ายมาก.
+   * ทุกตัวเป็น "จำนวนรายการที่ยังรออนุมัติ/รอดำเนินการ" ล้วน.
+   */
+  guild: {
+    /** activity_claims (status == pending) — ขอเพิ่ม EXP */
+    expClaims: number;
+    /** quest_submissions (status == pending) — เควสรอตรวจ */
+    questSubmissions: number;
+    /** shop_requests (status == pending) — คำขอแลกของ */
+    shopRequests: number;
+    /** coin_topups (status == pending_manual) — เติมเหรียญรอยืนยัน */
+    coinTopups: number;
+    /** merge_requests (status == pending) — คำขอรวมบัญชี */
+    mergeRequests: number;
+    /** shop_orders (status in [pending, processing]) — ออเดอร์ร้านค้าในเว็บกิลด์ */
+    guildShopOrders: number;
+    /** users (status == pending_manual) — สมาชิกใหม่รอ approve */
+    pendingMembers: number;
+  };
 };
+
+/** เว็บกิลด์อยู่คนละโดเมน — กดจากแจ้งเตือนต้องพาไปหน้าอนุมัติของกิลด์โดยตรง */
+const GUILD_ADMIN_HREF = "https://guild.uplevelguild.com/admin";
+
+/**
+ * หนึ่งบรรทัดต่อหนึ่งหมวดของเว็บกิลด์. เรียงตามความสำคัญคร่าวๆ (เงิน/สมาชิกก่อน) แต่
+ * ระดับเป็น warning เท่ากันหมด — การเรียงจริงทำที่ sortNotifications ตามจำนวน.
+ */
+const GUILD_ROWS: Array<{ key: keyof NotificationInput["guild"]; id: string; label: string }> = [
+  { key: "expClaims", id: "guild-exp-claims", label: "ขอเพิ่ม EXP รออนุมัติ" },
+  { key: "questSubmissions", id: "guild-quest-submissions", label: "เควสรอตรวจ" },
+  { key: "shopRequests", id: "guild-shop-requests", label: "คำขอแลกของรออนุมัติ" },
+  { key: "coinTopups", id: "guild-coin-topups", label: "เติมเหรียญรอยืนยัน" },
+  { key: "mergeRequests", id: "guild-merge-requests", label: "คำขอรวมบัญชี" },
+  { key: "guildShopOrders", id: "guild-shop-orders", label: "ออเดอร์ร้านค้ารอดำเนินการ" },
+  { key: "pendingMembers", id: "guild-pending-members", label: "สมาชิกใหม่รอ approve" }
+];
 
 export function buildAdminNotifications(input: NotificationInput): AdminNotification[] {
   const items: AdminNotification[] = [];
@@ -206,6 +244,21 @@ export function buildAdminNotifications(input: NotificationInput): AdminNotifica
       href: "/admin/ops",
       count: input.bugReports.open
     });
+  }
+
+  // ── เว็บกิลด์ — หนึ่งบรรทัดต่อหมวดที่มีของค้างเท่านั้น ──────────────────────
+  for (const row of GUILD_ROWS) {
+    const count = input.guild[row.key];
+    if (count > 0) {
+      items.push({
+        id: row.id,
+        level: "warning",
+        source: "เว็บกิลด์",
+        title: `${row.label} ${count}`,
+        href: GUILD_ADMIN_HREF,
+        count
+      });
+    }
   }
 
   return sortNotifications(items);
