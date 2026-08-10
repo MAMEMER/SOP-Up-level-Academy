@@ -26,6 +26,7 @@ import { evidenceForItem, type ChecklistEvidence, type PhaseWindows } from "../l
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 import { useWorkRecordWindow } from "../lib/work-records-client.ts";
 import { SaveIndicator } from "./SaveIndicator.tsx";
+import { logSubmitPress } from "../lib/submit-log-client.ts";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import { dailyScopeKey, shiftWorkDate } from "../lib/work-records.ts";
 
@@ -919,7 +920,7 @@ export function WorkflowChecklist({
 
   // Server-persisted day record: today's is writable, the previous days are read for
   // on-time streaks and the "ยอดปิดร้านเมื่อวาน" lookup.
-  const { data, history, loaded, status, update } = useWorkRecordWindow<WorkflowDayPayload>({
+  const { data, history, loaded, status, update, flush } = useWorkRecordWindow<WorkflowDayPayload>({
     scope: "daily",
     scopeKey,
     fromScopeKey,
@@ -953,6 +954,9 @@ export function WorkflowChecklist({
   const withinWorkHours = isWithinWorkflowWorkHours(now);
   const locked = readOnly || !loaded;
   const { redirecting, goToDashboard } = useChecklistCompleteRedirect();
+  // หัวข้อที่กำลังส่ง / หัวข้อที่ส่งแล้วไม่ถึงระบบ — น้องต้องเห็นชัดว่ากดติดหรือไม่ติด
+  const [submitting, setSubmitting] = useState("");
+  const [failedSubmit, setFailedSubmit] = useState<Record<string, boolean>>({});
 
   function updateRecords(next: WorkflowDailyRecord[]) {
     update((previous) => ({ ...previous, records: next }));
@@ -1061,9 +1065,26 @@ export function WorkflowChecklist({
       adminUnlockedBy: existing?.adminUnlockedBy
     });
     updateRecords(next);
+    if (recordStatus !== "submitted") return;
 
-    // เมื่อกดส่งงานแล้วทุก phase ของ checklist วันนี้ถูกส่งครบ 100% → กลับหน้า Dashboard อัตโนมัติ
-    if (recordStatus === "submitted") {
+    // กดส่งงานต้องรอให้ถึง server จริงก่อน. เดิมเด้งกลับหน้า Dashboard ทันทีที่กด ทั้งที่การ
+    // บันทึกยังเป็น debounce 700ms อยู่ — พอหน้าถูก unmount timer ก็ถูกล้าง งานที่กดไปแล้ว
+    // จึงไม่เคยถึงระบบ ("น้องบอกกดมาแล้วแต่ไม่ขึ้น")
+    setSubmitting(phase.id);
+    const pressedAt = recordedAt;
+    void flush().then((ok) => {
+      // บันทึกการกดไว้เสมอ แม้รอบนี้บันทึกงานไม่สำเร็จ — เจ้าของร้านต้องตรวจย้อนได้
+      logSubmitPress({ workDate, phaseId: phase.id, phaseTitle: phase.title, pressedAt, ok });
+      setSubmitting((current) => (current === phase.id ? "" : current));
+      setFailedSubmit((current) => {
+        const nextFailed = { ...current };
+        if (ok) delete nextFailed[phase.id];
+        else nextFailed[phase.id] = true;
+        return nextFailed;
+      });
+      if (!ok) return;
+
+      // ส่งครบทุกหัวข้อของวันแล้ว → กลับหน้า Dashboard ให้เอง
       const allSubmitted =
         checklistPhases.length > 0 &&
         checklistPhases.every(
@@ -1072,7 +1093,7 @@ export function WorkflowChecklist({
             "submitted"
         );
       if (allSubmitted) goToDashboard();
-    }
+    });
   }
 
   function recordPhase(phase: WorkflowPhase, recordStatus: WorkflowRecordStatus) {
@@ -1456,8 +1477,13 @@ export function WorkflowChecklist({
                     ปลดล็อคให้แก้ไข
                   </button>
                 ) : null}
-                <button type="button" className="green-button" onClick={() => recordPhase(phase, "submitted")} disabled={!canSubmit}>
-                  ส่งงาน
+                <button
+                  type="button"
+                  className="green-button"
+                  onClick={() => recordPhase(phase, "submitted")}
+                  disabled={!canSubmit || submitting === phase.id}
+                >
+                  {submitting === phase.id ? "กำลังส่ง…" : failedSubmit[phase.id] ? "ส่งอีกครั้ง" : "ส่งงาน"}
                 </button>
                 {record ? (
                   <strong className={isSubmitted ? "record-status submitted" : "record-status"}>
@@ -1465,6 +1491,11 @@ export function WorkflowChecklist({
                   </strong>
                 ) : null}
               </div>
+              {failedSubmit[phase.id] ? (
+                <p className="phase-submit-failed">
+                  ยังส่งไม่ถึงระบบ — งานนี้ยังไม่ถูกบันทึก เช็คอินเทอร์เน็ตแล้วกด “ส่งอีกครั้ง” อย่าเพิ่งปิดหน้านี้
+                </p>
+              ) : null}
             </section>
           );
         })}

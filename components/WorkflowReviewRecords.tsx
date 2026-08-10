@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   elapsedSeconds,
   formatWorkDate,
@@ -8,6 +8,12 @@ import {
   workflowVisualStatus
 } from "../lib/workflow-records.ts";
 import { useWorkflowRecordsForDay } from "../lib/workflow-records-client.ts";
+import { fetchSubmitLog, summarisePresses, type SubmitLogEntry } from "../lib/submit-log-client.ts";
+
+const pressTime = (iso: string) =>
+  new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hour12: false }).format(
+    new Date(iso)
+  );
 
 const reviewLabel = {
   white: "ยังไม่เริ่ม",
@@ -22,6 +28,18 @@ const reviewLabel = {
 export function WorkflowReviewRecords() {
   const [workDate, setWorkDate] = useState(formatWorkDate());
   const { staff, loaded } = useWorkflowRecordsForDay(workDate);
+  // ประวัติการกดปุ่มส่งงาน — ตอบคำถาม "น้องกดมาจริงไหม กี่ครั้ง กี่โมง"
+  const [presses, setPresses] = useState<SubmitLogEntry[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    fetchSubmitLog(workDate)
+      .then((entries) => alive && setPresses(entries))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [workDate]);
 
   const rows = staff
     .map((person) => ({
@@ -31,6 +49,18 @@ export function WorkflowReviewRecords() {
       )
     }))
     .filter((person) => person.records.length > 0);
+
+  // กดส่งแล้วแต่ไม่มีข้อมูลในระบบ = ระบบพลาด ไม่ใช่พนักงานไม่ทำ. ถ้าไม่แสดงตรงนี้ เคสนี้จะ
+  // มองไม่เห็นเลย เพราะไม่มีแถวงานให้แสดง
+  const orphanedPresses = presses.filter(
+    (entry) =>
+      !entry.impersonating &&
+      !staff.some(
+        (person) =>
+          person.employeeEmail === entry.employeeEmail &&
+          person.records.some((record) => record.workDate === workDate && record.phaseId === entry.phaseId)
+      )
+  );
 
   return (
     <section className="workflow-panel">
@@ -73,6 +103,15 @@ export function WorkflowReviewRecords() {
                         {isWorkflowRecordOnTime(record) ? "ตรงเวลา" : "ช้ากว่ากำหนด"}
                       </small>
                     ) : null}
+                    {(() => {
+                      const pressLabel = summarisePresses(
+                        presses.filter(
+                          (entry) => entry.employeeEmail === person.employeeEmail && entry.phaseId === record.phaseId
+                        ),
+                        pressTime
+                      );
+                      return pressLabel ? <small className="review-presses">{pressLabel}</small> : null;
+                    })()}
                   </div>
                   <em>{reviewLabel[visualStatus]}</em>
                 </div>
@@ -86,6 +125,20 @@ export function WorkflowReviewRecords() {
           </div>
         )}
       </div>
+
+      {orphanedPresses.length ? (
+        <div className="review-orphaned">
+          <strong>กดส่งงานแล้วแต่ไม่มีข้อมูลในระบบ</strong>
+          <p>รอบเหล่านี้พนักงานกดจริง แต่บันทึกไม่ถึงเซิร์ฟเวอร์ — ให้ตรวจก่อนตัดสินว่าไม่ได้ทำ</p>
+          <ul>
+            {orphanedPresses.map((entry) => (
+              <li key={entry.id}>
+                {entry.employeeName} · {entry.phaseTitle || entry.phaseId} · กดเมื่อ {pressTime(entry.pressedAt)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

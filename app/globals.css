@@ -3688,6 +3688,24 @@ a {
   font-weight: 800;
 }
 
+/* ประวัติการกดส่งงาน (หน้าตรวจงาน) */
+.review-presses { color: var(--color-orange); font-weight: 700; }
+.review-orphaned { margin: 16px 0 0; border: 1px solid rgba(192, 57, 43, 0.35); border-radius: 12px; background: #fff3f0; padding: 14px 16px; }
+.review-orphaned strong { display: block; color: #a12312; }
+.review-orphaned p { margin: 4px 0 8px; font-size: 13px; color: var(--color-ink-soft); }
+.review-orphaned ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+
+/* ส่งงานแล้วไม่ถึง server — ต้องเด่นกว่า warning ปกติ เพราะงานยังไม่ถูกบันทึก */
+.phase-submit-failed {
+  margin: 10px 0 0;
+  border: 1px solid rgba(192, 57, 43, 0.45);
+  border-radius: 8px;
+  background: #ffe9e5;
+  color: #a12312;
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
 .handoff-inbox {
   margin: 12px 0 0;
   padding: 4px 0 4px 14px;

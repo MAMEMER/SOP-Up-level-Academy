@@ -21,6 +21,7 @@ import {
   workflowVisualStatus,
   type WorkflowDailyRecord
 } from "../lib/workflow-records.ts";
+import { summarisePresses } from "../lib/submit-log-client.ts";
 
 describe("workflow daily records", () => {
   it("formats a stable work date key", () => {
@@ -380,5 +381,23 @@ describe("preserveFirstSubmission (กดส่งซ้ำต้องไม่
     const merged = preserveFirstSubmission([first], [second, other]);
     assert.equal(merged[0].submittedAt, first.submittedAt);
     assert.equal(merged[1].submittedAt, second.submittedAt);
+  });
+});
+
+describe("summarisePresses (ประวัติการกดส่งงาน)", () => {
+  const at = (iso: string) => iso.slice(11, 16);
+  const press = (pressedAt: string, saved = true) =>
+    ({ id: pressedAt, staffCode: "UP-008", employeeEmail: "a@b.c", employeeName: "Kongh", workDate: "2026-08-10", phaseId: "open-store", phaseTitle: "เปิดร้าน", pressedAt, receivedAt: pressedAt, saved, impersonating: false });
+
+  it("ไม่มีการกด → ไม่ต้องแสดงอะไร", () => {
+    assert.equal(summarisePresses([], at), "");
+  });
+
+  it("บอกจำนวนครั้งและเวลาที่กด", () => {
+    assert.equal(summarisePresses([press("2026-08-10T12:40"), press("2026-08-10T15:03")], at), "กด 2 ครั้ง · 12:40, 15:03");
+  });
+
+  it("แยกรอบที่กดแล้วไม่ถึงระบบออกมาให้เห็น", () => {
+    assert.match(summarisePresses([press("2026-08-10T12:40", false)], at), /ไม่ถึงระบบ 1 ครั้ง/);
   });
 });

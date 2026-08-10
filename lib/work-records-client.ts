@@ -49,6 +49,15 @@ export async function saveWorkRecord(
 const SAVE_DEBOUNCE_MS = 700;
 
 /**
+ * ร้านใช้ Wi-Fi/มือถือ เน็ตสะดุดชั่ววินาทีเกิดขึ้นจริง. เดิมยิงครั้งเดียว พลาดแล้วจบ —
+ * งานที่กดไปแล้วหายถาวรทั้งที่หน้าจอยังขึ้นว่าติ๊กครบ กลายเป็น "กดมาแล้วแต่ไม่ขึ้น".
+ * ลองใหม่ให้ครบก่อนค่อยยอมแพ้.
+ */
+const SAVE_RETRY_DELAYS_MS = [600, 1500, 3000];
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
  * Loads one scope window (plus optional history range for streaks / previous-day lookups)
  * and keeps the current window synced to the server.
  */
@@ -94,18 +103,33 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
     };
   }, [scope, scopeKey, fromScopeKey, toScopeKey, owner]);
 
-  const flush = useCallback(async () => {
-    const payload = pending.current;
-    if (!payload) return;
-    pending.current = null;
+  /**
+   * บันทึกสิ่งที่ค้างอยู่ทันที คืน true เมื่อถึง server จริง. ลองใหม่อัตโนมัติเมื่อเน็ตสะดุด
+   * และไม่ทิ้ง payload จนกว่าจะสำเร็จ — ผู้เรียกจึงเชื่อผลลัพธ์ได้ (ปุ่มส่งงานใช้ค่านี้
+   * ตัดสินว่าจะบอกน้องว่า "ส่งแล้ว" หรือ "ยังไม่ถึงระบบ")
+   */
+  const flush = useCallback(async (): Promise<boolean> => {
+    if (readOnly) return true;
+    if (!pending.current) return true;
     setStatus("saving");
-    try {
-      await saveWorkRecord(scope, scopeKey, payload, owner);
-      setStatus("saved");
-    } catch {
-      setStatus("error");
+    for (let attempt = 0; ; attempt += 1) {
+      const payload = pending.current;
+      if (!payload) return true;
+      try {
+        await saveWorkRecord(scope, scopeKey, payload, owner);
+        // มีการติ๊กใหม่ระหว่างกำลังส่ง → เก็บ payload ใหม่ไว้ให้รอบถัดไป
+        if (pending.current === payload) pending.current = null;
+        setStatus("saved");
+        return true;
+      } catch {
+        if (attempt >= SAVE_RETRY_DELAYS_MS.length) {
+          setStatus("error");
+          return false;
+        }
+        await wait(SAVE_RETRY_DELAYS_MS[attempt]);
+      }
     }
-  }, [scope, scopeKey, owner]);
+  }, [scope, scopeKey, owner, readOnly]);
 
   const update = useCallback(
     (updater: (previous: T) => T) => {
