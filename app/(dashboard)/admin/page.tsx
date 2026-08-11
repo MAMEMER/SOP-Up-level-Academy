@@ -90,6 +90,11 @@ export default async function AdminHubPage() {
           detail: "สั่งงานรายคน แนบไฟล์ได้ · ขึ้นบนหน้าของเขาทันทีที่ login",
           badge: openWork ? { count: openWork, label: "ยังไม่ส่ง" } : undefined
         },
+        {
+          href: "/admin/stock-runs",
+          title: "ตรวจนับ Stock",
+          detail: "มอบหมาย + ตรวจรับงานตรวจนับ Stock อุปกรณ์/Sleeve (สัปดาห์) และ Single card (เดือน) เป็นรายครั้ง พร้อมประวัติ"
+        },
         { href: "/admin/schedule", title: "ตารางกะ", detail: "วางกะรายเดือน · ดึงเวลาเข้างานจริงจาก StoreHub มาเทียบ" },
         { href: "/admin/checklist-config", title: "ปรับ Checklist", detail: "แก้รายการ checklist ทั้ง Daily / Weekly / Monthly · เวลาส่ง ลำดับหัวข้อ และกะ" },
         { href: "/admin/manual-config", title: "แก้คู่มืองาน", detail: "แก้ขั้นตอน วัตถุประสงค์ ข้อควรระวัง ที่พนักงานอ่าน" }
