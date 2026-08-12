@@ -51,6 +51,9 @@ export default async function AdminHubPage() {
   // ทุกเรื่องค้างจากทุกหน้า รวมมาไว้บนสุดของ hub — ไม่ต้องไล่เปิดทีละหน้าถึงจะรู้
   const notifications = await getAdminNotifications(summary, workDate, ADMIN_BRANCH, deliveryTasks);
   const owner = isOwner(user.email);
+  // หน้าจัดการพนักงานย้ายมาอยู่ที่ /admin/staff ตอน /admin กลายเป็น hub — เลยยกปุ่มลัด
+  // ขึ้นมาไว้บนสุดให้กดเข้าได้ทันที ไม่ต้องเลื่อนลงไปหาการ์ดเล็กๆ ท้ายหน้า (SOP bug: หน้าจัดการพนักงานหาย)
+  const canManageStaff = canManageStaffAccounts(user.actualEmail);
 
   const waitingReview = summary.assignments.filter((item) => item.status === "submitted").length;
   const openWork = summary.assignments.filter((item) => item.status === "open").length;
@@ -140,6 +143,9 @@ export default async function AdminHubPage() {
           <p>ทุกอย่างที่ต้องใช้จัดการทีม อยู่ในหน้านี้ที่เดียว · {workDate}</p>
         </div>
         <div className="hero-actions">
+          {canManageStaff ? (
+            <Link href="/admin/staff" className="primary-action">จัดการพนักงาน</Link>
+          ) : null}
           <Link href="/" className="soft-button">ดูหน้าพนักงาน</Link>
         </div>
       </section>
