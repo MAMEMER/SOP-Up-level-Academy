@@ -16,9 +16,10 @@ import {
   type MonthlyStockSinglePhase
 } from "../lib/monthly-stock-single-workflow.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
-import { applyStringPhaseOverride, itemsFromStrings, resolvePhaseChecklistItems } from "../lib/checklist-overrides.ts";
+import { applyStringPhaseOverride, itemsFromStrings, normalizeItemEvidence, resolvePhaseChecklistItems } from "../lib/checklist-overrides.ts";
 import { useChecklistOverrides } from "../lib/checklist-overrides-store.ts";
 import { ChecklistItemGuide } from "./ChecklistItemGuide.tsx";
+import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 
 // Shared branch task like the weekly count — scoped by ISO week (the completion scope of
 // this checklist), stored once for the team rather than per person.
@@ -56,6 +57,10 @@ function itemKey(workScope: string, index: number) {
 function detailKey(workScope: string, key: string) {
   return `${workScope}:${key}`;
 }
+
+// หลักฐานที่เจ้าของตั้งต่อรายการ (รูป/ลิงก์) เก็บใน details map เหมือนหน้า Daily
+const evidencePhotoKey = (index: number) => `evidence:${index}:photos`;
+const evidenceLinkKey = (index: number) => `evidence:${index}:link`;
 
 function MonthlyStockSingleTaskDetails({
   index,
@@ -405,6 +410,9 @@ export function MonthlyStockSingleChecklist({
   const discrepancyStatus = data.discrepancyStatus || "";
   const locked = readOnly || !loaded;
 
+  // จำนวนขั้นตอนที่มี detail panel เฉพาะทางในโค้ด (index 0-4) — หลักฐานที่เจ้าของตั้งจะใช้กับ
+  // "รายการที่เพิ่มเอง" (index ตั้งแต่ตรงนี้ขึ้นไป) เท่านั้น เหมือน itemHasHardcodedDetail ของ Daily
+  const builtinDetailCount = basePhase.checklist.length;
   const total = phase.checklist.length;
   const completed = useMemo(
     () => phase.checklist.filter((_, index) => checked[itemKey(workScope, index)]).length,
@@ -413,6 +421,23 @@ export function MonthlyStockSingleChecklist({
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
   const statusSubmittable = submittableStocktakeStatuses.includes(
     status as (typeof submittableStocktakeStatuses)[number]
+  );
+  // หลักฐาน (รูป/ลิงก์) ที่เจ้าของบังคับต่อรายการที่เพิ่มเอง แต่ยังไม่ได้แนบ → บล็อกปุ่มส่งงาน
+  const missingEvidence = useMemo(
+    () =>
+      phase.checklist
+        .map((_, index) => index)
+        .filter((index) => {
+          if (index < builtinDetailCount) return false;
+          const ev = normalizeItemEvidence(guideItems[index]?.evidence);
+          if (!ev) return false;
+          const photoMissing =
+            ev.kinds.includes("photo") && !(details[detailKey(workScope, evidencePhotoKey(index))] || "").trim();
+          const linkMissing =
+            ev.kinds.includes("link") && !(details[detailKey(workScope, evidenceLinkKey(index))] || "").trim();
+          return photoMissing || linkMissing;
+        }),
+    [phase.checklist, guideItems, details, workScope, builtinDetailCount]
   );
   // ถ้ามีรายการ +/- ต้องกรอกรายละเอียด (+, - หรือ สาเหตุ) อย่างน้อยหนึ่งช่องก่อนส่งงาน
   const discrepancyResolved =
@@ -423,7 +448,8 @@ export function MonthlyStockSingleChecklist({
           (details[detailKey(workScope, "minus-list")] || "").trim() ||
           (details[detailKey(workScope, "reason-review")] || "").trim()
       ));
-  const canSubmit = !locked && completed === total && statusSubmittable && discrepancyResolved;
+  const canSubmit =
+    !locked && completed === total && statusSubmittable && discrepancyResolved && missingEvidence.length === 0;
 
   function toggleTask(index: number) {
     if (locked) return;
@@ -521,6 +547,42 @@ export function MonthlyStockSingleChecklist({
                     details={details}
                     updateDetail={updateDetail}
                   />
+                  {(() => {
+                    const ev = index >= builtinDetailCount ? normalizeItemEvidence(guideItems[index]?.evidence) : undefined;
+                    if (!ev) return null;
+                    return (
+                      <div className="detail-panel">
+                        <div className="detail-panel-head">
+                          <strong>หลักฐาน</strong>
+                          <small>{ev.note?.trim() || "แนบหลักฐานหลังทำรายการนี้เสร็จ"}</small>
+                        </div>
+                        {ev.kinds.includes("photo") ? (
+                          <div className="detail-upload">
+                            <span>อัปโหลดรูป (สูงสุด 3 รูป)</span>
+                            <EvidencePhotosInput
+                              value={details[detailKey(workScope, evidencePhotoKey(index))] || ""}
+                              onChange={(value) => updateDetail(evidencePhotoKey(index), value)}
+                              disabled={locked}
+                              max={3}
+                            />
+                          </div>
+                        ) : null}
+                        {ev.kinds.includes("link") ? (
+                          <label className="workflow-note-field compact">
+                            <span>แนบลิงก์</span>
+                            <input
+                              type="url"
+                              inputMode="url"
+                              value={details[detailKey(workScope, evidenceLinkKey(index))] || ""}
+                              disabled={locked}
+                              onChange={(event) => updateDetail(evidenceLinkKey(index), event.target.value)}
+                              placeholder="วางลิงก์หลักฐาน"
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                   <ChecklistItemGuide note={guideItems[index]?.note} links={guideItems[index]?.links} />
                 </div>
               );
@@ -536,6 +598,9 @@ export function MonthlyStockSingleChecklist({
             <p className="phase-warning">
               มีรายการ +/- ต้องกรอกชื่อสินค้าและจำนวนก่อนส่งงาน
             </p>
+          ) : null}
+          {missingEvidence.length ? (
+            <p className="phase-warning">แนบหลักฐาน (รูป/ลิงก์) ให้ครบทุกรายการที่กำหนดก่อนส่งงาน</p>
           ) : null}
 
           <div className="workflow-record-actions">

@@ -14,9 +14,10 @@ import {
   type WeeklyStockPhase
 } from "../lib/weekly-stock-workflow.ts";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
-import { applyStringPhaseOverride, itemsFromStrings, resolvePhaseChecklistItems } from "../lib/checklist-overrides.ts";
+import { applyStringPhaseOverride, itemsFromStrings, normalizeItemEvidence, resolvePhaseChecklistItems } from "../lib/checklist-overrides.ts";
 import { useChecklistOverrides } from "../lib/checklist-overrides-store.ts";
 import { ChecklistItemGuide } from "./ChecklistItemGuide.tsx";
+import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 
 // Weekly stock is a shared branch task ("ทั้งทีมช่วยกันทำให้ครบในรอบ"), so it is stored
 // once per branch per ISO week rather than per person.
@@ -49,6 +50,10 @@ function itemKey(workWeek: string, index: number) {
 function detailKey(workWeek: string, key: string) {
   return `${workWeek}:${key}`;
 }
+
+// หลักฐานที่เจ้าของตั้งต่อรายการ (รูป/ลิงก์) เก็บใน details map เหมือนหน้า Daily
+const evidencePhotoKey = (index: number) => `evidence:${index}:photos`;
+const evidenceLinkKey = (index: number) => `evidence:${index}:link`;
 
 function WeeklyStockTaskDetails({
   index,
@@ -209,6 +214,9 @@ export function WeeklyStockChecklist({
   const status = data.status || "";
   const locked = readOnly || !loaded;
 
+  // จำนวนขั้นตอนที่มี detail panel เฉพาะทางในโค้ด (index 0-3) — หลักฐานที่เจ้าของตั้งจะใช้กับ
+  // "รายการที่เพิ่มเอง" (index ตั้งแต่ตรงนี้ขึ้นไป) เท่านั้น เหมือน itemHasHardcodedDetail ของ Daily
+  const builtinDetailCount = basePhase.checklist.length;
   const total = phase.checklist.length;
   const completed = useMemo(
     () => phase.checklist.filter((_, index) => checked[itemKey(workWeek, index)]).length,
@@ -218,7 +226,24 @@ export function WeeklyStockChecklist({
   const statusSubmittable = submittableStocktakeStatuses.includes(
     status as (typeof submittableStocktakeStatuses)[number]
   );
-  const canSubmit = !locked && completed === total && statusSubmittable;
+  // หลักฐาน (รูป/ลิงก์) ที่เจ้าของบังคับต่อรายการที่เพิ่มเอง แต่ยังไม่ได้แนบ → บล็อกปุ่มส่งงาน
+  const missingEvidence = useMemo(
+    () =>
+      phase.checklist
+        .map((_, index) => index)
+        .filter((index) => {
+          if (index < builtinDetailCount) return false;
+          const ev = normalizeItemEvidence(guideItems[index]?.evidence);
+          if (!ev) return false;
+          const photoMissing =
+            ev.kinds.includes("photo") && !(details[detailKey(workWeek, evidencePhotoKey(index))] || "").trim();
+          const linkMissing =
+            ev.kinds.includes("link") && !(details[detailKey(workWeek, evidenceLinkKey(index))] || "").trim();
+          return photoMissing || linkMissing;
+        }),
+    [phase.checklist, guideItems, details, workWeek, builtinDetailCount]
+  );
+  const canSubmit = !locked && completed === total && statusSubmittable && missingEvidence.length === 0;
 
   function toggleTask(index: number) {
     if (locked) return;
@@ -309,6 +334,42 @@ export function WeeklyStockChecklist({
                     details={details}
                     updateDetail={updateDetail}
                   />
+                  {(() => {
+                    const ev = index >= builtinDetailCount ? normalizeItemEvidence(guideItems[index]?.evidence) : undefined;
+                    if (!ev) return null;
+                    return (
+                      <div className="detail-panel">
+                        <div className="detail-panel-head">
+                          <strong>หลักฐาน</strong>
+                          <small>{ev.note?.trim() || "แนบหลักฐานหลังทำรายการนี้เสร็จ"}</small>
+                        </div>
+                        {ev.kinds.includes("photo") ? (
+                          <div className="detail-upload">
+                            <span>อัปโหลดรูป (สูงสุด 3 รูป)</span>
+                            <EvidencePhotosInput
+                              value={details[detailKey(workWeek, evidencePhotoKey(index))] || ""}
+                              onChange={(value) => updateDetail(evidencePhotoKey(index), value)}
+                              disabled={locked}
+                              max={3}
+                            />
+                          </div>
+                        ) : null}
+                        {ev.kinds.includes("link") ? (
+                          <label className="workflow-note-field compact">
+                            <span>แนบลิงก์</span>
+                            <input
+                              type="url"
+                              inputMode="url"
+                              value={details[detailKey(workWeek, evidenceLinkKey(index))] || ""}
+                              disabled={locked}
+                              onChange={(event) => updateDetail(evidenceLinkKey(index), event.target.value)}
+                              placeholder="วางลิงก์หลักฐาน"
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                   <ChecklistItemGuide note={guideItems[index]?.note} links={guideItems[index]?.links} />
                 </div>
               );
@@ -319,6 +380,9 @@ export function WeeklyStockChecklist({
             <p className="phase-warning">
               Stock Take ใน StoreHub ต้องเป็น In Progress หรือ Completed ก่อนส่งงาน
             </p>
+          ) : null}
+          {missingEvidence.length ? (
+            <p className="phase-warning">แนบหลักฐาน (รูป/ลิงก์) ให้ครบทุกรายการที่กำหนดก่อนส่งงาน</p>
           ) : null}
 
           <div className="workflow-record-actions">
