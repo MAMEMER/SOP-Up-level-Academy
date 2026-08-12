@@ -5511,6 +5511,21 @@ main .page > section, main > section { margin-top: 16px !important; }
   .staff-calendar__mine { font-size: 11px; }
 }
 
+/* Phones: 7 columns squeeze each day to ~44px, so the time ranges and teammate
+   names overflow their cell and overlap the neighbouring day — the calendar
+   becomes unreadable. Stack the days into one full-width column per day so every
+   cell has room. (bug-reports/crawf8V4GOzvOm5SaRC1) */
+@media (max-width: 600px) {
+  .staff-calendar__head { display: none; }
+  .staff-calendar__week { grid-template-columns: 1fr; gap: 8px; }
+  .staff-calendar__day { min-height: 0; padding: 12px 14px; }
+  .staff-calendar__day.is-pad { display: none; }
+  .staff-calendar__date span { font-size: 16px; }
+  .staff-calendar__mine { font-size: 13px; display: inline-block; }
+  .staff-calendar__team li { font-size: 12px; }
+  .staff-calendar__acts li { font-size: 12px; }
+}
+
 /* กิจกรรมของวันในปฏิทินตารางกะ (มาจากหน้าตารางกะแอดมิน) */
 .staff-calendar__acts { display: grid; gap: 2px; list-style: none; margin: 2px 0 0; padding: 0; }
 .staff-calendar__acts li {
