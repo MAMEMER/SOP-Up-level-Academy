@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { WorkflowReviewRecords } from "../../../components/WorkflowReviewRecords.tsx";
-import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
+import { ManagerReviewBoard } from "../../../components/ManagerReviewBoard.tsx";
+import { branchFor, employeeCodeForEmail } from "../../../lib/employee-directory.ts";
 import { requireUser } from "../../../lib/auth.ts";
+
+export const dynamic = "force-dynamic";
 
 export default async function ManagerReviewPage() {
   const user = await requireUser();
+  // เฉพาะ role admin (เจ้าของร้าน) เท่านั้น — พนักงาน/leader เข้าไม่ได้.
   if (user.role !== "admin") redirect("/");
 
-  const checklistPhases = cardStoreWorkflow.filter((phase) => phase.checklist.length > 0);
+  const staffCode = employeeCodeForEmail(user.email);
+  const branch = staffCode ? branchFor(staffCode) : "bangkae";
 
   return (
     <main className="page">
@@ -16,32 +20,15 @@ export default async function ManagerReviewPage() {
       <section className="board-hero">
         <div>
           <p className="eyebrow">Manager review</p>
-          <h2>ตรวจงานประจำวันของหัวหน้า</h2>
-          <p>ใช้ตรวจว่าพนักงานทำงานครบ ยอดขายตรง ออเดอร์ไม่ค้าง และสินค้าแพงครบก่อนปิดวัน</p>
+          <h2>ตรวจงานที่พนักงานส่ง</h2>
+          <p>
+            งานที่พนักงานทุกคนส่งตรวจ ทั้งรายวัน รายสัปดาห์ รายเดือน และงานที่มอบหมาย —
+            ดูรายละเอียดและหลักฐานของแต่ละงาน แล้วอนุมัติหรือขอให้แก้ไขได้จากที่เดียว
+          </p>
         </div>
       </section>
 
-      <WorkflowReviewRecords />
-
-      <section className="workflow-panel">
-        <div className="section-heading">
-          <p className="eyebrow">daily checkpoints</p>
-          <h2>จุดที่ต้องตรวจซ้ำ</h2>
-          <p>หัวหน้าควรเทียบ checklist กับหลักฐานจริง เช่น ยอด POS สลิป รูปสินค้า และออเดอร์ค้าง</p>
-        </div>
-        <div className="review-table">
-          {checklistPhases.map((phase) => (
-            <div key={phase.id} className={`review-row phase-${phase.category}`}>
-              <span className="phase-icon">{phase.icon}</span>
-              <div>
-                <strong>{phase.title}</strong>
-                <small>{phase.caution}</small>
-              </div>
-              <em>{phase.checklist.length} รายการ</em>
-            </div>
-          ))}
-        </div>
-      </section>
+      <ManagerReviewBoard branch={branch} />
     </main>
   );
 }
