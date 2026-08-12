@@ -5676,3 +5676,54 @@ main .page > section, main > section { margin-top: 16px !important; }
   .mrev-stats { grid-template-columns: repeat(4, 96px); }
   .mrev-cards { display: grid; grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   MOBILE OVERFLOW FIX — bug ticket 115Ilo8gNIrLL145VUbk
+   "แสดงตัวเล็กคล้ายๆว่าอยู่บนคอม ... ต้องคอยซูมเข้าซูมออก"
+   Cause: the checklist phase cards are CSS grids whose items keep
+   the default `min-width: auto`, so they refuse to shrink below
+   their content's min-content (~336px). On phones ≤390px wide the
+   card was wider than the viewport → horizontal overflow → the
+   mobile browser zoomed the whole page out → everything looked
+   desktop-tiny and needed pinch-zoom to tick / type.
+   Fix: make every checklist grid column shrinkable (minmax(0,1fr))
+   + min-width:0 on the grid items, and let inputs / long strings
+   wrap to the card width instead of forcing it wide.
+   ============================================================ */
+.checklist-view,
+.checklist-workflow,
+.training-card,
+.workflow-panel,
+.workflow-card-head,
+.workflow-note-field,
+.checklist-tick-list,
+.tick-group,
+.detail-panel { min-width: 0; }
+
+.checklist-workflow { grid-template-columns: minmax(0, 1fr); }
+.training-card { grid-template-columns: minmax(0, 1fr); }
+.workflow-note-field { grid-template-columns: minmax(0, 1fr); }
+.checklist-tick-list { grid-template-columns: minmax(0, 1fr); }
+.tick-group { grid-template-columns: minmax(0, 1fr); }
+.workflow-card-head { grid-template-columns: 48px minmax(0, 1fr) auto; }
+
+.workflow-note-field input,
+.workflow-note-field textarea,
+.detail-panel input,
+.detail-panel textarea {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* stray long strings (emails / URLs / codes) wrap to the card,
+   never force it wider than the phone screen */
+.training-card,
+.training-card p,
+.training-card span,
+.training-card strong,
+.detail-panel,
+.detail-panel-head strong,
+.tick-row,
+.tick-row span { overflow-wrap: anywhere; }
