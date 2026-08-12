@@ -11,6 +11,9 @@ import {
   type ChecklistScope
 } from "./checklist-overrides.ts";
 
+/** When/who last saved a scope's overrides — powers the editor's "แก้ไขล่าสุด" line. */
+export type ChecklistOverridesMeta = { updatedAt: string | null; updatedBy: string | null };
+
 export async function fetchChecklistOverrides(scope: ChecklistScope): Promise<ChecklistOverrides> {
   const res = await fetch(`/api/checklist-overrides?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
   if (!res.ok) return emptyChecklistOverrides;
@@ -18,16 +21,31 @@ export async function fetchChecklistOverrides(scope: ChecklistScope): Promise<Ch
   return overrides ?? emptyChecklistOverrides;
 }
 
+/** Same read, but also returns who/when last saved (for the editor's meta line). */
+export async function fetchChecklistOverridesWithMeta(
+  scope: ChecklistScope
+): Promise<{ overrides: ChecklistOverrides; meta: ChecklistOverridesMeta }> {
+  const res = await fetch(`/api/checklist-overrides?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
+  if (!res.ok) return { overrides: emptyChecklistOverrides, meta: { updatedAt: null, updatedBy: null } };
+  const data = (await res.json()) as { overrides?: ChecklistOverrides; updatedAt?: string | null; updatedBy?: string | null };
+  return {
+    overrides: data.overrides ?? emptyChecklistOverrides,
+    meta: { updatedAt: data.updatedAt ?? null, updatedBy: data.updatedBy ?? null }
+  };
+}
+
 export async function saveChecklistOverrides(input: {
   scope: ChecklistScope;
   overrides: ChecklistOverrides;
-}): Promise<void> {
+}): Promise<ChecklistOverridesMeta> {
   const res = await fetch("/api/checklist-overrides", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ scope: input.scope, overrides: input.overrides })
   });
   if (!res.ok) throw new Error(`checklist-overrides write failed: ${res.status}`);
+  const data = (await res.json().catch(() => ({}))) as { updatedAt?: string | null; updatedBy?: string | null };
+  return { updatedAt: data.updatedAt ?? null, updatedBy: data.updatedBy ?? null };
 }
 
 /**

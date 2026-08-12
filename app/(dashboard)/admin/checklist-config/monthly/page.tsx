@@ -13,7 +13,8 @@ export default async function AdminChecklistMonthlyPage() {
     {
       id: monthlyStockSinglePhase.id,
       heading: "Stock Single card (งานประจำเดือน)",
-      note: "รายการที่พนักงานติ๊กในหน้า Checklist ประจำเดือน → Stock Single card",
+      note: "รายการที่พนักงานติ๊กในหน้า Checklist ประจำเดือน → Stock Single card · รายการที่เพิ่มเองตั้งให้ต้องแนบหลักฐาน (รูป/ลิงก์) ได้เหมือนหน้า Daily",
+      editEvidence: true,
       editTitle: true,
       baseTitle: monthlyStockSinglePhase.title,
       editGoal: true,

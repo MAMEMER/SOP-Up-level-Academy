@@ -14,7 +14,8 @@ export default async function AdminChecklistWeeklyPage() {
     {
       id: weeklyStockSleevePhase.id,
       heading: "Stock อุปกรณ์ / Sleeve (งานประจำสัปดาห์)",
-      note: "รายการที่พนักงานติ๊กในหน้า Checklist ประจำสัปดาห์ → Stock อุปกรณ์ / Sleeve",
+      note: "รายการที่พนักงานติ๊กในหน้า Checklist ประจำสัปดาห์ → Stock อุปกรณ์ / Sleeve · รายการที่เพิ่มเองตั้งให้ต้องแนบหลักฐาน (รูป/ลิงก์) ได้เหมือนหน้า Daily",
+      editEvidence: true,
       editTitle: true,
       baseTitle: weeklyStockSleevePhase.title,
       editGoal: true,

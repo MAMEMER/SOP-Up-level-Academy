@@ -2,13 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  normalizeItemEvidence,
   normalizeOverrideItem,
   type ChecklistScope,
   type ChecklistOverrides,
+  type EvidenceKind,
+  type ItemEvidence,
   type OverrideItem,
   type UnitOverride
 } from "../lib/checklist-overrides.ts";
-import { fetchChecklistOverrides, saveChecklistOverrides } from "../lib/checklist-overrides-store.ts";
+import {
+  fetchChecklistOverridesWithMeta,
+  saveChecklistOverrides,
+  type ChecklistOverridesMeta
+} from "../lib/checklist-overrides-store.ts";
+import { formatEditedAt } from "../lib/daily-checklist.ts";
 import { firstInvalidLink, linkHostname, type ItemLink } from "../lib/checklist-links.ts";
 
 // Owner editor for a WEEKLY or MONTHLY checklist scope. Simpler sibling of DailyChecklistEditor:
@@ -37,6 +45,18 @@ export type EditableUnit = {
   /** allow editing กะที่รับผิดชอบ (free-text shift label) */
   editShift?: boolean;
   baseShiftLabel?: string;
+  /**
+   * allow the owner to require หลักฐาน (รูป/ลิงก์) per item — same control as the daily editor.
+   * Enabled only where the staff view actually renders + enforces it (the stock checklists);
+   * left off for blocks whose staff view already captures evidence its own way (events).
+   */
+  editEvidence?: boolean;
+  /**
+   * Items at index >= this already have a built-in detail/evidence panel on the staff card, so the
+   * owner's per-item หลักฐาน control is offered only for items ADDED beyond them (matches how the
+   * staff stock view renders it). Defaults to baseItems.length.
+   */
+  builtinDetailCount?: number;
   /** built-in tick items, used as the starting point */
   baseItems: OverrideItem[];
 };
@@ -50,6 +70,15 @@ function sameLinks(a: ItemLink[] | undefined, b: ItemLink[] | undefined): boolea
   return la.every((link, index) => link.label.trim() === lb[index].label.trim() && link.url.trim() === lb[index].url.trim());
 }
 
+function sameEvidence(a: ItemEvidence | undefined, b: ItemEvidence | undefined): boolean {
+  const na = normalizeItemEvidence(a);
+  const nb = normalizeItemEvidence(b);
+  if (!na && !nb) return true;
+  if (!na || !nb) return false;
+  if ((na.note || "") !== (nb.note || "")) return false;
+  return [...na.kinds].sort().join(",") === [...nb.kinds].sort().join(",");
+}
+
 function sameItems(a: OverrideItem[], b: OverrideItem[]): boolean {
   if (a.length !== b.length) return false;
   return a.every(
@@ -57,14 +86,19 @@ function sameItems(a: OverrideItem[], b: OverrideItem[]): boolean {
       item.id === b[index].id &&
       item.title.trim() === b[index].title.trim() &&
       (item.note || "").trim() === (b[index].note || "").trim() &&
-      sameLinks(item.links, b[index].links)
+      sameLinks(item.links, b[index].links) &&
+      sameEvidence(item.evidence, b[index].evidence)
   );
 }
 
 export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; units: EditableUnit[] }) {
   const [draft, setDraft] = useState<Record<string, UnitDraft>>({});
+  const [meta, setMeta] = useState<ChecklistOverridesMeta>({ updatedAt: null, updatedBy: null });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
+
+  /** "แก้ไขล่าสุด ..." line — hidden until the scope has been saved at least once. */
+  const editedAt = formatEditedAt(meta.updatedAt);
 
   const seed = useMemo(() => {
     return (overrides: ChecklistOverrides): Record<string, UnitDraft> => {
@@ -86,8 +120,12 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchChecklistOverrides(scope)
-      .then((data) => alive && setDraft(seed(data)))
+    fetchChecklistOverridesWithMeta(scope)
+      .then((data) => {
+        if (!alive) return;
+        setDraft(seed(data.overrides));
+        setMeta(data.meta);
+      })
       .catch(() => alive && setDraft(seed({})))
       .finally(() => alive && setLoading(false));
     return () => {
@@ -137,6 +175,20 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
   function removeItemLink(unitId: string, index: number, linkIndex: number) {
     const links = (draft[unitId]?.items[index]?.links || []).filter((_, i) => i !== linkIndex);
     patchItem(unitId, index, { links });
+  }
+
+  /** ตั้ง/ปิด ว่ารายการนี้ต้องแนบ รูป หรือ ลิงก์ — mirrors the daily editor's หลักฐาน control. */
+  function toggleItemEvidenceKind(unitId: string, index: number, kind: EvidenceKind) {
+    const current = draft[unitId]?.items[index]?.evidence;
+    const kinds = current?.kinds || [];
+    const nextKinds = kinds.includes(kind) ? kinds.filter((value) => value !== kind) : [...kinds, kind];
+    patchItem(unitId, index, { evidence: nextKinds.length ? { kinds: nextKinds, note: current?.note } : undefined });
+  }
+
+  function updateItemEvidenceNote(unitId: string, index: number, note: string) {
+    const current = draft[unitId]?.items[index]?.evidence;
+    if (!current) return;
+    patchItem(unitId, index, { evidence: { ...current, note } });
   }
 
   function moveItem(unitId: string, index: number, direction: -1 | 1) {
@@ -198,7 +250,9 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
 
     setStatus("กำลังบันทึก…");
     try {
-      await saveChecklistOverrides({ scope, overrides });
+      const saved = await saveChecklistOverrides({ scope, overrides });
+      // Reflect the server-stamped time/editor immediately so "แก้ไขล่าสุด" is current without a reload.
+      setMeta({ updatedAt: saved.updatedAt ?? meta.updatedAt, updatedBy: saved.updatedBy ?? meta.updatedBy });
       setStatus("บันทึกแล้ว — checklist ของ staff อัปเดตแล้ว");
     } catch {
       setStatus("บันทึกไม่สำเร็จ");
@@ -221,6 +275,13 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
 
   return (
     <div className="checklist-config">
+      <p className="checklist-config__edited">
+        {editedAt ? (
+          <>แก้ไขล่าสุด {editedAt}{meta.updatedBy ? ` · โดย ${meta.updatedBy}` : ""}</>
+        ) : (
+          "ยังไม่เคยบันทึก — แก้แล้วกดบันทึกทั้งหมด ระบบจะจำค่าล่าสุดไว้จนกว่าจะแก้ใหม่"
+        )}
+      </p>
       {units.map((unit) => {
         const d = draft[unit.id];
         if (!d) return null;
@@ -281,6 +342,10 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
               {d.items.map((item, index, items) => {
                 const hasText = Boolean(item.title.trim());
                 const links = item.links || [];
+                const evidenceKinds = item.evidence?.kinds || [];
+                // หลักฐานตั้งค่าได้เฉพาะรายการที่เพิ่มเอง(เกินจำนวนขั้นตอนที่มี panel เฉพาะทางในหน้า staff อยู่แล้ว)
+                const builtinDetailCount = unit.builtinDetailCount ?? unit.baseItems.length;
+                const showEvidence = Boolean(unit.editEvidence) && index >= builtinDetailCount;
                 return (
                 <li key={item.id}>
                   <input
@@ -293,6 +358,38 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
                     <button type="button" onClick={() => moveItem(unit.id, index, 1)} disabled={index === items.length - 1} aria-label="เลื่อนลง">↓</button>
                   </div>
                   <button type="button" onClick={() => removeItem(unit.id, index)} aria-label="ลบ">✕</button>
+                  {/* หลักฐานที่บังคับให้พนักงานแนบตอนทำรายการนี้ (รูป/ลิงก์) — เหมือนหน้า Daily */}
+                  {showEvidence ? (
+                    <div className="checklist-config__evidence">
+                      <span className="checklist-config__evidence-label">ต้องส่งหลักฐาน</span>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={evidenceKinds.includes("photo")}
+                          disabled={!hasText}
+                          onChange={() => toggleItemEvidenceKind(unit.id, index, "photo")}
+                        />
+                        รูปภาพ
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={evidenceKinds.includes("link")}
+                          disabled={!hasText}
+                          onChange={() => toggleItemEvidenceKind(unit.id, index, "link")}
+                        />
+                        ลิงก์
+                      </label>
+                      {evidenceKinds.length ? (
+                        <input
+                          className="checklist-config__evidence-note"
+                          value={item.evidence?.note || ""}
+                          onChange={(e) => updateItemEvidenceNote(unit.id, index, e.target.value)}
+                          placeholder="คำอธิบายหลักฐาน (ไม่บังคับ) เช่น รูปหลังนับ Stock เสร็จ"
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
                   {/* รายละเอียด + ปุ่มลิงก์ ที่ช่วยอธิบายรายการนี้ให้พนักงาน (ไม่บังคับ) */}
                   <div className="checklist-config__guide">
                     <span className="checklist-config__guide-label">รายละเอียด / ปุ่มลิงก์ (ไม่บังคับ)</span>
