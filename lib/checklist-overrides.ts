@@ -14,6 +14,25 @@
 
 import type { WeeklyEventChecklistItem } from "./weekly-event-tasks.ts";
 import { type ItemLink, normalizeLinks } from "./checklist-links.ts";
+import type { EvidenceKind, ItemEvidence } from "./daily-checklist.ts";
+
+// The หลักฐาน requirement an item may carry reuses the daily checklist's ItemEvidence shape
+// (kinds: photo/link + optional note) so the weekly/monthly editor and staff views behave the
+// same way the daily one does.
+export type { EvidenceKind, ItemEvidence } from "./daily-checklist.ts";
+const EVIDENCE_KINDS: EvidenceKind[] = ["photo", "link"];
+
+/** Cleans an owner-set หลักฐาน requirement; undefined when it asks for nothing. */
+export function normalizeItemEvidence(raw: ItemEvidence | undefined): ItemEvidence | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const kinds = Array.isArray(raw.kinds)
+    ? raw.kinds.filter((kind): kind is EvidenceKind => EVIDENCE_KINDS.includes(kind as EvidenceKind))
+    : [];
+  const uniq = Array.from(new Set(kinds));
+  if (!uniq.length) return undefined;
+  const note = typeof raw.note === "string" ? raw.note.trim() : "";
+  return note ? { kinds: uniq, note } : { kinds: uniq };
+}
 
 export type ChecklistScope = "weekly-stock" | "monthly-stock" | "weekly-event";
 
@@ -24,7 +43,7 @@ export const CHECKLIST_SCOPES: ChecklistScope[] = ["weekly-stock", "monthly-stoc
  * `note` (คำอธิบายว่าต้องทำอะไร) and `links` (ปุ่มกดไปหน้างานจริง) are optional — an item saved
  * before these fields existed simply omits them, and every reader treats missing as empty.
  */
-export type OverrideItem = { id: string; title: string; note?: string; links?: ItemLink[] };
+export type OverrideItem = { id: string; title: string; note?: string; links?: ItemLink[]; evidence?: ItemEvidence };
 
 /** What the owner changed for one checklist block. Missing fields = keep built-in. */
 export type UnitOverride = {
@@ -74,6 +93,8 @@ export function normalizeOverrideItem(item: OverrideItem, index: number): Overri
   if (note) out.note = note;
   const links = normalizeLinks(item.links);
   if (links.length) out.links = links;
+  const evidence = normalizeItemEvidence(item.evidence);
+  if (evidence) out.evidence = evidence;
   return out;
 }
 

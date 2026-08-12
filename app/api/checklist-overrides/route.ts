@@ -27,10 +27,16 @@ export async function GET(request: Request) {
   if (!scope) return badRequest("bad_scope");
   try {
     const snap = await db().collection(COLLECTION).doc(scope).get();
-    if (!snap.exists) return NextResponse.json({ overrides: emptyChecklistOverrides });
+    if (!snap.exists) return NextResponse.json({ overrides: emptyChecklistOverrides, updatedAt: null, updatedBy: null });
     const data = snap.data() as Record<string, unknown>;
     const overrides = (data.overrides as ChecklistOverrides) ?? {};
-    return NextResponse.json({ overrides });
+    // Surface when/who last saved so the editor can show a "แก้ไขล่าสุด" line, mirroring the daily
+    // config route (older docs written before these fields existed simply return null).
+    return NextResponse.json({
+      overrides,
+      updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
+      updatedBy: typeof data.updatedBy === "string" ? data.updatedBy : null
+    });
   } catch (error) {
     return NextResponse.json({ error: "read_failed", detail: String(error) }, { status: 500 });
   }
@@ -55,7 +61,7 @@ export async function POST(request: Request) {
   };
   try {
     await db().collection(COLLECTION).doc(scope).set(record);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, updatedAt: record.updatedAt, updatedBy: record.updatedBy });
   } catch (error) {
     return NextResponse.json({ error: "write_failed", detail: String(error) }, { status: 500 });
   }
