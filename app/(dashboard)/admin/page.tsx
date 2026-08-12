@@ -11,6 +11,8 @@ import { WorkflowReviewRecords } from "../../../components/WorkflowReviewRecords
 import { syncDeliveryTasks } from "../../../lib/delivery-tasks-server.ts";
 import { deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-tasks.ts";
 import type { DeliveryTask } from "../../../lib/delivery-tasks.ts";
+import { getShopSyncStatus } from "../../../lib/shop-sync-status.ts";
+import { ShopStockSyncPanel } from "../../../components/ShopStockSyncPanel.tsx";
 
 const ADMIN_BRANCH = "bangkae";
 
@@ -50,6 +52,8 @@ export default async function AdminHubPage() {
   );
   // ทุกเรื่องค้างจากทุกหน้า รวมมาไว้บนสุดของ hub — ไม่ต้องไล่เปิดทีละหน้าถึงจะรู้
   const notifications = await getAdminNotifications(summary, workDate, ADMIN_BRANCH, deliveryTasks);
+  // สถานะ sync สต็อกร้านออนไลน์ล่าสุด (StoreHub → shop-products) — โชว์ให้เจ้าของกด sync เองได้
+  const shopSyncStatus = await getShopSyncStatus();
   const owner = isOwner(user.email);
   // หน้าจัดการพนักงานย้ายมาอยู่ที่ /admin/staff ตอน /admin กลายเป็น hub — เลยยกปุ่มลัด
   // ขึ้นมาไว้บนสุดให้กดเข้าได้ทันที ไม่ต้องเลื่อนลงไปหาการ์ดเล็กๆ ท้ายหน้า (SOP bug: หน้าจัดการพนักงานหาย)
@@ -186,6 +190,17 @@ export default async function AdminHubPage() {
 
       {/* คิวตรวจงาน — ยกจาก /manager-review มาไว้บน hub ตรงนี้ด้วย */}
       <WorkflowReviewRecords />
+
+      {/* สต็อกร้านออนไลน์ — sync อัตโนมัติทุกคืน + ปุ่ม sync ตอนนี้ */}
+      <section className="admin-hub__group">
+        <div className="section-heading">
+          <p className="eyebrow">ร้านออนไลน์</p>
+          <h3>สต็อก uplevelguild.com/shop</h3>
+        </div>
+        <div className="admin-hub__tools">
+          <ShopStockSyncPanel initialStatus={shopSyncStatus} />
+        </div>
+      </section>
 
       {groups.map((group) => (
         <section key={group.title} className="admin-hub__group">
