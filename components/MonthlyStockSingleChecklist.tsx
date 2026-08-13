@@ -410,9 +410,6 @@ export function MonthlyStockSingleChecklist({
   const discrepancyStatus = data.discrepancyStatus || "";
   const locked = readOnly || !loaded;
 
-  // จำนวนขั้นตอนที่มี detail panel เฉพาะทางในโค้ด (index 0-4) — หลักฐานที่เจ้าของตั้งจะใช้กับ
-  // "รายการที่เพิ่มเอง" (index ตั้งแต่ตรงนี้ขึ้นไป) เท่านั้น เหมือน itemHasHardcodedDetail ของ Daily
-  const builtinDetailCount = basePhase.checklist.length;
   const total = phase.checklist.length;
   const completed = useMemo(
     () => phase.checklist.filter((_, index) => checked[itemKey(workScope, index)]).length,
@@ -422,13 +419,12 @@ export function MonthlyStockSingleChecklist({
   const statusSubmittable = submittableStocktakeStatuses.includes(
     status as (typeof submittableStocktakeStatuses)[number]
   );
-  // หลักฐาน (รูป/ลิงก์) ที่เจ้าของบังคับต่อรายการที่เพิ่มเอง แต่ยังไม่ได้แนบ → บล็อกปุ่มส่งงาน
+  // หลักฐาน (รูป/ลิงก์) ที่เจ้าของบังคับต่อรายการใด ๆ แต่ยังไม่ได้แนบ → บล็อกปุ่มส่งงาน
   const missingEvidence = useMemo(
     () =>
       phase.checklist
         .map((_, index) => index)
         .filter((index) => {
-          if (index < builtinDetailCount) return false;
           const ev = normalizeItemEvidence(guideItems[index]?.evidence);
           if (!ev) return false;
           const photoMissing =
@@ -437,7 +433,7 @@ export function MonthlyStockSingleChecklist({
             ev.kinds.includes("link") && !(details[detailKey(workScope, evidenceLinkKey(index))] || "").trim();
           return photoMissing || linkMissing;
         }),
-    [phase.checklist, guideItems, details, workScope, builtinDetailCount]
+    [phase.checklist, guideItems, details, workScope]
   );
   // ถ้ามีรายการ +/- ต้องกรอกรายละเอียด (+, - หรือ สาเหตุ) อย่างน้อยหนึ่งช่องก่อนส่งงาน
   const discrepancyResolved =
@@ -548,7 +544,7 @@ export function MonthlyStockSingleChecklist({
                     updateDetail={updateDetail}
                   />
                   {(() => {
-                    const ev = index >= builtinDetailCount ? normalizeItemEvidence(guideItems[index]?.evidence) : undefined;
+                    const ev = normalizeItemEvidence(guideItems[index]?.evidence);
                     if (!ev) return null;
                     return (
                       <div className="detail-panel">

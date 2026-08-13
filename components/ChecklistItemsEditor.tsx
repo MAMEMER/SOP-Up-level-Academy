@@ -49,14 +49,13 @@ export type EditableUnit = {
   /** allow editing กะที่รับผิดชอบ (free-text shift label) */
   editShift?: boolean;
   baseShiftLabel?: string;
-  /** allow the owner to require หลักฐาน (รูป/ลิงก์) per item — same control as the daily editor */
-  editEvidence?: boolean;
   /**
-   * Items at index < this already have a built-in detail/evidence panel on the staff card, so the
-   * owner's per-item หลักฐาน control is offered only for items ADDED beyond them. Leave unset to
-   * offer it on every item (the daily editor's behaviour).
+   * allow the owner to require หลักฐาน (รูป/ลิงก์) per item — same control as the daily editor,
+   * shown on every item (built-in and owner-added). Enabled only where the staff view renders +
+   * enforces it (the stock checklists); left off for blocks whose staff view already captures
+   * evidence its own way (events).
    */
-  builtinDetailCount?: number;
+  editEvidence?: boolean;
   /** built-in tick items, used as the starting point */
   baseItems: OverrideItem[];
   /** true for a หัวข้อ the owner added here (deletable, always renameable) */
@@ -481,10 +480,9 @@ export function ChecklistItemsEditor({
                 const hasText = Boolean(item.title.trim());
                 const links = item.links || [];
                 const evidenceKinds = item.evidence?.kinds || [];
-                // บาง block มี panel เฉพาะทางในหน้า staff อยู่แล้วสำหรับขั้นตอน built-in — ตั้งหลักฐานเองได้
-                // เฉพาะรายการที่เพิ่มเกินจากนั้น (unit ที่ไม่ตั้ง builtinDetailCount = ตั้งได้ทุกรายการ)
-                const builtinDetailCount = unit.builtinDetailCount ?? 0;
-                const showEvidence = Boolean(unit.editEvidence) && index >= builtinDetailCount;
+                // หลักฐานตั้งค่าได้ทุกรายการ (ทั้งรายการเดิมและที่เพิ่มเอง) เหมือนหน้า Daily —
+                // เจ้าของเปิด/ปิด "ต้องส่งหลักฐาน" รายข้อได้เอง
+                const showEvidence = Boolean(unit.editEvidence);
                 return (
                 <li key={item.id}>
                   <input
