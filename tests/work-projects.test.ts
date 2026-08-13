@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   addDays,
-  assigneesMissingProgress,
   currentPercent,
   dailyTargetPercent,
   dayIndex,
@@ -10,7 +9,9 @@ import {
   daysLeft,
   expectedPercent,
   hasProgressOn,
-  needsProgressToday,
+  progressAuthorsOn,
+  progressCount,
+  teamNeedsProgressToday,
   paceOf,
   projectDays,
   projectsForViewer,
@@ -125,24 +126,35 @@ describe("work projects — เปอร์เซ็นต์และการ�
   });
 });
 
-describe("work projects — เตือนให้ลง progress ทุกวัน", () => {
-  it("วันนี้ยังไม่มีใครลง = ต้องเตือนทุกคนที่รับผิดชอบ", () => {
+describe("work projects — เตือนให้ส่ง progress วันละครั้ง (ใครก็ได้ในทีม)", () => {
+  it("วันนี้ยังไม่มีใครส่ง = ต้องเตือน", () => {
     const p = project({ assignees: ["ICE", "LEO"], progress: [progress("2026-08-04", 30, "ICE")] });
-    assert.deepEqual(assigneesMissingProgress(p, "2026-08-05"), ["ICE", "LEO"]);
+    assert.equal(teamNeedsProgressToday(p, "2026-08-05"), true);
   });
 
-  it("คนที่ลงแล้ววันนี้ ไม่ถูกเตือน — แต่คนอื่นยังถูกเตือน", () => {
+  it("มีคนใดคนหนึ่งส่งแล้ว = วันนี้ครบ ไม่ต้องเตือนคนอื่นซ้ำ", () => {
     const p = project({ assignees: ["ICE", "LEO"], progress: [progress("2026-08-05", 30, "ICE")] });
-    assert.deepEqual(assigneesMissingProgress(p, "2026-08-05"), ["LEO"]);
-    assert.equal(needsProgressToday(p, "2026-08-05", "ICE"), false);
-    assert.equal(needsProgressToday(p, "2026-08-05", "LEO"), true);
+    assert.equal(teamNeedsProgressToday(p, "2026-08-05"), false);
   });
 
-  it("ยังไม่ถึงวันเริ่ม / เลยกำหนด / ปิดงานแล้ว ไม่ต้องเตือน", () => {
-    const p = project({ assignees: ["ICE"] });
-    assert.deepEqual(assigneesMissingProgress(p, "2026-07-25"), []);
-    assert.deepEqual(assigneesMissingProgress(p, "2026-08-20"), []);
-    assert.deepEqual(assigneesMissingProgress(project({ status: "done" }), "2026-08-05"), []);
+  it("ยังไม่ถึงวันเริ่ม หรือปิดงานแล้ว ไม่ต้องเตือน — แต่เลยกำหนดแล้วยังต้องเตือนต่อ", () => {
+    assert.equal(teamNeedsProgressToday(project(), "2026-07-25"), false);
+    assert.equal(teamNeedsProgressToday(project({ status: "done" }), "2026-08-05"), false);
+    assert.equal(teamNeedsProgressToday(project(), "2026-08-20"), true);
+  });
+
+  it("นับจำนวนครั้งที่ส่ง และบอกได้ว่าใครส่งบ้างในวันนั้น", () => {
+    const p = project({
+      progress: [
+        progress("2026-08-05", 10, "ICE", "2026-08-05T03:00:00.000Z"),
+        progress("2026-08-05", 20, "LEO", "2026-08-05T09:00:00.000Z"),
+        progress("2026-08-05", 25, "ICE", "2026-08-05T15:00:00.000Z"),
+        progress("2026-08-06", 30, "LEO")
+      ]
+    });
+    assert.equal(progressCount(p), 4);
+    assert.equal(progressCount(p, "2026-08-05"), 3);
+    assert.deepEqual(progressAuthorsOn(p, "2026-08-05"), ["ICE", "LEO"]);
   });
 
   it("hasProgressOn ดูเฉพาะของคนนั้นได้", () => {

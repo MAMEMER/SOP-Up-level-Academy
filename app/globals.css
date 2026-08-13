@@ -5869,3 +5869,12 @@ main .page > section, main > section { margin-top: 16px !important; }
   border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; font-family: inherit; background: #fff;
   color: var(--color-ink); resize: vertical;
 }
+
+/* รูปของแต่ละอัปเดตในไทม์ไลน์โปรเจกต์ — เห็นหน้างานจริงโดยไม่ต้องกดทีละลิงก์ */
+.project-days__photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.project-days__photos img {
+  width: 96px; height: 96px; object-fit: cover; border-radius: 10px;
+  border: 1px solid rgba(255,199,142,0.6); display: block;
+}
+.project-card__count { margin: 0; font-size: 12px; color: var(--color-ink-soft); }
+.project-progress-form__rule { margin: -4px 0 0; font-size: 12px; color: var(--color-ink-soft); }

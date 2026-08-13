@@ -9,10 +9,10 @@ import { addProjectProgress, deleteProjectProgress, fetchProjectsForStaff } from
 import {
   PROJECT_STATUS_LABEL,
   currentPercent,
-  hasProgressOn,
-  needsProgressToday,
-  progressOnDate,
+  progressAuthorsOn,
+  progressCount,
   sortProjects,
+  teamNeedsProgressToday,
   totalDays,
   validateProgressInput,
   type WorkProject
@@ -67,7 +67,7 @@ export function MyProjects({
   return (
     <div className="project-list">
       {projects.map((project) => {
-        const needsToday = needsProgressToday(project, today, staffCode);
+        const needsToday = teamNeedsProgressToday(project, today);
         const open = openId === project.id;
         return (
           <section key={project.id} className="project-card soft-card">
@@ -89,12 +89,15 @@ export function MyProjects({
 
             {project.status === "active" ? (
               needsToday ? (
-                <p className="project-card__nudge">วันนี้ยังไม่ได้อัปเดต progress — ลงสักบรรทัดก่อนกลับบ้าน</p>
-              ) : hasProgressOn(project, today, staffCode) ? (
-                <p className="project-card__done-today">
-                  วันนี้อัปเดตแล้ว {progressOnDate(project, today).filter((entry) => entry.by === staffCode).length} ครั้ง · เพิ่มอีกได้ถ้าทำต่อ
+                <p className="project-card__nudge">
+                  วันนี้ยังไม่มีใครอัปเดต — งานนี้ต้องมีคนส่ง progress อย่างน้อยวันละ 1 ครั้ง (ใครในทีมก็ได้)
                 </p>
-              ) : null
+              ) : (
+                <p className="project-card__done-today">
+                  วันนี้อัปเดตแล้ว {progressCount(project, today)} ครั้ง · โดย{" "}
+                  {progressAuthorsOn(project, today).map(displayNameFor).join(", ")} · ทำต่อแล้วส่งเพิ่มได้เรื่อยๆ
+                </p>
+              )
             ) : null}
 
             {project.status === "active" && !readOnly ? (
@@ -178,7 +181,10 @@ function ProgressForm({
 
   return (
     <div className="project-progress-form">
-      <p className="assign-work__label">อัปเดต progress</p>
+      <p className="assign-work__label">ส่ง progress ของวันนี้</p>
+      <p className="project-progress-form__rule">
+        ใครในทีมส่งก็ได้ · อย่างน้อยวันละ 1 ครั้ง · ทำเพิ่มตอนไหนก็ส่งซ้ำได้จนกว่างานจะเสร็จ (100% = ปิดงาน)
+      </p>
       <label className="project-progress-form__percent">
         ตอนนี้เสร็จไปแล้วกี่ % ({percent}%)
         <input
@@ -196,11 +202,12 @@ function ProgressForm({
         onChange={(e) => setNote(e.target.value)}
         placeholder="วันนี้ทำอะไรไปบ้าง เช่น จัดของขึ้นชั้น 3 ตู้ · ถ่ายรูปสินค้าเสร็จ 20 รายการ"
       />
-      <EvidencePhotosInput value={photos} onChange={setPhotos} label="แนบรูป (ถ้ามี)" />
+      {/* แนบรูปได้ทุกครั้งที่อัปเดต — เจ้าของจะได้เห็นหน้างานจริงของแต่ละครั้ง ไม่ใช่แค่ตัวเลข % */}
+      <EvidencePhotosInput value={photos} onChange={setPhotos} label="แนบรูปหน้างาน (ถ้ามี)" />
       <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="ลิงก์งาน (ถ้ามี)" inputMode="url" />
       {error ? <p className="project-progress-form__error">{error}</p> : null}
       <button type="button" className="primary-action" onClick={submit} disabled={busy || !note.trim()}>
-        {busy ? "กำลังบันทึก…" : "บันทึก progress"}
+        {busy ? "กำลังส่ง…" : `ส่ง progress (${percent}%)`}
       </button>
     </div>
   );

@@ -30,7 +30,13 @@ export function ProjectProgressList({
               วันที่ {day.index} · {day.date}
               {day.isToday ? " (วันนี้)" : ""}
             </strong>
-            <span>{day.entries.length ? `${day.percent}%` : day.missed ? "ไม่ได้อัปเดต" : "-"}</span>
+            <span>
+              {day.entries.length
+                ? `${day.percent}% · ${day.entries.length} อัปเดต`
+                : day.missed
+                  ? "ไม่ได้อัปเดต"
+                  : "-"}
+            </span>
           </div>
           {day.entries.map((entry) => (
             <div key={entry.id} className="project-days__entry">
@@ -38,11 +44,12 @@ export function ProjectProgressList({
                 <strong>{displayNameFor(entry.by)}</strong> · {entry.percent}% · {entry.at.slice(11, 16)} น.
               </p>
               <p>{entry.note}</p>
+              {/* รูปของแต่ละครั้ง โชว์เป็นภาพเลย — เจ้าของจะได้เห็นหน้างานจริงโดยไม่ต้องกดเปิดทีละลิงก์ */}
               {entry.images?.length ? (
-                <p className="project-days__files">
+                <p className="project-days__photos">
                   {entry.images.map((url, index) => (
                     <a key={url} href={url} target="_blank" rel="noreferrer">
-                      รูป{index + 1}
+                      <img src={url} alt={`รูปอัปเดตครั้งที่ ${index + 1}`} loading="lazy" />
                     </a>
                   ))}
                 </p>
