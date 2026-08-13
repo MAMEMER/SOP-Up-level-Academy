@@ -6,11 +6,17 @@ import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { addProjectProgress, deleteProjectProgress, fetchProjectsForStaff } from "../lib/work-projects-store.ts";
+import { ANSWER_KIND_LABEL, answerNeedsInput } from "../lib/checklist-overrides.ts";
 import {
+  MODE_LABEL,
   PROJECT_STATUS_LABEL,
   currentPercent,
+  isSingleDay,
+  needsSubmitToday,
   progressAuthorsOn,
   progressCount,
+  projectMode,
+  submitWindowState,
   sortProjects,
   teamNeedsProgressToday,
   totalDays,
@@ -49,7 +55,7 @@ export function MyProjects({
     } catch {
       // เดิมกลืน error แล้วโชว์ "ยังไม่มีงาน" — งานที่สั่งมาแล้วหายไปเงียบๆ แยกไม่ออกจาก "ไม่มีงานจริงๆ"
       setProjects([]);
-      setLoadError("โหลดงานโปรเจกต์ไม่สำเร็จ — ลองรีเฟรชอีกครั้ง ถ้ายังไม่ขึ้นแจ้งแอดมิน");
+      setLoadError("โหลดงานที่มอบหมายไม่สำเร็จ — ลองรีเฟรชอีกครั้ง ถ้ายังไม่ขึ้นแจ้งแอดมิน");
     } finally {
       setLoading(false);
     }
@@ -59,15 +65,16 @@ export function MyProjects({
     void load();
   }, [load]);
 
-  if (!staffCode) return <p className="assign-work__empty">บัญชีนี้ยังไม่ผูกกับรหัสพนักงาน — ยังไม่มีโปรเจกต์</p>;
+  if (!staffCode) return <p className="assign-work__empty">บัญชีนี้ยังไม่ผูกกับรหัสพนักงาน — ยังไม่มีงานที่มอบหมาย</p>;
   if (loading) return <p className="assign-work__empty">กำลังโหลด…</p>;
   if (loadError) return <p className="project-progress-form__error">{loadError}</p>;
-  if (projects.length === 0) return <p className="assign-work__empty">ยังไม่มีงานแบบโปรเจกต์ที่มอบหมายให้คุณ</p>;
+  if (projects.length === 0) return <p className="assign-work__empty">ยังไม่มีงานที่มอบหมายให้คุณ</p>;
 
   return (
     <div className="project-list">
       {projects.map((project) => {
-        const needsToday = teamNeedsProgressToday(project, today);
+        const needsToday = needsSubmitToday(project, today, staffCode);
+        const single = isSingleDay(project);
         const open = openId === project.id;
         return (
           <section key={project.id} className="project-card soft-card">
@@ -79,7 +86,10 @@ export function MyProjects({
                   {project.assignees.map(displayNameFor).join(", ")}
                 </em>
               </div>
-              <span className="project-card__status">{PROJECT_STATUS_LABEL[project.status]}</span>
+              <span className="project-card__status">
+                {MODE_LABEL[projectMode(project)]}
+                {single ? " · วันเดียว" : ""} · {PROJECT_STATUS_LABEL[project.status]}
+              </span>
             </div>
 
             {project.detail ? <p className="project-card__detail">{project.detail}</p> : null}
@@ -90,7 +100,11 @@ export function MyProjects({
             {project.status === "active" ? (
               needsToday ? (
                 <p className="project-card__nudge">
-                  วันนี้ยังไม่มีใครอัปเดต — งานนี้ต้องมีคนส่ง progress อย่างน้อยวันละ 1 ครั้ง (ใครในทีมก็ได้)
+                  {single
+                    ? "งานนี้ต้องส่งภายในวันนี้"
+                    : projectMode(project) === "group"
+                      ? "วันนี้ยังไม่มีใครอัปเดต — งานนี้ต้องมีคนส่ง progress อย่างน้อยวันละ 1 ครั้ง (ใครในทีมก็ได้)"
+                      : "วันนี้คุณยังไม่ได้ส่ง progress — งานเดี่ยว ต้องส่งเอง"}
                 </p>
               ) : (
                 <p className="project-card__done-today">
@@ -133,6 +147,10 @@ export function MyProjects({
   );
 }
 
+function nowHhMm(): string {
+  return new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" });
+}
+
 function ProgressForm({
   project,
   today,
@@ -163,7 +181,8 @@ function ProgressForm({
       await addProjectProgress({
         id: project.id,
         date: today,
-        percent,
+        // งานวันเดียวไม่มี % ระหว่างทาง — ส่งแล้วคือจบ
+        percent: isSingleDay(project) ? 100 : percent,
         note: note.trim(),
         images: photos.split("\n").map((url) => url.trim()).filter(Boolean),
         link: link.trim() || undefined
@@ -179,12 +198,29 @@ function ProgressForm({
     }
   }
 
+  const single = isSingleDay(project);
+  const window = submitWindowState(project, nowHhMm());
+  const tooEarly = window === "before_open";
+  const needsPhoto = project.answer?.kind === "photo" || answerNeedsInput(project.answer);
+
   return (
     <div className="project-progress-form">
-      <p className="assign-work__label">ส่ง progress ของวันนี้</p>
+      <p className="assign-work__label">{single ? "ส่งงานนี้" : "ส่ง progress ของวันนี้"}</p>
       <p className="project-progress-form__rule">
-        ใครในทีมส่งก็ได้ · อย่างน้อยวันละ 1 ครั้ง · ทำเพิ่มตอนไหนก็ส่งซ้ำได้จนกว่างานจะเสร็จ (100% = ปิดงาน)
+        {single
+          ? "งานวันเดียว — ส่งครั้งเดียวจบ"
+          : projectMode(project) === "group"
+            ? "ใครในทีมส่งก็ได้ · อย่างน้อยวันละ 1 ครั้ง · ส่งซ้ำได้จนกว่างานจะเสร็จ (100% = ปิดงาน)"
+            : "งานเดี่ยว — ส่งเองอย่างน้อยวันละ 1 ครั้ง · ส่งซ้ำได้จนกว่างานจะเสร็จ (100% = ปิดงาน)"}
+        {project.timing?.openTime || project.timing?.dueTime
+          ? ` · เวลา ${project.timing?.openTime || ""}${project.timing?.dueTime ? `–${project.timing.dueTime}` : ""}`
+          : ""}
+        {needsPhoto ? ` · ต้อง${ANSWER_KIND_LABEL[project.answer!.kind]}` : ""}
       </p>
+      {tooEarly ? (
+        <p className="shared-checklist__answer-hint">เริ่มส่งได้ตั้งแต่ {project.timing?.openTime}</p>
+      ) : null}
+      {single ? null : (
       <label className="project-progress-form__percent">
         ตอนนี้เสร็จไปแล้วกี่ % ({percent}%)
         <input
@@ -196,18 +232,28 @@ function ProgressForm({
           onChange={(e) => setPercent(Number(e.target.value))}
         />
       </label>
+      )}
       <textarea
         rows={2}
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        placeholder="วันนี้ทำอะไรไปบ้าง เช่น จัดของขึ้นชั้น 3 ตู้ · ถ่ายรูปสินค้าเสร็จ 20 รายการ"
+        placeholder={
+          isSingleDay(project)
+            ? "ทำอะไรไปบ้าง / ผลลัพธ์เป็นยังไง"
+            : "วันนี้ทำอะไรไปบ้าง เช่น จัดของขึ้นชั้น 3 ตู้ · ถ่ายรูปสินค้าเสร็จ 20 รายการ"
+        }
       />
       {/* แนบรูปได้ทุกครั้งที่อัปเดต — เจ้าของจะได้เห็นหน้างานจริงของแต่ละครั้ง ไม่ใช่แค่ตัวเลข % */}
       <EvidencePhotosInput value={photos} onChange={setPhotos} label="แนบรูปหน้างาน (ถ้ามี)" />
       <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="ลิงก์งาน (ถ้ามี)" inputMode="url" />
       {error ? <p className="project-progress-form__error">{error}</p> : null}
-      <button type="button" className="primary-action" onClick={submit} disabled={busy || !note.trim()}>
-        {busy ? "กำลังส่ง…" : `ส่ง progress (${percent}%)`}
+      <button
+        type="button"
+        className="primary-action"
+        onClick={submit}
+        disabled={busy || !note.trim() || tooEarly || (project.answer?.kind === "photo" && !photos.trim())}
+      >
+        {busy ? "กำลังส่ง…" : single ? "ส่งงาน (เสร็จแล้ว)" : `ส่ง progress (${percent}%)`}
       </button>
     </div>
   );

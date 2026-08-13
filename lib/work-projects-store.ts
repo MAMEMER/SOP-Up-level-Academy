@@ -54,6 +54,11 @@ export async function createProject(input: {
   startDate: string;
   endDate: string;
   assignees: string[];
+  /** เดี่ยว = คนเดียวส่งเอง · กลุ่ม = ใครในทีมส่งก็นับ */
+  mode?: "single" | "group";
+  openTime?: string;
+  dueTime?: string;
+  answer?: { kind: string; options?: string[]; placeholder?: string };
 }): Promise<void> {
   await post({ action: "createProject", ...input });
 }
@@ -73,6 +78,10 @@ export async function updateProjectDetail(input: {
   expectedResult?: string;
 }): Promise<void> {
   await post({ action: "updateProjectDetail", ...input });
+}
+
+export async function setProjectMode(id: string, mode: "single" | "group"): Promise<void> {
+  await post({ action: "setProjectMode", id, mode });
 }
 
 export async function setProjectStatus(id: string, status: "active" | "done" | "cancelled"): Promise<void> {

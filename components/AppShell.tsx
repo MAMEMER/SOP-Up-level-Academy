@@ -13,7 +13,7 @@ const mainLinks = [
   { href: "/schedule", label: "ตารางกะ" },
   { href: "/tasks", label: "งานวันนี้" },
   { href: "/checklist", label: "เช็คลิสต์" },
-  { href: "/projects", label: "งานโปรเจกต์" },
+  { href: "/projects", label: "งานที่มอบหมาย" },
   { href: "/handoff", label: "งานส่งต่อ" },
   { href: "/training", label: "คู่มืองาน" }
 ];
@@ -24,7 +24,7 @@ const adminLinks = [
   { href: "/admin", label: "หน้ารวมงานจัดการ" },
   { href: "/admin/schedule", label: "ตารางกะ" },
   { href: "/admin/assign", label: "มอบหมายงาน" },
-  { href: "/admin/projects", label: "งานโปรเจกต์" },
+  { href: "/admin/projects", label: "มอบหมายงาน (เดี่ยว/กลุ่ม)" },
   { href: "/admin/tasks", label: "สั่งงานประจำ" },
   { href: "/admin/calendar", label: "ปฏิทินสั่งงาน" },
   { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
