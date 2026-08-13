@@ -146,6 +146,11 @@ export type ChecklistScopeConfig = {
   hidden: string[];
   /** หัวข้อใหญ่ที่เจ้าของเพิ่มเอง */
   customUnits: CustomUnit[];
+  /**
+   * รายการของช่วงนี้ถูกย้ายไปอยู่ในระบบ "สั่งงาน" (/admin/tasks) แล้ว — หน้าพนักงานจะชี้ไปที่
+   * หน้างานวันนี้แทน ไม่ให้ติ๊กซ้ำสองที่. เก็บของเดิมไว้ ไม่ลบ เผื่อต้องย้อนดู
+   */
+  migratedToTasks?: boolean;
 };
 
 export const emptyChecklistScopeConfig: ChecklistScopeConfig = {
@@ -166,7 +171,9 @@ export function normalizeScopeConfig(raw: Partial<ChecklistScopeConfig> | undefi
     : [];
   const strings = (value: unknown): string[] =>
     Array.isArray(value) ? Array.from(new Set(value.filter((item): item is string => typeof item === "string" && item.trim().length > 0))) : [];
-  return { overrides, order: strings(raw?.order), hidden: strings(raw?.hidden), customUnits };
+  const out: ChecklistScopeConfig = { overrides, order: strings(raw?.order), hidden: strings(raw?.hidden), customUnits };
+  if (raw?.migratedToTasks) out.migratedToTasks = true;
+  return out;
 }
 
 /** unitIds ตามลำดับที่จะแสดง: ตามที่เจ้าของจัดก่อน แล้วต่อด้วยที่เหลือ */

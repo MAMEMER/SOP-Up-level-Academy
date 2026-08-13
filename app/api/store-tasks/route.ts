@@ -3,6 +3,9 @@ import { actor, badRequest, canWriteNow, db, forbidden, isAdmin, readOnly } from
 import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
 import { isValidLinkUrl } from "../../../lib/checklist-links.ts";
 import { normalizeWorkSpecs, type WorkSpec } from "../../../lib/work-spec.ts";
+import { normalizeScopeConfig, type ChecklistScopeConfig } from "../../../lib/checklist-overrides.ts";
+import { scopeForPeriod, type PeriodicPeriod } from "../../../lib/periodic-tasks.ts";
+import { mergeImportedSpecs, specsFromPeriod } from "../../../lib/task-import.ts";
 
 // Server route for "งานสั่ง" ของร้าน — งานประจำทุกความถี่ (รายวัน / สัปดาห์ / เดือน) อยู่ในลิสต์
 // เดียว ตั้งค่าได้เหมือนกันหมด (ดู lib/work-spec.ts). เขียนได้เฉพาะแอดมิน และไม่เขียนตอน
@@ -14,6 +17,7 @@ import { normalizeWorkSpecs, type WorkSpec } from "../../../lib/work-spec.ts";
 export const dynamic = "force-dynamic";
 const TASKS = "sop_store_tasks";
 const RECORDS = "sop_task_records";
+const CHECKLIST_OVERRIDES = "sop_checklist_overrides";
 
 type TaskRecord = { by: string; at: string; value?: string; photos?: string[] };
 
@@ -65,6 +69,31 @@ export async function POST(request: Request) {
         const tasks: WorkSpec[] = normalizeWorkSpecs(body.tasks);
         await db().collection(TASKS).doc(branch).set({ branch, tasks, updatedAt: nowIso, updatedBy: user.actualEmail });
         return NextResponse.json({ ok: true, tasks, updatedAt: nowIso, updatedBy: user.actualEmail });
+      }
+
+      // ── ย้ายรายการ checklist สัปดาห์/เดือน ของเดิมเข้ามา (กดซ้ำได้ ไม่ซ้ำงาน) ─────
+      case "importLegacy": {
+        if (!isAdmin(user)) return forbidden();
+        const taskSnap = await db().collection(TASKS).doc(branch).get();
+        const existing = normalizeWorkSpecs(taskSnap.exists ? (taskSnap.data() as { tasks?: unknown }).tasks : []);
+        const periods: PeriodicPeriod[] = ["weekly", "monthly"];
+        const incoming: WorkSpec[] = [];
+        for (const period of periods) {
+          const snap = await db().collection(CHECKLIST_OVERRIDES).doc(scopeForPeriod(period)).get();
+          const config = normalizeScopeConfig((snap.exists ? snap.data() : {}) as Partial<ChecklistScopeConfig>);
+          incoming.push(...specsFromPeriod(period, config, incoming.length));
+        }
+        const { tasks, added } = mergeImportedSpecs(existing, incoming);
+        if (added > 0) {
+          await db().collection(TASKS).doc(branch).set({ branch, tasks, updatedAt: nowIso, updatedBy: user.actualEmail });
+          // ปักธงไว้ที่ scope เดิม เพื่อไม่ให้พนักงานเจอรายการเดียวกันสองที่
+          await Promise.all(
+            periods.map((period) =>
+              db().collection(CHECKLIST_OVERRIDES).doc(scopeForPeriod(period)).set({ migratedToTasks: true }, { merge: true })
+            )
+          );
+        }
+        return NextResponse.json({ ok: true, tasks, added, updatedAt: nowIso, updatedBy: user.actualEmail });
       }
 
       // ── พนักงานส่งงานของวันนั้น (ติ๊ก / พร้อมคำตอบที่เจ้าของสั่งให้กรอก) ─────

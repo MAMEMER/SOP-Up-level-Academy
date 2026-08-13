@@ -49,6 +49,11 @@ describe("checklist scope config (weekly/monthly แก้ได้เหมื�
     assert.deepEqual(parsed.customUnits, [{ id: "custom-x", title: "งานเสริม" }]);
   });
 
+  it("ธง 'ย้ายไประบบสั่งงานแล้ว' อ่านกลับมาได้ และไม่โผล่เองถ้าไม่ได้ตั้ง", () => {
+    assert.equal(normalizeScopeConfig({ overrides: {}, migratedToTasks: true }).migratedToTasks, true);
+    assert.equal(normalizeScopeConfig({ overrides: {} }).migratedToTasks, undefined);
+  });
+
   it("ลำดับที่เจ้าของจัดมาก่อน แล้วต่อด้วยหัวข้อที่ยังไม่เคยจัด", () => {
     const cfg = config({ order: ["b"], customUnits: [{ id: "custom-new", title: "งานใหม่" }] });
     assert.deepEqual(orderedUnitIds(["a", "b"], cfg), ["b", "a", "custom-new"]);
