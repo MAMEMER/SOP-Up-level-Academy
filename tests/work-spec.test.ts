@@ -15,6 +15,7 @@ import {
   weekdayOf,
   type WorkSpec
 } from "../lib/work-spec.ts";
+import { weeklyEvents } from "../lib/weekly-event-tasks.ts";
 
 function spec(overrides: Partial<WorkSpec> = {}): WorkSpec {
   return {
@@ -73,6 +74,29 @@ describe("work spec — ลงวันไหน", () => {
     assert.equal(scheduleLabel({ frequency: "daily" }), "ทุกวัน");
     assert.equal(scheduleLabel({ frequency: "weekly", weekdays: [1, 4] }), "ทุกสัปดาห์ · วันจ พฤ");
     assert.equal(scheduleLabel({ frequency: "monthly", monthDays: [5] }), "ทุกเดือน · วันที่ 5");
+  });
+});
+
+describe("work spec — งานที่ผูกกับกิจกรรม", () => {
+  it("ลงเองตามวันที่กิจกรรมนั้นจัด (Gym pokemon = อังคาร ศุกร์ เสาร์)", () => {
+    const gym = weeklyEvents.find((event) => event.game.toLowerCase().includes("pokemon")) || weeklyEvents[0];
+    const schedule = { frequency: "event" as const, eventKey: gym.key };
+    const dueDay = gym.activeDays[0];
+    // หาวันในเดือน ส.ค. 2026 ที่ตรงกับวันจัดกิจกรรมวันแรก
+    const dates = Array.from({ length: 7 }, (_, i) => `2026-08-${String(10 + i).padStart(2, "0")}`);
+    const match = dates.find((date) => weekdayOf(date) === dueDay)!;
+    const miss = dates.find((date) => !gym.activeDays.includes(weekdayOf(date)))!;
+    assert.equal(isDueOn(schedule, match), true);
+    assert.equal(isDueOn(schedule, miss), false);
+  });
+
+  it("กิจกรรมที่ไม่รู้จัก = ไม่ขึ้นวันไหนเลย (ไม่เดา)", () => {
+    assert.equal(isDueOn({ frequency: "event", eventKey: "ไม่มีอยู่จริง" }, "2026-08-13"), false);
+  });
+
+  it("ป้ายบอกว่าอิงกิจกรรมไหน", () => {
+    const event = weeklyEvents[0];
+    assert.equal(scheduleLabel({ frequency: "event", eventKey: event.key }), `ทุกวันที่มี ${event.name}`);
   });
 });
 

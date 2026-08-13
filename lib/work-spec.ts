@@ -15,15 +15,17 @@
 import type { ItemAnswer } from "./checklist-overrides.ts";
 import type { ItemLink } from "./checklist-links.ts";
 import type { ShiftCode } from "./shift-schedule.ts";
+import { weeklyEvents } from "./weekly-event-tasks.ts";
 
 // ---- สั่งบ่อยแค่ไหน + ลงวันไหน ------------------------------------------------
 
-export type WorkFrequency = "daily" | "weekly" | "monthly" | "once" | "range";
+export type WorkFrequency = "daily" | "weekly" | "monthly" | "event" | "once" | "range";
 
 export const FREQUENCY_LABEL: Record<WorkFrequency, string> = {
   daily: "ทุกวัน",
   weekly: "ทุกสัปดาห์",
   monthly: "ทุกเดือน",
+  event: "ทุกวันที่มีกิจกรรม",
   once: "ครั้งเดียว",
   range: "ช่วงวันที่"
 };
@@ -37,6 +39,8 @@ export type WorkSchedule = {
   weekdays?: number[];
   /** monthly: ลงวันที่เท่าไหร่ของเดือน 1–31 (ว่าง = วันแรกของเดือน) */
   monthDays?: number[];
+  /** event: ผูกกับกิจกรรมประจำสัปดาห์ (key ของ weeklyEvents) — ลงเองตามวันที่กิจกรรมนั้นจัด */
+  eventKey?: string;
   /** once / range: วันเริ่ม–วันจบ (once ใช้ startDate อย่างเดียว) */
   startDate?: string;
   endDate?: string;
@@ -81,6 +85,12 @@ export function isDueOn(schedule: WorkSchedule, date: string): boolean {
       // วันที่ 31 ในเดือนที่มี 30 วัน → ถือว่าครบกำหนดวันสุดท้ายของเดือนนั้น
       return days.some((day) => day === today || (day > last && today === last));
     }
+    case "event": {
+      // งานที่ผูกกับกิจกรรม เช่น "ทุกวันที่มี Gym Pokemon" — วันจัดกิจกรรมเปลี่ยนเมื่อไหร่
+      // งานก็ตามไปเอง ไม่ต้องมาไล่แก้วันในสัปดาห์ทีละงาน
+      const event = weeklyEvents.find((item) => item.key === schedule.eventKey);
+      return Boolean(event && event.activeDays.includes(weekdayOf(date)));
+    }
     case "once":
       return Boolean(schedule.startDate) && schedule.startDate === date;
     case "range": {
@@ -104,6 +114,10 @@ export function scheduleLabel(schedule: WorkSchedule): string {
     case "monthly": {
       const days = schedule.monthDays || [];
       return days.length ? `ทุกเดือน · วันที่ ${days.join(", ")}` : "ทุกเดือน · วันที่ 1";
+    }
+    case "event": {
+      const event = weeklyEvents.find((item) => item.key === schedule.eventKey);
+      return event ? `ทุกวันที่มี ${event.name}` : "ตามกิจกรรม";
     }
     case "once":
       return schedule.startDate ? `วันที่ ${schedule.startDate}` : "ครั้งเดียว";
@@ -226,7 +240,7 @@ export function normalizeWorkSpec(raw: Partial<WorkSpec>, index: number): WorkSp
   const title = typeof raw.title === "string" ? raw.title.trim() : "";
   if (!title) return null;
   const id = (typeof raw.id === "string" && raw.id.trim()) || `task-${index + 1}`;
-  const frequency: WorkFrequency = (["daily", "weekly", "monthly", "once", "range"] as WorkFrequency[]).includes(
+  const frequency: WorkFrequency = (["daily", "weekly", "monthly", "event", "once", "range"] as WorkFrequency[]).includes(
     raw.schedule?.frequency as WorkFrequency
   )
     ? (raw.schedule!.frequency as WorkFrequency)
@@ -245,6 +259,9 @@ export function normalizeWorkSpec(raw: Partial<WorkSpec>, index: number): WorkSp
   if (frequency === "monthly") {
     const monthDays = numbers(raw.schedule?.monthDays, 1, 31);
     if (monthDays.length) schedule.monthDays = monthDays;
+  }
+  if (frequency === "event" && typeof raw.schedule?.eventKey === "string" && raw.schedule.eventKey.trim()) {
+    schedule.eventKey = raw.schedule.eventKey.trim();
   }
   if (frequency === "once" || frequency === "range") {
     if (isDate(raw.schedule?.startDate)) schedule.startDate = raw.schedule!.startDate;

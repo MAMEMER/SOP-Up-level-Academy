@@ -26,6 +26,7 @@ const adminLinks = [
   { href: "/admin/assign", label: "มอบหมายงาน" },
   { href: "/admin/projects", label: "งานโปรเจกต์" },
   { href: "/admin/tasks", label: "สั่งงานประจำ" },
+  { href: "/admin/calendar", label: "ปฏิทินสั่งงาน" },
   { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
   { href: "/admin/staff", label: "จัดการพนักงาน" },
   { href: "/admin/checklist-config", label: "ปรับ Checklist" },
