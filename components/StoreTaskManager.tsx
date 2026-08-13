@@ -26,6 +26,20 @@ const SHIFTS: Array<{ value: ShiftCode; label: string }> = [
   { value: "s2", label: "กะ 2" }
 ];
 
+const MONTH_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
+
+function sortDays(days: number[]): number[] {
+  return [...days].sort((a, b) => a - b);
+}
+
+function monthDaysOf(task: WorkSpec): number[] {
+  return task.schedule.monthDays || [];
+}
+
+function monthDaysLabel(task: WorkSpec): string {
+  return `ทุกวันที่ ${sortDays(monthDaysOf(task)).join(", ")}`;
+}
+
 function newTask(order: number): WorkSpec {
   return {
     id: `task-${Date.now().toString(36)}-${order}`,
@@ -252,26 +266,37 @@ export function StoreTaskManager({ branch }: { branch: string }) {
                       </label>
                     ) : null}
 
+                    {/* เลือกวันที่เป็นปุ่ม ไม่ใช่ช่องพิมพ์คั่นจุลภาค — ของเดิม parse ทุกตัวอักษรที่พิมพ์
+                        จุลภาคจึงถูกลบทิ้งทันทีและใส่วันที่สองไม่ได้เลย */}
                     {task.schedule.frequency === "monthly" ? (
-                      <label>
-                        ลงวันที่เท่าไหร่ของเดือน (คั่นด้วย , — ไม่ใส่ = วันที่ 1)
-                        <input
-                          value={(task.schedule.monthDays || []).join(", ")}
-                          onChange={(e) =>
-                            patch(task.id, {
-                              schedule: {
-                                ...task.schedule,
-                                monthDays: e.target.value
-                                  .split(",")
-                                  .map((part) => Number(part.trim()))
-                                  .filter((day) => Number.isFinite(day) && day >= 1 && day <= 31)
-                              }
-                            })
-                          }
-                          placeholder="เช่น 1, 15"
-                          inputMode="numeric"
-                        />
-                      </label>
+                      <div className="task-row__days">
+                        <span>
+                          ลงวันที่เท่าไหร่ของเดือน (เลือกได้หลายวัน · ไม่เลือก = วันที่ 1)
+                          {monthDaysOf(task).length ? ` · ตอนนี้ ${monthDaysLabel(task)}` : ""}
+                        </span>
+                        <div className="assign-work__chips assign-work__chips--days">
+                          {MONTH_DAYS.map((day) => (
+                            <label
+                              key={day}
+                              className={monthDaysOf(task).includes(day) ? "assign-work__chip is-on" : "assign-work__chip"}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={monthDaysOf(task).includes(day)}
+                                onChange={() =>
+                                  patch(task.id, {
+                                    schedule: { ...task.schedule, monthDays: sortDays(toggleInList(task.schedule.monthDays, day)) }
+                                  })
+                                }
+                              />
+                              {day}
+                            </label>
+                          ))}
+                        </div>
+                        <small className="task-row__hint">
+                          วันที่ 29–31 ในเดือนที่สั้นกว่านั้น ระบบจะเลื่อนมาลงวันสุดท้ายของเดือนให้เอง
+                        </small>
+                      </div>
                     ) : null}
 
                     <div className="task-row__days">
