@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  answerNeedsInput,
   customUnitId,
   isUnitHidden,
   moveUnitItem,
+  normalizeItemAnswer,
   normalizeScopeConfig,
+  normalizeUnitOverride,
   orderedUnitIds,
   type ChecklistScopeConfig
 } from "../lib/checklist-overrides.ts";
@@ -88,6 +91,53 @@ describe("checklist scope config (weekly/monthly แก้ได้เหมื�
   });
 });
 
+describe("ส่งงานแบบไหน (ItemAnswer — เหมือนชนิดคำถามใน Google Form)", () => {
+  it("ติ๊กเฉยๆ คือค่าปกติ — ไม่เก็บฟิลด์ และไม่บังคับกรอกอะไร", () => {
+    assert.equal(normalizeItemAnswer(undefined), undefined);
+    assert.equal(normalizeItemAnswer({ kind: "tick" }), undefined);
+    assert.equal(answerNeedsInput(undefined), false);
+    assert.equal(answerNeedsInput({ kind: "tick" }), false);
+  });
+
+  it("แบบที่ต้องกรอก/แนบ ถูกบังคับก่อนติ๊ก", () => {
+    for (const kind of ["text", "number", "photo", "link", "choice"] as const) {
+      assert.equal(answerNeedsInput({ kind }), true, kind);
+    }
+  });
+
+  it("เลือกตัวเลือก: ตัดตัวเลือกว่าง เก็บได้สูงสุด 20", () => {
+    const answer = normalizeItemAnswer({ kind: "choice", options: ["ครบ", "  ", "ไม่ครบ", ...Array(25).fill("x")] });
+    assert.equal(answer?.kind, "choice");
+    assert.equal(answer?.options?.length, 20);
+    assert.deepEqual(answer?.options?.slice(0, 2), ["ครบ", "ไม่ครบ"]);
+  });
+
+  it("เลือกตัวเลือกแต่ไม่ใส่ตัวเลือกเลย → กลายเป็นพิมพ์ข้อความ (กันพนักงานติ๊กไม่ได้)", () => {
+    assert.deepEqual(normalizeItemAnswer({ kind: "choice", options: [] }), { kind: "text" });
+  });
+
+  it("ชนิดที่ไม่รู้จัก ถือเป็นติ๊กเฉยๆ", () => {
+    assert.equal(normalizeItemAnswer({ kind: "อะไรก็ไม่รู้" as never }), undefined);
+  });
+
+  it("บันทึกแบบส่ง + เวลา + กะ ของรายการ แล้วอ่านกลับมาได้ครบ", () => {
+    const [item] = normalizeUnitOverride({
+      items: [
+        {
+          id: "i1",
+          title: "นับ Sleeve",
+          answer: { kind: "number", placeholder: "ใส่จำนวนที่นับได้" },
+          timeLabel: "ก่อน 12:00",
+          shiftLabel: "กะ 1"
+        }
+      ]
+    })!.items!;
+    assert.deepEqual(item.answer, { kind: "number", placeholder: "ใส่จำนวนที่นับได้" });
+    assert.equal(item.timeLabel, "ก่อน 12:00");
+    assert.equal(item.shiftLabel, "กะ 1");
+  });
+});
+
 describe("งานประจำสัปดาห์/เดือน ที่เจ้าของแก้ได้", () => {
   it("ยังไม่เคยแก้ = เห็นรายการ built-in ครบเหมือนเดิม", () => {
     const units = resolvePeriodicUnits("weekly", config());
@@ -103,6 +153,28 @@ describe("งานประจำสัปดาห์/เดือน ที�
     );
     assert.equal(units[0].title, "งานสัปดาห์นี้");
     assert.deepEqual(units[0].items.map((item) => item.title), ["เช็ดตู้โชว์"]);
+  });
+
+  it("รายละเอียดใต้ชื่อหัวข้อ (goal / เวลา / กะ) ส่งถึงหน้าพนักงาน เหมือนการ์ดรายวัน", () => {
+    const unitId = sharedUnitIdFor("weekly");
+    const [unit] = resolvePeriodicUnits(
+      "weekly",
+      config({
+        overrides: {
+          [unitId]: { goal: "เคลียร์ให้จบก่อนสุดสัปดาห์", timeLabel: "ทำให้เสร็จก่อนวันอาทิตย์", shiftLabel: "กะ 2" }
+        }
+      })
+    );
+    assert.equal(unit.goal, "เคลียร์ให้จบก่อนสุดสัปดาห์");
+    assert.equal(unit.timeLabel, "ทำให้เสร็จก่อนวันอาทิตย์");
+    assert.equal(unit.shiftLabel, "กะ 2");
+  });
+
+  it("หัวข้อที่ยังไม่ได้กรอกรายละเอียด ไม่ส่งฟิลด์ว่างไปให้หน้าพนักงานแสดงบรรทัดเปล่า", () => {
+    const [unit] = resolvePeriodicUnits("weekly", config());
+    assert.equal(unit.goal, undefined);
+    assert.equal(unit.timeLabel, undefined);
+    assert.equal(unit.shiftLabel, undefined);
   });
 
   it("หัวข้อที่เพิ่มเองขึ้นให้ทีมติ๊ก และหัวข้อที่ปิดไว้หายไป", () => {

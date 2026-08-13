@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { actor, badRequest, canWriteNow, db, readOnly } from "../../../lib/api-firestore.ts";
+import { isValidLinkUrl } from "../../../lib/checklist-links.ts";
 
 // Server route for the shared weekly/monthly checklist ticks (fix 1). Replaces the client
 // store (lib/shared-tasks-store.ts). Read + tick: any signed-in staffer (the whole team
@@ -10,7 +11,8 @@ import { actor, badRequest, canWriteNow, db, readOnly } from "../../../lib/api-f
 export const dynamic = "force-dynamic";
 const SHARED = "sop_shared_tasks";
 
-type SharedTick = { by: string; at: string };
+/** `value` / `photos` = คำตอบที่เจ้าของสั่งให้กรอกตอนติ๊ก (ดู lib/checklist-overrides ItemAnswer) */
+type SharedTick = { by: string; at: string; value?: string; photos?: string[] };
 
 const docId = (branch: string, period: string, periodKey: string) => `${branch}__${period}__${periodKey}`;
 
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
   if (!canWriteNow(user)) return readOnly();
 
   const body = (await request.json().catch(() => null)) as
-    | { branch?: string; period?: string; periodKey?: string; taskId?: string; ticked?: boolean }
+    | { branch?: string; period?: string; periodKey?: string; taskId?: string; ticked?: boolean; value?: unknown; photos?: unknown }
     | null;
   if (!body || !body.branch || !isPeriod(body.period) || !body.periodKey || !body.taskId)
     return badRequest("missing_params");
@@ -52,7 +54,14 @@ export async function POST(request: Request) {
     const ticks: Record<string, SharedTick> = snap.exists
       ? { ...((snap.data() as { ticks?: Record<string, SharedTick> }).ticks ?? {}) }
       : {};
-    if (body.ticked) ticks[body.taskId] = { by, at: nowIso };
+    // คำตอบที่แนบมากับการติ๊ก: ตัดความยาว และรับเฉพาะ URL รูปที่ปลอดภัย (กัน javascript: หลุดไป
+    // เป็นลิงก์ให้คนอื่นกด) — ส่วนจะ "ต้องกรอกไหม" หน้าจอเป็นคนบังคับตามที่เจ้าของตั้งไว้
+    const value = typeof body.value === "string" ? body.value.trim().slice(0, 500) : "";
+    const photos = Array.isArray(body.photos)
+      ? body.photos.filter((url): url is string => typeof url === "string" && isValidLinkUrl(url)).slice(0, 3)
+      : [];
+    if (body.ticked)
+      ticks[body.taskId] = { by, at: nowIso, ...(value ? { value } : {}), ...(photos.length ? { photos } : {}) };
     else delete ticks[body.taskId];
     await ref.set(
       { branch: body.branch, period: body.period, periodKey: body.periodKey, ticks, updatedAt: nowIso },

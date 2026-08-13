@@ -2,15 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  ANSWER_KINDS,
+  ANSWER_KIND_LABEL,
   customUnitId,
   moveUnitItem,
+  normalizeItemAnswer,
   normalizeItemEvidence,
   normalizeOverrideItem,
   orderedUnitIds,
+  type AnswerKind,
   type ChecklistScope,
   type ChecklistScopeConfig,
   type CustomUnit,
   type EvidenceKind,
+  type ItemAnswer,
   type ItemEvidence,
   type OverrideItem,
   type UnitOverride
@@ -56,6 +61,11 @@ export type EditableUnit = {
    * evidence its own way (events).
    */
   editEvidence?: boolean;
+  /**
+   * ตั้ง "ส่งงานแบบไหน" (ติ๊ก / พิมพ์ / ตัวเลข / รูป / ลิงก์ / เลือกตัวเลือก) + เวลา + กะ ราย
+   * รายการได้ไหม — เปิดเฉพาะที่หน้าพนักงานเรนเดอร์ช่องกรอกให้จริง (แท็บ Weekly / Monthly)
+   */
+  editAnswer?: boolean;
   /** built-in tick items, used as the starting point */
   baseItems: OverrideItem[];
   /** true for a หัวข้อ the owner added here (deletable, always renameable) */
@@ -85,6 +95,18 @@ function sameEvidence(a: ItemEvidence | undefined, b: ItemEvidence | undefined):
   return [...na.kinds].sort().join(",") === [...nb.kinds].sort().join(",");
 }
 
+function sameAnswer(a: ItemAnswer | undefined, b: ItemAnswer | undefined): boolean {
+  const na = normalizeItemAnswer(a);
+  const nb = normalizeItemAnswer(b);
+  if (!na && !nb) return true;
+  if (!na || !nb) return false;
+  return (
+    na.kind === nb.kind &&
+    (na.placeholder || "") === (nb.placeholder || "") &&
+    (na.options || []).join("|") === (nb.options || []).join("|")
+  );
+}
+
 function sameItems(a: OverrideItem[], b: OverrideItem[]): boolean {
   if (a.length !== b.length) return false;
   return a.every(
@@ -92,8 +114,11 @@ function sameItems(a: OverrideItem[], b: OverrideItem[]): boolean {
       item.id === b[index].id &&
       item.title.trim() === b[index].title.trim() &&
       (item.note || "").trim() === (b[index].note || "").trim() &&
+      (item.timeLabel || "").trim() === (b[index].timeLabel || "").trim() &&
+      (item.shiftLabel || "").trim() === (b[index].shiftLabel || "").trim() &&
       sameLinks(item.links, b[index].links) &&
-      sameEvidence(item.evidence, b[index].evidence)
+      sameEvidence(item.evidence, b[index].evidence) &&
+      sameAnswer(item.answer, b[index].answer)
   );
 }
 
@@ -172,7 +197,11 @@ export function ChecklistItemsEditor({
       heading: unit.title,
       editTitle: true,
       baseTitle: unit.title,
-      editEvidence: true,
+      // หัวข้อที่เพิ่มเองกรอกรายละเอียดได้ครบเหมือนหัวข้อ built-in (ชื่อ · รายละเอียด · เวลา · กะ)
+      editGoal: true,
+      editTime: true,
+      editShift: true,
+      editAnswer: true,
       baseItems: [],
       isCustom: true
     };
@@ -249,6 +278,22 @@ export function ChecklistItemsEditor({
 
   function updateItemNote(unitId: string, index: number, note: string) {
     patchItem(unitId, index, { note });
+  }
+
+  /** "ส่งงานแบบไหน" ของรายการนี้ — ติ๊กเฉยๆ = ไม่เก็บฟิลด์ (ค่า default) */
+  function updateItemAnswerKind(unitId: string, index: number, kind: AnswerKind) {
+    if (kind === "tick") {
+      patchItem(unitId, index, { answer: undefined });
+      return;
+    }
+    const current = draft[unitId]?.items[index]?.answer;
+    patchItem(unitId, index, { answer: { ...current, kind } });
+  }
+
+  function updateItemAnswerField(unitId: string, index: number, patch: Partial<ItemAnswer>) {
+    const current = draft[unitId]?.items[index]?.answer;
+    if (!current) return;
+    patchItem(unitId, index, { answer: { ...current, ...patch } });
   }
 
   function addItemLink(unitId: string, index: number) {
@@ -539,6 +584,65 @@ export function ChecklistItemsEditor({
                           onChange={(e) => updateItemEvidenceNote(unit.id, index, e.target.value)}
                           placeholder="คำอธิบายหลักฐาน (ไม่บังคับ) เช่น รูปหลังนับ Stock เสร็จ"
                         />
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {/* ส่งงานแบบไหน + เวลา + กะ ของรายการนี้ — คุมเหมือนตั้งคำถามใน Google Form */}
+                  {unit.editAnswer ? (
+                    <div className="checklist-config__answer">
+                      <label>
+                        ส่งงานแบบไหน
+                        <select
+                          value={item.answer?.kind || "tick"}
+                          disabled={!hasText}
+                          onChange={(e) => updateItemAnswerKind(unit.id, index, e.target.value as AnswerKind)}
+                        >
+                          {ANSWER_KINDS.map((kind) => (
+                            <option key={kind} value={kind}>{ANSWER_KIND_LABEL[kind]}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        เวลา (ไม่บังคับ)
+                        <input
+                          type="text"
+                          value={item.timeLabel || ""}
+                          disabled={!hasText}
+                          onChange={(e) => patchItem(unit.id, index, { timeLabel: e.target.value })}
+                          placeholder="เช่น ก่อน 12:00 · หลังปิดร้าน"
+                        />
+                      </label>
+                      <label>
+                        กะ (ไม่บังคับ)
+                        <input
+                          type="text"
+                          value={item.shiftLabel || ""}
+                          disabled={!hasText}
+                          onChange={(e) => patchItem(unit.id, index, { shiftLabel: e.target.value })}
+                          placeholder="เช่น กะ 1 · ทุกกะ"
+                        />
+                      </label>
+                      {item.answer && item.answer.kind !== "tick" ? (
+                        <label className="checklist-config__answer-wide">
+                          ข้อความช่วยบอกว่าให้กรอกอะไร (ไม่บังคับ)
+                          <input
+                            type="text"
+                            value={item.answer.placeholder || ""}
+                            onChange={(e) => updateItemAnswerField(unit.id, index, { placeholder: e.target.value })}
+                            placeholder="เช่น ใส่จำนวนที่นับได้ · แนบรูปชั้นวางหลังจัดเสร็จ"
+                          />
+                        </label>
+                      ) : null}
+                      {item.answer?.kind === "choice" ? (
+                        <label className="checklist-config__answer-wide">
+                          ตัวเลือก (บรรทัดละ 1 ตัวเลือก)
+                          <textarea
+                            rows={3}
+                            value={(item.answer.options || []).join("\n")}
+                            onChange={(e) => updateItemAnswerField(unit.id, index, { options: e.target.value.split("\n") })}
+                            placeholder={"ครบ\nไม่ครบ\nไม่ได้ตรวจ"}
+                          />
+                        </label>
                       ) : null}
                     </div>
                   ) : null}
