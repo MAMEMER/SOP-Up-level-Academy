@@ -39,11 +39,73 @@ export type ChecklistScope = "weekly-stock" | "monthly-stock" | "weekly-event";
 export const CHECKLIST_SCOPES: ChecklistScope[] = ["weekly-stock", "monthly-stock", "weekly-event"];
 
 /**
+ * "ส่งงานแบบไหน" ของรายการหนึ่ง — เหมือนชนิดคำถามใน Google Form. ไม่ได้ตั้ง = `tick` (ติ๊กเฉยๆ)
+ * ซึ่งเป็นพฤติกรรมเดิมของทุกรายการที่บันทึกไว้ก่อนหน้านี้.
+ */
+export type AnswerKind = "tick" | "text" | "number" | "photo" | "link" | "choice";
+
+export const ANSWER_KINDS: AnswerKind[] = ["tick", "text", "number", "photo", "link", "choice"];
+
+/** ป้ายภาษาไทยของแต่ละแบบ ใช้ทั้งหน้า config และหน้าพนักงาน */
+export const ANSWER_KIND_LABEL: Record<AnswerKind, string> = {
+  tick: "ติ๊กว่าทำแล้ว",
+  text: "พิมพ์ข้อความสั้นๆ",
+  number: "กรอกตัวเลข",
+  photo: "แนบรูป",
+  link: "วางลิงก์",
+  choice: "เลือกจากตัวเลือก"
+};
+
+export type ItemAnswer = {
+  kind: AnswerKind;
+  /** ตัวเลือกให้เลือก (ใช้เมื่อ kind = choice) */
+  options?: string[];
+  /** ข้อความช่วยบอกว่าให้กรอกอะไร */
+  placeholder?: string;
+};
+
+/** ต้องกรอก/แนบอะไรก่อนถึงจะติ๊กผ่านไหม — ติ๊กเฉยๆ = ไม่ต้อง */
+export function answerNeedsInput(answer: ItemAnswer | undefined): boolean {
+  return Boolean(answer) && answer!.kind !== "tick";
+}
+
+/** Cleans an owner-set answer type; undefined เมื่อเป็นการติ๊กธรรมดา (ค่า default) */
+export function normalizeItemAnswer(raw: ItemAnswer | undefined): ItemAnswer | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const kind = ANSWER_KINDS.includes(raw.kind) ? raw.kind : "tick";
+  if (kind === "tick") return undefined;
+  const out: ItemAnswer = { kind };
+  const placeholder = typeof raw.placeholder === "string" ? raw.placeholder.trim() : "";
+  if (placeholder) out.placeholder = placeholder;
+  if (kind === "choice") {
+    const options = Array.isArray(raw.options)
+      ? raw.options.filter((option): option is string => typeof option === "string").map((option) => option.trim()).filter(Boolean)
+      : [];
+    // ตัวเลือกว่างเปล่า = ไม่มีอะไรให้เลือก → ถอยกลับเป็นพิมพ์ข้อความ ดีกว่าค้างกดไม่ได้
+    if (!options.length) return { kind: "text", ...(placeholder ? { placeholder } : {}) };
+    out.options = options.slice(0, 20);
+  }
+  return out;
+}
+
+/**
  * One tick item in the editor. `id` keeps a renamed/reordered item tied to its saved ticks.
  * `note` (คำอธิบายว่าต้องทำอะไร) and `links` (ปุ่มกดไปหน้างานจริง) are optional — an item saved
  * before these fields existed simply omits them, and every reader treats missing as empty.
+ * `answer` (ส่งงานแบบไหน), `timeLabel` (เวลา) and `shiftLabel` (กะ) are per-item and optional too.
  */
-export type OverrideItem = { id: string; title: string; note?: string; links?: ItemLink[]; evidence?: ItemEvidence };
+export type OverrideItem = {
+  id: string;
+  title: string;
+  note?: string;
+  links?: ItemLink[];
+  evidence?: ItemEvidence;
+  answer?: ItemAnswer;
+  /** เวลาของรายการนี้ เช่น "ก่อน 12:00" หรือ "หลังปิดร้าน" */
+  timeLabel?: string;
+  /** กะที่ต้องทำรายการนี้ เช่น "กะ 1" */
+  shiftLabel?: string;
+};
 
 /** What the owner changed for one checklist block. Missing fields = keep built-in. */
 export type UnitOverride = {
@@ -181,6 +243,12 @@ export function normalizeOverrideItem(item: OverrideItem, index: number): Overri
   if (links.length) out.links = links;
   const evidence = normalizeItemEvidence(item.evidence);
   if (evidence) out.evidence = evidence;
+  const answer = normalizeItemAnswer(item.answer);
+  if (answer) out.answer = answer;
+  const timeLabel = typeof item.timeLabel === "string" ? item.timeLabel.trim() : "";
+  if (timeLabel) out.timeLabel = timeLabel;
+  const shiftLabel = typeof item.shiftLabel === "string" ? item.shiftLabel.trim() : "";
+  if (shiftLabel) out.shiftLabel = shiftLabel;
   return out;
 }
 

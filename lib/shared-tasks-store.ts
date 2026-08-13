@@ -5,7 +5,12 @@
 // /api/shared-tasks route (Admin SDK, session-verified). The "by" stamp is set from the
 // session server-side. Exported types and signatures are unchanged.
 
-export type SharedTick = { by: string; at: string };
+/**
+ * หนึ่งรายการที่ทีมติ๊กแล้ว. `value` / `photos` คือคำตอบที่เจ้าของสั่งให้กรอกตอนติ๊ก
+ * ("ส่งงานแบบไหน" — พิมพ์ข้อความ / ตัวเลข / ลิงก์ / เลือกตัวเลือก / แนบรูป). รายการที่ติ๊กเฉยๆ
+ * ไม่มีสองฟิลด์นี้ เหมือนที่บันทึกไว้ก่อนหน้า.
+ */
+export type SharedTick = { by: string; at: string; value?: string; photos?: string[] };
 export type SharedTaskDoc = {
   branch: string;
   period: "weekly" | "monthly";
@@ -36,6 +41,10 @@ export async function setSharedTick(input: {
   by: string;
   atIso: string;
   currentTicks: Record<string, SharedTick>;
+  /** คำตอบที่เจ้าของสั่งให้กรอกตอนติ๊ก (ข้อความ / ตัวเลข / ลิงก์ / ตัวเลือกที่เลือก) */
+  value?: string;
+  /** รูปที่แนบตอนติ๊ก (อัปโหลดผ่าน /api/evidence-upload มาแล้ว) */
+  photos?: string[];
 }): Promise<Record<string, SharedTick>> {
   const res = await fetch("/api/shared-tasks", {
     method: "POST",
@@ -45,7 +54,9 @@ export async function setSharedTick(input: {
       period: input.period,
       periodKey: input.periodKey,
       taskId: input.taskId,
-      ticked: input.ticked
+      ticked: input.ticked,
+      ...(input.value ? { value: input.value } : {}),
+      ...(input.photos?.length ? { photos: input.photos } : {})
     })
   });
   if (!res.ok) throw new Error(`shared-tasks write failed: ${res.status}`);

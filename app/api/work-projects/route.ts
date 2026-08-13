@@ -60,12 +60,16 @@ export async function GET(request: Request) {
       }
       case "projectsForStaff": {
         const staffCode = p.get("staffCode") || "";
-        if (!branch || !staffCode) return badRequest("missing_params");
+        if (!staffCode) return badRequest("missing_params");
+        // array-contains + equality on another field ต้องมี composite index — เดิม query คู่กับ
+        // branch เลยพังเงียบๆ (500) แล้วหน้าพนักงานขึ้นว่า "ยังไม่มีงาน". ใช้ index ตัวเดียวที่
+        // Firestore สร้างให้เองแล้วกรอง branch ในโค้ด — ไม่ต้อง deploy index
         const snap = await db()
           .collection(WORK_PROJECTS_COLLECTION)
-          .where("branch", "==", branch)
           .where("assignees", "array-contains", staffCode)
           .get();
+        // ไม่กรองสาขาที่นี่: ถ้าเจ้าของมอบหมายชื่อคุณไว้ คุณต้องเห็น — สาขาในโปรไฟล์พนักงานกับสาขา
+        // ที่ตอนสั่งงานไม่ตรงกัน ไม่ควรทำให้งานหายไปเงียบๆ
         return NextResponse.json({ projects: snap.docs.map((d) => d.data() as WorkProject) });
       }
       case "projectById": {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DashboardChecklistStatus } from "../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../components/DashboardTaskSections.tsx";
+import { MyProjects } from "../../components/MyProjects.tsx";
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
 import { TodayWorkBoard } from "../../components/TodayWorkBoard.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
@@ -65,6 +66,23 @@ export default async function HomePage() {
       </section>
 
       {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
+
+      {/* งานโปรเจกต์ (หลายวัน) อยู่บนหน้าหลัก — ถ้าซ่อนอยู่ในเมนู พนักงานไม่เห็นและลืมลง progress
+          ของวันนั้น ซึ่งเป็นทั้งงานเดียวที่ต้องแตะทุกวันและตัววัดว่าจะทันกำหนดไหม */}
+      {staffCode || user.role === "admin" ? (
+        <>
+          <section className="section-heading">
+            <p className="eyebrow">งานโปรเจกต์</p>
+            <h3>งานหลายวันที่ต้องอัปเดตทุกวัน</h3>
+          </section>
+          {staffCode ? (
+            <MyProjects branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} />
+          ) : (
+            // บัญชีแอดมินที่ไม่ได้ผูกรหัสพนักงานไม่มีงานของตัวเอง — ส่งไปหน้าที่คุมทุกโปรเจกต์แทน
+            <Link href="/admin/projects" className="primary-action">ดูงานโปรเจกต์ทั้งหมด</Link>
+          )}
+        </>
+      ) : null}
 
       {/* ทุกอย่างที่ต้องทำวันนี้ในกระดานเดียว — รายวัน/สัปดาห์/เดือน/มอบหมาย/ส่งต่อ */}
       <TodayWorkBoard

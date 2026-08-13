@@ -20,6 +20,12 @@ export default async function AdminChecklistWeeklyPage() {
       note: "รายการที่ทีมช่วยกันติ๊กในหน้า /checklist แท็บ Weekly · ใครติ๊กก็ได้ ทุกคนเห็นเหมือนกัน",
       editTitle: true,
       baseTitle: sharedUnitTitle("weekly"),
+      editGoal: true,
+      goalLabel: "รายละเอียดงาน (พนักงานอ่านใต้ชื่อหัวข้อ)",
+      editTime: true,
+      timeLabel: "เวลา (แสดงบนการ์ด) เช่น ทำให้เสร็จก่อนวันอาทิตย์",
+      editShift: true,
+      editAnswer: true,
       baseItems: baseItemsFor("weekly")
     },
     {

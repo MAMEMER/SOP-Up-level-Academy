@@ -86,8 +86,21 @@ export function baseItemsFor(period: PeriodicPeriod): OverrideItem[] {
   return tasksFor(period).map((task) => (task.hint ? { id: task.id, title: task.title, note: task.hint } : { id: task.id, title: task.title }));
 }
 
-/** One tickable block on the staff Weekly / Monthly tab. */
-export type PeriodicUnit = { id: string; title: string; items: OverrideItem[] };
+/**
+ * One tickable block on the staff Weekly / Monthly tab — ชื่อหัวข้อ + รายละเอียดใต้ชื่อ (goal /
+ * เวลา / กะ) แบบเดียวกับการ์ดของ checklist รายวัน แล้วตามด้วยรายการที่ต้องติ๊ก.
+ */
+export type PeriodicUnit = {
+  id: string;
+  title: string;
+  /** รายละเอียดงาน ที่เจ้าของเขียนไว้ใต้ชื่อหัวข้อ */
+  goal?: string;
+  /** เวลา / กำหนดส่ง ที่แสดงบนการ์ด */
+  timeLabel?: string;
+  /** กะที่รับผิดชอบ */
+  shiftLabel?: string;
+  items: OverrideItem[];
+};
 
 /**
  * The blocks a staffer sees for a period: the built-in shared tasks (as the owner edited them)
@@ -106,6 +119,9 @@ export function resolvePeriodicUnits(period: PeriodicPeriod, config: ChecklistSc
       return {
         id: unitId,
         title: override?.title || custom?.title || sharedUnitTitle(period),
+        ...(override?.goal ? { goal: override.goal } : {}),
+        ...(override?.timeLabel ? { timeLabel: override.timeLabel } : {}),
+        ...(override?.shiftLabel ? { shiftLabel: override.shiftLabel } : {}),
         items: resolvePhaseChecklistItems(baseItems, override)
       };
     })

@@ -18,6 +18,12 @@ export default async function AdminChecklistMonthlyPage() {
       note: "รายการที่ทีมช่วยกันติ๊กในหน้า /checklist แท็บ Monthly · ใครติ๊กก็ได้ ทุกคนเห็นเหมือนกัน",
       editTitle: true,
       baseTitle: sharedUnitTitle("monthly"),
+      editGoal: true,
+      goalLabel: "รายละเอียดงาน (พนักงานอ่านใต้ชื่อหัวข้อ)",
+      editTime: true,
+      timeLabel: "เวลา (แสดงบนการ์ด) เช่น ทำให้เสร็จก่อนวันที่ 5 ของเดือน",
+      editShift: true,
+      editAnswer: true,
       baseItems: baseItemsFor("monthly")
     },
     {
