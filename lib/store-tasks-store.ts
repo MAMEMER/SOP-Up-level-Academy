@@ -51,6 +51,12 @@ export async function saveStoreTasks(branch: string, tasks: WorkSpec[]): Promise
   return { updatedAt: (data.updatedAt as string) ?? null, updatedBy: (data.updatedBy as string) ?? null };
 }
 
+/** ย้ายรายการ checklist สัปดาห์/เดือน ของเดิมเข้ามา — กดซ้ำได้ ของที่แก้ไปแล้วไม่ถูกทับ */
+export async function importLegacyTasks(branch: string): Promise<{ tasks: WorkSpec[]; added: number }> {
+  const data = await post({ action: "importLegacy", branch });
+  return { tasks: (data.tasks as WorkSpec[]) ?? [], added: (data.added as number) ?? 0 };
+}
+
 export async function submitStoreTask(input: {
   branch: string;
   date: string;

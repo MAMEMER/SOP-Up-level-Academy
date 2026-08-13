@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ChecklistItemGuide } from "./ChecklistItemGuide.tsx";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import { periodicTickKey, periodKeyFor, resolvePeriodicUnits, scopeForPeriod } from "../lib/periodic-tasks.ts";
@@ -79,6 +80,19 @@ export function SharedPeriodicChecklist({
 
   const allKeys = units.flatMap((unit) => unit.items.map((item) => periodicTickKey(period, unit.id, item.id)));
   const done = allKeys.filter((key) => ticks[key]).length;
+
+  // ย้ายไปอยู่ในระบบสั่งงานแล้ว — ชี้ไปที่เดียว ไม่ให้ทีมติ๊กซ้ำสองที่แล้วเถียงกันว่าอันไหนจริง
+  if (config.migratedToTasks) {
+    return (
+      <div className="shared-checklist">
+        <p className="shared-checklist__meta">
+          งาน{period === "weekly" ? "ประจำสัปดาห์" : "ประจำเดือน"}ย้ายไปอยู่ในหน้า “งานวันนี้” แล้ว —
+          ระบบจะขึ้นให้เองเมื่อถึงวันที่ต้องทำ
+        </p>
+        <Link href="/tasks" className="primary-action">เปิดหน้างานวันนี้</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="shared-checklist">

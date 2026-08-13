@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ANSWER_KINDS, ANSWER_KIND_LABEL, type AnswerKind } from "../lib/checklist-overrides.ts";
-import { fetchStoreTasks, saveStoreTasks } from "../lib/store-tasks-store.ts";
+import { fetchStoreTasks, importLegacyTasks, saveStoreTasks } from "../lib/store-tasks-store.ts";
 import {
   FREQUENCY_LABEL,
   WEEKDAY_LABEL,
@@ -89,6 +89,22 @@ export function StoreTaskManager({ branch }: { branch: string }) {
   function toggleInList<T>(list: T[] | undefined, value: T): T[] {
     const current = list || [];
     return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+  }
+
+  /** ดึงรายการ checklist สัปดาห์/เดือน ของเดิมเข้ามาเป็นงานในระบบนี้ (กดซ้ำได้) */
+  async function importLegacy() {
+    setStatus("กำลังย้ายรายการเดิม…");
+    try {
+      const result = await importLegacyTasks(branch);
+      setTasks(result.tasks);
+      setStatus(
+        result.added > 0
+          ? `ย้ายเข้ามา ${result.added} งาน — แก้ต่อได้เลย (ตั้งวัน กะ เวลา และวิธีส่งงาน)`
+          : "ย้ายครบแล้ว ไม่มีรายการใหม่"
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "ย้ายไม่สำเร็จ");
+    }
   }
 
   async function save() {
@@ -343,6 +359,7 @@ export function StoreTaskManager({ branch }: { branch: string }) {
 
       <div className="checklist-config__bar">
         <button type="button" className="btn-soft" onClick={add}>+ เพิ่มงาน</button>
+        <button type="button" className="btn-soft" onClick={importLegacy}>ย้ายรายการเดิมเข้ามา</button>
         <button type="button" className="primary-action" onClick={save}>บันทึกทั้งหมด</button>
         {status ? <span className="checklist-config__status">{status}</span> : null}
       </div>

@@ -57,9 +57,14 @@ export async function POST(request: Request) {
   const scope = body && (CHECKLIST_SCOPES as string[]).includes(body.scope || "") ? (body.scope as ChecklistScope) : null;
   if (!scope || !body || typeof body.overrides !== "object" || body.overrides === null) return badRequest("bad_request");
 
+  // ธง migratedToTasks ตั้งโดยการย้ายงาน ไม่ได้อยู่ในฟอร์ม — อ่านค่าเดิมมาคงไว้ ไม่งั้นกดบันทึก
+  // จากหน้า config เดิมทีเดียว รายการจะกลับมาโผล่ซ้ำกับระบบใหม่
+  const previous = await db().collection(COLLECTION).doc(scope).get().catch(() => null);
+  const migratedToTasks = Boolean(previous?.exists && (previous.data() as { migratedToTasks?: boolean }).migratedToTasks);
   const record = {
     scope,
     ...normalizeScopeConfig(body),
+    ...(migratedToTasks ? { migratedToTasks: true } : {}),
     updatedAt: new Date().toISOString(),
     updatedBy: user.actualEmail
   };
