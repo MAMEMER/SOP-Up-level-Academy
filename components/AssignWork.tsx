@@ -346,6 +346,15 @@ export function AssignWork({
                       </em>
                     ) : null}
                     <em className={assignmentStatusClass[row.status]}>สถานะ: {assignmentStatusLabel[row.status]}</em>
+                    {/* ความคืบหน้าระหว่างทาง — เห็นว่างานเดินอยู่ ไม่ต้องรอจนส่งงาน */}
+                    {row.progress?.length ? (
+                      <em>
+                        อัปเดตล่าสุด ({row.progress.length} ครั้ง): {row.progress[row.progress.length - 1].note}
+                        {row.progress[row.progress.length - 1].images?.length
+                          ? ` · ${row.progress[row.progress.length - 1].images!.length} รูป`
+                          : ""}
+                      </em>
+                    ) : null}
                     {row.note ? <em>สิ่งที่ทำ: {row.note}</em> : null}
                     {row.imageEvidence?.length ? (
                       <em>

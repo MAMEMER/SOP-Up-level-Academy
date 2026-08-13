@@ -2,7 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "../../../../lib/auth.ts";
-import { canManageStaffAccounts } from "../../../../lib/owner.ts";
+import { STAFF_ADMIN_EMAILS, canManageStaffAccounts } from "../../../../lib/owner.ts";
 import { StaffManager } from "../../../../components/StaffManager.tsx";
 import { ensureEmployeeIds, listStaff, removeStaff, saveStaff, seedStaffIfEmpty } from "../../../../lib/staff-store.ts";
 import type { StaffRecord } from "../../../../lib/staff-records.ts";
@@ -87,8 +87,28 @@ const statusMessages: Record<string, { tone: "success" | "warning"; text: string
 
 export default async function AdminStaffPage({ searchParams }: PageProps) {
   const user = await requireUser();
-  // หน้านี้เปิดประตูเข้าระบบให้คนอื่น จึงจำกัดไว้ที่บัญชีเดียวตามที่ Champ กำหนด
-  if (!canManageStaffAccounts(user.actualEmail)) redirect("/admin");
+  // หน้านี้เปิดประตูเข้าระบบให้คนอื่น จึงจำกัดไว้ที่บัญชีเดียวตามที่ Champ กำหนด.
+  // เดิมเด้งกลับ /admin เงียบๆ ซึ่งดูเหมือนเมนูเสีย — บอกไปตรงๆ ว่าติดที่บัญชีไหน
+  // และต้องเข้าด้วยบัญชีอะไรถึงจะแก้ได้ (ไม่แสดงรายชื่อพนักงานให้บัญชีที่ไม่มีสิทธิ์)
+  if (!canManageStaffAccounts(user.actualEmail)) {
+    return (
+      <main className="page">
+        <Link href="/admin" className="back-link">← กลับหน้ารวมงานจัดการ</Link>
+        <section className="board-hero">
+          <div>
+            <p className="eyebrow">STAFF</p>
+            <h2>จัดการพนักงาน</h2>
+            <p>
+              หน้านี้แก้ได้เฉพาะบัญชี {STAFF_ADMIN_EMAILS.join(" หรือ ")} เพราะเป็นหน้าที่เปิด–ปิดสิทธิ์เข้าระบบให้ทุกคน
+            </p>
+          </div>
+        </section>
+        <p className="input-status warning">
+          ตอนนี้เข้าระบบด้วย {user.actualEmail} — ออกจากระบบแล้ว login ใหม่ด้วยบัญชีที่มีสิทธิ์ถึงจะแก้ได้
+        </p>
+      </main>
+    );
+  }
 
   await seedStaffIfEmpty();
   await ensureEmployeeIds();
