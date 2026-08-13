@@ -14,12 +14,13 @@ import {
 } from "../lib/work-spec.ts";
 import { formatEditedAt } from "../lib/daily-checklist.ts";
 import type { ShiftCode } from "../lib/shift-schedule.ts";
+import { weeklyEvents } from "../lib/weekly-event-tasks.ts";
 
 // หน้าเดียวที่คุมงานสั่งทั้งร้าน — รายวัน / รายสัปดาห์ / รายเดือน อยู่ในลิสต์เดียวกัน
 // ต่างกันแค่ "สั่งบ่อยแค่ไหน" กับ "ลงวันไหน" และทุกงานตั้งค่าได้เหมือนกันหมด:
 // ใครทำ (กะ) · เริ่มทำได้ตั้งแต่ · ต้องจบไม่เกิน · ส่งงานแบบไหน · รายละเอียด · หมวดหมู่.
 
-const FREQUENCIES: WorkFrequency[] = ["daily", "weekly", "monthly"];
+const FREQUENCIES: WorkFrequency[] = ["daily", "weekly", "monthly", "event"];
 const SHIFTS: Array<{ value: ShiftCode; label: string }> = [
   { value: "s1", label: "กะ 1" },
   { value: "s2", label: "กะ 2" }
@@ -234,6 +235,21 @@ export function StoreTaskManager({ branch }: { branch: string }) {
                           ))}
                         </div>
                       </div>
+                    ) : null}
+
+                    {task.schedule.frequency === "event" ? (
+                      <label>
+                        ผูกกับกิจกรรมไหน (ลงวันให้เองตามวันที่กิจกรรมจัด)
+                        <select
+                          value={task.schedule.eventKey || ""}
+                          onChange={(e) => patch(task.id, { schedule: { ...task.schedule, eventKey: e.target.value } })}
+                        >
+                          <option value="">— เลือกกิจกรรม —</option>
+                          {weeklyEvents.map((event) => (
+                            <option key={event.key} value={event.key}>{event.name}</option>
+                          ))}
+                        </select>
+                      </label>
                     ) : null}
 
                     {task.schedule.frequency === "monthly" ? (
