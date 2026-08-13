@@ -14,6 +14,8 @@ import {
   type WorkProject
 } from "../../../lib/work-projects.ts";
 import { isValidLinkUrl } from "../../../lib/checklist-links.ts";
+import { normalizeItemAnswer } from "../../../lib/checklist-overrides.ts";
+import { isHhMm } from "../../../lib/work-spec.ts";
 
 // Server route for งานแบบโปรเจกต์ (หลายวัน + ส่ง progress รายวัน). Same shape as
 // /api/work-tasks: session-verified, blocked while impersonating, Admin SDK does the write,
@@ -37,6 +39,18 @@ const docId = (v: unknown) => {
   const value = str(v).trim();
   return value && !value.includes("/") ? value : "";
 };
+/** เวลาเริ่ม/จบ ที่ผ่านการตรวจรูปแบบแล้วเท่านั้น — เวลาเพี้ยนจะไปล็อกไม่ให้พนักงานส่งงาน */
+function timingFromBody(body: Record<string, unknown>) {
+  const openTime = typeof body.openTime === "string" && isHhMm(body.openTime) ? body.openTime : undefined;
+  const dueTime = typeof body.dueTime === "string" && isHhMm(body.dueTime) ? body.dueTime : undefined;
+  if (!openTime && !dueTime) return undefined;
+  return { ...(openTime ? { openTime } : {}), ...(dueTime ? { dueTime } : {}) };
+}
+
+function answerFromBody(body: Record<string, unknown>) {
+  return normalizeItemAnswer(body.answer as never);
+}
+
 const strArr = (v: unknown) => (Array.isArray(v) ? Array.from(new Set(v.filter((x): x is string => typeof x === "string" && x.trim().length > 0))) : []);
 const safeUrls = (v: unknown) => strArr(v).filter((url) => isValidLinkUrl(url));
 
@@ -131,6 +145,10 @@ export async function POST(request: Request) {
           endDate: draft.endDate,
           assignees: draft.assignees,
           status: "active",
+          // เดี่ยว/กลุ่ม + เวลา + วิธีส่งงาน — ฟิลด์ชุดเดียวกับงานประจำ (lib/work-spec.ts)
+          mode: body.mode === "group" ? "group" : "single",
+          ...(timingFromBody(body) ? { timing: timingFromBody(body) } : {}),
+          ...(answerFromBody(body) ? { answer: answerFromBody(body) } : {}),
           createdBy: user.actualEmail,
           createdAt: nowIso,
           updatedAt: nowIso,
@@ -193,6 +211,9 @@ export async function POST(request: Request) {
           title,
           detail: str(body.detail).trim(),
           expectedResult: str(body.expectedResult).trim(),
+          ...(body.mode ? { mode: body.mode === "group" ? "group" : "single" } : {}),
+          ...(timingFromBody(body) ? { timing: timingFromBody(body) } : {}),
+          ...(answerFromBody(body) ? { answer: answerFromBody(body) } : {}),
           updatedAt: nowIso,
           history: stamp(project, { action: "detail", detail: title })
         });
@@ -211,6 +232,22 @@ export async function POST(request: Request) {
           status,
           updatedAt: nowIso,
           history: stamp(project, { action: "status", detail: `${project.status} → ${status}` })
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── สลับ เดี่ยว/กลุ่ม ────────────────────────────────────────────────────
+      case "setProjectMode": {
+        if (!isAdmin(user)) return forbidden();
+        const id = docId(body.id);
+        const mode = body.mode === "group" ? "group" : "single";
+        if (!id) return badRequest("missing_id");
+        const project = await load(id);
+        if (project instanceof NextResponse) return project;
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
+          mode,
+          updatedAt: nowIso,
+          history: stamp(project, { action: "detail", detail: `เปลี่ยนเป็น${mode === "group" ? "งานกลุ่ม" : "งานเดี่ยว"}` })
         });
         return NextResponse.json({ ok: true });
       }

@@ -90,14 +90,14 @@ export default async function HomePage() {
       {staffCode || user.role === "admin" ? (
         <>
           <section className="section-heading">
-            <p className="eyebrow">งานโปรเจกต์</p>
-            <h3>งานหลายวันที่ต้องอัปเดตทุกวัน</h3>
+            <p className="eyebrow">งานที่มอบหมาย</p>
+            <h3>งานที่มอบหมายให้ฉัน (เดี่ยว / กลุ่ม)</h3>
           </section>
           {staffCode ? (
             <MyProjects branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} />
           ) : (
             // บัญชีแอดมินที่ไม่ได้ผูกรหัสพนักงานไม่มีงานของตัวเอง — ส่งไปหน้าที่คุมทุกโปรเจกต์แทน
-            <Link href="/admin/projects" className="primary-action">ดูงานโปรเจกต์ทั้งหมด</Link>
+            <Link href="/admin/projects" className="primary-action">ดูงานที่มอบหมายทั้งหมด</Link>
           )}
         </>
       ) : null}

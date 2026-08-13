@@ -17,8 +17,8 @@ export default async function ProjectsPage() {
       <section className="board-hero">
         <div>
           <p className="eyebrow">Projects</p>
-          <h2>งานโปรเจกต์ของฉัน</h2>
-          <p>งานที่ทำหลายวัน — อัปเดต progress ได้ทุกเวลา แต่อย่างน้อยวันละครั้ง เพื่อให้เห็นว่าทันแผนไหม</p>
+          <h2>งานที่มอบหมายให้ฉัน</h2>
+          <p>งานเดี่ยว/กลุ่ม ที่เจ้าของสั่งไว้ — งานวันเดียวส่งครั้งเดียวจบ · งานหลายวันส่ง progress อย่างน้อยวันละครั้ง</p>
         </div>
       </section>
       <MyProjects branch={branch} staffCode={staffCode} today={formatWorkDate()} readOnly={user.isImpersonating} />

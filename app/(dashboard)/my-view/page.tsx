@@ -120,8 +120,8 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
       {/* งานโปรเจกต์ (หลายวัน) — ขึ้นตรงนี้ด้วยเพื่อเตือนให้ลง progress ของวันนี้ก่อนกลับ */}
       <section className="section-heading">
-        <p className="eyebrow">งานโปรเจกต์</p>
-        <h3>งานหลายวันที่ต้องอัปเดตทุกวัน</h3>
+        <p className="eyebrow">งานที่มอบหมาย</p>
+        <h3>งานที่มอบหมาย (เดี่ยว / กลุ่ม)</h3>
       </section>
       <MyProjects branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} />
 

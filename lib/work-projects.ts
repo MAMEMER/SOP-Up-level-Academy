@@ -8,6 +8,9 @@
 // ไฟล์นี้เป็น pure logic ล้วน (คำนวณ + ตรวจความถูกต้อง) — ไม่แตะ network ให้ test ได้ตรงๆ.
 // เอกสารจริงอยู่ใน Firestore `sop_work_projects` เขียนผ่าน /api/work-projects เท่านั้น.
 
+import type { ItemAnswer } from "./checklist-overrides.ts";
+import { timingStateAt, type WorkTiming } from "./work-spec.ts";
+
 export const WORK_PROJECTS_COLLECTION = "sop_work_projects";
 
 export type ProjectStatus = "active" | "done" | "cancelled";
@@ -37,6 +40,12 @@ export type ProjectHistoryEntry = {
   detail: string;
 };
 
+/**
+ * งานที่มอบหมาย: **เดี่ยว** = คนเดียวรับผิดชอบและต้องส่งเอง · **กลุ่ม** = หลายคนช่วยกัน
+ * ใครส่งก็นับ. ไม่ได้ตั้งไว้ = ดูจากจำนวนคน (คนเดียว = เดี่ยว)
+ */
+export type ProjectMode = "single" | "group";
+
 export type WorkProject = {
   id: string;
   branch: string;
@@ -51,6 +60,12 @@ export type WorkProject = {
   /** staff codes ที่รับผิดชอบ */
   assignees: string[];
   status: ProjectStatus;
+  /** เดี่ยว / กลุ่ม — ฟิลด์เดียวกับที่ระบบงานประจำใช้ (lib/work-spec.ts WorkOwners.mode) */
+  mode?: ProjectMode;
+  /** เริ่มส่งได้ตั้งแต่ / ต้องจบไม่เกิน (เวลาในวัน) */
+  timing?: WorkTiming;
+  /** ส่งงานแบบไหน — ใช้กับงานวันเดียว (หลายวันใช้ progress + รูปอยู่แล้ว) */
+  answer?: ItemAnswer;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -178,6 +193,24 @@ export function dailyTargetPercent(project: WorkProject, today: string): number 
   return Math.ceil(remaining / left);
 }
 
+/** เดี่ยวหรือกลุ่ม — ไม่ได้ตั้งไว้ก็ดูจากจำนวนคนที่รับผิดชอบ */
+export function projectMode(project: Pick<WorkProject, "mode" | "assignees">): ProjectMode {
+  if (project.mode) return project.mode;
+  return project.assignees.length > 1 ? "group" : "single";
+}
+
+export const MODE_LABEL: Record<ProjectMode, string> = { single: "งานเดี่ยว", group: "งานกลุ่ม" };
+
+/** งานวันเดียว = สั่งวันนั้นวันเดียว ไม่ต้องรายงาน progress รายวัน ส่งครั้งเดียวจบ */
+export function isSingleDay(project: Pick<WorkProject, "startDate" | "endDate">): boolean {
+  return totalDays(project.startDate, project.endDate) === 1;
+}
+
+/** ตอนนี้ส่งงานได้ไหมตามเวลาที่เจ้าของตั้งไว้ */
+export function submitWindowState(project: Pick<WorkProject, "timing">, nowHhMm: string) {
+  return timingStateAt(project.timing || {}, nowHhMm);
+}
+
 export function progressOnDate(project: Pick<WorkProject, "progress">, date: string): ProjectProgress[] {
   return (project.progress || []).filter((entry) => entry.date === date);
 }
@@ -206,6 +239,19 @@ export function teamNeedsProgressToday(project: WorkProject, today: string): boo
   if (project.status !== "active") return false;
   if (daysBetween(project.startDate, today) < 0) return false;
   return !hasProgressOn(project, today);
+}
+
+/**
+ * คนนี้ต้องส่งงานวันนี้ไหม.
+ * - งานกลุ่ม: ใครส่งแล้วก็ถือว่าวันนี้ครบทั้งทีม (เป้าคือวันละ 1 ครั้งจากใครก็ได้)
+ * - งานเดี่ยว: เจ้าของงานต้องส่งเอง คนอื่นส่งแทนไม่นับ
+ */
+export function needsSubmitToday(project: WorkProject, today: string, staffCode: string): boolean {
+  if (!project.assignees.includes(staffCode)) return false;
+  if (project.status !== "active") return false;
+  if (daysBetween(project.startDate, today) < 0) return false;
+  if (projectMode(project) === "group") return !hasProgressOn(project, today);
+  return !hasProgressOn(project, today, staffCode);
 }
 
 /** หนึ่งช่องของไทม์ไลน์รายวัน — ให้เห็นว่าวันไหนทำ วันไหนเงียบ */

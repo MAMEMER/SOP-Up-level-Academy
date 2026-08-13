@@ -11,6 +11,10 @@ import {
   hasProgressOn,
   progressAuthorsOn,
   progressCount,
+  isSingleDay,
+  needsSubmitToday,
+  projectMode,
+  submitWindowState,
   teamNeedsProgressToday,
   paceOf,
   projectDays,
@@ -162,6 +166,42 @@ describe("work projects — เตือนให้ส่ง progress วัน
     assert.equal(hasProgressOn(p, "2026-08-05"), true);
     assert.equal(hasProgressOn(p, "2026-08-05", "ICE"), false);
     assert.equal(hasProgressOn(p, "2026-08-05", "LEO"), true);
+  });
+});
+
+describe("งานที่มอบหมาย — เดี่ยว / กลุ่ม / วันเดียว", () => {
+  it("ไม่ได้ตั้งไว้ = ดูจากจำนวนคน (คนเดียว = เดี่ยว, หลายคน = กลุ่ม)", () => {
+    assert.equal(projectMode(project({ assignees: ["ICE"] })), "single");
+    assert.equal(projectMode(project({ assignees: ["ICE", "LEO"] })), "group");
+    assert.equal(projectMode(project({ assignees: ["ICE", "LEO"], mode: "single" })), "single");
+  });
+
+  it("งานกลุ่ม: คนอื่นส่งแล้ว ทุกคนถือว่าวันนี้ครบ", () => {
+    const p = project({ assignees: ["ICE", "LEO"], mode: "group", progress: [progress("2026-08-05", 30, "ICE")] });
+    assert.equal(needsSubmitToday(p, "2026-08-05", "LEO"), false);
+  });
+
+  it("งานเดี่ยว: คนอื่นส่งแทนไม่นับ ต้องส่งเอง", () => {
+    const p = project({ assignees: ["ICE", "LEO"], mode: "single", progress: [progress("2026-08-05", 30, "ICE")] });
+    assert.equal(needsSubmitToday(p, "2026-08-05", "LEO"), true);
+    assert.equal(needsSubmitToday(p, "2026-08-05", "ICE"), false);
+  });
+
+  it("คนที่ไม่ได้ถูกมอบหมาย ไม่ถูกเตือน", () => {
+    assert.equal(needsSubmitToday(project({ assignees: ["ICE"] }), "2026-08-05", "BOOM"), false);
+  });
+
+  it("งานวันเดียว = ส่งครั้งเดียวจบ", () => {
+    assert.equal(isSingleDay(project({ startDate: "2026-08-05", endDate: "2026-08-05" })), true);
+    assert.equal(isSingleDay(project()), false);
+  });
+
+  it("เวลาเริ่มส่ง: ก่อนเวลา ส่งไม่ได้ · หลังกำหนด ส่งได้แต่ถือว่าช้า", () => {
+    const p = project({ timing: { openTime: "09:00", dueTime: "18:00" } });
+    assert.equal(submitWindowState(p, "08:30"), "before_open");
+    assert.equal(submitWindowState(p, "10:00"), "open");
+    assert.equal(submitWindowState(p, "19:00"), "late");
+    assert.equal(submitWindowState(project(), "03:00"), "anytime");
   });
 });
 

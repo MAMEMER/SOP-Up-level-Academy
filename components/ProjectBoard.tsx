@@ -5,18 +5,23 @@ import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { isTeamSelected, toggleTeamSelection, type TeamOption } from "../lib/team-options.ts";
+import { ANSWER_KINDS, ANSWER_KIND_LABEL, type AnswerKind } from "../lib/checklist-overrides.ts";
 import {
   createProject,
   deleteProject,
   deleteProjectProgress,
   fetchProjectsForBranch,
+  setProjectMode,
   setProjectStatus,
   updateProjectAssignees,
   updateProjectDates
 } from "../lib/work-projects-store.ts";
 import {
+  MODE_LABEL,
   PROJECT_STATUS_LABEL,
   addDays,
+  isSingleDay,
+  projectMode,
   progressAuthorsOn,
   progressCount,
   sortProjects,
@@ -54,6 +59,10 @@ export function ProjectBoard({
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(addDays(today, 6));
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [mode, setMode] = useState<"single" | "group">("single");
+  const [openTime, setOpenTime] = useState("");
+  const [dueTime, setDueTime] = useState("");
+  const [answerKind, setAnswerKind] = useState<AnswerKind>("tick");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,7 +100,11 @@ export function ProjectBoard({
         expectedResult: expectedResult.trim() || undefined,
         startDate,
         endDate,
-        assignees: selectedCodes
+        assignees: selectedCodes,
+        mode,
+        openTime: openTime || undefined,
+        dueTime: dueTime || undefined,
+        ...(answerKind === "tick" ? {} : { answer: { kind: answerKind } })
       });
       setTitle("");
       setDetail("");
@@ -99,7 +112,7 @@ export function ProjectBoard({
       setSelectedCodes([]);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "สร้างงานไม่สำเร็จ");
+      setError(err instanceof Error ? err.message : "มอบหมายงานไม่สำเร็จ");
     } finally {
       setBusy(false);
     }
@@ -110,9 +123,9 @@ export function ProjectBoard({
   return (
     <div className="assign-work">
       <section className="assign-work__form soft-card">
-        <p className="assign-work__label">สั่งงานแบบโปรเจกต์</p>
+        <p className="assign-work__label">มอบหมายงาน (เดี่ยว / กลุ่ม)</p>
         <p className="assign-work__hint-lead">
-          งานที่กินเวลาหลายวัน — บอกแค่ <strong>ทำอะไร · ตั้งแต่วันไหนถึงวันไหน · ใครทำบ้าง</strong> แล้วให้เขาส่ง progress ทุกวัน
+          บอก <strong>ทำอะไร · ใครทำ · วันไหนถึงวันไหน · ส่งงานแบบไหน</strong> — วันเดียวก็ได้ หลายวันก็ส่ง progress ทุกวัน
         </p>
 
         <div className="assign-work__field">
@@ -185,7 +198,43 @@ export function ProjectBoard({
               ถึงวันที่
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </label>
-            <span className="project-form__days">รวม {days} วัน</span>
+            <span className="project-form__days">
+              รวม {days} วัน{days === 1 ? " (งานวันเดียว — ส่งครั้งเดียวจบ)" : ""}
+            </span>
+          </div>
+        </div>
+
+        <div className="assign-work__field">
+          <span className="assign-work__field-label">5. เดี่ยวหรือกลุ่ม · เวลา · วิธีส่งงาน</span>
+          <div className="assign-work__chips">
+            {(["single", "group"] as const).map((value) => (
+              <button
+                type="button"
+                key={value}
+                className={mode === value ? "assign-work__chip is-on" : "assign-work__chip"}
+                onClick={() => setMode(value)}
+              >
+                {MODE_LABEL[value]}{value === "group" ? " (ใครในทีมส่งก็นับ)" : " (คนที่รับผิดชอบส่งเอง)"}
+              </button>
+            ))}
+          </div>
+          <div className="assign-work__due-row">
+            <label>
+              เริ่มส่งได้ตั้งแต่
+              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} />
+            </label>
+            <label>
+              ต้องจบไม่เกิน
+              <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+            </label>
+            <label>
+              ส่งงานแบบไหน
+              <select value={answerKind} onChange={(e) => setAnswerKind(e.target.value as AnswerKind)}>
+                {ANSWER_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>{ANSWER_KIND_LABEL[kind]}</option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
@@ -196,16 +245,16 @@ export function ProjectBoard({
           onClick={submit}
           disabled={busy || !title.trim() || selectedCodes.length === 0}
         >
-          {busy ? "กำลังสร้าง…" : `สร้างโปรเจกต์${selectedCodes.length > 1 ? ` (${selectedCodes.length} คน)` : ""}`}
+          {busy ? "กำลังมอบหมาย…" : `มอบหมายงาน${selectedCodes.length > 1 ? ` (${selectedCodes.length} คน)` : ""}`}
         </button>
       </section>
 
       <section className="assign-work__list">
-        <p className="assign-work__label">โปรเจกต์ทั้งหมด</p>
+        <p className="assign-work__label">งานที่มอบหมายทั้งหมด</p>
         {loading ? (
           <p className="assign-work__empty">กำลังโหลด…</p>
         ) : rows.length === 0 ? (
-          <p className="assign-work__empty">ยังไม่มีโปรเจกต์</p>
+          <p className="assign-work__empty">ยังไม่มีงานที่มอบหมาย</p>
         ) : (
           <div className="project-list">
             {rows.map((project) => (
@@ -281,7 +330,10 @@ function ProjectRow({
             {project.assignees.map(displayNameFor).join(", ")}
           </em>
         </div>
-        <span className="project-card__status">{PROJECT_STATUS_LABEL[project.status]}</span>
+        <span className="project-card__status">
+          {MODE_LABEL[projectMode(project)]}
+          {isSingleDay(project) ? " · วันเดียว" : ""} · {PROJECT_STATUS_LABEL[project.status]}
+        </span>
       </div>
 
       {project.detail ? <p className="project-card__detail">{project.detail}</p> : null}
@@ -348,6 +400,20 @@ function ProjectRow({
             บันทึกคนที่รับผิดชอบ
           </button>
         ) : null}
+
+        <div className="assign-work__chips">
+          {(["single", "group"] as const).map((value) => (
+            <button
+              type="button"
+              key={value}
+              className={projectMode(project) === value ? "assign-work__chip is-on" : "assign-work__chip"}
+              disabled={busy}
+              onClick={() => run(() => setProjectMode(project.id, value))}
+            >
+              {MODE_LABEL[value]}
+            </button>
+          ))}
+        </div>
 
         <div className="assign-work__actions">
           {project.status === "active" ? (
