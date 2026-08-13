@@ -98,6 +98,11 @@ export default async function AdminHubPage() {
           badge: openWork ? { count: openWork, label: "ยังไม่ส่ง" } : undefined
         },
         {
+          href: "/admin/tasks",
+          title: "สั่งงานประจำ",
+          detail: "งานรายวัน/สัปดาห์/เดือน ที่เดียว — ลงวันไหน กะไหน เริ่มได้เมื่อไร จบไม่เกินเมื่อไร ส่งงานแบบไหน"
+        },
+        {
           href: "/admin/projects",
           title: "งานโปรเจกต์",
           detail: "งานหลายวัน — สั่งเป็นช่วงเวลา ดูความคืบหน้ารายวันเป็น % ยืดเวลา/เพิ่มคนช่วยได้"

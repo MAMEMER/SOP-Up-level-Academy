@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DashboardChecklistStatus } from "../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../components/DashboardTaskSections.tsx";
 import { MyProjects } from "../../components/MyProjects.tsx";
+import { TodayTaskList } from "../../components/TodayTaskList.tsx";
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
 import { TodayWorkBoard } from "../../components/TodayWorkBoard.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
@@ -66,6 +67,23 @@ export default async function HomePage() {
       </section>
 
       {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
+
+      {/* งานประจำของวันนี้ (รายวัน/สัปดาห์/เดือน รวมกัน) — เห็นตั้งแต่หน้าแรก ไม่ต้องไล่เปิดแท็บ */}
+      {staffCode ? (
+        <>
+          <section className="section-heading">
+            <p className="eyebrow">งานวันนี้</p>
+            <h3>งานประจำที่ครบกำหนดวันนี้</h3>
+          </section>
+          <TodayTaskList
+            branch={branch}
+            date={workDate}
+            shift={shiftToday === "s1" || shiftToday === "s2" ? shiftToday : null}
+            staffCode={staffCode}
+            readOnly={user.isImpersonating}
+          />
+        </>
+      ) : null}
 
       {/* งานโปรเจกต์ (หลายวัน) อยู่บนหน้าหลัก — ถ้าซ่อนอยู่ในเมนู พนักงานไม่เห็นและลืมลง progress
           ของวันนั้น ซึ่งเป็นทั้งงานเดียวที่ต้องแตะทุกวันและตัววัดว่าจะทันกำหนดไหม */}
