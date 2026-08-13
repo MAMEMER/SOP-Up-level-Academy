@@ -17,8 +17,10 @@ import {
 import {
   PROJECT_STATUS_LABEL,
   addDays,
-  assigneesMissingProgress,
+  progressAuthorsOn,
+  progressCount,
   sortProjects,
+  teamNeedsProgressToday,
   totalDays,
   validateProjectDraft,
   type WorkProject
@@ -244,7 +246,9 @@ function ProjectRow({
   const [assignees, setAssignees] = useState<string[]>(project.assignees);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const missing = assigneesMissingProgress(project, today);
+  const needsToday = teamNeedsProgressToday(project, today);
+  const todayCount = progressCount(project, today);
+  const totalCount = progressCount(project);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -285,11 +289,17 @@ function ProjectRow({
 
       <ProjectMeter project={project} today={today} />
 
-      {missing.length ? (
-        <p className="project-card__nudge">วันนี้ยังไม่อัปเดต: {missing.map(displayNameFor).join(", ")}</p>
+      {/* เป้าคือวันละอย่างน้อย 1 ครั้งจากใครก็ได้ในทีม — ไม่ใช่ทุกคนต้องลงของตัวเอง */}
+      {needsToday ? (
+        <p className="project-card__nudge">
+          วันนี้ยังไม่มีใครส่ง progress — ผู้รับผิดชอบ: {project.assignees.map(displayNameFor).join(", ")}
+        </p>
       ) : project.status === "active" ? (
-        <p className="project-card__done-today">วันนี้อัปเดตครบทุกคนแล้ว</p>
+        <p className="project-card__done-today">
+          วันนี้ส่งแล้ว {todayCount} ครั้ง · โดย {progressAuthorsOn(project, today).map(displayNameFor).join(", ")}
+        </p>
       ) : null}
+      <p className="project-card__count">อัปเดตทั้งหมด {totalCount} ครั้ง</p>
 
       <div className="project-card__controls">
         <div className="assign-work__due-row">

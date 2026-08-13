@@ -187,17 +187,25 @@ export function hasProgressOn(project: Pick<WorkProject, "progress">, date: stri
   return progressOnDate(project, date).some((entry) => !staffCode || entry.by === staffCode);
 }
 
-/** ใครยังไม่ได้ลง progress วันนี้ — ใช้เตือนทั้งเจ้าของและคนทำ */
-export function assigneesMissingProgress(project: WorkProject, today: string): string[] {
-  if (project.status !== "active") return [];
-  if (daysBetween(project.startDate, today) < 0) return [];
-  if (isOverdue(project, today)) return [];
-  return project.assignees.filter((code) => !hasProgressOn(project, today, code));
+/** ใครอัปเดตในวันนั้นบ้าง (ไม่ซ้ำ เรียงตามที่ลงก่อน-หลัง) */
+export function progressAuthorsOn(project: Pick<WorkProject, "progress">, date: string): string[] {
+  return Array.from(new Set(progressOnDate(project, date).map((entry) => entry.by)));
 }
 
-/** ต้องเตือนคนนี้ให้ลง progress วันนี้ไหม */
-export function needsProgressToday(project: WorkProject, today: string, staffCode: string): boolean {
-  return assigneesMissingProgress(project, today).includes(staffCode);
+/** อัปเดตไปกี่ครั้งแล้ว — ทั้งโปรเจกต์ หรือเฉพาะวันที่ระบุ */
+export function progressCount(project: Pick<WorkProject, "progress">, date?: string): number {
+  return date ? progressOnDate(project, date).length : (project.progress || []).length;
+}
+
+/**
+ * ทีมต้องลง progress ของวันนี้ไหม — เป้าหมายคือ **วันละอย่างน้อย 1 ครั้ง จากใครก็ได้ในทีม**
+ * ไม่ใช่ทุกคนต้องลงของตัวเอง. มีคนลงแล้วถือว่าวันนี้ครบ (คนอื่นจะลงเพิ่มอีกกี่ครั้งก็ได้).
+ * ยังเตือนต่อแม้เลยกำหนดแล้ว ตราบใดที่งานยังไม่ปิด — งานที่ค้างคือเรื่องที่ต้องรู้ยิ่งกว่าเดิม.
+ */
+export function teamNeedsProgressToday(project: WorkProject, today: string): boolean {
+  if (project.status !== "active") return false;
+  if (daysBetween(project.startDate, today) < 0) return false;
+  return !hasProgressOn(project, today);
 }
 
 /** หนึ่งช่องของไทม์ไลน์รายวัน — ให้เห็นว่าวันไหนทำ วันไหนเงียบ */
