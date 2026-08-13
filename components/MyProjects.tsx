@@ -34,6 +34,7 @@ export function MyProjects({
 }) {
   const [projects, setProjects] = useState<WorkProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -44,8 +45,11 @@ export function MyProjects({
     setLoading(true);
     try {
       setProjects(sortProjects(await fetchProjectsForStaff(branch, staffCode)));
+      setLoadError(null);
     } catch {
+      // เดิมกลืน error แล้วโชว์ "ยังไม่มีงาน" — งานที่สั่งมาแล้วหายไปเงียบๆ แยกไม่ออกจาก "ไม่มีงานจริงๆ"
       setProjects([]);
+      setLoadError("โหลดงานโปรเจกต์ไม่สำเร็จ — ลองรีเฟรชอีกครั้ง ถ้ายังไม่ขึ้นแจ้งแอดมิน");
     } finally {
       setLoading(false);
     }
@@ -57,6 +61,7 @@ export function MyProjects({
 
   if (!staffCode) return <p className="assign-work__empty">บัญชีนี้ยังไม่ผูกกับรหัสพนักงาน — ยังไม่มีโปรเจกต์</p>;
   if (loading) return <p className="assign-work__empty">กำลังโหลด…</p>;
+  if (loadError) return <p className="project-progress-form__error">{loadError}</p>;
   if (projects.length === 0) return <p className="assign-work__empty">ยังไม่มีงานแบบโปรเจกต์ที่มอบหมายให้คุณ</p>;
 
   return (
