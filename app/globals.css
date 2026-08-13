@@ -4135,9 +4135,10 @@ input:focus, select:focus, textarea:focus {
   }
   .sidebar section { width: 100%; min-width: 0; }
   .sidebar-label { margin: 6px 2px 2px; }
+  /* เมนูงานจัดการยาวขึ้นเรื่อยๆ ตามฟีเจอร์ที่เพิ่ม — แถบเลื่อนแนวนอนทำให้เมนูท้ายๆ
+     (เช่น "จัดการพนักงาน") ตกขอบจอจนหาไม่เจอ. ให้ตัดบรรทัดลงมาแทน เห็นครบทุกอันในจอเดียว */
   .nav-list {
-    display: flex; flex-direction: row; flex-wrap: nowrap; gap: 8px;
-    overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; padding-bottom: 4px;
   }
   .nav-list::-webkit-scrollbar { display: none; }
   .nav-list a {
