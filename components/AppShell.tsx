@@ -23,7 +23,7 @@ const staffLinks = mainLinks;
 const adminLinks = [
   { href: "/admin", label: "หน้ารวมงานจัดการ" },
   { href: "/admin/schedule", label: "ตารางกะ" },
-  { href: "/admin/assign", label: "มอบหมายงาน" },
+  { href: "/admin/assign", label: "มอบหมายงานรายวัน (แบบเดิม)" },
   { href: "/admin/projects", label: "มอบหมายงาน (เดี่ยว/กลุ่ม)" },
   { href: "/admin/tasks", label: "สั่งงานประจำ" },
   { href: "/admin/calendar", label: "ปฏิทินสั่งงาน" },
