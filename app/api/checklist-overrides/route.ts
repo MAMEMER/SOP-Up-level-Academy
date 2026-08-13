@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { actor, badRequest, canWriteNow, db, forbidden, isAdmin, readOnly } from "../../../lib/api-firestore.ts";
 import {
   CHECKLIST_SCOPES,
-  emptyChecklistOverrides,
-  normalizeChecklistOverrides,
-  type ChecklistOverrides,
-  type ChecklistScope
+  emptyChecklistScopeConfig,
+  normalizeScopeConfig,
+  type ChecklistScope,
+  type ChecklistScopeConfig
 } from "../../../lib/checklist-overrides.ts";
 
 // Server route for the owner-edited WEEKLY / MONTHLY checklist overrides. Mirrors the daily
@@ -27,13 +27,17 @@ export async function GET(request: Request) {
   if (!scope) return badRequest("bad_scope");
   try {
     const snap = await db().collection(COLLECTION).doc(scope).get();
-    if (!snap.exists) return NextResponse.json({ overrides: emptyChecklistOverrides, updatedAt: null, updatedBy: null });
+    if (!snap.exists) {
+      return NextResponse.json({ ...emptyChecklistScopeConfig, updatedAt: null, updatedBy: null });
+    }
     const data = snap.data() as Record<string, unknown>;
-    const overrides = (data.overrides as ChecklistOverrides) ?? {};
+    // order / hidden / customUnits arrived with the "same format as Daily" editor — a doc saved
+    // before them simply has none, and normalizeScopeConfig fills the blanks.
+    const config = normalizeScopeConfig(data as Partial<ChecklistScopeConfig>);
     // Surface when/who last saved so the editor can show a "แก้ไขล่าสุด" line, mirroring the daily
     // config route (older docs written before these fields existed simply return null).
     return NextResponse.json({
-      overrides,
+      ...config,
       updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
       updatedBy: typeof data.updatedBy === "string" ? data.updatedBy : null
     });
@@ -48,14 +52,14 @@ export async function POST(request: Request) {
   if (!isAdmin(user)) return forbidden();
 
   const body = (await request.json().catch(() => null)) as
-    | { scope?: string; overrides?: ChecklistOverrides }
+    | ({ scope?: string } & Partial<ChecklistScopeConfig>)
     | null;
   const scope = body && (CHECKLIST_SCOPES as string[]).includes(body.scope || "") ? (body.scope as ChecklistScope) : null;
   if (!scope || !body || typeof body.overrides !== "object" || body.overrides === null) return badRequest("bad_request");
 
   const record = {
     scope,
-    overrides: normalizeChecklistOverrides(body.overrides),
+    ...normalizeScopeConfig(body),
     updatedAt: new Date().toISOString(),
     updatedBy: user.actualEmail
   };

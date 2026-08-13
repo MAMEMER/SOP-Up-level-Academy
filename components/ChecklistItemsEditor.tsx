@@ -2,29 +2,33 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  customUnitId,
+  moveUnitItem,
   normalizeItemEvidence,
   normalizeOverrideItem,
+  orderedUnitIds,
   type ChecklistScope,
-  type ChecklistOverrides,
+  type ChecklistScopeConfig,
+  type CustomUnit,
   type EvidenceKind,
   type ItemEvidence,
   type OverrideItem,
   type UnitOverride
 } from "../lib/checklist-overrides.ts";
 import {
-  fetchChecklistOverridesWithMeta,
+  fetchChecklistConfigWithMeta,
   saveChecklistOverrides,
   type ChecklistOverridesMeta
 } from "../lib/checklist-overrides-store.ts";
 import { formatEditedAt } from "../lib/daily-checklist.ts";
 import { firstInvalidLink, linkHostname, type ItemLink } from "../lib/checklist-links.ts";
 
-// Owner editor for a WEEKLY or MONTHLY checklist scope. Simpler sibling of DailyChecklistEditor:
-// it edits the tick items (add / reword / delete / reorder) of each block, plus the block title
-// and goal where that makes sense. Reuses the daily editor's CSS so it matches the theme. Saves
-// the whole scope back to Firestore; the staff checklist page picks the changes up on reload.
+// Owner editor for a WEEKLY or MONTHLY checklist scope. Now the same format as the Daily editor
+// (DailyChecklistEditor): every หัวข้อ can be renamed, reordered, switched off or (for the owner's
+// own) deleted, รายการ ย้ายข้ามหัวข้อได้ และตั้งหลักฐาน/รายละเอียด/ลิงก์ ได้ทุกรายการ. Saves the
+// whole scope back to Firestore; staff pages pick the changes up on reload.
 
-/** One editable checklist block on the page (a stock phase, or one event's checklist). */
+/** One editable checklist block on the page (a stock phase, one event's checklist, or a custom one). */
 export type EditableUnit = {
   id: string;
   /** fixed label above the block (e.g. the event name) */
@@ -54,6 +58,13 @@ export type EditableUnit = {
   editEvidence?: boolean;
   /** built-in tick items, used as the starting point */
   baseItems: OverrideItem[];
+  /** true for a หัวข้อ the owner added here (deletable, always renameable) */
+  isCustom?: boolean;
+  /**
+   * ปิดหัวข้อได้ไหม — ปิดไว้สำหรับ block ที่หน้าพนักงานแสดงเสมอ (เช่น รอบตรวจนับ Stock ที่แอดมิน
+   * เป็นคนสั่งเปิดรอบเอง) เพื่อไม่ให้มีปุ่มที่กดแล้วไม่เกิดอะไรขึ้น
+   */
+  canHide?: boolean;
 };
 
 type UnitDraft = { title: string; goal: string; timeLabel: string; shiftLabel: string; items: OverrideItem[] };
@@ -86,8 +97,26 @@ function sameItems(a: OverrideItem[], b: OverrideItem[]): boolean {
   );
 }
 
-export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; units: EditableUnit[] }) {
+export function ChecklistItemsEditor({
+  scope,
+  units,
+  allowCustomUnits = false,
+  allowUnitOrdering = true,
+  customUnitHint
+}: {
+  scope: ChecklistScope;
+  units: EditableUnit[];
+  /** show the "เพิ่มหัวข้อใหญ่" box — on where the staff page renders owner-added หัวข้อ */
+  allowCustomUnits?: boolean;
+  /** สลับลำดับหัวข้อได้ไหม — ปิดสำหรับ scope ที่หน้าพนักงานเรียงเองอยู่แล้ว (เช่น วันจัดกิจกรรม) */
+  allowUnitOrdering?: boolean;
+  customUnitHint?: string;
+}) {
   const [draft, setDraft] = useState<Record<string, UnitDraft>>({});
+  const [customUnits, setCustomUnits] = useState<CustomUnit[]>([]);
+  const [order, setOrder] = useState<string[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [newUnitTitle, setNewUnitTitle] = useState("");
   const [meta, setMeta] = useState<ChecklistOverridesMeta>({ updatedAt: null, updatedBy: null });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
@@ -96,10 +125,11 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
   const editedAt = formatEditedAt(meta.updatedAt);
 
   const seed = useMemo(() => {
-    return (overrides: ChecklistOverrides): Record<string, UnitDraft> => {
+    return (config: ChecklistScopeConfig): Record<string, UnitDraft> => {
       const out: Record<string, UnitDraft> = {};
-      for (const unit of units) {
-        const ov = overrides[unit.id] || {};
+      const all: EditableUnit[] = [...units, ...config.customUnits.map(customToEditable)];
+      for (const unit of all) {
+        const ov = config.overrides[unit.id] || {};
         out[unit.id] = {
           title: ov.title ?? unit.baseTitle ?? "",
           goal: ov.goal ?? unit.baseGoal ?? "",
@@ -115,21 +145,85 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchChecklistOverridesWithMeta(scope)
+    fetchChecklistConfigWithMeta(scope)
       .then((data) => {
         if (!alive) return;
-        setDraft(seed(data.overrides));
+        setDraft(seed(data.config));
+        setCustomUnits(data.config.customUnits);
+        setOrder(orderedUnitIds(units.map((unit) => unit.id), data.config));
+        setHidden(data.config.hidden);
         setMeta(data.meta);
       })
-      .catch(() => alive && setDraft(seed({})))
+      .catch(() => {
+        if (!alive) return;
+        setDraft(seed({ overrides: {}, order: [], hidden: [], customUnits: [] }));
+        setOrder(units.map((unit) => unit.id));
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [scope, seed]);
+  }, [scope, seed, units]);
+
+  /** A หัวข้อ the owner added behaves like a built-in one that starts empty. */
+  function customToEditable(unit: CustomUnit): EditableUnit {
+    return {
+      id: unit.id,
+      heading: unit.title,
+      editTitle: true,
+      baseTitle: unit.title,
+      editEvidence: true,
+      baseItems: [],
+      isCustom: true
+    };
+  }
+
+  const allUnits: EditableUnit[] = [...units, ...customUnits.map(customToEditable)];
+  const orderedUnits: EditableUnit[] = order
+    .map((id) => allUnits.find((unit) => unit.id === id))
+    .filter((unit): unit is EditableUnit => Boolean(unit));
+
+  const titleOf = (unit: EditableUnit) => (draft[unit.id]?.title || "").trim() || unit.heading;
+  const isHidden = (unitId: string) => hidden.includes(unitId);
 
   function updateUnit(unitId: string, patch: Partial<UnitDraft>) {
     setDraft((prev) => ({ ...prev, [unitId]: { ...prev[unitId], ...patch } }));
+  }
+
+  function moveUnit(unitId: string, direction: -1 | 1) {
+    setOrder((prev) => {
+      const next = [...prev];
+      const index = next.indexOf(unitId);
+      const target = index + direction;
+      if (index === -1 || target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  /** Built-in หัวข้อ cannot be deleted (they live in code) — they are switched off instead. */
+  function toggleHidden(unitId: string) {
+    setHidden((prev) => (prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]));
+  }
+
+  function addCustomUnit(title: string) {
+    const clean = title.trim();
+    if (!clean) return;
+    const id = customUnitId(clean, allUnits.map((unit) => unit.id));
+    setCustomUnits((prev) => [...prev, { id, title: clean }]);
+    setDraft((prev) => ({ ...prev, [id]: { title: clean, goal: "", timeLabel: "", shiftLabel: "", items: [] } }));
+    setOrder((prev) => [...prev, id]);
+    setNewUnitTitle("");
+  }
+
+  function removeCustomUnit(unitId: string) {
+    setCustomUnits((prev) => prev.filter((unit) => unit.id !== unitId));
+    setOrder((prev) => prev.filter((id) => id !== unitId));
+    setHidden((prev) => prev.filter((id) => id !== unitId));
+    setDraft((prev) => {
+      const { [unitId]: _dropped, ...rest } = prev;
+      return rest;
+    });
   }
 
   function updateItem(unitId: string, index: number, value: string) {
@@ -196,6 +290,21 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
     });
   }
 
+  /** ย้ายรายการไปต่อท้ายหัวข้ออื่น — ปุ่ม "ย้ายไป…" แบบเดียวกับหน้า Daily */
+  function moveItemToUnit(unitId: string, index: number, toUnitId: string) {
+    if (!toUnitId || toUnitId === unitId) return;
+    setDraft((prev) => {
+      const itemsByUnit: Record<string, OverrideItem[]> = {};
+      for (const [id, unitDraft] of Object.entries(prev)) itemsByUnit[id] = unitDraft.items;
+      const moved = moveUnitItem(itemsByUnit, { unitId, index }, toUnitId);
+      return {
+        ...prev,
+        [unitId]: { ...prev[unitId], items: moved[unitId] },
+        [toUnitId]: { ...prev[toUnitId], items: moved[toUnitId] }
+      };
+    });
+  }
+
   function removeItem(unitId: string, index: number) {
     setDraft((prev) => ({
       ...prev,
@@ -213,10 +322,8 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
   }
 
   async function save() {
-    // Persist only what the owner actually changed, so an untouched block keeps falling back to
-    // its built-in value (and future edits in code still reach staff).
     // Refuse a bad link before persisting — a staffer must never tap a button that goes nowhere.
-    for (const unit of units) {
+    for (const unit of orderedUnits) {
       const d = draft[unit.id];
       if (!d) continue;
       for (const item of d.items) {
@@ -228,24 +335,36 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
       }
     }
 
-    const overrides: ChecklistOverrides = {};
-    for (const unit of units) {
+    // Persist only what the owner actually changed on a BUILT-IN block, so an untouched one keeps
+    // falling back to its built-in value (and future edits in code still reach staff). A หัวข้อ the
+    // owner added has no built-in to fall back to — its fields are always written.
+    const overrides: Record<string, UnitOverride> = {};
+    for (const unit of orderedUnits) {
       const d = draft[unit.id];
       if (!d) continue;
       const ov: UnitOverride = {};
-      if (unit.editTitle && d.title.trim() && d.title.trim() !== (unit.baseTitle || "").trim()) ov.title = d.title.trim();
-      if (unit.editGoal && d.goal.trim() && d.goal.trim() !== (unit.baseGoal || "").trim()) ov.goal = d.goal.trim();
-      if (unit.editTime && d.timeLabel.trim() && d.timeLabel.trim() !== (unit.baseTimeLabel || "").trim()) ov.timeLabel = d.timeLabel.trim();
-      if (unit.editShift && d.shiftLabel.trim() && d.shiftLabel.trim() !== (unit.baseShiftLabel || "").trim()) ov.shiftLabel = d.shiftLabel.trim();
+      const changed = (value: string, base: string | undefined) => value.trim() && value.trim() !== (base || "").trim();
+      if ((unit.editTitle && changed(d.title, unit.baseTitle)) || (unit.isCustom && d.title.trim())) ov.title = d.title.trim();
+      if (unit.editGoal && changed(d.goal, unit.baseGoal)) ov.goal = d.goal.trim();
+      if (unit.editTime && changed(d.timeLabel, unit.baseTimeLabel)) ov.timeLabel = d.timeLabel.trim();
+      if (unit.editShift && changed(d.shiftLabel, unit.baseShiftLabel)) ov.shiftLabel = d.shiftLabel.trim();
       // normalizeOverrideItem trims the title and attaches the item's cleaned note + valid links.
       const cleanItems = d.items.map((item, index) => normalizeOverrideItem(item, index)).filter((item) => item.title);
-      if (!sameItems(cleanItems, unit.baseItems)) ov.items = cleanItems;
+      if (unit.isCustom || !sameItems(cleanItems, unit.baseItems)) ov.items = cleanItems;
       if (Object.keys(ov).length) overrides[unit.id] = ov;
     }
 
     setStatus("กำลังบันทึก…");
     try {
-      const saved = await saveChecklistOverrides({ scope, overrides });
+      const saved = await saveChecklistOverrides({
+        scope,
+        config: {
+          overrides,
+          order: orderedUnits.map((unit) => unit.id),
+          hidden: hidden.filter((id) => allUnits.some((unit) => unit.id === id)),
+          customUnits: customUnits.map((unit) => ({ ...unit, title: (draft[unit.id]?.title || unit.title).trim() }))
+        }
+      });
       // Reflect the server-stamped time/editor immediately so "แก้ไขล่าสุด" is current without a reload.
       setMeta({ updatedAt: saved.updatedAt ?? meta.updatedAt, updatedBy: saved.updatedBy ?? meta.updatedBy });
       setStatus("บันทึกแล้ว — checklist ของ staff อัปเดตแล้ว");
@@ -255,7 +374,7 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
   }
 
   function resetUnit(unitId: string) {
-    const unit = units.find((item) => item.id === unitId);
+    const unit = allUnits.find((item) => item.id === unitId);
     if (!unit) return;
     updateUnit(unitId, {
       title: unit.baseTitle ?? "",
@@ -277,17 +396,40 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
           "ยังไม่เคยบันทึก — แก้แล้วกดบันทึกทั้งหมด ระบบจะจำค่าล่าสุดไว้จนกว่าจะแก้ใหม่"
         )}
       </p>
-      {units.map((unit) => {
+      {orderedUnits.map((unit, unitIndex) => {
         const d = draft[unit.id];
         if (!d) return null;
         return (
-          <section key={unit.id} className="checklist-config__phase soft-card">
+          <section key={unit.id} className={`checklist-config__phase soft-card${isHidden(unit.id) ? " is-hidden" : ""}`}>
             <div className="checklist-config__phase-head">
               <strong>{unit.heading}</strong>
               <div className="checklist-config__move">
+                {allowUnitOrdering ? (
+                  <>
+                    <button type="button" onClick={() => moveUnit(unit.id, -1)} disabled={unitIndex === 0} aria-label="เลื่อนขึ้น">↑</button>
+                    <button
+                      type="button"
+                      onClick={() => moveUnit(unit.id, 1)}
+                      disabled={unitIndex === orderedUnits.length - 1}
+                      aria-label="เลื่อนลง"
+                    >
+                      ↓
+                    </button>
+                  </>
+                ) : null}
+                {unit.isCustom ? (
+                  <button type="button" onClick={() => removeCustomUnit(unit.id)} aria-label="ลบหัวข้อใหญ่">ลบ</button>
+                ) : unit.canHide === false ? null : (
+                  <button type="button" onClick={() => toggleHidden(unit.id)}>
+                    {isHidden(unit.id) ? "เปิดใช้" : "ปิดหัวข้อนี้"}
+                  </button>
+                )}
                 <button type="button" onClick={() => resetUnit(unit.id)}>คืนค่าเริ่มต้น</button>
               </div>
             </div>
+            {isHidden(unit.id) ? (
+              <p className="checklist-config__hint">ปิดอยู่ — พนักงานไม่เห็นหัวข้อนี้ และไม่ต้องทำ</p>
+            ) : null}
             {unit.note ? <p className="checklist-config__hint">{unit.note}</p> : null}
 
             {unit.editTitle ? (
@@ -352,6 +494,21 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
                     <button type="button" onClick={() => moveItem(unit.id, index, -1)} disabled={index === 0} aria-label="เลื่อนขึ้น">↑</button>
                     <button type="button" onClick={() => moveItem(unit.id, index, 1)} disabled={index === items.length - 1} aria-label="เลื่อนลง">↓</button>
                   </div>
+                  {/* ย้ายข้ามหัวข้อใหญ่: เลือกปลายทางแล้วรายการเด้งไปต่อท้ายหัวข้อนั้นทันที */}
+                  {orderedUnits.length > 1 ? (
+                    <select
+                      value=""
+                      onChange={(e) => moveItemToUnit(unit.id, index, e.target.value)}
+                      aria-label="ย้ายไปหัวข้ออื่น"
+                    >
+                      <option value="">ย้ายไป…</option>
+                      {orderedUnits
+                        .filter((target) => target.id !== unit.id)
+                        .map((target) => (
+                          <option key={target.id} value={target.id}>{titleOf(target)}</option>
+                        ))}
+                    </select>
+                  ) : null}
                   <button type="button" onClick={() => removeItem(unit.id, index)} aria-label="ลบ">✕</button>
                   {/* หลักฐานที่บังคับให้พนักงานแนบตอนทำรายการนี้ (รูป/ลิงก์) — เหมือนหน้า Daily */}
                   {showEvidence ? (
@@ -433,6 +590,26 @@ export function ChecklistItemsEditor({ scope, units }: { scope: ChecklistScope; 
           </section>
         );
       })}
+
+      {allowCustomUnits ? (
+        <section className="checklist-config__phase soft-card">
+          <div className="checklist-config__phase-head">
+            <strong>เพิ่มหัวข้อใหญ่</strong>
+          </div>
+          <p className="checklist-config__hint">
+            {customUnitHint ||
+              "หัวข้อที่เพิ่มเองเป็นรายการติ๊ก · ตั้งให้แต่ละรายการต้องแนบหลักฐาน (รูปภาพ/ลิงก์) ได้ · ย้ายรายการเดิมเข้ามาได้ด้วยปุ่ม “ย้ายไป…”"}
+          </p>
+          <div className="checklist-config__new-phase">
+            <input
+              value={newUnitTitle}
+              onChange={(e) => setNewUnitTitle(e.target.value)}
+              placeholder="ชื่อหัวข้อใหญ่ เช่น งานทำความสะอาดใหญ่"
+            />
+            <button type="button" className="checklist-config__add" onClick={() => addCustomUnit(newUnitTitle)}>+ เพิ่มหัวข้อ</button>
+          </div>
+        </section>
+      ) : null}
 
       <div className="checklist-config__bar">
         <button type="button" className="primary-action" onClick={save}>บันทึกทั้งหมด</button>

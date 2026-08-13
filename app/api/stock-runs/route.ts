@@ -4,6 +4,12 @@ import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
 import { weeklyStockSleevePhase } from "../../../lib/weekly-stock-workflow.ts";
 import { monthlyStockSinglePhase } from "../../../lib/monthly-stock-single-workflow.ts";
 import {
+  applyStringPhaseOverride,
+  normalizeScopeConfig,
+  type ChecklistScope,
+  type ChecklistScopeConfig
+} from "../../../lib/checklist-overrides.ts";
+import {
   appendApproval,
   buildStockRun,
   canSubmitStockRun,
@@ -24,10 +30,25 @@ import {
 
 export const dynamic = "force-dynamic";
 const RUNS = "stock_runs";
+const CHECKLIST_OVERRIDES = "sop_checklist_overrides";
 
-function snapshotFor(kind: StockRunKind) {
+/**
+ * Checklist snapshot for a new Run. Reads the owner's edits first (/admin/checklist-config/
+ * weekly|monthly) — before this, a Run always snapshotted the built-in list, so editing the
+ * weekly/monthly checklist changed nothing for staff. Falls back to the built-in phase when
+ * nothing is saved or the read fails, so a Run never starts without its checklist.
+ */
+async function snapshotFor(kind: StockRunKind) {
   const phase = kind === "weekly" ? weeklyStockSleevePhase : monthlyStockSinglePhase;
-  return { title: phase.title, items: [...phase.checklist] };
+  const scope: ChecklistScope = kind === "weekly" ? "weekly-stock" : "monthly-stock";
+  try {
+    const snap = await db().collection(CHECKLIST_OVERRIDES).doc(scope).get();
+    const config = normalizeScopeConfig((snap.exists ? snap.data() : {}) as Partial<ChecklistScopeConfig>);
+    const applied = applyStringPhaseOverride(phase, config.overrides[phase.id]);
+    return { title: applied.title, items: [...applied.checklist] };
+  } catch {
+    return { title: phase.title, items: [...phase.checklist] };
+  }
 }
 
 function newId(kind: string, staff: string, iso: string): string {
@@ -149,7 +170,7 @@ export async function POST(request: Request) {
           assignedBy: user.actualEmail,
           periodLabel,
           dueDate: str(body.dueDate),
-          checklist: snapshotFor(kind),
+          checklist: await snapshotFor(kind),
           createdAt: nowIso
         });
         await db().collection(RUNS).doc(id).set(run);
@@ -175,7 +196,7 @@ export async function POST(request: Request) {
             assignedBy: user.actualEmail,
             periodLabel,
             dueDate: str(body.dueDate),
-            checklist: snapshotFor(kind),
+            checklist: await snapshotFor(kind),
             createdAt: nowIso
           }),
           status: "in_progress",

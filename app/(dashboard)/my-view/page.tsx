@@ -18,6 +18,7 @@ import { resolveStaffViewSelection } from "../../../lib/staff-view.ts";
 import { StaffScoreCard } from "../../../components/StaffScoreCard.tsx";
 import { MyShiftToday } from "../../../components/MyShiftToday.tsx";
 import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
+import { MyProjects } from "../../../components/MyProjects.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
 import { fetchPerformanceDailyStore } from "../../../lib/performance-daily-store.ts";
@@ -116,6 +117,13 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       <MyShiftToday staffCode={selectedCode} branch={branch} workDate={workDate} />
 
       <MyAssignedWork staffCode={selectedCode} branch={branch} workDate={workDate} />
+
+      {/* งานโปรเจกต์ (หลายวัน) — ขึ้นตรงนี้ด้วยเพื่อเตือนให้ลง progress ของวันนี้ก่อนกลับ */}
+      <section className="section-heading">
+        <p className="eyebrow">งานโปรเจกต์</p>
+        <h3>งานหลายวันที่ต้องอัปเดตทุกวัน</h3>
+      </section>
+      <MyProjects branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} />
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
       <DashboardTaskSections
