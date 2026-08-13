@@ -12,7 +12,8 @@ import { assignedWorkRecordsForDate } from "../../lib/performance-service-record
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assigned-work-feed.ts";
 import { DeliveryOrdersBoard } from "../../components/DeliveryOrdersBoard.tsx";
 import { fetchShiftForStaff, syncDeliveryTasks } from "../../lib/delivery-tasks-server.ts";
-import { deliveryTaskVisibleTo, sortDeliveryTasks } from "../../lib/delivery-tasks.ts";
+import { deliveryTaskState, deliveryTaskVisibleTo, sortDeliveryTasks } from "../../lib/delivery-tasks.ts";
+import { TodaySummary } from "../../components/TodaySummary.tsx";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
 import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../../lib/performance-daily-store.ts";
@@ -66,12 +67,23 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* บนสุด: รวมทุกกองของวันนี้ไว้ที่เดียว ก่อนจะเลื่อนลงไปทำทีละบล็อก */}
+      <TodaySummary
+        phases={cardStoreWorkflow}
+        branch={branch}
+        workDate={workDate}
+        shift={shiftToday === "s1" || shiftToday === "s2" ? shiftToday : null}
+        staffCode={staffCode ?? null}
+        assignedRemaining={assignedWorkFeed.filter((item) => item.statusClass !== "workflow-status-green").length}
+        deliveryRemaining={deliveryTasks.filter((task) => deliveryTaskState(task, workDate) !== "done").length}
+      />
+
       {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
 
       {/* งานประจำของวันนี้ (รายวัน/สัปดาห์/เดือน รวมกัน) — เห็นตั้งแต่หน้าแรก ไม่ต้องไล่เปิดแท็บ */}
       {staffCode ? (
         <>
-          <section className="section-heading">
+          <section className="section-heading" id="today-tasks">
             <p className="eyebrow">งานวันนี้</p>
             <h3>งานประจำที่ครบกำหนดวันนี้</h3>
           </section>
@@ -89,7 +101,7 @@ export default async function HomePage() {
           ของวันนั้น ซึ่งเป็นทั้งงานเดียวที่ต้องแตะทุกวันและตัววัดว่าจะทันกำหนดไหม */}
       {staffCode || user.role === "admin" ? (
         <>
-          <section className="section-heading">
+          <section className="section-heading" id="assigned-work">
             <p className="eyebrow">งานที่มอบหมาย</p>
             <h3>งานที่มอบหมายให้ฉัน (เดี่ยว / กลุ่ม)</h3>
           </section>
@@ -114,6 +126,7 @@ export default async function HomePage() {
         branch={branch}
       />
 
+      <div id="delivery" />
       <DeliveryOrdersBoard
         branch={branch}
         initialTasks={deliveryTasks}
