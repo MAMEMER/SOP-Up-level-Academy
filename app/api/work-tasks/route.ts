@@ -11,6 +11,9 @@ import { actor, badRequest, canWriteNow, db, forbidden, isAdmin, readOnly } from
 export const dynamic = "force-dynamic";
 const ASSIGNMENTS = "work_assignments";
 const HANDOFFS = "work_handoffs";
+// เท่ากับ MAX_ASSIGNMENT_PROGRESS ใน lib/work-assignments-store.ts — ไฟล์นั้นเป็น "use client"
+// จึง import ข้ามมาที่ route ฝั่ง server ไม่ได้ (ดูหมายเหตุใน lib/work-assignments-server.ts)
+const MAX_ASSIGNMENT_PROGRESS = 50;
 
 function newId(prefix: string, ...parts: string[]): string {
   return `${prefix}__${parts.join("__").replace(/\s+/g, "-").slice(0, 120)}`;
@@ -131,6 +134,49 @@ export async function POST(request: Request) {
           submittedAt: nowIso,
           revisionNote: ""
         });
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── staff reports progress without closing the job (own assignment or admin) ──
+      // งานที่ยังทำไม่เสร็จก็รายงานได้ — ไม่แตะ status เพราะยังไม่ใช่การส่งงาน
+      case "addAssignmentProgress": {
+        const id = str(body.id);
+        if (!id) return badRequest("missing_id");
+        const ref = db().collection(ASSIGNMENTS).doc(id);
+        const snap = await ref.get();
+        if (!snap.exists) return badRequest("not_found");
+        const current = snap.data() as { staffCode?: string; status?: string; progress?: unknown };
+        if (!isAdmin(user) && str(current.staffCode) !== staffCode) return forbidden();
+        if (current.status === "done") return badRequest("งานนี้ปิดแล้ว อัปเดตเพิ่มไม่ได้");
+        const note = str(body.note).trim();
+        if (!note) return badRequest("เขียนสั้นๆ ว่าตอนนี้ทำถึงไหนแล้ว");
+        const images = strArr(body.images).filter((url) => url.trim().length > 0);
+        const existing = Array.isArray(current.progress) ? (current.progress as Record<string, unknown>[]) : [];
+        const entry = {
+          id: newId("ap", id, nowIso),
+          at: nowIso,
+          by: staffCode || user.actualEmail,
+          note,
+          ...(images.length ? { images } : {})
+        };
+        await ref.update({
+          progress: [...existing, entry].slice(-MAX_ASSIGNMENT_PROGRESS),
+          lastProgressAt: nowIso
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      case "deleteAssignmentProgress": {
+        const id = str(body.id);
+        const progressId = str(body.progressId);
+        if (!id || !progressId) return badRequest("missing_params");
+        const ref = db().collection(ASSIGNMENTS).doc(id);
+        const snap = await ref.get();
+        if (!snap.exists) return badRequest("not_found");
+        const current = snap.data() as { staffCode?: string; progress?: unknown };
+        if (!isAdmin(user) && str(current.staffCode) !== staffCode) return forbidden();
+        const existing = Array.isArray(current.progress) ? (current.progress as { id?: string }[]) : [];
+        await ref.update({ progress: existing.filter((entry) => entry?.id !== progressId) });
         return NextResponse.json({ ok: true });
       }
 

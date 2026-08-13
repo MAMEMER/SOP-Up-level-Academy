@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchAssignmentsForStaff, type WorkAssignment } from "../lib/work-assignments-store.ts";
+import { fetchAssignmentsForStaff, latestProgress, type WorkAssignment } from "../lib/work-assignments-store.ts";
 import {
   assignmentStatusClass,
   assignmentStatusLabel,
@@ -48,7 +48,9 @@ export function MyAssignedWork({
           {label} ({items.length})
         </p>
         <div className="daily-phase-grid">
-          {items.map((item, index) => (
+          {items.map((item, index) => {
+            const last = latestProgress(item);
+            return (
             <Link
               key={item.id}
               href={`/assigned-work/task/${encodeURIComponent(item.id)}`}
@@ -64,9 +66,16 @@ export function MyAssignedWork({
                 {item.status === "needs_revision" && item.revisionNote ? (
                   <em>ต้องแก้: {item.revisionNote}</em>
                 ) : null}
+                {/* บอกให้เห็นตั้งแต่การ์ดว่าอัปเดตล่าสุดคืออะไร จะได้ไม่ต้องเปิดทีละงาน */}
+                {last ? (
+                  <em>อัปเดตล่าสุด: {last.note}{last.images?.length ? ` · ${last.images.length} รูป` : ""}</em>
+                ) : item.status === "open" ? (
+                  <em>ยังไม่ได้อัปเดตความคืบหน้า — เปิดงานแล้วกดอัปเดตได้เลย</em>
+                ) : null}
               </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
       </div>
     );

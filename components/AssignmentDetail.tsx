@@ -5,8 +5,11 @@ import Link from "next/link";
 import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { assignmentStatusClass, assignmentStatusLabel } from "../lib/assignment-view.ts";
+import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import {
   acceptAssignment,
+  addAssignmentProgress,
+  deleteAssignmentProgress,
   fetchAssignmentById,
   requestAssignmentRevision,
   submitAssignment,
@@ -15,6 +18,26 @@ import {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+const isImageUrl = (u: string) => /^https?:\/\/\S+\.(png|jpe?g|gif|webp|heic)/i.test(u) || /firebasestorage/.test(u);
+
+/** ชื่อคนอัปเดต — แอดมินที่ไม่มีรหัสพนักงานจะถูกบันทึกเป็นอีเมล อย่าโชว์ทั้งอีเมล */
+function authorLabel(by: string): string {
+  return by.includes("@") ? by.split("@")[0] : displayNameFor(by);
+}
+
+/** เวลาไทยแบบอ่านง่ายจาก ISO — ใช้กับไทม์ไลน์ความคืบหน้า */
+function thaiTime(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  return at.toLocaleString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 // Staff-facing submit form + owner review controls for a single assignment.
@@ -191,8 +214,6 @@ export function AssignmentDetail({
     }
   }
 
-  const isImageUrl = (u: string) => /^https?:\/\/\S+\.(png|jpe?g|gif|webp|heic)/i.test(u) || /firebasestorage/.test(u);
-
   return (
     <main className="page">
       <Link href="/my-view" className="back-link">← กลับ งานของฉัน</Link>
@@ -280,6 +301,13 @@ export function AssignmentDetail({
       ) : null}
 
       {saved ? <p className="assignment-detail__ok">✓ ส่งงานเรียบร้อย รอผู้ตรวจงานตรวจ</p> : null}
+
+      {/* ความคืบหน้าระหว่างทาง — งานยังไม่เสร็จก็รายงานได้ ไม่ต้องรอส่งจบ */}
+      <ProgressPanel
+        record={record}
+        canPost={record.status !== "done" && (isOwner || record.staffCode === viewerCode)}
+        onChanged={load}
+      />
 
       <section className="performance-manual-input-grid">
         {/* Submit / edit — available to the assigned staff (and owner) while still actionable */}
@@ -419,5 +447,116 @@ export function AssignmentDetail({
         ) : null}
       </section>
     </main>
+  );
+}
+
+/**
+ * "อัปเดตความคืบหน้า" — ระหว่างที่งานยังทำอยู่ กดอัปเดตกี่ครั้งก็ได้ แนบรูปได้แต่ไม่บังคับ
+ * (บังคับรูปเฉพาะตอนส่งงานจริง). อัปเดตไม่เปลี่ยนสถานะงาน คนสั่งงานเห็นไทม์ไลน์นี้ทันที.
+ */
+function ProgressPanel({
+  record,
+  canPost,
+  onChanged
+}: {
+  record: WorkAssignment;
+  canPost: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  const [photos, setPhotos] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const entries = record.progress || [];
+
+  async function post() {
+    if (!note.trim()) {
+      setError("เขียนสั้นๆ ว่าตอนนี้ทำถึงไหนแล้ว");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await addAssignmentProgress(record.id, {
+        note: note.trim(),
+        images: photos.split("\n").map((url) => url.trim()).filter(Boolean)
+      });
+      setNote("");
+      setPhotos("");
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "อัปเดตไม่สำเร็จ ลองใหม่อีกครั้ง");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(progressId: string) {
+    setBusy(true);
+    try {
+      await deleteAssignmentProgress(record.id, progressId);
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="assignment-detail__brief soft-card">
+      <p className="assign-work__label">ความคืบหน้า ({entries.length} ครั้ง)</p>
+
+      {entries.length === 0 ? (
+        <p className="assignment-detail__progress-empty">
+          ยังไม่มีการอัปเดต — งานที่ใช้เวลาหลายชั่วโมงหรือหลายวัน อัปเดตระหว่างทางได้เลย ไม่ต้องรอส่งงานจบ
+        </p>
+      ) : (
+        <ol className="assignment-detail__progress">
+          {[...entries].reverse().map((entry) => (
+            <li key={entry.id}>
+              <div className="assignment-detail__progress-head">
+                <strong>{authorLabel(entry.by)}</strong>
+                <small>{thaiTime(entry.at)}</small>
+                {canPost ? (
+                  <button type="button" className="assign-work__del" onClick={() => void remove(entry.id)} disabled={busy}>
+                    ลบ
+                  </button>
+                ) : null}
+              </div>
+              <p>{entry.note}</p>
+              {entry.images?.length ? (
+                <div className="assignment-detail__evidence-view">
+                  {entry.images.map((url) =>
+                    isImageUrl(url) ? (
+                      <img key={url} className="evidence-input__preview" src={url} alt="รูปความคืบหน้า" />
+                    ) : (
+                      <a key={url} href={url} target="_blank" rel="noreferrer">{url}</a>
+                    )
+                  )}
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {canPost ? (
+        <div className="project-progress-form">
+          <textarea
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="ตอนนี้ทำถึงไหนแล้ว เช่น แพ็กไปแล้ว 20/50 กล่อง เหลือรอบบ่าย"
+          />
+          <EvidencePhotosInput value={photos} onChange={setPhotos} label="แนบรูป (ถ้ามี)" />
+          {error ? <p className="project-progress-form__error">{error}</p> : null}
+          <button type="button" className="btn-soft" onClick={() => void post()} disabled={busy || !note.trim()}>
+            {busy ? "กำลังอัปเดต…" : "อัปเดตความคืบหน้า"}
+          </button>
+        </div>
+      ) : null}
+    </section>
   );
 }

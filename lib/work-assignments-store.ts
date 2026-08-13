@@ -7,6 +7,23 @@
 
 export type AssignmentStatus = "open" | "submitted" | "needs_revision" | "done";
 
+/**
+ * ความคืบหน้าระหว่างทางของงานที่มอบหมาย — งานที่ยังไม่เสร็จก็รายงานได้ ไม่ต้องรอส่งจบ.
+ * ส่งกี่ครั้งก็ได้ แนบรูปได้ทุกครั้ง และไม่เปลี่ยนสถานะงาน (ยังไม่ถือว่าส่งงาน).
+ */
+export type AssignmentProgress = {
+  id: string;
+  /** เวลาที่กดส่ง (ISO) */
+  at: string;
+  /** staff code ของคนที่อัปเดต */
+  by: string;
+  note: string;
+  images?: string[];
+};
+
+/** เก็บได้สูงสุดกี่อัปเดตต่องาน (กันเอกสารบวมชนลิมิต 1MiB ของ Firestore) */
+export const MAX_ASSIGNMENT_PROGRESS = 50;
+
 export type WorkAssignment = {
   id: string;
   branch: string;
@@ -29,6 +46,8 @@ export type WorkAssignment = {
   revisionNote?: string;
   reviewedAt?: string;
   doneAt?: string;
+  /** อัปเดตความคืบหน้าระหว่างทาง เรียงเก่า→ใหม่ */
+  progress?: AssignmentProgress[];
 };
 
 export type WorkHandoff = {
@@ -118,6 +137,23 @@ export async function submitAssignment(
   if (!note) throw new Error("ต้องกรอกรายละเอียดสิ่งที่ทำก่อนส่งงาน");
   if (!hasEvidence) throw new Error("ต้องแนบหลักฐานอย่างน้อย 1 อย่างก่อนส่งงาน");
   await post({ action: "submitAssignment", id, note, evidence: input.evidence ?? "", imageEvidence: input.imageEvidence ?? [] });
+}
+
+/** อัปเดตความคืบหน้าโดยไม่ปิดงาน — รูปแนบได้แต่ไม่บังคับ (งานยังทำอยู่) */
+export async function addAssignmentProgress(id: string, input: { note: string; images?: string[] }): Promise<void> {
+  const note = input.note.trim();
+  if (!note) throw new Error("เขียนสั้นๆ ว่าตอนนี้ทำถึงไหนแล้ว");
+  await post({ action: "addAssignmentProgress", id, note, images: input.images ?? [] });
+}
+
+export async function deleteAssignmentProgress(id: string, progressId: string): Promise<void> {
+  await post({ action: "deleteAssignmentProgress", id, progressId });
+}
+
+/** อัปเดตล่าสุดของงานนี้ (ยังไม่มี = null) */
+export function latestProgress(assignment: Pick<WorkAssignment, "progress">): AssignmentProgress | null {
+  const list = assignment.progress || [];
+  return list.length ? list[list.length - 1] : null;
 }
 
 export async function requestAssignmentRevision(id: string, note: string, reviewedAtIso: string): Promise<void> {
