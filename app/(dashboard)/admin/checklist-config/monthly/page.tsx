@@ -4,17 +4,27 @@ import { ChecklistItemsEditor, type EditableUnit } from "../../../../../componen
 import { requireUser } from "../../../../../lib/auth.ts";
 import { itemsFromStrings } from "../../../../../lib/checklist-overrides.ts";
 import { monthlyStockSinglePhase } from "../../../../../lib/monthly-stock-single-workflow.ts";
+import { baseItemsFor, sharedUnitIdFor, sharedUnitTitle } from "../../../../../lib/periodic-tasks.ts";
 
 export default async function AdminChecklistMonthlyPage() {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
+  // เหมือนหน้า Weekly: หัวข้อของเดือนทั้งหมดอยู่ใน editor ก้อนเดียว และเพิ่มหัวข้อเองได้
   const units: EditableUnit[] = [
     {
+      id: sharedUnitIdFor("monthly"),
+      heading: "งานประจำเดือนที่ช่วยกันทำ (แท็บ Monthly ในหน้าเช็คลิสต์)",
+      note: "รายการที่ทีมช่วยกันติ๊กในหน้า /checklist แท็บ Monthly · ใครติ๊กก็ได้ ทุกคนเห็นเหมือนกัน",
+      editTitle: true,
+      baseTitle: sharedUnitTitle("monthly"),
+      baseItems: baseItemsFor("monthly")
+    },
+    {
       id: monthlyStockSinglePhase.id,
+      canHide: false,
       heading: "Stock Single card (งานประจำเดือน)",
-      note: "รายการที่พนักงานติ๊กในหน้า Checklist ประจำเดือน → Stock Single card · รายการที่เพิ่มเองตั้งให้ต้องแนบหลักฐาน (รูป/ลิงก์) ได้เหมือนหน้า Daily",
-      editEvidence: true,
+      note: "ขั้นตอนที่พนักงานติ๊กในรอบตรวจนับ Stock Single card (หน้า Checklist ประจำเดือน) · หลักฐานรูปแนบตอนส่งรอบอยู่แล้ว",
       editTitle: true,
       baseTitle: monthlyStockSinglePhase.title,
       editGoal: true,
@@ -36,10 +46,20 @@ export default async function AdminChecklistMonthlyPage() {
         <div>
           <p className="eyebrow">Checklist config · Monthly</p>
           <h2>ปรับ Checklist ประจำเดือน</h2>
-          <p>งาน Stock Single card ประจำเดือน — แก้รายการที่พนักงานต้องติ๊ก · staff เห็นทันทีที่เปิดหน้า checklist</p>
+          <p>แก้ได้เหมือนหน้า Daily — เพิ่มหัวข้อใหญ่เอง ปิดหัวข้อที่ไม่ใช้ สลับลำดับ ย้ายรายการข้ามหัวข้อ · staff เห็นทันทีที่เปิดหน้า checklist</p>
         </div>
       </section>
-      <ChecklistItemsEditor scope="monthly-stock" units={units} />
+
+      <section className="section-heading">
+        <p className="eyebrow">งานประจำเดือน</p>
+        <h3>หัวข้อและรายการที่ต้องทำ</h3>
+      </section>
+      <ChecklistItemsEditor
+        scope="monthly-stock"
+        units={units}
+        allowCustomUnits
+        customUnitHint="หัวข้อที่เพิ่มเองจะขึ้นในหน้า /checklist แท็บ Monthly ให้ทีมช่วยกันติ๊ก · ย้ายรายการเดิมเข้ามาได้ด้วยปุ่ม “ย้ายไป…”"
+      />
     </main>
   );
 }

@@ -4516,7 +4516,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 .checklist-config__loading { color: var(--color-ink-soft); }
 .checklist-config__edited { font-size: 12.5px; color: var(--color-ink-soft); margin: 0 0 4px; }
 .checklist-config__phase { padding: 16px; }
-.checklist-config__phase-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.checklist-config__phase-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .checklist-config__phase-head strong { font-size: 16px; }
 .checklist-config__phase-head span { font-size: 11.5px; color: var(--color-ink-soft); }
 .checklist-config__items { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -4546,7 +4546,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 .manual-config__section { border-left: 2px solid rgba(255,140,66,0.35); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; }
 .manual-config__section-head { display: flex; gap: 8px; align-items: center; }
 .manual-config__section-head input { flex: 1; border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 7px 11px; font-size: 13.5px; font-family: inherit; }
-.checklist-config__move { display: flex; gap: 4px; }
+.checklist-config__move { display: flex; gap: 4px; flex-wrap: wrap; }
 .checklist-config__title { flex: 1; border: 1px solid transparent; border-radius: 9px; padding: 6px 9px; font-size: 16px; font-family: inherit; font-weight: 500; background: rgba(255,199,142,0.12); }
 .checklist-config__title:focus { border-color: rgba(255,140,66,0.6); outline: none; background: #fff; }
 /* Weekly/Monthly items editor: title shown standalone (not inside a flex head) + goal field */
@@ -4558,7 +4558,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 .checklist-config__new-phase { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .checklist-config__new-phase input { flex: 1 1 240px; border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 8px 11px; font-size: 13.5px; font-family: inherit; }
 .checklist-config__items select { border: 1px solid rgba(255,199,142,0.5); border-radius: 9px; padding: 6px 8px; font-size: 12px; font-family: inherit; max-width: 130px; }
-.checklist-config__move button { border: 1px solid rgba(255,199,142,0.6); background: transparent; color: var(--color-ink-soft); border-radius: 8px; width: 28px; height: 28px; font-size: 13px; cursor: pointer; }
+.checklist-config__move button { border: 1px solid rgba(255,199,142,0.6); background: transparent; color: var(--color-ink-soft); border-radius: 8px; min-width: 28px; height: 28px; padding: 0 8px; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .checklist-config__move button:disabled { opacity: 0.35; cursor: default; }
 .checklist-config__window { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin-bottom: 12px; }
 .checklist-config__window > label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--color-ink-soft); }
@@ -5676,3 +5676,90 @@ main .page > section, main > section { margin-top: 16px !important; }
   .mrev-stats { grid-template-columns: repeat(4, 96px); }
   .mrev-cards { display: grid; grid-template-columns: 1fr; }
 }
+
+/* ── งานแบบโปรเจกต์ (หลายวัน + progress รายวัน) ───────────────────────────── */
+
+.project-list { display: flex; flex-direction: column; gap: 18px; }
+
+.project-card { display: flex; flex-direction: column; gap: 12px; padding: 18px; }
+.project-card__head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.project-card__head strong { display: block; font-size: 16px; color: var(--color-ink); }
+.project-card__head em {
+  display: block; font-style: normal; font-size: 12.5px; color: var(--color-ink-soft); margin-top: 4px;
+}
+.project-card__status { font-size: 12px; color: var(--color-ink-soft); white-space: nowrap; }
+.project-card__detail { margin: 0; font-size: 13.5px; color: var(--color-ink); white-space: pre-wrap; }
+
+.project-card__nudge {
+  margin: 0; font-size: 13px; font-weight: 700; color: #B54708;
+  background: rgba(255,199,142,0.28); border-radius: 12px; padding: 10px 12px;
+}
+.project-card__done-today { margin: 0; font-size: 12.5px; color: #2e7d5b; }
+
+.project-card__toggle {
+  align-self: flex-start; min-height: 44px; border: none; background: none; padding: 0;
+  color: var(--color-orange); font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+}
+
+.project-card__controls { display: flex; flex-direction: column; gap: 12px; border-top: 1px dashed rgba(255,199,142,0.6); padding-top: 12px; }
+.project-card__quick { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.project-card__quick span { font-size: 12.5px; color: var(--color-ink-soft); }
+.project-card__quick button {
+  min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid rgba(255,199,142,0.7);
+  background: #fff; color: var(--color-ink); font-family: inherit; font-size: 13px; cursor: pointer;
+}
+.project-form__days { font-size: 13px; font-weight: 700; color: var(--color-ink); align-self: flex-end; padding-bottom: 10px; }
+
+/* แถบความคืบหน้า: เส้นทึบ = ทำจริง, ขีดตั้ง = เป้าหมายตามแผนวันนี้ */
+.project-meter { display: flex; flex-direction: column; gap: 6px; }
+.project-meter__head { display: flex; gap: 10px; align-items: center; }
+.project-meter__head strong { font-size: 22px; color: var(--color-ink); }
+.project-meter__bar {
+  position: relative; height: 12px; border-radius: 999px; background: rgba(255,199,142,0.35); overflow: hidden;
+}
+.project-meter__fill {
+  position: absolute; inset: 0 auto 0 0; border-radius: 999px;
+  background: linear-gradient(135deg, var(--color-orange), #FFB067);
+}
+.project-meter__target { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--color-ink); opacity: 0.55; }
+.project-meter__stats { margin: 0; font-size: 12.5px; color: var(--color-ink-soft); }
+
+.project-progress-form { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed rgba(255,199,142,0.6); padding-top: 12px; }
+.project-progress-form textarea,
+.project-progress-form input[type="text"],
+.project-progress-form input:not([type]) {
+  width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255,199,142,0.6); background: #fff; color: var(--color-ink);
+  font-family: inherit; resize: vertical; min-height: 44px;
+}
+.project-progress-form__percent { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--color-ink-soft); }
+.project-progress-form__percent input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--color-orange); }
+.project-progress-form__error { margin: 0; font-size: 12.5px; color: #E5484D; font-weight: 600; }
+
+.project-days { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.project-days__empty { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+.project-days__day {
+  border: 1px solid rgba(255,199,142,0.45); border-radius: 12px; padding: 10px 12px; background: #fff;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.project-days__day.is-missed { background: rgba(229,72,77,0.06); border-color: rgba(229,72,77,0.35); }
+.project-days__day.is-today { border-color: var(--color-orange); }
+.project-days__head { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.project-days__head span { color: var(--color-ink-soft); white-space: nowrap; }
+.project-days__entry { display: flex; flex-direction: column; gap: 4px; border-top: 1px dashed rgba(255,199,142,0.5); padding-top: 6px; }
+.project-days__entry p { margin: 0; font-size: 13px; color: var(--color-ink); white-space: pre-wrap; }
+.project-days__files { display: flex; gap: 10px; flex-wrap: wrap; }
+.project-days__files a { font-size: 12.5px; color: var(--color-orange); }
+
+/* หัวข้อของ checklist สัปดาห์/เดือน ที่เจ้าของจัดเอง */
+.shared-checklist__unit { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.shared-checklist__unit-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--color-ink); }
+
+@media (max-width: 640px) {
+  .project-card { padding: 14px; }
+  .project-card__quick button { flex: 1 1 calc(50% - 8px); }
+  .project-form__days { padding-bottom: 0; }
+}
+
+/* ปุ่มลบ progress ไม่ต้องกินเต็มบรรทัด — ชิดซ้ายพอ */
+.project-days__entry .assign-work__del { align-self: flex-start; }

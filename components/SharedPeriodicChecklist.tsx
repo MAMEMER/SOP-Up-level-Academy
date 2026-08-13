@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { periodKeyFor, tasksFor } from "../lib/periodic-tasks.ts";
+import { ChecklistItemGuide } from "./ChecklistItemGuide.tsx";
+import { periodicTickKey, periodKeyFor, resolvePeriodicUnits, scopeForPeriod } from "../lib/periodic-tasks.ts";
+import { useChecklistScopeConfig } from "../lib/checklist-overrides-store.ts";
 import { fetchSharedTicks, setSharedTick, type SharedTick } from "../lib/shared-tasks-store.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 
@@ -21,7 +23,10 @@ export function SharedPeriodicChecklist({
   readOnly?: boolean;
 }) {
   const periodKey = periodKeyFor(period, workDate);
-  const tasks = tasksFor(period);
+  // หัวข้อ + รายการ ตามที่เจ้าของแก้ไว้ (/admin/checklist-config/weekly|monthly) — ยังไม่โหลดเสร็จ
+  // ก็ขึ้นรายการ built-in ไปก่อน เหมือน checklist รายวัน
+  const config = useChecklistScopeConfig(scopeForPeriod(period));
+  const units = resolvePeriodicUnits(period, config);
   const [ticks, setTicks] = useState<Record<string, SharedTick>>({});
   const [loading, setLoading] = useState(true);
 
@@ -61,33 +66,41 @@ export function SharedPeriodicChecklist({
     }
   }
 
-  const done = tasks.filter((t) => ticks[t.id]).length;
+  const allKeys = units.flatMap((unit) => unit.items.map((item) => periodicTickKey(period, unit.id, item.id)));
+  const done = allKeys.filter((key) => ticks[key]).length;
 
   return (
     <div className="shared-checklist">
       <p className="shared-checklist__meta">
-        {period === "weekly" ? "สัปดาห์นี้" : "เดือนนี้"} ({periodKey}) · เสร็จ {done}/{tasks.length} · ช่วยกันทั้งทีม
+        {period === "weekly" ? "สัปดาห์นี้" : "เดือนนี้"} ({periodKey}) · เสร็จ {done}/{allKeys.length} · ช่วยกันทั้งทีม
       </p>
-      {/* Tasks are static, so render them immediately — never hide the list behind a
-          spinner (that made the tab look empty / "ไม่ไป" while Firestore loaded ticks
-          on a slow connection). Tick state just fills in when the fetch resolves. */}
-      <ul className="shared-checklist__list">
-        {tasks.map((task) => {
-          const tick = ticks[task.id];
-          return (
-            <li key={task.id} className={tick ? "shared-checklist__item shared-checklist__item--done" : "shared-checklist__item"}>
-              <button type="button" onClick={() => toggle(task.id)} aria-pressed={!!tick} disabled={loading || readOnly}>
-                {tick ? "●" : "○"}
-              </button>
-              <span>
-                <strong>{task.title}</strong>
-                {task.hint ? <em>{task.hint}</em> : null}
-                {tick ? <small>โดย {displayNameFor(tick.by)}</small> : null}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      {/* Tasks render immediately — never hide the list behind a spinner (that made the tab look
+          empty / "ไม่ไป" while Firestore loaded ticks on a slow connection). Tick state just fills
+          in when the fetch resolves. */}
+      {units.map((unit) => (
+        <section key={unit.id} className="shared-checklist__unit">
+          {units.length > 1 ? <p className="shared-checklist__unit-title">{unit.title}</p> : null}
+          <ul className="shared-checklist__list">
+            {unit.items.map((item) => {
+              const key = periodicTickKey(period, unit.id, item.id);
+              const tick = ticks[key];
+              return (
+                <li key={key} className={tick ? "shared-checklist__item shared-checklist__item--done" : "shared-checklist__item"}>
+                  <button type="button" onClick={() => toggle(key)} aria-pressed={!!tick} disabled={loading || readOnly}>
+                    {tick ? "●" : "○"}
+                  </button>
+                  <span>
+                    <strong>{item.title}</strong>
+                    <ChecklistItemGuide note={item.note} links={item.links} />
+                    {tick ? <small>โดย {displayNameFor(tick.by)}</small> : null}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+      {units.length === 0 ? <p className="shared-checklist__meta">ยังไม่มีรายการในช่วงนี้</p> : null}
     </div>
   );
 }

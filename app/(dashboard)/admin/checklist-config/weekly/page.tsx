@@ -4,18 +4,29 @@ import { ChecklistItemsEditor, type EditableUnit } from "../../../../../componen
 import { requireUser } from "../../../../../lib/auth.ts";
 import { itemsFromStrings } from "../../../../../lib/checklist-overrides.ts";
 import { weeklyStockSleevePhase } from "../../../../../lib/weekly-stock-workflow.ts";
+import { baseItemsFor, sharedUnitIdFor, sharedUnitTitle } from "../../../../../lib/periodic-tasks.ts";
 import { weeklyEvents, weeklyEventDaysLabel } from "../../../../../lib/weekly-event-tasks.ts";
 
 export default async function AdminChecklistWeeklyPage() {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
-  const stockUnits: EditableUnit[] = [
+  // หัวข้อของสัปดาห์ทั้งหมดอยู่ใน editor ก้อนเดียว (เหมือนหน้า Daily): งานที่ช่วยกันทำ + งาน Stock
+  // และหัวข้อที่เจ้าของเพิ่มเอง — สลับลำดับ ปิดหัวข้อ ย้ายรายการข้ามหัวข้อ ได้ในที่เดียว
+  const weeklyUnits: EditableUnit[] = [
+    {
+      id: sharedUnitIdFor("weekly"),
+      heading: "งานประจำสัปดาห์ที่ช่วยกันทำ (แท็บ Weekly ในหน้าเช็คลิสต์)",
+      note: "รายการที่ทีมช่วยกันติ๊กในหน้า /checklist แท็บ Weekly · ใครติ๊กก็ได้ ทุกคนเห็นเหมือนกัน",
+      editTitle: true,
+      baseTitle: sharedUnitTitle("weekly"),
+      baseItems: baseItemsFor("weekly")
+    },
     {
       id: weeklyStockSleevePhase.id,
+      canHide: false,
       heading: "Stock อุปกรณ์ / Sleeve (งานประจำสัปดาห์)",
-      note: "รายการที่พนักงานติ๊กในหน้า Checklist ประจำสัปดาห์ → Stock อุปกรณ์ / Sleeve · รายการที่เพิ่มเองตั้งให้ต้องแนบหลักฐาน (รูป/ลิงก์) ได้เหมือนหน้า Daily",
-      editEvidence: true,
+      note: "ขั้นตอนที่พนักงานติ๊กในรอบตรวจนับ Stock อุปกรณ์ / Sleeve (หน้า Checklist ประจำสัปดาห์) · หลักฐานรูปแนบตอนส่งรอบอยู่แล้ว",
       editTitle: true,
       baseTitle: weeklyStockSleevePhase.title,
       editGoal: true,
@@ -39,6 +50,7 @@ export default async function AdminChecklistWeeklyPage() {
     baseTimeLabel: event.timeWindow,
     editShift: true,
     baseShiftLabel: event.shiftLabel,
+    canHide: false,
     baseItems: event.checklist.map((item) => ({ id: item.id, title: item.title }))
   }));
 
@@ -49,21 +61,26 @@ export default async function AdminChecklistWeeklyPage() {
         <div>
           <p className="eyebrow">Checklist config · Weekly</p>
           <h2>ปรับ Checklist ประจำสัปดาห์</h2>
-          <p>งาน Stock อุปกรณ์ / Sleeve และ checklist วันจัดกิจกรรมของแต่ละเกม — staff เห็นทันทีที่เปิดหน้า checklist</p>
+          <p>แก้ได้เหมือนหน้า Daily — เพิ่มหัวข้อใหญ่เอง ปิดหัวข้อที่ไม่ใช้ สลับลำดับ ย้ายรายการข้ามหัวข้อ · staff เห็นทันทีที่เปิดหน้า checklist</p>
         </div>
       </section>
 
       <section className="section-heading">
-        <p className="eyebrow">งาน Stock</p>
-        <h3>Stock อุปกรณ์ / Sleeve</h3>
+        <p className="eyebrow">งานประจำสัปดาห์</p>
+        <h3>หัวข้อและรายการที่ต้องทำ</h3>
       </section>
-      <ChecklistItemsEditor scope="weekly-stock" units={stockUnits} />
+      <ChecklistItemsEditor
+        scope="weekly-stock"
+        units={weeklyUnits}
+        allowCustomUnits
+        customUnitHint="หัวข้อที่เพิ่มเองจะขึ้นในหน้า /checklist แท็บ Weekly ให้ทีมช่วยกันติ๊ก · ย้ายรายการเดิมเข้ามาได้ด้วยปุ่ม “ย้ายไป…”"
+      />
 
       <section className="section-heading">
         <p className="eyebrow">วันจัดกิจกรรม</p>
         <h3>Checklist กิจกรรมแต่ละเกม</h3>
       </section>
-      <ChecklistItemsEditor scope="weekly-event" units={eventUnits} />
+      <ChecklistItemsEditor scope="weekly-event" units={eventUnits} allowUnitOrdering={false} />
     </main>
   );
 }

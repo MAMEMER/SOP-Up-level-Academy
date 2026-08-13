@@ -63,10 +63,96 @@ export type UnitOverride = {
   shiftLabel?: string;
 };
 
-/** unitId → override. This is the whole document body for one scope. */
+/** unitId → override. */
 export type ChecklistOverrides = Record<string, UnitOverride>;
 
 export const emptyChecklistOverrides: ChecklistOverrides = {};
+
+/** หัวข้อใหญ่ ที่เจ้าของเพิ่มเองในสัปดาห์/เดือน (ไม่มีในโค้ด) — items อยู่ใน overrides[id].items */
+export type CustomUnit = { id: string; title: string };
+
+/**
+ * ทั้งเอกสารของหนึ่ง scope. เดิมเก็บแค่ `overrides`; ตอนนี้เก็บลำดับ/ปิดหัวข้อ/หัวข้อที่เพิ่มเอง
+ * ด้วย เพื่อให้หน้าแก้ Weekly/Monthly ทำได้เท่ากับหน้า Daily (เพิ่มหัวข้อ ปิดหัวข้อ สลับลำดับ
+ * ย้ายรายการข้ามหัวข้อ). เอกสารเก่าที่มีแค่ overrides อ่านได้เหมือนเดิม (ฟิลด์ใหม่ = ว่าง).
+ */
+export type ChecklistScopeConfig = {
+  overrides: ChecklistOverrides;
+  /** unitId ตามลำดับที่เจ้าของจัด (unit ที่ไม่อยู่ในนี้ต่อท้ายตามลำดับ built-in) */
+  order: string[];
+  /** unitId ที่ปิดไว้ — พนักงานไม่เห็น และไม่ต้องทำ */
+  hidden: string[];
+  /** หัวข้อใหญ่ที่เจ้าของเพิ่มเอง */
+  customUnits: CustomUnit[];
+};
+
+export const emptyChecklistScopeConfig: ChecklistScopeConfig = {
+  overrides: {},
+  order: [],
+  hidden: [],
+  customUnits: []
+};
+
+/** Cleans a whole scope document (run on read and on save). */
+export function normalizeScopeConfig(raw: Partial<ChecklistScopeConfig> | undefined): ChecklistScopeConfig {
+  const overrides = normalizeChecklistOverrides((raw?.overrides || {}) as ChecklistOverrides);
+  const customUnits: CustomUnit[] = Array.isArray(raw?.customUnits)
+    ? raw!.customUnits
+        .filter((unit): unit is CustomUnit => Boolean(unit) && typeof unit.id === "string" && typeof unit.title === "string")
+        .map((unit) => ({ id: unit.id.trim(), title: unit.title.trim() }))
+        .filter((unit) => unit.id && unit.title)
+    : [];
+  const strings = (value: unknown): string[] =>
+    Array.isArray(value) ? Array.from(new Set(value.filter((item): item is string => typeof item === "string" && item.trim().length > 0))) : [];
+  return { overrides, order: strings(raw?.order), hidden: strings(raw?.hidden), customUnits };
+}
+
+/** unitIds ตามลำดับที่จะแสดง: ตามที่เจ้าของจัดก่อน แล้วต่อด้วยที่เหลือ */
+export function orderedUnitIds(builtinIds: string[], config: ChecklistScopeConfig): string[] {
+  const all = [...builtinIds, ...config.customUnits.map((unit) => unit.id)];
+  const ordered = config.order.filter((id) => all.includes(id));
+  return [...ordered, ...all.filter((id) => !ordered.includes(id))];
+}
+
+export function isUnitHidden(config: ChecklistScopeConfig, unitId: string): boolean {
+  return config.hidden.includes(unitId);
+}
+
+/** A slug that is safe as a custom unit id — mirrors the daily editor's customPhaseId. */
+export function customUnitId(title: string, existing: string[] = []): string {
+  const base = `custom-${title.trim()}`.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9ก-๙-]/g, "").toLowerCase() || "custom-unit";
+  if (!existing.includes(base)) return base;
+  let suffix = 2;
+  while (existing.includes(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+/**
+ * ย้ายหนึ่งรายการข้ามหัวข้อ (ปุ่ม "ย้ายไป…" แบบเดียวกับหน้า Daily). คืน items map ใหม่ทั้งก้อน —
+ * รายการที่ย้ายไปต่อท้ายหัวข้อปลายทาง และ id ถูกตั้งใหม่ไม่ให้ชนกับของเดิมในหัวข้อนั้น.
+ */
+export function moveUnitItem(
+  itemsByUnit: Record<string, OverrideItem[]>,
+  from: { unitId: string; index: number },
+  toUnitId: string
+): Record<string, OverrideItem[]> {
+  const source = itemsByUnit[from.unitId] || [];
+  const item = source[from.index];
+  if (!item || from.unitId === toUnitId) return itemsByUnit;
+  const target = itemsByUnit[toUnitId] || [];
+  const taken = new Set(target.map((row) => row.id));
+  let id = item.id;
+  let suffix = 2;
+  while (taken.has(id)) {
+    id = `${item.id}-${suffix}`;
+    suffix += 1;
+  }
+  return {
+    ...itemsByUnit,
+    [from.unitId]: source.filter((_, index) => index !== from.index),
+    [toUnitId]: [...target, { ...item, id }]
+  };
+}
 
 /** Trims and drops empty items; returns undefined when nothing meaningful is set. */
 export function normalizeUnitOverride(raw: UnitOverride | undefined): UnitOverride | undefined {

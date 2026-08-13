@@ -98,6 +98,11 @@ export default async function AdminHubPage() {
           badge: openWork ? { count: openWork, label: "ยังไม่ส่ง" } : undefined
         },
         {
+          href: "/admin/projects",
+          title: "งานโปรเจกต์",
+          detail: "งานหลายวัน — สั่งเป็นช่วงเวลา ดูความคืบหน้ารายวันเป็น % ยืดเวลา/เพิ่มคนช่วยได้"
+        },
+        {
           href: "/admin/stock-runs",
           title: "ตรวจนับ Stock",
           detail: "มอบหมาย + ตรวจรับงานตรวจนับ Stock อุปกรณ์/Sleeve (สัปดาห์) และ Single card (เดือน) เป็นรายครั้ง พร้อมประวัติ"

@@ -12,6 +12,7 @@ const mainLinks = [
   { href: "/my-view", label: "งานของฉัน" },
   { href: "/schedule", label: "ตารางกะ" },
   { href: "/checklist", label: "เช็คลิสต์" },
+  { href: "/projects", label: "งานโปรเจกต์" },
   { href: "/handoff", label: "งานส่งต่อ" },
   { href: "/training", label: "คู่มืองาน" }
 ];
@@ -22,6 +23,7 @@ const adminLinks = [
   { href: "/admin", label: "หน้ารวมงานจัดการ" },
   { href: "/admin/schedule", label: "ตารางกะ" },
   { href: "/admin/assign", label: "มอบหมายงาน" },
+  { href: "/admin/projects", label: "งานโปรเจกต์" },
   { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
   { href: "/admin/staff", label: "จัดการพนักงาน" },
   { href: "/admin/checklist-config", label: "ปรับ Checklist" },
