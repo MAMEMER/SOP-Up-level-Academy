@@ -165,8 +165,11 @@ describe("dashboard task sections UI", () => {
     assert.equal(sections.includes("offDay"), true);
     assert.equal(status.includes("offDay"), true);
 
-    // both pages pass the viewer's staff code + branch so the hook can resolve their shift
-    assert.equal(homePage.includes("staffCode={staffCode} branch={branch}"), true);
+    // both pages pass the viewer's staff code + branch so the hook can resolve their shift.
+    // หน้าแรกเลิก render การ์ดสถานะเช็คลิสต์แล้ว (ซ้ำกับหน้า /checklist) แต่ยังส่ง staffCode +
+    // branch เข้ากล่องสรุปของวันนี้ ซึ่งใช้ hook ตัวเดียวกัน
+    assert.equal(homePage.includes("staffCode={staffCode ?? null}"), true);
+    assert.equal(homePage.includes("branch={branch}"), true);
     assert.equal(myViewPage.includes("staffCode={selectedCode} branch={branch}"), true);
   });
 

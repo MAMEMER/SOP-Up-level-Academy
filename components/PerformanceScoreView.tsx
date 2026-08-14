@@ -387,8 +387,12 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
         </article>
       </section>
 
-      <section className="performance-source-panel">
-        <h3>Data source status</h3>
+      {/* สถานะแหล่งข้อมูลเป็นของไว้ไล่ปัญหา ไม่ใช่ของที่ต้องดูทุกวัน — พับไว้ก่อน
+          เพื่อให้ช่อง "บันทึกปัญหาบริการรายวัน" ขึ้นมาอยู่ในระยะเลื่อนสั้นๆ บนมือถือ.
+          เปิดค้างให้เองถ้ากดเข้ามาดูแหล่งข้อมูลใดข้อมูลหนึ่งอยู่ */}
+      <details className="performance-source-collapse" open={Boolean(params.source)}>
+        <summary>ดูสถานะแหล่งข้อมูล</summary>
+        <section className="performance-source-panel">
         <div>
           {performanceSourceStatuses.map((source) => (
             <article key={source.key} className={`performance-source-card${params.source === source.key ? " active" : ""}`}>
@@ -431,6 +435,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
           </div>
         </section>
       ) : null}
+      </details>
 
       <section className="performance-manual-input-grid">
         <article className="performance-input-panel">

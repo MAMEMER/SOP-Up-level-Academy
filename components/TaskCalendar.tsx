@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Modal } from "./Modal.tsx";
+import { ProjectAssignForm, type StaffOption } from "./ProjectAssignForm.tsx";
+import type { TeamOption } from "../lib/team-options.ts";
 import { ANSWER_KINDS, ANSWER_KIND_LABEL, type AnswerKind } from "../lib/checklist-overrides.ts";
 import { fetchStoreTasks, saveStoreTasks } from "../lib/store-tasks-store.ts";
 import { isDueOn, scheduleLabel, timingLabel, type WorkSpec } from "../lib/work-spec.ts";
@@ -30,7 +33,17 @@ function shiftMonth(monthKey: string, delta: number): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function TaskCalendar({ branch, today }: { branch: string; today: string }) {
+export function TaskCalendar({
+  branch,
+  today,
+  staff = [],
+  teams = []
+}: {
+  branch: string;
+  today: string;
+  staff?: StaffOption[];
+  teams?: TeamOption[];
+}) {
   const [tasks, setTasks] = useState<WorkSpec[]>([]);
   const [monthKey, setMonthKey] = useState(today.slice(0, 7));
   const [selected, setSelected] = useState(today);
@@ -46,6 +59,8 @@ export function TaskCalendar({ branch, today }: { branch: string; today: string 
   const [dueTime, setDueTime] = useState("");
   const [answerKind, setAnswerKind] = useState<AnswerKind>("tick");
   const [repeatEvent, setRepeatEvent] = useState("");
+  // ฟอร์มยาวไม่ต้องอยู่บนหน้าตลอด — กดวันแล้วค่อยเปิดหน้าต่างที่ต้องการ
+  const [openForm, setOpenForm] = useState<"none" | "routine" | "assign">("none");
 
   useEffect(() => {
     let alive = true;
@@ -63,6 +78,7 @@ export function TaskCalendar({ branch, today }: { branch: string; today: string 
   const leading = new Date(`${dates[0]}T12:00:00+07:00`).getUTCDay();
   const tasksOn = (date: string) => tasks.filter((task) => task.active && isDueOn(task.schedule, date));
   const selectedTasks = tasksOn(selected);
+  const dayEvents = weeklyEventsActiveOn(selected);
 
   async function addTask() {
     if (!title.trim()) {
@@ -135,9 +151,9 @@ export function TaskCalendar({ branch, today }: { branch: string; today: string 
 
       <section className="task-calendar__day-panel soft-card">
         <p className="assign-work__label">วันที่ {selected}</p>
-        {weeklyEventsActiveOn(selected).length ? (
+        {dayEvents.length ? (
           <p className="task-calendar__day-events">
-            วันนี้มีกิจกรรม: {weeklyEventsActiveOn(selected).map((event) => event.name).join(" · ")}
+            วันนี้มีกิจกรรม: {dayEvents.map((event) => event.name).join(" · ")}
           </p>
         ) : null}
 
@@ -158,68 +174,102 @@ export function TaskCalendar({ branch, today }: { branch: string; today: string 
           <p className="assign-work__empty">วันนี้ยังไม่มีงาน</p>
         )}
 
-        <div className="task-row__form">
-          <label className="task-row__wide">
-            สั่งงานเพิ่มในวันนี้
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ชื่องาน เช่น เตรียมของรางวัล Gym" />
-          </label>
-          <label className="task-row__wide">
-            รายละเอียด
-            <textarea rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} placeholder="ต้องทำอะไร / ทำยังไง" />
-          </label>
-          <label>
-            หมวดหมู่
-            <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="เช่น กิจกรรม" />
-          </label>
-          <label>
-            ส่งงานแบบไหน
-            <select value={answerKind} onChange={(e) => setAnswerKind(e.target.value as AnswerKind)}>
-              {ANSWER_KINDS.map((kind) => (
-                <option key={kind} value={kind}>{ANSWER_KIND_LABEL[kind]}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            เริ่มทำได้ตั้งแต่
-            <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} />
-          </label>
-          <label>
-            ต้องจบไม่เกิน
-            <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
-          </label>
-          <div className="task-row__days">
-            <span>กะที่ต้องทำ (ไม่เลือก = ทุกกะ)</span>
-            <div className="assign-work__chips">
-              {SHIFTS.map((shift) => (
-                <label key={shift.value} className={shifts.includes(shift.value) ? "assign-work__chip is-on" : "assign-work__chip"}>
-                  <input
-                    type="checkbox"
-                    checked={shifts.includes(shift.value)}
-                    onChange={() =>
-                      setShifts((prev) => (prev.includes(shift.value) ? prev.filter((s) => s !== shift.value) : [...prev, shift.value]))
-                    }
-                  />
-                  {shift.label}
-                </label>
-              ))}
-            </div>
-          </div>
-          <label className="task-row__wide">
-            ทำทุกครั้งที่มีกิจกรรมนี้ (เว้นว่าง = เฉพาะวันที่เลือก)
-            <select value={repeatEvent} onChange={(e) => setRepeatEvent(e.target.value)}>
-              <option value="">— เฉพาะวันที่ {selected} —</option>
-              {weeklyEvents.map((event) => (
-                <option key={event.key} value={event.key}>ทุกวันที่มี {event.name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="checklist-config__bar">
-          <button type="button" className="primary-action" onClick={addTask}>สั่งงาน</button>
+        <div className="task-calendar__actions">
+          <button type="button" className="primary-action" onClick={() => setOpenForm("assign")}>
+            มอบหมายงาน (เดี่ยว / กลุ่ม)
+          </button>
+          <button type="button" className="btn-soft" onClick={() => setOpenForm("routine")}>
+            สั่งงานประจำวันนี้
+          </button>
           {status ? <span className="checklist-config__status">{status}</span> : null}
         </div>
       </section>
+
+      {openForm === "routine" ? (
+        <Modal title={`สั่งงานประจำ · วันที่ ${selected}`} onClose={() => setOpenForm("none")}>
+        <div className="task-row__form">
+            <label className="task-row__wide">
+              สั่งงานเพิ่มในวันนี้
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ชื่องาน เช่น เตรียมของรางวัล Gym" />
+            </label>
+            <label className="task-row__wide">
+              รายละเอียด
+              <textarea rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} placeholder="ต้องทำอะไร / ทำยังไง" />
+            </label>
+            <label>
+              หมวดหมู่
+              <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="เช่น กิจกรรม" />
+            </label>
+            <label>
+              ส่งงานแบบไหน
+              <select value={answerKind} onChange={(e) => setAnswerKind(e.target.value as AnswerKind)}>
+                {ANSWER_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>{ANSWER_KIND_LABEL[kind]}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              เริ่มทำได้ตั้งแต่
+              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} />
+            </label>
+            <label>
+              ต้องจบไม่เกิน
+              <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+            </label>
+            <div className="task-row__days">
+              <span>กะที่ต้องทำ (ไม่เลือก = ทุกกะ)</span>
+              <div className="assign-work__chips">
+                {SHIFTS.map((shift) => (
+                  <label key={shift.value} className={shifts.includes(shift.value) ? "assign-work__chip is-on" : "assign-work__chip"}>
+                    <input
+                      type="checkbox"
+                      checked={shifts.includes(shift.value)}
+                      onChange={() =>
+                        setShifts((prev) => (prev.includes(shift.value) ? prev.filter((s) => s !== shift.value) : [...prev, shift.value]))
+                      }
+                    />
+                    {shift.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <label className="task-row__wide">
+              ทำทุกครั้งที่มีกิจกรรมนี้ (เว้นว่าง = เฉพาะวันที่เลือก)
+              <select value={repeatEvent} onChange={(e) => setRepeatEvent(e.target.value)}>
+                <option value="">— เฉพาะวันที่ {selected} —</option>
+                {weeklyEvents.map((event) => (
+                  <option key={event.key} value={event.key}>ทุกวันที่มี {event.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="checklist-config__bar">
+            <button type="button" className="primary-action" onClick={addTask}>สั่งงาน</button>
+            {status ? <span className="checklist-config__status">{status}</span> : null}
+          </div>
+        </Modal>
+      ) : null}
+
+      {openForm === "assign" ? (
+        <Modal title={`มอบหมายงาน · วันที่ ${selected}`} onClose={() => setOpenForm("none")}>
+          <ProjectAssignForm
+            branch={branch}
+            staff={staff}
+            teams={teams}
+            defaultStartDate={selected}
+            contextNote={
+              dayEvents.length
+                ? `วันที่ ${selected} · มีกิจกรรม ${dayEvents.map((event) => event.name).join(" · ")}`
+                : `วันที่ ${selected}`
+            }
+            onCreated={() => {
+              setStatus(`มอบหมายงานของวันที่ ${selected} แล้ว`);
+              setOpenForm("none");
+            }}
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }
