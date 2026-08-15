@@ -83,6 +83,12 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
 
   const pending = useRef<T | null>(null);
   const timer = useRef<number | null>(null);
+  // Mirror of the committed data so update() can compute the next payload and stage it for
+  // saving SYNCHRONOUSLY. React runs setData's functional updater on the *next* render, so
+  // staging pending.current inside it left an immediate flush() (the ปุ่มส่งงาน path) saving
+  // the previous/empty payload instead of the just-submitted one — the submit reached the
+  // server only via the 700ms debounce, and a refresh before it fired reverted "ส่งแล้ว".
+  const dataRef = useRef<T>(emptyRef.current);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +98,9 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
         if (cancelled) return;
         setHistory(result.records);
         const current = result.records.find((record) => record.scopeKey === scopeKey);
-        setData((current?.data as T) ?? emptyRef.current);
+        const loadedData = (current?.data as T) ?? emptyRef.current;
+        dataRef.current = loadedData;
+        setData(loadedData);
         setLoaded(true);
       })
       .catch(() => {
@@ -133,16 +141,19 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
 
   const update = useCallback(
     (updater: (previous: T) => T) => {
-      setData((previous) => {
-        const next = updater(previous);
-        if (readOnly) return next;
-        pending.current = next;
-        if (timer.current) window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => {
-          void flush();
-        }, SAVE_DEBOUNCE_MS);
-        return next;
-      });
+      // Compute from the ref, not from setData's deferred updater, so pending.current is
+      // staged in the SAME tick — an immediate flush() (ปุ่มส่งงาน) then saves this exact
+      // payload instead of the previous one. dataRef stays the source of truth for the next
+      // synchronous update() as well, so back-to-back updates chain correctly.
+      const next = updater(dataRef.current);
+      dataRef.current = next;
+      setData(next);
+      if (readOnly) return;
+      pending.current = next;
+      if (timer.current) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => {
+        void flush();
+      }, SAVE_DEBOUNCE_MS);
     },
     [flush, readOnly]
   );
