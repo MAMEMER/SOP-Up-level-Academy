@@ -87,7 +87,7 @@ const statusMessages: Record<string, { tone: "success" | "warning"; text: string
 
 export default async function AdminStaffPage({ searchParams }: PageProps) {
   const user = await requireUser();
-  // หน้านี้เปิดประตูเข้าระบบให้คนอื่น จึงจำกัดไว้ที่บัญชีเดียวตามที่ Champ กำหนด.
+  // หน้านี้เปิดประตูเข้าระบบให้คนอื่น จึงจำกัดไว้ที่เจ้าของสองบัญชี (แชมป์ + เคน) เท่านั้น.
   // เดิมเด้งกลับ /admin เงียบๆ ซึ่งดูเหมือนเมนูเสีย — บอกไปตรงๆ ว่าติดที่บัญชีไหน
   // และต้องเข้าด้วยบัญชีอะไรถึงจะแก้ได้ (ไม่แสดงรายชื่อพนักงานให้บัญชีที่ไม่มีสิทธิ์)
   if (!canManageStaffAccounts(user.actualEmail)) {
