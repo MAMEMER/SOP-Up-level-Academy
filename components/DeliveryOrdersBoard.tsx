@@ -21,6 +21,14 @@ import { displayNameFor } from "../lib/employee-directory.ts";
 
 const REFRESH_MS = 60_000;
 
+// หน้าแรกโชว์เฉพาะใบที่ยังต้องทำ — ใบที่ปิดแล้วยังเปิดดูย้อนหลังได้จากตัวกรองนี้
+type DeliveryFilter = "open" | "closed" | "all";
+const FILTERS: Array<{ value: DeliveryFilter; label: string }> = [
+  { value: "open", label: "กำลังดำเนินการ" },
+  { value: "closed", label: "ปิดแล้ว" },
+  { value: "all", label: "ทั้งหมด" }
+];
+
 export function DeliveryOrdersBoard({
   branch,
   canAct = true,
@@ -42,10 +50,11 @@ export function DeliveryOrdersBoard({
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
   const [tracking, setTracking] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<DeliveryFilter>("open");
 
   const reload = useCallback(async () => {
     try {
-      const feed = await fetchDeliveryFeed(branch);
+      const feed = await fetchDeliveryFeed(branch, filter !== "open");
       setTasks(feed.tasks);
       setToday(feed.today);
       setShiftToday(feed.shiftToday);
@@ -55,9 +64,10 @@ export function DeliveryOrdersBoard({
     } finally {
       setLoading(false);
     }
-  }, [branch]);
+  }, [branch, filter]);
 
   // งานชุดแรกมาจาก server render แล้ว — รอบแรกจึงข้ามไป ไม่ต้อง sync ซ้ำทันทีที่โหลดหน้า
+  // (แต่พอเปลี่ยนตัวกรอง reload เปลี่ยน identity → ยิงใหม่ทันทีเพื่อดึงใบที่ปิดแล้วมา)
   const hasServerData = useRef(Boolean(initialToday));
   useEffect(() => {
     if (hasServerData.current) hasServerData.current = false;
@@ -86,6 +96,11 @@ export function DeliveryOrdersBoard({
   );
   const remaining = tasks.filter((task) => task.status !== "shipped");
   const overdue = remaining.filter((task) => deliveryTaskState(task, today) === "overdue");
+  const shown = ordered.filter((task) => {
+    if (filter === "open") return task.status !== "shipped";
+    if (filter === "closed") return task.status === "shipped";
+    return true;
+  });
   const headline = loading
     ? "กำลังโหลด…"
     : remaining.length === 0
@@ -102,16 +117,33 @@ export function DeliveryOrdersBoard({
         <span className={`status-pill ${overdue.length > 0 ? "is-late" : ""}`}>{headline}</span>
       </div>
 
+      <div className="delivery-board__filters" role="tablist" aria-label="ตัวกรองออเดอร์">
+        {FILTERS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={filter === option.value}
+            className={filter === option.value ? "delivery-board__filter is-on" : "delivery-board__filter"}
+            onClick={() => setFilter(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       {error ? <p className="delivery-board__error">{error}</p> : null}
 
-      {tasks.length === 0 && !loading ? (
+      {shown.length === 0 && !loading ? (
         <p className="delivery-board__empty">
-          ออเดอร์ที่ลูกค้าจ่ายเงินแล้วจะขึ้นที่นี่เอง — จ่ายก่อน 15:00 เป็นงานของทีมวันนี้ หลัง 15:00 ขึ้นให้ทีมพรุ่งนี้ด้วย
+          {filter === "closed"
+            ? "ยังไม่มีออเดอร์ที่ปิดแล้วในช่วงนี้"
+            : "ออเดอร์ที่ลูกค้าจ่ายเงินแล้วจะขึ้นที่นี่เอง — จ่ายก่อน 15:00 เป็นงานของทีมวันนี้ หลัง 15:00 ขึ้นให้ทีมพรุ่งนี้ด้วย"}
         </p>
       ) : null}
 
       <ul className="delivery-board__list">
-        {ordered.map((task) => {
+        {shown.map((task) => {
           const state = deliveryTaskState(task, today);
           const busy = busyId === task.id;
           const mine = isOwnShiftTask(task, viewer);

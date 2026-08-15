@@ -9,9 +9,11 @@ describe("canManageStaffAccounts", () => {
     assert.equal(canManageStaffAccounts("champ.championest@gmail.com"), true);
   });
 
-  it("เจ้าของอีกคนก็แก้รายชื่อไม่ได้ — คนละชั้นกัน", () => {
-    assert.equal(isOwner("namenrw@gmail.com"), true);
-    assert.equal(canManageStaffAccounts("namenrw@gmail.com"), false);
+  it("เจ้าของคนอื่นก็แก้รายชื่อไม่ได้ — คนละชั้นกัน", () => {
+    for (const owner of ["namenrw@gmail.com", "kittibhonlim@gmail.com"]) {
+      assert.equal(isOwner(owner), true, owner);
+      assert.equal(canManageStaffAccounts(owner), false, owner);
+    }
   });
 
   it("พนักงานแก้ไม่ได้ และค่าว่างไม่ผ่าน", () => {
@@ -24,7 +26,11 @@ describe("canManageStaffAccounts", () => {
     assert.equal(canManageStaffAccounts("  Champ.Championest@Gmail.com "), true);
   });
 
-  it("เจ้าของยังเป็นแชมป์กับเนมเหมือนเดิม ไม่ถูกกระทบ", () => {
-    assert.deepEqual(OWNER_EMAILS, ["champ.championest@gmail.com", "namenrw@gmail.com"]);
+  it("เจ้าของ = หุ้นส่วนสามคน (แชมป์ · เนม · เคน)", () => {
+    assert.deepEqual(OWNER_EMAILS, [
+      "champ.championest@gmail.com",
+      "namenrw@gmail.com",
+      "kittibhonlim@gmail.com",
+    ]);
   });
 });

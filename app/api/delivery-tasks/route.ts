@@ -18,7 +18,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { user, staffCode } = await actor();
-  const branch = new URL(request.url).searchParams.get("branch") || "bangkae";
+  const params = new URL(request.url).searchParams;
+  const branch = params.get("branch") || "bangkae";
+  // ปกติคืนเฉพาะใบที่ยังต้องทำ (deliveryTaskVisibleTo ตัดใบที่ส่งแล้วทิ้ง) — ตัวกรอง
+  // "ทั้งหมด / ปิดแล้ว" บนหน้าจอส่ง includeClosed มาเพื่อขอใบที่ปิดไปแล้วในช่วงล่าสุดด้วย
+  const includeClosed = params.get("includeClosed") === "1";
   const now = new Date();
   const today = bangkokWorkDate(now);
 
@@ -29,7 +33,9 @@ export async function GET(request: Request) {
     ]);
     const viewer = { isAdmin: isAdmin(user), staffCode: staffCode || null, shiftToday, today };
     const visible = sortDeliveryTasks(
-      tasks.filter((task) => deliveryTaskVisibleTo(task, viewer)),
+      tasks.filter(
+        (task) => deliveryTaskVisibleTo(task, viewer) || (includeClosed && task.status === "shipped")
+      ),
       today
     );
     return NextResponse.json({ tasks: visible, today, shiftToday, isAdmin: viewer.isAdmin, staffCode });

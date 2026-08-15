@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { DashboardChecklistStatus } from "../../components/DashboardChecklistStatus.tsx";
-import { DashboardTaskSections } from "../../components/DashboardTaskSections.tsx";
+import { AssignedDailyList } from "../../components/AssignedDailyList.tsx";
 import { MyProjects } from "../../components/MyProjects.tsx";
 import { TodayTaskList } from "../../components/TodayTaskList.tsx";
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
-import { TodayWorkBoard } from "../../components/TodayWorkBoard.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
 import { requireUser } from "../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../lib/employee-directory.ts";
@@ -18,6 +16,9 @@ import { formatWorkDate } from "../../lib/workflow-records.ts";
 import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../../lib/performance-daily-store.ts";
 
+// หน้าแรก = "งานที่มอบหมายให้ฉัน" เป็นหลัก แยกเป็น 3 ประเภทให้ชัด (รายวัน · งานประจำ/เป็นรอบ ·
+// งานโปรเจกต์) แล้วต่อด้วยออเดอร์ที่ต้องส่ง. รายการรวมยาวๆ ของทั้งร้านย้ายไปอยู่หน้าของมันเอง
+// (/checklist, /tasks) เพราะซ้ำกันและดันงานของตัวเองตกจอ.
 export default async function HomePage() {
   const user = await requireUser();
   const workDate = formatWorkDate();
@@ -25,13 +26,14 @@ export default async function HomePage() {
   const employeeCode = employeeCodeForEmail(user.email);
   const staffCode = resolveEmployeeByEmail(user.email);
   const branch = staffCode ? branchFor(staffCode) : "bangkae";
-  const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter((record) => {
-    if (user.role === "admin") return true;
-    return Boolean(employeeCode && (record.employeeName === employeeCode || record.employeeName === "ทีม บางแค"));
-  });
+  // หน้าแรกเป็นของ "คนที่เข้าระบบอยู่" เท่านั้น — แอดมินก็เห็นแค่งานของตัวเอง
+  // (ภาพรวมทั้งร้านอยู่ที่ /admin/ops) ไม่งั้นงานของตัวเองจมอยู่ในลิสต์ของทุกคน
+  const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
+    (record) => Boolean(employeeCode && (record.employeeName === employeeCode || record.employeeName === "ทีม บางแค"))
+  );
   // งานที่มอบหมายจาก 2 ส่วน: เจ้าของร้านมอบหมาย (work_assignments) + ส่งต่อจากกะปิดร้าน (work_handoffs)
   const assignedWorkFeed = assignedWorkFeedForViewer(await fetchAssignedWorkFeed(branch, workDate), {
-    isAdmin: user.role === "admin",
+    isAdmin: false,
     employeeCode
   });
 
@@ -58,16 +60,16 @@ export default async function HomePage() {
       <section className="board-hero apple-store-hero">
         <div>
           <p className="eyebrow">หน้าหลัก</p>
-          <h2>SOP Up Level</h2>
-          <p>ศูนย์งานประจำวันของทีมหน้าร้าน — checklist, stock, จัดส่ง, ปิดร้าน ในที่เดียว</p>
+          <h2>งานของฉันวันนี้</h2>
+          <p>งานที่มอบหมายให้คุณ · งานประจำที่ครบกำหนด · ออเดอร์ที่ต้องส่ง</p>
         </div>
         <div className="hero-actions">
           <Link href="/checklist" className="primary-action">เปิด Checklist</Link>
-          {user.role === "admin" ? <Link href="/admin/performance-score" className="btn-soft">คะแนนพนักงาน</Link> : null}
+          {user.role === "admin" ? <Link href="/admin" className="btn-soft">หน้ารวมงานจัดการ</Link> : null}
         </div>
       </section>
 
-      {/* บนสุด: รวมทุกกองของวันนี้ไว้ที่เดียว ก่อนจะเลื่อนลงไปทำทีละบล็อก */}
+      {/* บนสุด: เหลืออะไรบ้างวันนี้ แบบนับเป็นตัวเลข ไม่ใช่ลิสต์ยาว */}
       <TodaySummary
         phases={cardStoreWorkflow}
         branch={branch}
@@ -80,51 +82,67 @@ export default async function HomePage() {
 
       {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
 
-      {/* งานประจำของวันนี้ (รายวัน/สัปดาห์/เดือน รวมกัน) — เห็นตั้งแต่หน้าแรก ไม่ต้องไล่เปิดแท็บ */}
-      {staffCode ? (
-        <>
-          <section className="section-heading" id="today-tasks">
-            <p className="eyebrow">งานวันนี้</p>
-            <h3>งานประจำที่ครบกำหนดวันนี้</h3>
-          </section>
-          <TodayTaskList
-            branch={branch}
-            date={workDate}
-            shift={shiftToday === "s1" || shiftToday === "s2" ? shiftToday : null}
-            staffCode={staffCode}
-            readOnly={user.isImpersonating}
-          />
-        </>
-      ) : null}
+      <section className="section-heading" id="assigned-work">
+        <p className="eyebrow">งานที่มอบหมายให้ฉัน</p>
+        <h3>แยกตามประเภทงาน</h3>
+      </section>
 
-      {/* งานโปรเจกต์ (หลายวัน) อยู่บนหน้าหลัก — ถ้าซ่อนอยู่ในเมนู พนักงานไม่เห็นและลืมลง progress
-          ของวันนั้น ซึ่งเป็นทั้งงานเดียวที่ต้องแตะทุกวันและตัววัดว่าจะทันกำหนดไหม */}
-      {staffCode || user.role === "admin" ? (
+      {staffCode || employeeCode ? (
         <>
-          <section className="section-heading" id="assigned-work">
-            <p className="eyebrow">งานที่มอบหมาย</p>
-            <h3>งานที่มอบหมายให้ฉัน (เดี่ยว / กลุ่ม)</h3>
-          </section>
+          <article className="task-section">
+            <div className="task-section-head">
+              <div>
+                <p className="eyebrow">รายวัน</p>
+                <h3>งานรายวันที่มอบหมาย / ส่งต่อมาให้</h3>
+              </div>
+            </div>
+            <AssignedDailyList
+              records={assignedWorkRecords}
+              feed={assignedWorkFeed}
+              workDate={workDate}
+              canSeeStatus={user.role === "admin"}
+            />
+          </article>
+
           {staffCode ? (
-            <MyProjects branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} />
-          ) : (
-            // บัญชีแอดมินที่ไม่ได้ผูกรหัสพนักงานไม่มีงานของตัวเอง — ส่งไปหน้าที่คุมทุกโปรเจกต์แทน
-            <Link href="/admin/projects" className="primary-action">ดูงานที่มอบหมายทั้งหมด</Link>
-          )}
-        </>
-      ) : null}
+            <article className="task-section" id="today-tasks">
+              <div className="task-section-head">
+                <div>
+                  <p className="eyebrow">งานประจำ / เป็นรอบ</p>
+                  <h3>งานประจำที่ครบกำหนดวันนี้</h3>
+                </div>
+                <Link className="status-pill" href="/tasks">ดูงานประจำทั้งหมด</Link>
+              </div>
+              <TodayTaskList
+                branch={branch}
+                date={workDate}
+                shift={shiftToday === "s1" || shiftToday === "s2" ? shiftToday : null}
+                staffCode={staffCode}
+                readOnly={user.isImpersonating}
+              />
+            </article>
+          ) : null}
 
-      {/* ทุกอย่างที่ต้องทำวันนี้ในกระดานเดียว — รายวัน/สัปดาห์/เดือน/มอบหมาย/ส่งต่อ */}
-      <TodayWorkBoard
-        phases={cardStoreWorkflow}
-        assignedWorkRecords={assignedWorkRecords}
-        assignedWorkFeed={assignedWorkFeed}
-        deliveryTasks={deliveryTasks}
-        workDate={workDate}
-        canManageAssignedWork={user.role === "admin"}
-        staffCode={staffCode}
-        branch={branch}
-      />
+          {staffCode ? (
+            <article className="task-section">
+              <div className="task-section-head">
+                <div>
+                  <p className="eyebrow">งานโปรเจกต์</p>
+                  <h3>งานเดี่ยว / กลุ่ม ที่ต้องส่งความคืบหน้า</h3>
+                </div>
+                <Link className="status-pill" href="/projects">ดูทั้งหมด</Link>
+              </div>
+              <MyProjects branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} />
+            </article>
+          ) : null}
+        </>
+      ) : (
+        // บัญชีที่ไม่ได้ผูกรหัสพนักงานไม่มีงานของตัวเอง — ส่งไปหน้าที่คุมงานทุกคนแทน
+        <p className="assign-work__empty">
+          บัญชีนี้ยังไม่ผูกกับรหัสพนักงาน — ดูงานของทุกคนได้ที่{" "}
+          <Link href="/admin/projects">มอบหมายงานเดี่ยว/กลุ่ม</Link>
+        </p>
+      )}
 
       <div id="delivery" />
       <DeliveryOrdersBoard
@@ -133,17 +151,6 @@ export default async function HomePage() {
         initialToday={workDate}
         initialShift={shiftToday}
         canAct={!user.isImpersonating}
-      />
-
-      <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={staffCode} branch={branch} />
-      <DashboardTaskSections
-        phases={cardStoreWorkflow}
-        assignedWorkRecords={assignedWorkRecords}
-        assignedWorkFeed={assignedWorkFeed}
-        workDate={workDate}
-        canManageAssignedWork={user.role === "admin"}
-        staffCode={staffCode}
-        branch={branch}
       />
     </main>
   );
