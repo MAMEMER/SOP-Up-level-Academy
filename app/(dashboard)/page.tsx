@@ -8,6 +8,7 @@ import { requireUser } from "../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../lib/employee-directory.ts";
 import { assignedWorkRecordsForDate } from "../../lib/performance-service-records.ts";
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assigned-work-feed.ts";
+import { weeklyEventsActiveOn } from "../../lib/weekly-event-tasks.ts";
 import { DeliveryOrdersBoard } from "../../components/DeliveryOrdersBoard.tsx";
 import { fetchShiftForStaff, syncDeliveryTasks } from "../../lib/delivery-tasks-server.ts";
 import { deliveryTaskState, deliveryTaskVisibleTo, sortDeliveryTasks } from "../../lib/delivery-tasks.ts";
@@ -36,6 +37,11 @@ export default async function HomePage() {
     isAdmin: false,
     employeeCode
   });
+
+  // งานกิจกรรมประจำสัปดาห์ (Lorcana, Pokemon, Rift Bound ฯลฯ) ที่ "ถึงกำหนดวันนี้" ตาม activeDays
+  // = งานของทีมบางแค ขึ้นเป็นการ์ดแรกในหัวข้อ "งานที่มอบหมาย" อัตโนมัติทุกวันจัดกิจกรรม
+  // (ชุด activeDays เดียวกับที่ปฏิทินกิจกรรม /admin/calendar ใช้ → เชื่อมกันเสมอ)
+  const weeklyEventIds = branch === "bangkae" ? weeklyEventsActiveOn(workDate).map((event) => event.id) : [];
 
   // งานส่งของ: ออเดอร์ที่จ่ายเงินแล้วบนเว็บกิลด์ เด้งเข้ากะที่รับผิดชอบเอง
   // (ก่อน 15:00 = กะปัจจุบัน · ตั้งแต่ 15:00 = กะปัจจุบัน + กะถัดไป)
@@ -93,12 +99,13 @@ export default async function HomePage() {
             <div className="task-section-head">
               <div>
                 <p className="eyebrow">รายวัน</p>
-                <h3>งานรายวันที่มอบหมาย / ส่งต่อมาให้</h3>
+                <h3>งานกิจกรรม · งานที่มอบหมาย / ส่งต่อมาให้</h3>
               </div>
             </div>
             <AssignedDailyList
               records={assignedWorkRecords}
               feed={assignedWorkFeed}
+              weeklyEventIds={weeklyEventIds}
               workDate={workDate}
               canSeeStatus={user.role === "admin"}
             />
