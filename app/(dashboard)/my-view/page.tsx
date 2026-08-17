@@ -123,7 +123,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
         <p className="eyebrow">งานที่มอบหมาย</p>
         <h3>งานที่มอบหมาย (เดี่ยว / กลุ่ม)</h3>
       </section>
-      <MyProjects branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} />
+      <MyProjects branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} isAdmin={isOwner && !user.isImpersonating} />
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
       <DashboardTaskSections

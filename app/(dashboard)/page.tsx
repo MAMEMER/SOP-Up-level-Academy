@@ -139,7 +139,7 @@ export default async function HomePage() {
                 </div>
                 <Link className="status-pill" href="/projects">ดูทั้งหมด</Link>
               </div>
-              <MyProjects branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} />
+              <MyProjects branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} isAdmin={user.role === "admin" && !user.isImpersonating} />
             </article>
           ) : null}
         </>

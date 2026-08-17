@@ -5798,6 +5798,24 @@ main .page > section, main > section { margin-top: 16px !important; }
 .project-meter__target { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--color-ink); opacity: 0.55; }
 .project-meter__stats { margin: 0; font-size: 12.5px; color: var(--color-ink-soft); }
 
+/* แอดมินปรับแถบ % โดยตรง — คนละบล็อกกับฟอร์มส่ง progress ของคนทำ */
+.admin-percent {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 4px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(47,128,237,0.06); border: 1px dashed rgba(47,128,237,0.35);
+}
+.admin-percent__label { font-size: 12px; font-weight: 700; color: var(--color-ink-soft); letter-spacing: 0.02em; }
+.admin-percent__row { display: flex; align-items: center; gap: 10px; }
+.admin-percent__row input[type="range"] { flex: 1; min-height: 44px; accent-color: var(--color-orange); }
+.admin-percent__row > button {
+  min-width: 44px; min-height: 44px; border-radius: 12px; font-weight: 700; font-size: 15px;
+  border: 1px solid rgba(255,199,142,0.7); background: #fff; color: var(--color-ink); cursor: pointer;
+}
+.admin-percent__row > button:disabled { opacity: 0.4; cursor: not-allowed; }
+.admin-percent__value { min-width: 48px; text-align: right; font-size: 18px; color: var(--color-ink); }
+.admin-percent__save { align-self: flex-start; }
+.admin-percent__ok { font-size: 12.5px; font-weight: 600; color: #2E9E5B; }
+
 .project-progress-form { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed rgba(255,199,142,0.6); padding-top: 12px; }
 .project-progress-form textarea,
 .project-progress-form input[type="text"],

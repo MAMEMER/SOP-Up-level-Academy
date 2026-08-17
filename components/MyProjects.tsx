@@ -5,7 +5,7 @@ import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
 import { displayNameFor } from "../lib/employee-directory.ts";
-import { addProjectProgress, deleteProjectProgress, fetchProjectsForStaff } from "../lib/work-projects-store.ts";
+import { addProjectProgress, deleteProjectProgress, fetchProjectsForStaff, setProjectPercent } from "../lib/work-projects-store.ts";
 import { ANSWER_KIND_LABEL, answerNeedsInput } from "../lib/checklist-overrides.ts";
 import {
   MODE_LABEL,
@@ -31,12 +31,15 @@ export function MyProjects({
   branch,
   staffCode,
   today,
-  readOnly = false
+  readOnly = false,
+  isAdmin = false
 }: {
   branch: string;
   staffCode: string | null;
   today: string;
   readOnly?: boolean;
+  /** เจ้าของ/แอดมิน — โชว์ตัวปรับแถบ % ได้โดยตรง (เพิ่ม/ลด) */
+  isAdmin?: boolean;
 }) {
   const [projects, setProjects] = useState<WorkProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +100,10 @@ export function MyProjects({
 
             <ProjectMeter project={project} today={today} />
 
+            {isAdmin ? (
+              <AdminPercentControl project={project} startPercent={currentPercent(project)} onSaved={load} />
+            ) : null}
+
             {project.status === "active" ? (
               needsToday ? (
                 <p className="project-card__nudge">
@@ -149,6 +156,74 @@ export function MyProjects({
 
 function nowHhMm(): string {
   return new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" });
+}
+
+// เจ้าของ/แอดมินปรับแถบ % ของงานได้โดยตรง — เพิ่ม/ลด แล้วกดบันทึก
+// (คนละช่องกับ "ส่ง progress" ของคนทำที่ต้องเขียนโน้ต) ใช้ตอนคนทำลง % ผิด
+// หรืออยากปรับให้ตรงหน้างานจริง. บันทึกแล้วขึ้น log ว่าเป็นแอดมินปรับ.
+function AdminPercentControl({
+  project,
+  startPercent,
+  onSaved
+}: {
+  project: WorkProject;
+  startPercent: number;
+  onSaved: () => Promise<void>;
+}) {
+  const [percent, setPercent] = useState(startPercent);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  // เมื่อ progress ใหม่เข้ามา (คนทำลงเพิ่ม/รีโหลด) ให้เด้งค่าเริ่มต้นตามของจริง
+  useEffect(() => {
+    setPercent(startPercent);
+  }, [startPercent]);
+
+  const clamp = (value: number) => Math.max(0, Math.min(100, value));
+  const changed = percent !== startPercent;
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await setProjectPercent(project.id, percent);
+      setSaved(true);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ปรับ % ไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-percent">
+      <span className="admin-percent__label">แอดมินปรับแถบ %</span>
+      <div className="admin-percent__row">
+        <button type="button" onClick={() => { setPercent((p) => clamp(p - 5)); setSaved(false); }} disabled={busy || percent <= 0} aria-label="ลด 5%">−5</button>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={percent}
+          onChange={(e) => { setPercent(clamp(Number(e.target.value))); setSaved(false); }}
+          aria-label="ปรับเปอร์เซ็นต์งาน"
+        />
+        <button type="button" onClick={() => { setPercent((p) => clamp(p + 5)); setSaved(false); }} disabled={busy || percent >= 100} aria-label="เพิ่ม 5%">+5</button>
+        <strong className="admin-percent__value">{percent}%</strong>
+      </div>
+      {changed ? (
+        <button type="button" className="primary-action admin-percent__save" onClick={save} disabled={busy}>
+          {busy ? "กำลังบันทึก…" : `บันทึกเป็น ${percent}%`}
+        </button>
+      ) : saved ? (
+        <span className="admin-percent__ok">บันทึกแล้ว</span>
+      ) : null}
+      {error ? <p className="project-progress-form__error">{error}</p> : null}
+    </div>
+  );
 }
 
 function ProgressForm({

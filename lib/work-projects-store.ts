@@ -106,3 +106,8 @@ export async function addProjectProgress(input: {
 export async function deleteProjectProgress(id: string, progressId: string): Promise<void> {
   await post({ action: "deleteProgress", id, progressId });
 }
+
+/** แอดมินปรับแถบ % ของงานโดยตรง (เพิ่ม/ลด) — server ตรวจสิทธิ์ว่าเป็นแอดมินจาก session */
+export async function setProjectPercent(id: string, percent: number): Promise<void> {
+  await post({ action: "setPercent", id, percent });
+}

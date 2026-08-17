@@ -21,7 +21,7 @@ export default async function ProjectsPage() {
           <p>งานเดี่ยว/กลุ่ม ที่เจ้าของสั่งไว้ — งานวันเดียวส่งครั้งเดียวจบ · งานหลายวันส่ง progress อย่างน้อยวันละครั้ง</p>
         </div>
       </section>
-      <MyProjects branch={branch} staffCode={staffCode} today={formatWorkDate()} readOnly={user.isImpersonating} />
+      <MyProjects branch={branch} staffCode={staffCode} today={formatWorkDate()} readOnly={user.isImpersonating} isAdmin={user.role === "admin" && !user.isImpersonating} />
     </main>
   );
 }

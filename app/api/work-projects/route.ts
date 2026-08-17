@@ -295,6 +295,37 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      // ── แอดมินปรับ % ของงานโดยตรง (เพิ่ม/ลด) โดยไม่ต้องเขียนโน้ตเหมือนคนทำ ───
+      // ใช้ตอนเจ้าของอยากแก้แถบ % ที่คนทำลงมาผิด หรืออยากปรับให้ตรงหน้างานจริง
+      case "setPercent": {
+        if (!isAdmin(user)) return forbidden();
+        const id = docId(body.id);
+        if (!id) return badRequest("missing_id");
+        const project = await load(id);
+        if (project instanceof NextResponse) return project;
+        const percent = clampPercent(Number(body.percent));
+        if (!Number.isFinite(percent)) return badRequest("bad_percent");
+        const date = isIsoDate(body.date) ? (body.date as string) : nowIso.slice(0, 10);
+        const entry: ProjectProgress = {
+          id: `pg__${nowIso}__admin`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
+          date,
+          at: nowIso,
+          by: user.actualEmail,
+          percent,
+          // โน้ตอัตโนมัติให้เห็นชัดว่าแถบ % นี้เจ้าของเป็นคนปรับเอง ไม่ใช่คนทำลง
+          note: `ปรับ % โดยแอดมิน (${user.actualName || user.actualEmail}) → ${percent}%`
+        };
+        const progress = [...(project.progress || []), entry].slice(-MAX_PROJECT_PROGRESS);
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
+          progress,
+          updatedAt: nowIso,
+          // ปรับถึง 100% = ปิดงาน · ปรับลงต่ำกว่า 100 ในงานที่ปิดไปแล้ว = เปิดใหม่
+          ...(percent >= 100 && project.status === "active" ? { status: "done" as ProjectStatus } : {}),
+          ...(percent < 100 && project.status === "done" ? { status: "active" as ProjectStatus } : {})
+        });
+        return NextResponse.json({ ok: true });
+      }
+
       // ── ลบ progress ที่ลงผิด (คนลงเอง หรือแอดมิน) ──────────────────────────
       case "deleteProgress": {
         const id = docId(body.id);
