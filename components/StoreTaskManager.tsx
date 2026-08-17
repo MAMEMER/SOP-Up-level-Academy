@@ -20,7 +20,7 @@ import { weeklyEvents } from "../lib/weekly-event-tasks.ts";
 // ต่างกันแค่ "สั่งบ่อยแค่ไหน" กับ "ลงวันไหน" และทุกงานตั้งค่าได้เหมือนกันหมด:
 // ใครทำ (กะ) · เริ่มทำได้ตั้งแต่ · ต้องจบไม่เกิน · ส่งงานแบบไหน · รายละเอียด · หมวดหมู่.
 
-const FREQUENCIES: WorkFrequency[] = ["daily", "weekly", "monthly", "event"];
+const FREQUENCIES: WorkFrequency[] = ["daily", "weekly", "biweekly", "monthly", "event"];
 const SHIFTS: Array<{ value: ShiftCode; label: string }> = [
   { value: "s1", label: "กะ 1" },
   { value: "s2", label: "กะ 2" }
@@ -249,6 +249,20 @@ export function StoreTaskManager({ branch }: { branch: string }) {
                           ))}
                         </div>
                       </div>
+                    ) : null}
+
+                    {task.schedule.frequency === "biweekly" ? (
+                      <label>
+                        เริ่มรอบแรกวันไหน (จากนั้นลงซ้ำทุก 2 สัปดาห์ วันเดียวกัน)
+                        <input
+                          type="date"
+                          value={task.schedule.startDate || ""}
+                          onChange={(e) => patch(task.id, { schedule: { ...task.schedule, startDate: e.target.value } })}
+                        />
+                        <small className="task-row__hint">
+                          เช่น เริ่มจันทร์ 18 ส.ค. → ลงทุกจันทร์เว้นสัปดาห์: 18 ส.ค. · 1 ก.ย. · 15 ก.ย. …
+                        </small>
+                      </label>
                     ) : null}
 
                     {task.schedule.frequency === "event" ? (
