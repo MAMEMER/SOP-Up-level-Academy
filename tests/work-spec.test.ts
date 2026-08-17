@@ -7,6 +7,7 @@ import {
   isForStaff,
   lastDayOfMonth,
   monthDayOf,
+  normalizeWorkSpec,
   ownerModeLabel,
   scheduleLabel,
   specsDueFor,
@@ -70,9 +71,36 @@ describe("work spec — ลงวันไหน", () => {
     assert.equal(isDueOn(range, "2026-08-15"), false);
   });
 
+  it("สัปดาห์เว้นสัปดาห์ ลงทุก 2 สัปดาห์นับจากวันหมุด (เริ่ม 18 ส.ค. 2026)", () => {
+    const biweekly = { frequency: "biweekly" as const, startDate: "2026-08-18" };
+    assert.equal(weekdayOf("2026-08-18"), 2); // 18 ส.ค. 2026 = อังคาร
+    assert.equal(isDueOn(biweekly, "2026-08-18"), true); // รอบแรก
+    assert.equal(isDueOn(biweekly, "2026-08-25"), false); // สัปดาห์เว้น = ข้าม
+    assert.equal(isDueOn(biweekly, "2026-09-01"), true); // +14 วัน
+    assert.equal(isDueOn(biweekly, "2026-09-15"), true); // +28 วัน
+    assert.equal(isDueOn(biweekly, "2026-09-08"), false); // สัปดาห์เว้น
+    assert.equal(isDueOn(biweekly, "2026-08-19"), false); // คนละวันในสัปดาห์
+  });
+
+  it("สัปดาห์เว้นสัปดาห์ ก่อนวันหมุด = ยังไม่ต้องทำ · ไม่มีวันหมุด = ไม่ขึ้นวันไหนเลย", () => {
+    assert.equal(isDueOn({ frequency: "biweekly", startDate: "2026-08-18" }, "2026-08-04"), false);
+    assert.equal(isDueOn({ frequency: "biweekly" }, "2026-08-18"), false);
+  });
+
+  it("normalize เก็บวันหมุดของสัปดาห์เว้นสัปดาห์ไว้ (ไม่ถูกตัดทิ้ง)", () => {
+    const clean = normalizeWorkSpec(
+      { title: "งานเว้นสัปดาห์", schedule: { frequency: "biweekly", startDate: "2026-08-18" } },
+      0
+    );
+    assert.equal(clean?.schedule.frequency, "biweekly");
+    assert.equal(clean?.schedule.startDate, "2026-08-18");
+  });
+
   it("อ่านออกว่าลงวันไหน", () => {
     assert.equal(scheduleLabel({ frequency: "daily" }), "ทุกวัน");
     assert.equal(scheduleLabel({ frequency: "weekly", weekdays: [1, 4] }), "ทุกสัปดาห์ · วันจ พฤ");
+    assert.equal(scheduleLabel({ frequency: "biweekly", startDate: "2026-08-18" }), "ทุก 2 สัปดาห์ · วันอ · เริ่ม 2026-08-18");
+    assert.equal(scheduleLabel({ frequency: "biweekly" }), "ทุก 2 สัปดาห์");
     assert.equal(scheduleLabel({ frequency: "monthly", monthDays: [5] }), "ทุกเดือน · วันที่ 5");
   });
 });

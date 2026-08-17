@@ -19,11 +19,12 @@ import { weeklyEvents } from "./weekly-event-tasks.ts";
 
 // ---- สั่งบ่อยแค่ไหน + ลงวันไหน ------------------------------------------------
 
-export type WorkFrequency = "daily" | "weekly" | "monthly" | "event" | "once" | "range";
+export type WorkFrequency = "daily" | "weekly" | "biweekly" | "monthly" | "event" | "once" | "range";
 
 export const FREQUENCY_LABEL: Record<WorkFrequency, string> = {
   daily: "ทุกวัน",
   weekly: "ทุกสัปดาห์",
+  biweekly: "สัปดาห์เว้นสัปดาห์",
   monthly: "ทุกเดือน",
   event: "ทุกวันที่มีกิจกรรม",
   once: "ครั้งเดียว",
@@ -41,10 +42,20 @@ export type WorkSchedule = {
   monthDays?: number[];
   /** event: ผูกกับกิจกรรมประจำสัปดาห์ (key ของ weeklyEvents) — ลงเองตามวันที่กิจกรรมนั้นจัด */
   eventKey?: string;
-  /** once / range: วันเริ่ม–วันจบ (once ใช้ startDate อย่างเดียว) */
+  /**
+   * biweekly / once / range: วันเริ่ม–วันจบ (once ใช้ startDate อย่างเดียว).
+   * biweekly ใช้ startDate เป็นวันหมุด แล้วลงซ้ำทุก 14 วันนับจากวันนั้น (วันในสัปดาห์เดียวกัน).
+   */
   startDate?: string;
   endDate?: string;
 };
+
+/** จำนวนวันเต็มระหว่างสองวัน YYYY-MM-DD (ยึดเที่ยงวันเวลาไทยกันเพี้ยนข้ามช่วงเวลา) */
+export function daysBetween(from: string, to: string): number {
+  const start = Date.parse(`${from}T12:00:00+07:00`);
+  const end = Date.parse(`${to}T12:00:00+07:00`);
+  return Math.round((end - start) / 86_400_000);
+}
 
 /** วันในสัปดาห์ของ YYYY-MM-DD ตามเวลาไทย */
 export function weekdayOf(date: string): number {
@@ -77,6 +88,12 @@ export function isDueOn(schedule: WorkSchedule, date: string): boolean {
     case "weekly": {
       const days = schedule.weekdays || [];
       return days.length === 0 || days.includes(weekdayOf(date));
+    }
+    case "biweekly": {
+      // ลงทุก 2 สัปดาห์นับจากวันหมุด (startDate) — วันในสัปดาห์เดียวกันเสมอ
+      // เพราะ 14 หารด้วย 7 ลงตัว. ก่อนวันหมุดยังไม่ถึงรอบ = ยังไม่ต้องทำ
+      if (!schedule.startDate || date < schedule.startDate) return false;
+      return daysBetween(schedule.startDate, date) % 14 === 0;
     }
     case "monthly": {
       const days = (schedule.monthDays || []).length ? schedule.monthDays! : [1];
@@ -111,6 +128,10 @@ export function scheduleLabel(schedule: WorkSchedule): string {
       const days = schedule.weekdays || [];
       return days.length ? `ทุกสัปดาห์ · วัน${days.map((day) => WEEKDAY_LABEL[day]).join(" ")}` : "ทุกสัปดาห์";
     }
+    case "biweekly":
+      return schedule.startDate
+        ? `ทุก 2 สัปดาห์ · วัน${WEEKDAY_LABEL[weekdayOf(schedule.startDate)]} · เริ่ม ${schedule.startDate}`
+        : "ทุก 2 สัปดาห์";
     case "monthly": {
       const days = schedule.monthDays || [];
       return days.length ? `ทุกเดือน · วันที่ ${days.join(", ")}` : "ทุกเดือน · วันที่ 1";
@@ -240,9 +261,9 @@ export function normalizeWorkSpec(raw: Partial<WorkSpec>, index: number): WorkSp
   const title = typeof raw.title === "string" ? raw.title.trim() : "";
   if (!title) return null;
   const id = (typeof raw.id === "string" && raw.id.trim()) || `task-${index + 1}`;
-  const frequency: WorkFrequency = (["daily", "weekly", "monthly", "event", "once", "range"] as WorkFrequency[]).includes(
-    raw.schedule?.frequency as WorkFrequency
-  )
+  const frequency: WorkFrequency = (
+    ["daily", "weekly", "biweekly", "monthly", "event", "once", "range"] as WorkFrequency[]
+  ).includes(raw.schedule?.frequency as WorkFrequency)
     ? (raw.schedule!.frequency as WorkFrequency)
     : "daily";
   const numbers = (value: unknown, min: number, max: number) =>
@@ -263,7 +284,7 @@ export function normalizeWorkSpec(raw: Partial<WorkSpec>, index: number): WorkSp
   if (frequency === "event" && typeof raw.schedule?.eventKey === "string" && raw.schedule.eventKey.trim()) {
     schedule.eventKey = raw.schedule.eventKey.trim();
   }
-  if (frequency === "once" || frequency === "range") {
+  if (frequency === "biweekly" || frequency === "once" || frequency === "range") {
     if (isDate(raw.schedule?.startDate)) schedule.startDate = raw.schedule!.startDate;
     if (frequency === "range" && isDate(raw.schedule?.endDate)) schedule.endDate = raw.schedule!.endDate;
   }
