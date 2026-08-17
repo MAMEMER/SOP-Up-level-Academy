@@ -16,6 +16,13 @@ import {
 import { isValidLinkUrl } from "../../../lib/checklist-links.ts";
 import { normalizeItemAnswer } from "../../../lib/checklist-overrides.ts";
 import { isHhMm } from "../../../lib/work-spec.ts";
+import {
+  computeReviewPoints,
+  effectiveDue,
+  hasOpenRevision,
+  reviewEntriesFor
+} from "../../../lib/project-review.ts";
+import type { ProjectReviewEntry } from "../../../lib/work-projects.ts";
 
 // Server route for งานแบบโปรเจกต์ (หลายวัน + ส่ง progress รายวัน). Same shape as
 // /api/work-tasks: session-verified, blocked while impersonating, Admin SDK does the write,
@@ -339,6 +346,93 @@ export async function POST(request: Request) {
         await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
           progress: (project.progress || []).filter((entry) => entry.id !== progressId),
           updatedAt: nowIso
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── แอดมิน "ยืนยันผ่าน" งานของคนคนหนึ่ง → คิดคะแนน KPI ให้อัตโนมัติ ──────
+      // เร็ว/ตรงเวลา/แก้ทัน/ช้า คิดจากวันส่งจริงเทียบกำหนดที่มีผล (เดิม หรือกำหนดแก้ไข).
+      case "reviewApprove": {
+        if (!isAdmin(user)) return forbidden();
+        const id = docId(body.id);
+        const assignee = str(body.assignee).trim();
+        if (!id || !assignee) return badRequest("missing_params");
+        const project = await load(id);
+        if (project instanceof NextResponse) return project;
+        if (!project.assignees.includes(assignee)) return badRequest("ไม่พบชื่อคนนี้ในงาน");
+        const submittedDate = isIsoDate(body.submittedDate) ? (body.submittedDate as string) : nowIso.slice(0, 10);
+        const dueDate = effectiveDue(project, assignee);
+        const hadRevision = hasOpenRevision(reviewEntriesFor(project, assignee));
+        const comp = computeReviewPoints({ verdict: "approve", dueDate, submittedDate, hadRevision });
+        const entry: ProjectReviewEntry = {
+          id: `rv__${nowIso}__${assignee}`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
+          assignee,
+          outcome: comp.outcome,
+          dueDate,
+          submittedDate,
+          daysLate: comp.daysLate,
+          points: comp.points,
+          ...(str(body.note).trim() ? { note: str(body.note).trim() } : {}),
+          confirmedBy: user.actualEmail,
+          ...(user.actualName ? { confirmedByName: user.actualName } : {}),
+          confirmedAt: nowIso
+        };
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
+          reviews: [...(project.reviews || []), entry],
+          updatedAt: nowIso,
+          history: stamp(project, { action: "review", detail: `ยืนยันผ่าน ${assignee}: ${comp.outcome} (${comp.points >= 0 ? "+" : ""}${comp.points})` })
+        });
+        return NextResponse.json({ ok: true, points: comp.points, outcome: comp.outcome });
+      }
+
+      // ── แอดมิน "ให้แก้ไข" งานของคนคนหนึ่ง → หัก −1 ทันที + ตั้งกำหนดส่งใหม่ ────
+      case "reviewRequestFix": {
+        if (!isAdmin(user)) return forbidden();
+        const id = docId(body.id);
+        const assignee = str(body.assignee).trim();
+        const revisedDue = str(body.revisedDue);
+        if (!id || !assignee) return badRequest("missing_params");
+        if (!isIsoDate(revisedDue)) return badRequest("ต้องระบุกำหนดส่งแก้ไขใหม่");
+        const project = await load(id);
+        if (project instanceof NextResponse) return project;
+        if (!project.assignees.includes(assignee)) return badRequest("ไม่พบชื่อคนนี้ในงาน");
+        const dueDate = effectiveDue(project, assignee);
+        const comp = computeReviewPoints({ verdict: "request_fix", dueDate, hadRevision: false });
+        const entry: ProjectReviewEntry = {
+          id: `rv__${nowIso}__${assignee}`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
+          assignee,
+          outcome: comp.outcome,
+          dueDate,
+          revisedDue,
+          daysLate: 0,
+          points: comp.points,
+          ...(str(body.note).trim() ? { note: str(body.note).trim() } : {}),
+          confirmedBy: user.actualEmail,
+          ...(user.actualName ? { confirmedByName: user.actualName } : {}),
+          confirmedAt: nowIso
+        };
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
+          reviews: [...(project.reviews || []), entry],
+          updatedAt: nowIso,
+          history: stamp(project, { action: "review", detail: `ให้แก้ไข ${assignee}: −1 · กำหนดใหม่ ${revisedDue}` })
+        });
+        return NextResponse.json({ ok: true, points: comp.points });
+      }
+
+      // ── แอดมินลบผลตรวจที่กดผิด (แก้ประวัติคะแนน) ────────────────────────────
+      case "deleteReview": {
+        if (!isAdmin(user)) return forbidden();
+        const id = docId(body.id);
+        const reviewId = str(body.reviewId).trim();
+        if (!id || !reviewId) return badRequest("missing_params");
+        const project = await load(id);
+        if (project instanceof NextResponse) return project;
+        const target = (project.reviews || []).find((entry) => entry.id === reviewId);
+        if (!target) return badRequest("not_found");
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
+          reviews: (project.reviews || []).filter((entry) => entry.id !== reviewId),
+          updatedAt: nowIso,
+          history: stamp(project, { action: "review", detail: `ลบผลตรวจ ${target.assignee}: ${target.outcome} (${target.points >= 0 ? "+" : ""}${target.points})` })
         });
         return NextResponse.json({ ok: true });
       }

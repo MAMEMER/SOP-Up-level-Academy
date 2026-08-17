@@ -111,3 +111,18 @@ export async function deleteProjectProgress(id: string, progressId: string): Pro
 export async function setProjectPercent(id: string, percent: number): Promise<void> {
   await post({ action: "setPercent", id, percent });
 }
+
+/** แอดมิน "ยืนยันผ่าน" งานของคนคนหนึ่ง — server คิดคะแนน KPI ให้ (เร็ว/ตรงเวลา/แก้ทัน/ช้า) */
+export async function reviewApproveWork(input: { id: string; assignee: string; submittedDate: string; note?: string }): Promise<void> {
+  await post({ action: "reviewApprove", ...input });
+}
+
+/** แอดมิน "ให้แก้ไข" งานของคนคนหนึ่ง — หัก −1 ทันที + ตั้งกำหนดส่งใหม่ */
+export async function reviewRequestFix(input: { id: string; assignee: string; revisedDue: string; note?: string }): Promise<void> {
+  await post({ action: "reviewRequestFix", ...input });
+}
+
+/** แอดมินลบผลตรวจที่กดผิด */
+export async function deleteProjectReview(id: string, reviewId: string): Promise<void> {
+  await post({ action: "deleteReview", id, reviewId });
+}

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
+import { ProjectReviewPanel } from "./ProjectReviewPanel.tsx";
 import { ProjectAssignForm, type StaffOption } from "./ProjectAssignForm.tsx";
+import { ASSIGNEE_STATUS_CLASS, ASSIGNEE_STATUS_LABEL, assigneeStatus } from "../lib/project-review.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { type TeamOption } from "../lib/team-options.ts";
 import {
@@ -117,6 +119,7 @@ function ProjectRow({
   const [endDate, setEndDate] = useState(project.endDate);
   const [assignees, setAssignees] = useState<string[]>(project.assignees);
   const [busy, setBusy] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const needsToday = teamNeedsProgressToday(project, today);
   const todayCount = progressCount(project, today);
@@ -163,6 +166,18 @@ function ProjectRow({
       {project.expectedResult ? <p className="project-card__detail">งานเสร็จคือ: {project.expectedResult}</p> : null}
 
       <ProjectMeter project={project} today={today} />
+
+      {/* สถานะคะแนนรายคน — เห็นได้ทันทีว่าใครผ่าน/ต้องแก้/ล่าช้า */}
+      <div className="project-card__statuses">
+        {project.assignees.map((code) => {
+          const status = assigneeStatus(project, code);
+          return (
+            <span key={code} className={`project-card__pstat ${ASSIGNEE_STATUS_CLASS[status]}`}>
+              {displayNameFor(code)}: {ASSIGNEE_STATUS_LABEL[status]}
+            </span>
+          );
+        })}
+      </div>
 
       {/* เป้าคือวันละอย่างน้อย 1 ครั้งจากใครก็ได้ในทีม — ไม่ใช่ทุกคนต้องลงของตัวเอง */}
       {needsToday ? (
@@ -255,9 +270,15 @@ function ProjectRow({
         {error ? <p className="project-progress-form__error">{error}</p> : null}
       </div>
 
-      <button type="button" className="project-card__toggle" onClick={onToggleOpen}>
-        {open ? "ซ่อนความคืบหน้ารายวัน" : "ดูความคืบหน้ารายวัน"}
-      </button>
+      <div className="project-card__toggles">
+        <button type="button" className="project-card__toggle" onClick={onToggleOpen}>
+          {open ? "ซ่อนความคืบหน้ารายวัน" : "ดูความคืบหน้ารายวัน"}
+        </button>
+        <button type="button" className="project-card__toggle" onClick={() => setReviewOpen((v) => !v)}>
+          {reviewOpen ? "ซ่อนตรวจงาน & คะแนน" : "ตรวจงาน & คะแนน"}
+        </button>
+      </div>
+      {reviewOpen ? <ProjectReviewPanel project={project} today={today} onChanged={onChanged} /> : null}
       {open ? (
         <ProjectProgressList
           project={project}

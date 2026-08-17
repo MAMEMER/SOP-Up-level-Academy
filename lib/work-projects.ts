@@ -36,8 +36,37 @@ export type ProjectProgress = {
 export type ProjectHistoryEntry = {
   at: string;
   by: string;
-  action: "created" | "dates" | "assignees" | "status" | "detail";
+  action: "created" | "dates" | "assignees" | "status" | "detail" | "review";
   detail: string;
+};
+
+/**
+ * ผลตรวจงานรายคน (KPI งานที่มอบหมาย). แต่ละคนที่มีชื่อในงานได้คะแนนแยกกัน — ดูสเปกเต็มใน
+ * lib/project-review.ts. บันทึกลง Firestore เป็น ledger (ต่อท้ายเรื่อยๆ) เพื่อย้อนตรวจได้ว่า
+ * ใครหัก/คืนคะแนนตอนไหน เพราะอะไร. คะแนนจะนับก็ต่อเมื่อแอดมิน/เจ้าของร้านกดยืนยันผลตรวจแล้วเท่านั้น.
+ */
+export type ProjectReviewOutcome = "early_pass" | "ontime_pass" | "needs_fix" | "fixed_pass" | "late";
+
+export type ProjectReviewEntry = {
+  id: string;
+  /** staff code ของคนที่ถูกตรวจ */
+  assignee: string;
+  outcome: ProjectReviewOutcome;
+  /** กำหนดส่งที่ยึดตอนตรวจครั้งนี้ (เดิม หรือ กำหนดใหม่กรณีตีกลับ) — YYYY-MM-DD */
+  dueDate: string;
+  /** กำหนดส่งแก้ไข (ตั้งตอนสั่งให้แก้) — YYYY-MM-DD */
+  revisedDue?: string;
+  /** วันที่ส่งงานจริงที่ใช้คิดคะแนน — YYYY-MM-DD */
+  submittedDate?: string;
+  /** จำนวนวันที่ล่าช้า (0 ถ้าไม่ช้า) */
+  daysLate: number;
+  /** คะแนนของรายการนี้ (signed) — + เพิ่ม/คืน · − หัก */
+  points: number;
+  note?: string;
+  /** อีเมลผู้กดยืนยันผลตรวจ */
+  confirmedBy: string;
+  confirmedByName?: string;
+  confirmedAt: string;
 };
 
 /**
@@ -71,6 +100,8 @@ export type WorkProject = {
   updatedAt: string;
   progress: ProjectProgress[];
   history?: ProjectHistoryEntry[];
+  /** ledger ผลตรวจรายคน (KPI งานที่มอบหมาย) — ดู lib/project-review.ts */
+  reviews?: ProjectReviewEntry[];
 };
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
