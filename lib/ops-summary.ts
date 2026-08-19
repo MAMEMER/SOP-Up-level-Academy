@@ -3,6 +3,7 @@ import { listAllRecordsInScopeRange, listRecordsForScopeKey, storageMode } from 
 import { dailyScopeKey, monthlyScopeKey, weeklyScopeKey, type WorkRecordDoc } from "./work-records.ts";
 import { isoWeekKey } from "./periodic-tasks.ts";
 import { recordsFromDayPayloads, type WorkflowDailyRecord, type WorkflowDayPayload } from "./workflow-records.ts";
+import type { NamedWorkflowRecord } from "./monthly-summary-view.ts";
 import { cardStoreWorkflow } from "./card-store-workflow.ts";
 import type { WorkAssignment, WorkHandoff } from "./work-assignments-store.ts";
 import { fetchAssignmentsForDateServer, fetchOpenHandoffsServer } from "./work-assignments-server.ts";
@@ -188,4 +189,21 @@ export async function getMonthlyTeamRecords(monthKey: string): Promise<WorkflowD
     [] as WorkRecordDoc[]
   );
   return dayPayloads(docs);
+}
+
+/**
+ * Same month range, but each record keeps the staff member who wrote it. The monthly
+ * monitor lets the owner focus one day + one work type and see who submitted what — for
+ * that it needs per-record attribution, which the flat `getMonthlyTeamRecords` drops.
+ */
+export async function getMonthlyTeamRecordsByStaff(monthKey: string): Promise<NamedWorkflowRecord[]> {
+  if (storageMode() === "unavailable") return [];
+  const docs = await safe(
+    () => listAllRecordsInScopeRange(dailyScopeKey(`${monthKey}-01`), dailyScopeKey(`${monthKey}-31`)),
+    [] as WorkRecordDoc[]
+  );
+  return docs.flatMap((doc) => {
+    const employeeName = doc.employeeName || doc.employeeEmail;
+    return dayPayloads([doc]).map((record) => ({ ...record, employeeName, employeeEmail: doc.employeeEmail }));
+  });
 }
