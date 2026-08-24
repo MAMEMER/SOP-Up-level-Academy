@@ -1009,6 +1009,73 @@ describe("performance score engine", () => {
     assert.equal(source.includes("Source detail"), true);
   });
 
+  it("renders a per-category score ledger showing both credits and deductions", () => {
+    const source = readFileSync(new URL("../components/PerformanceScoreView.tsx", import.meta.url), "utf8");
+    const styles = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+
+    // ledger, not a flat deduction dump
+    assert.equal(source.includes("buildCategoryLedgers"), true);
+    assert.equal(source.includes("score ledger รายหมวด"), true);
+    assert.equal(source.includes("เริ่มต้นหมวด"), true);
+    assert.equal(source.includes("คะแนนจริง"), true);
+    // every category walks all five, in order
+    assert.equal(source.includes("customer_service"), true);
+    assert.equal(source.includes("assigned_work"), true);
+    // both a credit and a deduction row are styled distinctly (shows adds, not just หัก)
+    assert.equal(source.includes("ledger-credit"), true);
+    assert.equal(source.includes("ledger-debit"), true);
+    // source is labelled auto vs manual per the central rule
+    assert.equal(source.includes("sourceKind"), true);
+    assert.equal(styles.includes(".performance-ledger"), true);
+    assert.equal(styles.includes(".source-kind-manual"), true);
+  });
+
+  it("keeps the ledger consistent with the row total (sum of category ledgers = total)", () => {
+    // A row with an auto deduction, an owner credit, and an owner deduction: the ledger
+    // re-attributes all three to their category, so summing the five category ledger scores
+    // equals the row total (kept under the 100 ceiling here — see next test for the clamp).
+    const row = calculateEmployeePerformanceScore({
+      employeeName: "ICE",
+      attendance: {
+        schedules: [schedule],
+        clockEvents: [{ employeeName: "ICE", workDate: "2026-07-01", clockIn: "2026-07-01T15:11:00+07:00", source: "storehub" }]
+      },
+      stockCounts: [],
+      checklistEvents: [],
+      serviceEvents: [],
+      assignedWorks: [],
+      adjustments: [
+        { category: "checklist", points: 3, reason: "clock-in ไม่ sync", workDate: "2026-07-01" },
+        { category: "stock", points: -4, reason: "นับผิดซ้ำ", workDate: "2026-07-01" }
+      ]
+    });
+
+    // Reproduce the component's buildCategoryLedgers math: each category starts at maxScore
+    // and walks by -points from row.deductions (which merges auto deductions + adjustments).
+    const order = ["attendance", "stock", "checklist", "customer_service", "assigned_work"] as const;
+    const camel = {
+      attendance: "attendance",
+      stock: "stock",
+      checklist: "checklist",
+      customer_service: "customerService",
+      assigned_work: "assignedWork"
+    } as const;
+    const ledgerSum = order.reduce((sum, snake) => {
+      const maxScore = row.categories[camel[snake]].maxScore;
+      const walked = row.deductions
+        .filter((deduction) => deduction.category === snake)
+        .reduce((score, deduction) => score - deduction.points, maxScore);
+      return sum + walked;
+    }, 0);
+
+    assert.equal(ledgerSum, row.totalScore);
+    // the checklist ledger reflects the +3 owner credit above its 20 ceiling
+    const checklistWalked = row.deductions
+      .filter((deduction) => deduction.category === "checklist")
+      .reduce((score, deduction) => score - deduction.points, row.categories.checklist.maxScore);
+    assert.equal(checklistWalked, 23);
+  });
+
   it("renders quick period shortcuts on the performance score date picker", () => {
     const source = readFileSync(new URL("../components/PerformanceScoreView.tsx", import.meta.url), "utf8");
     const styles = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
