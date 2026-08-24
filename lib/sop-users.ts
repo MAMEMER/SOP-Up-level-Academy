@@ -14,6 +14,8 @@ import type { Role } from "./permissions.ts";
 // Leavers are removed here AND deactivated in the `sop_staff` collection, which
 // overrides this seed at runtime — editing only one of the two leaves them
 // signed in. ไอซ์ (phooreephat.k) resigned 2026-08-01.
+// 2026-08-24: Champ สั่งเพิ่ม Chutikan Ung (chutikanung) เป็น admin — สิทธิ์จัดการงาน
+// เท่านั้น ไม่ใช่ owner และไม่ได้อยู่ชั้นแก้บัญชีผู้ใช้ (ดู lib/owner.ts).
 
 export type SopUser = {
   email: string;
@@ -26,6 +28,7 @@ export const sopUsers: SopUser[] = [
   { email: "champ.championest@gmail.com", name: "Champ Master", role: "admin", departmentId: "admin" },
   { email: "namenrw@gmail.com", name: "Namen RW", role: "admin", departmentId: "admin" },
   { email: "kittibhonlim@gmail.com", name: "เคน", role: "admin", departmentId: "admin" },
+  { email: "chutikanung@gmail.com", name: "Chutikan Ung", role: "admin", departmentId: "admin" },
   { email: "thanakornjoeblack@gmail.com", name: "Kongh", role: "employee", departmentId: "front-store" },
   { email: "waranon4work@gmail.com", name: "Non", role: "employee", departmentId: "front-store" },
   { email: "wipop.tho@gmail.com", name: "Pee", role: "employee", departmentId: "front-store" },
