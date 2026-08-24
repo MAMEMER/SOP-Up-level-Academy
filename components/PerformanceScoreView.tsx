@@ -23,7 +23,7 @@ import { requireUser } from "../lib/auth.ts";
 import { isOwner } from "../lib/owner.ts";
 import { deleteScoreAdjustment, saveScoreAdjustment } from "../lib/score-adjustment-store.ts";
 import { adjustmentCategoryOptions } from "../lib/score-adjustments.ts";
-import type { ScoreCategoryKey } from "../lib/performance-score.ts";
+import type { DeductionRecord, ScoreCategoryKey } from "../lib/performance-score.ts";
 import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
 import { displayNameFor, employeeDirectory } from "../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../lib/performance-daily-store.ts";
@@ -47,14 +47,88 @@ const categoryLabels = {
   assignedWork: "งานที่มอบหมาย"
 };
 
-/** DeductionRecord uses snake_case category keys; the labels above are camelCase. */
-const categoryKeyToLabelKey: Record<ScoreCategoryKey, keyof typeof categoryLabels> = {
-  attendance: "attendance",
-  stock: "stock",
-  checklist: "checklist",
-  customer_service: "customerService",
-  assigned_work: "assignedWork"
+// Fixed left-to-right order for the per-category score ledger. `camel` matches the shape of
+// row.categories (calculateEmployeePerformanceScore), `snake` matches DeductionRecord.category.
+const CATEGORY_ORDER: Array<{ camel: keyof typeof categoryLabels; snake: ScoreCategoryKey }> = [
+  { camel: "attendance", snake: "attendance" },
+  { camel: "stock", snake: "stock" },
+  { camel: "checklist", snake: "checklist" },
+  { camel: "customerService", snake: "customer_service" },
+  { camel: "assignedWork", snake: "assigned_work" }
+];
+
+/** auto = derived from a data source (planner/StoreHub/sheet); manual = owner-entered. */
+function sourceKind(source: string): "auto" | "manual" {
+  return source === "manual" ? "manual" : "auto";
+}
+
+function formatImpact(impact: number) {
+  return impact >= 0 ? `+${impact}` : `${impact}`;
+}
+
+type LedgerEntry = {
+  category: ScoreCategoryKey;
+  /** original DeductionRecord points — counts DOWN (positive = a deduction) */
+  points: number;
+  /** signed effect on the category score (+ credit / − deduction) */
+  impact: number;
+  /** running category score after this entry, starting from the 20-point ceiling */
+  running: number;
+  detail: string;
+  reason: string;
+  source: string;
 };
+
+type CategoryLedger = {
+  camel: keyof typeof categoryLabels;
+  snake: ScoreCategoryKey;
+  label: string;
+  start: number;
+  maxScore: number;
+  /** เริ่ม 20 + ผลรวมทุกรายการ (รวมทั้งที่ auto และที่เจ้าของปรับเอง) */
+  score: number;
+  credits: number;
+  debits: number;
+  entries: LedgerEntry[];
+};
+
+/**
+ * Turn one employee's flat deduction list back into a per-category ledger, so the breakdown
+ * reads as "หมวดนี้เริ่ม 20 → รายการไหนบวก รายการไหนลบ → เหลือเท่าไหร่จริง" instead of a bare
+ * list of deductions.
+ *
+ * row.deductions already merges the auto-derived deductions with the owner's manual
+ * adjustments (a +2 credit is stored as points -2). scoreImpact = -points, so the running
+ * score walks down on a deduction and up on a credit. Summing every category ledger equals
+ * the row total (before the 0–100 clamp), so this is a faithful re-presentation, not a
+ * different score.
+ */
+function buildCategoryLedgers(row: { categories: Record<string, { maxScore: number }>; deductions: DeductionRecord[] }): CategoryLedger[] {
+  return CATEGORY_ORDER.map(({ camel, snake }) => {
+    const maxScore = row.categories[camel].maxScore;
+    let running = maxScore;
+    let credits = 0;
+    let debits = 0;
+    const entries: LedgerEntry[] = row.deductions
+      .filter((deduction) => deduction.category === snake)
+      .map((deduction) => {
+        const impact = -deduction.points;
+        running += impact;
+        if (impact >= 0) credits += impact;
+        else debits += impact;
+        return {
+          category: deduction.category,
+          points: deduction.points,
+          impact,
+          running,
+          detail: deduction.detail,
+          reason: deduction.reason,
+          source: deduction.source
+        };
+      });
+    return { camel, snake, label: categoryLabels[camel], start: maxScore, maxScore, score: running, credits, debits, entries };
+  });
+}
 
 function isDateValue(value: string | undefined) {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
@@ -582,12 +656,14 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
           <span>Breakdown</span>
           <span>สถานะ</span>
         </div>
-        {rows.map((row) => (
+        {rows.map((row) => {
+          const ledgers = buildCategoryLedgers(row);
+          return (
           <article key={row.employeeName} className="performance-score-row">
             <div>
               {/* rows are keyed by staff code; show the name the rest of the site shows */}
               <strong>{displayNameFor(row.employeeName)}</strong>
-              <small>{row.deductions.length} deduction event(s)</small>
+              <small>{row.deductions.length} รายการปรับคะแนน</small>
             </div>
             <div>
               <strong>{row.hasData ? `${row.totalScore}/100` : "—"}</strong>
@@ -603,9 +679,9 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               ) : null}
             </div>
             <div className="performance-category-grid">
-              {Object.entries(row.categories).map(([key, result]) => (
-                <span key={key}>
-                  {categoryLabels[key as keyof typeof categoryLabels]} {result.score}/{result.maxScore}
+              {ledgers.map((cat) => (
+                <span key={cat.snake}>
+                  {cat.label} {cat.score}/{cat.maxScore}
                 </span>
               ))}
             </div>
@@ -618,7 +694,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               </small>
             </div>
             <details className="performance-detail">
-              <summary>ดูเหตุผลการหักคะแนน</summary>
+              <summary>ดู score ledger รายหมวด (คะแนนจริงตามรายการ)</summary>
               {row.leaveSummary.records.length ? (
                 <div className="performance-leave-list">
                   {row.leaveSummary.records.map((leave) => (
@@ -628,47 +704,72 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                   ))}
                 </div>
               ) : null}
-              {row.deductions.length ? (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>หมวด</th>
-                      <th>หัก</th>
-                      <th>เหตุผล</th>
-                      <th>Source</th>
-                      {isOwnerView ? <th>แก้คะแนน</th> : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {row.deductions.map((deduction, index) => (
-                      <tr key={`${deduction.reason}-${index}`}>
-                        <td>{categoryLabels[categoryKeyToLabelKey[deduction.category]]}</td>
-                        <td>{deduction.points >= 0 ? `-${deduction.points}` : `+${Math.abs(deduction.points)}`}</td>
-                        <td>{deduction.detail}</td>
-                        <td>{deduction.source}</td>
-                        {isOwnerView ? (
-                          <td>
-                            {/* หักผิดตรงไหน แก้คืนได้ตรงนั้น — ต้องใส่เหตุผลเสมอ */}
-                            {deduction.points > 0 ? (
-                              <form action={saveScoreAdjustmentAction} className="performance-adjust-inline">
-                                <input type="hidden" name="redirectTo" value={redirectTo} />
-                                <input type="hidden" name="employeeName" value={row.employeeName} />
-                                <input type="hidden" name="adjustCategory" value={deduction.category} />
-                                <input type="hidden" name="adjustDate" value={entryDate} />
-                                <input name="adjustPoints" type="number" defaultValue={deduction.points} step="1" aria-label="คะแนนที่คืน" />
-                                <input name="adjustReason" placeholder="เหตุผลที่แก้" required />
-                                <button type="submit">คืนคะแนน</button>
-                              </form>
+              {/* Score ledger: ทุกหมวดเริ่ม 20 แล้วเดินคะแนนตามรายการจริง — โชว์ทั้งรายการที่บวก
+                  (คืน/ปรับเพิ่ม) และรายการที่หัก ไม่ใช่แค่ยอดหัก. ผลรวม 5 หมวด = คะแนนรวมของรอบนี้. */}
+              <div className="performance-ledger">
+                {ledgers.map((cat) => (
+                  <div key={cat.snake} className="performance-ledger-cat">
+                    <div className="performance-ledger-head">
+                      <strong>{cat.label}</strong>
+                      <span className={`score-badge ${cat.score >= cat.maxScore ? "score-badge-green" : cat.score < 0 ? "score-badge-red" : ""}`}>
+                        คะแนนจริง {cat.score}/{cat.maxScore}
+                      </span>
+                    </div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>รายการ</th>
+                          <th>ผลต่อคะแนน</th>
+                          <th>คงเหลือ</th>
+                          <th>ที่มา</th>
+                          {isOwnerView ? <th>แก้คะแนน</th> : null}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="ledger-start">
+                          <td>เริ่มต้นหมวด (เต็ม)</td>
+                          <td>+{cat.start}</td>
+                          <td>{cat.start}</td>
+                          <td>—</td>
+                          {isOwnerView ? <td /> : null}
+                        </tr>
+                        {cat.entries.map((entry, index) => (
+                          <tr key={`${entry.reason}-${index}`} className={entry.impact >= 0 ? "ledger-credit" : "ledger-debit"}>
+                            <td>{entry.detail}</td>
+                            <td>{formatImpact(entry.impact)}</td>
+                            <td>{entry.running}</td>
+                            <td>
+                              <span className={`source-kind source-kind-${sourceKind(entry.source)}`}>{sourceKind(entry.source)}</span>
+                              <small>{entry.source}</small>
+                            </td>
+                            {isOwnerView ? (
+                              <td>
+                                {/* หักผิดตรงไหน แก้คืนได้ตรงนั้น — ต้องใส่เหตุผลเสมอ */}
+                                {entry.points > 0 ? (
+                                  <form action={saveScoreAdjustmentAction} className="performance-adjust-inline">
+                                    <input type="hidden" name="redirectTo" value={redirectTo} />
+                                    <input type="hidden" name="employeeName" value={row.employeeName} />
+                                    <input type="hidden" name="adjustCategory" value={entry.category} />
+                                    <input type="hidden" name="adjustDate" value={entryDate} />
+                                    <input name="adjustPoints" type="number" defaultValue={entry.points} step="1" aria-label="คะแนนที่คืน" />
+                                    <input name="adjustReason" placeholder="เหตุผลที่แก้" required />
+                                    <button type="submit">คืนคะแนน</button>
+                                  </form>
+                                ) : null}
+                              </td>
                             ) : null}
-                          </td>
+                          </tr>
+                        ))}
+                        {cat.entries.length === 0 ? (
+                          <tr className="ledger-clean">
+                            <td colSpan={isOwnerView ? 5 : 4}>ไม่มีรายการในรอบนี้ — เต็ม {cat.maxScore}/{cat.maxScore}</td>
+                          </tr>
                         ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p>ไม่มีรายการหักคะแนนในรอบนี้</p>
-              )}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
               {isOwnerView && customRules.length ? (
                 <div className="performance-adjust-presets">
                   <strong>ข้อที่เพิ่มเอง</strong>
@@ -740,7 +841,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               ) : null}
             </details>
           </article>
-        ))}
+          );
+        })}
       </section>
 
     </main>
