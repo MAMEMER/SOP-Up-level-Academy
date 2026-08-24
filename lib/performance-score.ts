@@ -388,7 +388,7 @@ export function calculateChecklistScore(events: ChecklistEvent[], rules: KpiRule
   //    (submit ครบทุก phase = ไม่มี event นี้ = ไม่หัก). "ไม่มีงานนั้น" ที่พนักงานติ๊กถือว่าครบ ไม่ขาด
   //    (กรองที่ชั้น data ก่อนสร้าง event).
   //  - missing_important (ขาด item สำคัญ เช่น จัดส่งสินค้า/แจ้งเลข tracking): -1 ต่อข้อ.
-  //  - late_submit (ส่งหัวข้อนั้นช้ากว่าเวลาที่กำหนด แต่ยังในวันเดียวกัน): -2 ต่อหัวข้อ.
+  //  - late_submit (ส่งหัวข้อนั้นช้ากว่าเวลาที่กำหนด แต่ยังในวันเดียวกัน): -1 ต่อหัวข้อ.
   //  - false_record (audit แล้วข้อมูลไม่ตรงจริง): -10 ต่อครั้ง + flag coaching_required.
   //  - backfilled (ส่งย้อนหลัง): 0 — ไม่หัก.
   // คะแนนหมวดไม่ floor ที่ 0 (categoryScore) — หักไปเรื่อยๆ ติดลบได้.

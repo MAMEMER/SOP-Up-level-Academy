@@ -111,7 +111,7 @@ export const defaultKpiRules: KpiRules = {
     missingDayAfter: 5,
     missingDayEscalateAfter: 2,
     missingImportant: 1,
-    lateSubmit: 2,
+    lateSubmit: 1,
     falseRecord: 10,
     backfilled: 0
   },

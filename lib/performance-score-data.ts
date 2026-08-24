@@ -239,7 +239,7 @@ export function missingChecklistEventsFromAttendance(input: {
   clockEvents: ClockEvent[];
   missingChecklistDays?: { employeeName: string; workDate: string }[];
   submittedChecklistDays?: { employeeName: string; workDate: string }[];
-  /** หัวข้อ the employee submitted after its own deadline (-2 each) */
+  /** หัวข้อ the employee submitted after its own deadline (-1 each) */
   lateChecklistSubmissions?: ChecklistLateSubmission[];
 }): ChecklistEvent[] {
   const scheduledDays = new Set(input.schedules.map((schedule) => `${schedule.employeeName}:${schedule.workDate}`));

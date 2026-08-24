@@ -14,7 +14,7 @@ describe("KPI rulebook", () => {
   it("scores exactly as before when nothing is overridden", () => {
     const rules = mergeKpiRules(null);
 
-    assert.equal(calculateChecklistScore([{ type: "late_submit", count: 1, source: "manual" }], rules).score, 18);
+    assert.equal(calculateChecklistScore([{ type: "late_submit", count: 1, source: "manual" }], rules).score, 19);
     assert.equal(calculateChecklistScore([{ type: "false_record", count: 1, source: "manual" }], rules).score, 10);
     assert.equal(calculateCustomerServiceScore([{ bucket: "feedback", severity: "fixed_immediately", count: 1, source: "manual" }], rules).score, 15);
     assert.equal(calculateAssignedWorkScore([{ title: "x", status: "not_finished", source: "manual" }], rules).score, 15);

@@ -445,18 +445,18 @@ describe("performance score engine", () => {
   });
 
   it("deducts 2 checklist points per หัวข้อ submitted complete but late", () => {
-    // Each หัวข้อ carries its own clock time now, so lateness is charged per หัวข้อ (-2),
-    // not once per day (Champ, 4 Aug 2026).
+    // Each หัวข้อ carries its own clock time now, so lateness is charged per หัวข้อ (-1),
+    // not once per day (Champ, 4 Aug 2026; rate cut -2 -> -1 on 24 Aug 2026).
     const one = calculateChecklistScore([{ type: "late_submit", count: 1, source: "manual", label: "ปิดร้าน 2026-08-01" }]);
-    assert.equal(one.deductions[0].points, 2);
-    assert.equal(one.score, 18);
+    assert.equal(one.deductions[0].points, 1);
+    assert.equal(one.score, 19);
     assert.equal(one.deductions[0].reason, "late_submit");
     assert.match(one.deductions[0].detail, /ปิดร้าน 2026-08-01/);
     // late submit never triggers coaching
     assert.equal(one.flags.includes("coaching_required"), false);
 
     const three = calculateChecklistScore([{ type: "late_submit", count: 3, source: "manual" }]);
-    assert.equal(three.score, 14);
+    assert.equal(three.score, 17);
   });
 
   it("deducts 10 and flags coaching when an audit finds the checklist data is not real", () => {
@@ -475,8 +475,8 @@ describe("performance score engine", () => {
       { type: "late_submit", count: 2, source: "manual" }
     ]);
 
-    // missing: 10+10+5+5 = 30; false: 10; late: 2 x 2 = 4 -> 44 deducted -> 20 - 44 = -24
-    assert.equal(result.score, -24);
+    // missing: 10+10+5+5 = 30; false: 10; late: 1 x 2 = 2 -> 42 deducted -> 20 - 42 = -22
+    assert.equal(result.score, -22);
     assert.equal(result.flags.includes("coaching_required"), true);
   });
 
