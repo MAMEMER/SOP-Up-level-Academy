@@ -8,7 +8,8 @@ export type NavGroup = { key: string; label: string; links: NavLink[] };
 /** ลิงก์ที่โผล่ตลอด ไม่ต้องเปิดกลุ่ม */
 export const quickLinks: NavLink[] = [
   { href: "/", label: "หน้าหลัก" },
-  { href: "/my-view", label: "งานของฉัน" }
+  { href: "/my-view", label: "งานของฉัน" },
+  { href: "/my-review", label: "ผลงานของฉัน" }
 ];
 
 export const staffGroups: NavGroup[] = [

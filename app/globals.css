@@ -6671,3 +6671,75 @@ main .page > section, main > section { margin-top: 16px !important; }
   outline-offset: 2px;
   border-radius: 12px;
 }
+
+/* ── ประเมินผลงานตัวเอง (/my-review) ─────────────────────────────────────────
+   เรียงตาม "อ่านแล้วทำอะไรต่อ": สรุป → 3 เรื่องที่ต้องแก้ → คะแนนรายหมวด → ตารางเต็ม */
+.self-review { display: flex; flex-direction: column; gap: 18px; }
+.self-review__label { margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink); }
+
+.self-review__headline { display: flex; flex-direction: column; gap: 10px; }
+.self-review__headline h3 { margin: 0; font-size: 20px; line-height: 1.45; color: var(--color-ink); }
+.self-review__totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.self-review__totals > span {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 14px;
+  background: #fff; border: 1px solid rgba(45,49,66,0.08); border-left: 4px solid rgba(45,49,66,0.25);
+}
+.self-review__totals strong { font-size: 26px; line-height: 1; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+.self-review__totals small { font-size: 12px; color: var(--color-ink-soft); }
+.self-review__gain { border-left-color: #2E9E5B !important; }
+.self-review__loss { border-left-color: #E5484D !important; }
+
+.self-review__focus ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.self-review__focus li { padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid rgba(45,49,66,0.08); border-left: 4px solid #E08600; }
+.self-review__focus-head { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.self-review__rank {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
+  border-radius: 999px; background: rgba(224,134,0,0.14); color: #8a5200; font-size: 12px; font-weight: 700;
+}
+.self-review__focus-title { font-size: 15px; font-weight: 700; color: var(--color-ink); }
+.self-review__focus-cost { font-size: 12.5px; color: #B54708; font-variant-numeric: tabular-nums; }
+.self-review__advice { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--color-ink); }
+.self-review__clean { margin: 0; font-size: 14px; font-weight: 600; color: #2E9E5B; }
+
+.self-review__cat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 720px) { .self-review__cat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.self-review__cat {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px;
+  background: #fff; border: 1px solid rgba(45,49,66,0.08);
+}
+.self-review__cat-name { font-size: 12.5px; color: var(--color-ink-soft); }
+.self-review__cat strong { font-size: 20px; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+.self-review__cat strong small { font-size: 12px; color: var(--color-ink-soft); font-weight: 400; }
+.self-review__cat-lost { font-size: 11.5px; color: var(--color-ink-soft); }
+
+/* ตารางกว้างเกินจอมือถือได้ ให้เลื่อนในกล่องตัวเอง ไม่ใช่ทั้งหน้า */
+.self-review__table-wrap { overflow-x: auto; }
+.self-review__table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.self-review__table th, .self-review__table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid rgba(45,49,66,0.08); }
+.self-review__table thead th { font-size: 12px; color: var(--color-ink-soft); font-weight: 700; }
+.self-review__table tbody th { font-weight: 600; color: var(--color-ink); }
+.self-review__table td { color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
+/* บนมือถือคอลัมน์ "หมวด" ถูกตัดออก — ข้อมูลนั้นอยู่ในบล็อกด้านบนแล้ว และตัวเลขครั้ง/คะแนน
+   ต้องอยู่ในจอเสมอ ไม่ใช่ต้องเลื่อนตารางไปหา */
+@media (max-width: 640px) {
+  .self-review__table th:nth-child(2), .self-review__table td:nth-child(2) { display: none; }
+  .self-review__table th, .self-review__table td { padding: 10px 8px; }
+}
+.self-review__cat-negative { color: #C0303A; }
+.self-review__row-cat { display: none; }
+@media (max-width: 640px) {
+  .self-review__row-cat { display: block; font-size: 11.5px; font-weight: 400; color: var(--color-ink-soft); }
+}
+
+.self-review__lists { display: grid; grid-template-columns: 1fr; gap: 18px; }
+@media (min-width: 860px) { .self-review__lists { grid-template-columns: 1fr 1fr; } }
+.self-review__events { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.self-review__events li {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline;
+  padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid rgba(45,49,66,0.08);
+}
+.self-review__events li small { grid-column: 2; font-size: 11.5px; color: var(--color-ink-soft); }
+.self-review__events li > span:nth-child(2) { font-size: 13.5px; color: var(--color-ink); line-height: 1.5; }
+.self-review__plus { font-weight: 700; color: #2E7D43; font-variant-numeric: tabular-nums; }
+.self-review__minus { font-weight: 700; color: #C0303A; font-variant-numeric: tabular-nums; }
+.self-review__empty { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
