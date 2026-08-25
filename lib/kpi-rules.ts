@@ -76,6 +76,8 @@ export type KpiRules = {
     lateOneDay: number;
     /** ไม่เสร็จเกินกำหนด — ติดธง coach ด้วย */
     notFinished: number;
+    /** งานยังอยู่ในกำหนด แต่วันนั้นไม่มีใครอัปเดตความคืบหน้า — หักอัตโนมัติต่อวัน (ระบบ Auto KPI) */
+    noProgressPerDay: number;
   };
   incentive: { tiers: IncentiveTierRule[] };
   salary: {
@@ -116,7 +118,7 @@ export const defaultKpiRules: KpiRules = {
     backfilled: 0
   },
   customerService: { fixedImmediately: 5, repeatedOrSevere: 10 },
-  assignedWork: { lateOneDay: 1, notFinished: 5 },
+  assignedWork: { lateOneDay: 1, notFinished: 5, noProgressPerDay: 1 },
   incentive: {
     tiers: [
       { min: 90, percent: 100, label: "90-100" },
@@ -235,6 +237,7 @@ export function kpiRuleRows(rules: KpiRules): KpiRuleRow[] {
 
     { path: "assignedWork.lateOneDay", category: "งานที่มอบหมาย", label: "ส่งช้าไม่เกิน 1 วัน", value: rules.assignedWork.lateOneDay, unit: "ต่องาน", note: "เสร็จก่อนกำหนด / ตรงเวลา / แก้แล้วผ่าน = ไม่หัก" },
     { path: "assignedWork.notFinished", category: "งานที่มอบหมาย", label: "ไม่เสร็จเกินกำหนด", value: rules.assignedWork.notFinished, unit: "ต่องาน", note: "ติดธง coach ด้วย" },
+    { path: "assignedWork.noProgressPerDay", category: "งานที่มอบหมาย", label: "ไม่อัปเดตความคืบหน้าในวันนั้น (งานหลายวัน)", value: rules.assignedWork.noProgressPerDay, unit: "ต่อวัน", note: "Auto KPI: งานยังอยู่ในกำหนดแต่วันนั้นไม่มีการอัปเดต · งานกลุ่ม ใครในทีมอัปเดตก็ถือว่าครบทั้งวัน · เริ่มนับจากวันที่ระบบเปิดใช้ · งานวันเดียวไม่คิด" },
 
     { path: "salary.threshold", category: "หักเงิน", label: "คะแนนรวมต่ำกว่านี้ถึงเริ่มหักเงิน", value: rules.salary.threshold, unit: "คะแนน" },
     { path: "salary.fullTimeRatePerPoint", category: "หักเงิน", label: "Full time — ต่อคะแนนที่ขาด", value: rules.salary.fullTimeRatePerPoint, unit: "บาท" },

@@ -6,6 +6,9 @@ import { fetchScoreAdjustments } from "./score-adjustment-store.ts";
 import { fetchKpiRules } from "./kpi-rules-store.ts";
 import { fetchAllWorkProjects } from "./work-projects-server-store.ts";
 import { projectReviewsToAdjustments } from "./project-review.ts";
+import { projectNoProgressAdjustments } from "./assigned-work-auto-kpi.ts";
+import { bangkokToday } from "./performance-score-data.ts";
+import { defaultKpiRules } from "./kpi-rules.ts";
 
 /**
  * Every manual KPI input in one object.
@@ -27,11 +30,17 @@ export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStor
   // ผลตรวจงานที่มอบหมายรายคน (หน้า /admin/projects) เข้า KPI ผ่าน channel เดียวกับ
   // owner corrections — พนักงานจึงโดนหัก/ได้คืนคะแนนจริงในหน้าคะแนนพนักงานโดยไม่ต้องแก้ engine.
   const projectReviewAdjustments = projectReviewsToAdjustments(projects);
+  // Auto KPI ข้อ 3 (ใบงาน QZIE): งานยังอยู่ในกำหนดแต่วันนั้นไม่มีการอัปเดตความคืบหน้า → หักอัตโนมัติ
+  // ต่อวัน — คิดจากข้อมูล progress จริง ไม่ต้องให้แอดมินกดอะไร (คู่ขนานกับ Checklist ที่หัก "ขาดทั้งวัน").
+  const noProgressAdjustments = projectNoProgressAdjustments(projects, {
+    today: bangkokToday(),
+    ratePerDay: kpiRules?.assignedWork?.noProgressPerDay ?? defaultKpiRules.assignedWork.noProgressPerDay
+  });
   return {
     ...manual,
     stockCheckRecords,
     checklistAuditRecords,
-    scoreAdjustments: [...(scoreAdjustments || []), ...projectReviewAdjustments],
+    scoreAdjustments: [...(scoreAdjustments || []), ...projectReviewAdjustments, ...noProgressAdjustments],
     kpiRules
   };
 }
