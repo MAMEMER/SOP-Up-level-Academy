@@ -10,6 +10,12 @@ export type DeductionRecord = {
   reason: string;
   detail: string;
   source: DataSource;
+  /**
+   * กี่ครั้งจริงที่รวมอยู่ในรายการนี้ (ไม่ระบุ = 1). รายการหนึ่งบรรทัดอาจรวมหลายครั้งไว้แล้ว —
+   * เช่น "ส่ง checklist ช้า x 28 หัวข้อ" คือหนึ่ง deduction ที่ points = เรต × 28. หน้า
+   * ประเมินผลงานตัวเองต้องบอกจำนวนครั้งจริง ไม่งั้นขึ้นว่า "1 ครั้ง −28 คะแนน" ซึ่งอ่านแล้วเข้าใจผิด.
+   */
+  count?: number;
 };
 
 export type ScoreResult = {
@@ -412,7 +418,8 @@ export function calculateChecklistScore(events: ChecklistEvent[], rules: KpiRule
       points,
       reason: "missing_day",
       detail: `ขาด checklist ทั้งวัน ${occLabel}${dateDetail}`,
-      source: event.source
+      source: event.source,
+      count: event.count
     });
   });
 
@@ -438,7 +445,8 @@ export function calculateChecklistScore(events: ChecklistEvent[], rules: KpiRule
         points: pointsByType[event.type as OtherType] * event.count,
         reason: event.type,
         detail: detailByType[event.type as OtherType],
-        source: event.source
+        source: event.source,
+        count: event.count
       });
       if (event.type === "false_record") flags.push("coaching_required");
     });
@@ -467,7 +475,8 @@ export function calculateCustomerServiceScore(events: ServiceEvent[], rules: Kpi
       points,
       reason: `${event.bucket}_${event.severity}`,
       detail: `${event.bucket} ${event.severity} x ${event.count}`,
-      source: event.source
+      source: event.source,
+      count: event.count
     });
   });
 
