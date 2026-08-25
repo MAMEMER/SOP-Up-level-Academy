@@ -5993,6 +5993,33 @@ main .page > section, main > section { margin-top: 16px !important; }
 .admin-percent__save { align-self: flex-start; }
 .admin-percent__ok { font-size: 12.5px; font-weight: 600; color: #2E9E5B; }
 
+/* ส่งต่องาน — อยู่ในการ์ดงานที่มอบหมาย ไม่แยกหน้า (ใบงาน iDBqn3jE) */
+.project-handover { display: flex; flex-direction: column; gap: 8px; }
+.project-handover__owner { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+.project-handover__owner strong { color: var(--color-ink); }
+.project-handover__log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.project-handover__log li { display: flex; gap: 8px; font-size: 12.5px; color: var(--color-ink-soft); }
+.project-handover__log-date { font-variant-numeric: tabular-nums; color: var(--color-ink); font-weight: 700; white-space: nowrap; }
+.project-handover__open {
+  align-self: flex-start; min-height: 44px; border: 1px solid rgba(255,199,142,0.7); background: #fff;
+  border-radius: 12px; padding: 0 14px; color: var(--color-ink); font-family: inherit; font-size: 13.5px;
+  font-weight: 700; cursor: pointer;
+}
+.project-handover__form { display: flex; flex-direction: column; gap: 10px; }
+.project-handover__form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--color-ink-soft); }
+.project-handover__form select,
+.project-handover__form textarea {
+  width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255,199,142,0.6); background: #fff; color: var(--color-ink);
+  font-family: inherit; min-height: 44px; resize: vertical;
+}
+.project-handover__hint { margin: 0; font-size: 12px; color: var(--color-ink-soft); }
+.project-handover__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.project-handover__cancel {
+  min-height: 44px; border: none; background: none; padding: 0 6px; color: var(--color-ink-soft);
+  font-family: inherit; font-size: 13px; cursor: pointer;
+}
+
 .project-progress-form { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed rgba(255,199,142,0.6); padding-top: 12px; }
 .project-progress-form textarea,
 .project-progress-form input[type="text"],
@@ -6576,4 +6603,71 @@ main .page > section, main > section { margin-top: 16px !important; }
 @media (max-width: 640px) {
   .task-section-head { flex-direction: column; align-items: flex-start; gap: 6px; }
   .task-section-head > :last-child:not(h3):not(div) { align-self: flex-start; white-space: nowrap; }
+}
+
+/* ── Task Focus Board (ใบงาน YrTvFzXr) ───────────────────────────────────────
+   หน้าการทำงานหลักต้องตอบใน 3 วินาที: อะไรค้าง เร่งแค่ไหน ต้องเสร็จกี่โมง.
+   สีสถานะใช้เฉพาะกับความเร่งด่วนของงานเท่านั้น — ไม่เอาแดงไปใช้กับข้อมูลอื่น. */
+.focus-board { display: flex; flex-direction: column; gap: 14px; }
+
+.focus-board__strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 720px) { .focus-board__strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.focus-strip__item {
+  display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; border-radius: 14px;
+  background: #fff; border: 1px solid rgba(45,49,66,0.08); border-left-width: 4px; border-left-style: solid;
+}
+.focus-strip__item strong { font-size: 24px; line-height: 1; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+.focus-strip__item span { font-size: 12.5px; color: var(--color-ink-soft); }
+.focus-strip__item.is-zero { opacity: 0.5; }
+
+.focus-board__group { display: flex; flex-direction: column; gap: 8px; }
+/* หัวกลุ่มใช้สีหมึกเต็ม ไม่ใช่สีจาง — 12px ตัวหนาบนพื้นอ่อนต้องอ่านออกกลางแดดในร้าน */
+.focus-board__group-label { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink); }
+.focus-board__empty { margin: 0; font-size: 13.5px; color: var(--color-ink-soft); }
+
+.focus-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.focus-card {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: 14px; background: #fff;
+  border: 1px solid rgba(45,49,66,0.08); border-left-width: 4px; border-left-style: solid;
+}
+.focus-card__main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 220px; }
+.focus-card__title {
+  margin: 0; font-size: 15px; font-weight: 700; color: var(--color-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.focus-card__meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--color-ink-soft); }
+.focus-card__status { font-weight: 700; color: var(--color-ink); }
+.focus-card__count { font-variant-numeric: tabular-nums; }
+.focus-card__note { margin: 0; font-size: 12.5px; color: var(--color-ink-soft); }
+.focus-card__cta {
+  flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px;
+  border-radius: 12px; background: var(--color-orange); color: #fff; font-size: 13.5px; font-weight: 700;
+  text-decoration: none;
+}
+
+/* สีความเร่งด่วน — แดง เกินกำหนด · ส้ม ใกล้ครบ · เหลือง วันนี้ · น้ำเงิน กำลังทำ · เขียว เสร็จ */
+.focus-card.focus-red, .focus-strip__item.focus-red { border-left-color: #E5484D; }
+.focus-card.focus-red { background: rgba(229,72,77,0.06); }
+.focus-card.focus-orange, .focus-strip__item.focus-orange { border-left-color: #E08600; }
+.focus-card.focus-orange { background: rgba(224,134,0,0.06); }
+.focus-card.focus-yellow, .focus-strip__item.focus-yellow { border-left-color: #D9A200; }
+.focus-card.focus-blue, .focus-strip__item.focus-blue { border-left-color: #2F80ED; }
+.focus-card.focus-green, .focus-strip__item.focus-green { border-left-color: #2E9E5B; }
+.focus-card.focus-green .focus-card__cta { background: #fff; color: var(--color-ink); border: 1px solid rgba(45,49,66,0.15); }
+
+.focus-board__done { display: flex; flex-direction: column; gap: 8px; }
+.focus-board__toggle {
+  align-self: flex-start; min-height: 44px; border: none; background: none; padding: 0;
+  color: var(--color-orange); font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+}
+
+/* โฟกัสคีย์บอร์ดของบล็อกใหม่ (focus board + ส่งต่องาน) ต้องเห็นชัด — เว็บนี้ใช้บนแท็บเล็ตหน้าร้านด้วย */
+.focus-card__cta:focus-visible,
+.focus-board__toggle:focus-visible,
+.project-handover__open:focus-visible,
+.project-handover__cancel:focus-visible {
+  outline: 2px solid var(--color-orange);
+  outline-offset: 2px;
+  border-radius: 12px;
 }

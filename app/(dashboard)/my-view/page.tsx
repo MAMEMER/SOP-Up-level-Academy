@@ -19,6 +19,7 @@ import { StaffScoreCard } from "../../../components/StaffScoreCard.tsx";
 import { MyShiftToday } from "../../../components/MyShiftToday.tsx";
 import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
 import { MyProjects } from "../../../components/MyProjects.tsx";
+import { TaskFocusBoard } from "../../../components/TaskFocusBoard.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
 import { fetchPerformanceDailyStore } from "../../../lib/performance-daily-store.ts";
@@ -112,7 +113,8 @@ export default async function MyViewPage({ searchParams }: PageProps) {
         </form>
       ) : null}
 
-      {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
+      {/* งานที่ต้องลงมือตอนนี้มาก่อนทุกอย่างเสมอ — คะแนน/ประวัติเลื่อนลงไปอยู่ล่าง (ใบงาน YrTvFzXr) */}
+      <TaskFocusBoard branch={branch} staffCode={selectedCode} today={workDate} />
 
       <MyShiftToday staffCode={selectedCode} branch={branch} workDate={workDate} />
 
@@ -124,6 +126,9 @@ export default async function MyViewPage({ searchParams }: PageProps) {
         <h3>งานที่มอบหมาย (เดี่ยว / กลุ่ม)</h3>
       </section>
       <MyProjects branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} isAdmin={isOwner && !user.isImpersonating} />
+
+      {/* คะแนน = ข้อมูลสรุป ไม่ใช่งานที่ต้องทำ — อยู่ล่างสุดตามใบงาน */}
+      {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
       <DashboardTaskSections

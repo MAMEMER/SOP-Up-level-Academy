@@ -15,6 +15,7 @@
 
 import type { ScoreAdjustment } from "./score-adjustments.ts";
 import { effectiveDue, reviewEntriesFor } from "./project-review.ts";
+import { ownerOnDate } from "./project-handover.ts";
 import {
   addDays,
   daysBetween,
@@ -70,7 +71,8 @@ export type NoProgressOptions = {
  *      · ถ้าผ่านแล้ว ตัดหน้าต่างที่วันผ่าน — ผ่านแล้วไม่ต้องอัปเดตต่อ
  *      · ถ้างานปิด (done) ตัดที่วันอัปเดตล่าสุด — ทำจบแล้วไม่ต้องอัปเดตต่อ
  *  - งานกลุ่ม: ใครในทีมอัปเดตวันนั้นก็ถือว่าครบทั้งวัน (ตาม teamNeedsProgressToday)
- *  - งานเดี่ยว: เจ้าของงานต้องอัปเดตเอง คนอื่นลงแทนไม่นับ
+ *  - งานเดี่ยว: เจ้าของงานต้องอัปเดตเอง คนอื่นลงแทนไม่นับ — งานที่ส่งต่อแล้ว (lib/project-handover.ts)
+ *    หักเฉพาะ "คนที่ถือครองงานในวันนั้น" ไม่ใช่ทุกคนที่เคยมีชื่อ ไม่งั้นวันเดียวโดนหักสองหัว
  *  - งานยกเลิก (cancelled): ข้ามทั้งงาน
  */
 export function projectNoProgressAdjustments(projects: WorkProject[], opts: NoProgressOptions): ScoreAdjustment[] {
@@ -114,6 +116,8 @@ export function projectNoProgressAdjustments(projects: WorkProject[], opts: NoPr
       const maxDays = Math.min(span, 400);
       for (let offset = 0; offset <= maxDays; offset += 1) {
         const date = addDays(start, offset);
+        // งานเดี่ยวที่เคยส่งต่อ: วันนั้นเป็นภาระของ owner ณ วันนั้นคนเดียว
+        if (!isGroup && (project.handovers || []).length > 0 && ownerOnDate(project, date) !== assignee) continue;
         const updated = isGroup ? teamDates.has(date) : (personDatesForSingle as Set<string>).has(date);
         if (updated) continue;
         out.push({

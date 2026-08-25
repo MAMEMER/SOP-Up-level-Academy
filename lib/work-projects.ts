@@ -9,6 +9,8 @@
 // เอกสารจริงอยู่ใน Firestore `sop_work_projects` เขียนผ่าน /api/work-projects เท่านั้น.
 
 import type { ItemAnswer } from "./checklist-overrides.ts";
+// type-only: ตัว logic ของการส่งต่ออยู่ใน project-handover.ts ซึ่ง import runtime helper จากไฟล์นี้
+import type { ProjectHandover } from "./project-handover.ts";
 import { timingStateAt, type WorkTiming } from "./work-spec.ts";
 
 export const WORK_PROJECTS_COLLECTION = "sop_work_projects";
@@ -36,7 +38,7 @@ export type ProjectProgress = {
 export type ProjectHistoryEntry = {
   at: string;
   by: string;
-  action: "created" | "dates" | "assignees" | "status" | "detail" | "review";
+  action: "created" | "dates" | "assignees" | "status" | "detail" | "review" | "handover";
   detail: string;
 };
 
@@ -102,6 +104,12 @@ export type WorkProject = {
   history?: ProjectHistoryEntry[];
   /** ledger ผลตรวจรายคน (KPI งานที่มอบหมาย) — ดู lib/project-review.ts */
   reviews?: ProjectReviewEntry[];
+  /** ผู้รับผิดชอบตอนนี้ (ส่งต่องานแล้วเปลี่ยนตัว) — ไม่มี = คนแรกในรายชื่อ */
+  currentOwner?: string;
+  /** ผู้รับผิดชอบคนแรก — เก็บไว้ให้ประวัติไม่หายแม้ส่งต่อไปกี่ทอด */
+  originalOwner?: string;
+  /** ledger การส่งต่องาน (ต่อท้ายอย่างเดียว) — ดู lib/project-handover.ts */
+  handovers?: ProjectHandover[];
 };
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {

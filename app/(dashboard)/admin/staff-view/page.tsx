@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { StaffReviewView } from "../../../../components/StaffReviewView.tsx";
+import { TaskFocusBoard } from "../../../../components/TaskFocusBoard.tsx";
 import { ViewAsSwitcher } from "../../../../components/ViewAsSwitcher.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
@@ -21,9 +22,12 @@ export default async function AdminStaffViewPage() {
         <div>
           <p className="eyebrow">Staff review</p>
           <h2>มุมมองพนักงาน</h2>
-          <p>เลือกพนักงาน + วัน เพื่อดูกะ · งานที่มอบหมาย · งานส่งต่อ · routine checklist ของเขา แบบรวดเดียว</p>
+          <p>งานที่ต้องตามตอนนี้ของทั้งทีมอยู่บนสุด · เลือกพนักงาน + วัน เพื่อดูงานของเขาแบบรวดเดียว</p>
         </div>
       </section>
+
+      {/* ภาพรวมทีม: งานเกินกำหนด / ใกล้ครบกำหนด / รอตรวจ ต้องเห็นก่อนเลื่อนหา (ใบงาน YrTvFzXr) */}
+      <TaskFocusBoard branch="bangkae" staffCode={null} today={formatWorkDate()} scope="team" />
       <ViewAsSwitcher
         staff={staff
           .filter((entry): entry is typeof entry & { email: string } => Boolean(entry.email))

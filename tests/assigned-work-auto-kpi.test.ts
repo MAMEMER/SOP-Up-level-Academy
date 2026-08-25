@@ -147,3 +147,38 @@ describe("projectNoProgressAdjustments — Auto KPI ข้อ 3 (ไม่อั
     assert.equal(out[out.length - 1].workDate, "2026-09-04");
   });
 });
+
+describe("งานที่ส่งต่อแล้ว — หักเฉพาะคนที่ถือครองในวันนั้น", () => {
+  it("งานเดี่ยวที่ส่งต่อกลางทาง ไม่หักสองหัวในวันเดียวกัน", () => {
+    const project: WorkProject = {
+      id: "wp-ho",
+      branch: "bangkae",
+      title: "จัดชั้นการ์ด",
+      startDate: "2026-09-01",
+      endDate: "2026-09-05",
+      assignees: ["ICE", "Boom"],
+      status: "active",
+      mode: "single",
+      createdBy: "owner@x.com",
+      createdAt: "2026-09-01T00:00:00.000Z",
+      updatedAt: "2026-09-01T00:00:00.000Z",
+      originalOwner: "ICE",
+      currentOwner: "Boom",
+      progress: [],
+      handovers: [
+        { id: "ho-1", from: "ICE", to: "Boom", date: "2026-09-03", at: "2026-09-03T10:00:00.000Z", status: "accepted", by: "ice@x.com" }
+      ]
+    };
+    const rows = projectNoProgressAdjustments([project], { today: "2026-09-05", startFrom: "2026-09-01" });
+    // 1–4 ก.ย. (ถึงเมื่อวาน) — 1,2 เป็นของ ICE · 3,4 เป็นของ Boom · ห้ามซ้อนกัน
+    assert.deepEqual(
+      rows.map((row) => [row.workDate, row.employeeName]),
+      [
+        ["2026-09-01", "ICE"],
+        ["2026-09-02", "ICE"],
+        ["2026-09-03", "Boom"],
+        ["2026-09-04", "Boom"]
+      ]
+    );
+  });
+});
