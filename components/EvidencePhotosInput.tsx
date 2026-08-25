@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
+import { downscaleImage } from "../lib/image-downscale.ts";
 
 // Multi-photo evidence uploader (สูงสุด 3 รูป). อัปโหลดแต่ละรูปผ่าน server route
 // /api/evidence-upload (authorize ด้วย SOP session cookie — ไม่พึ่ง Firebase Auth ฝั่ง
@@ -29,6 +30,23 @@ export function EvidencePhotosInput({
     .filter(Boolean);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // แตะรูปเพื่อดูเต็มจอ — index ของรูปที่กำลังเปิดใน lightbox (null = ปิด)
+  const [viewIndex, setViewIndex] = useState<number | null>(null);
+
+  // ปิด lightbox ด้วยปุ่ม Esc + ล็อกการ scroll พื้นหลังตอนเปิด
+  useEffect(() => {
+    if (viewIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewIndex(null);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [viewIndex]);
 
   function commit(next: string[]) {
     onChange(next.slice(0, max).join("\n"));
@@ -53,12 +71,15 @@ export function EvidencePhotosInput({
           skipped = true;
           continue;
         }
-        if (file.size > 5 * 1024 * 1024) {
+        // Shrink phone-camera photos client-side before upload — keeps them under Vercel's
+        // request-body limit and fast on mobile data (bug ticket 0Fxe4Q9TTNTtD1BI6dq9).
+        const prepared = await downscaleImage(file);
+        if (prepared.size > 5 * 1024 * 1024) {
           setError("รูปต้องไม่เกิน 5MB");
           skipped = true;
           continue;
         }
-        uploaded.push(await uploadEvidenceImage(file));
+        uploaded.push(await uploadEvidenceImage(prepared));
       }
       if (uploaded.length) commit([...urls, ...uploaded]);
       if (fileList.length > remaining && !skipped) {
@@ -104,7 +125,14 @@ export function EvidencePhotosInput({
         <div className="evidence-input__gallery">
           {urls.map((url, index) => (
             <div key={url} className="evidence-input__thumb">
-              <img className="evidence-input__preview" src={url} alt={`หลักฐาน ${index + 1}`} />
+              <button
+                type="button"
+                className="evidence-input__zoom"
+                onClick={() => setViewIndex(index)}
+                aria-label={`ดูรูปที่ ${index + 1} แบบเต็มจอ`}
+              >
+                <img className="evidence-input__preview" src={url} alt={`หลักฐาน ${index + 1}`} />
+              </button>
               {!disabled ? (
                 <button
                   type="button"
@@ -120,6 +148,30 @@ export function EvidencePhotosInput({
         </div>
       ) : null}
       {error ? <span className="evidence-input__error">{error}</span> : null}
+      {viewIndex !== null && urls[viewIndex] ? (
+        <div
+          className="evidence-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`รูปหลักฐานที่ ${viewIndex + 1}`}
+          onClick={() => setViewIndex(null)}
+        >
+          <button
+            type="button"
+            className="evidence-lightbox__close"
+            onClick={() => setViewIndex(null)}
+            aria-label="ปิด"
+          >
+            ✕
+          </button>
+          <img
+            className="evidence-lightbox__img"
+            src={urls[viewIndex]}
+            alt={`หลักฐานที่ ${viewIndex + 1}`}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

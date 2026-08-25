@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
+import { downscaleImage } from "../lib/image-downscale.ts";
 
 // Evidence input for the performance form: attach an image (uploaded via the server
 // route /api/evidence-upload, which authorizes off the SOP session cookie — the local
@@ -19,14 +20,17 @@ export function EvidenceImageInput({ name }: { name: string }) {
       setError("ไฟล์ต้องเป็นรูปภาพ");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("รูปต้องไม่เกิน 5MB");
-      return;
-    }
     setError(null);
     setUploading(true);
     try {
-      const url = await uploadEvidenceImage(file);
+      // Shrink phone-camera photos before upload — keeps them under Vercel's request-body
+      // limit and fast on mobile (bug ticket 0Fxe4Q9TTNTtD1BI6dq9).
+      const prepared = await downscaleImage(file);
+      if (prepared.size > 5 * 1024 * 1024) {
+        setError("รูปต้องไม่เกิน 5MB");
+        return;
+      }
+      const url = await uploadEvidenceImage(prepared);
       setValue(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง");
