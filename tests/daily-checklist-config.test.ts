@@ -107,13 +107,13 @@ describe("owner checklist config", () => {
     assert.equal(resolvePhaseWindow("stock-work", saved, "s1").openTime, "09:00");
   });
 
-  it("charges 2 points per หัวข้อ handed in late", () => {
+  it("charges 1 point per หัวข้อ handed in late", () => {
     const result = calculateChecklistScore([
       { type: "late_submit", count: 3, dates: ["2026-08-03", "2026-08-04"], source: "live" }
     ]);
 
-    assert.equal(result.score, 14);
-    assert.equal(result.deductions[0].points, 6);
+    assert.equal(result.score, 17);
+    assert.equal(result.deductions[0].points, 3);
     assert.equal(result.flags.length, 0);
     assert.match(result.deductions[0].detail, /2026-08-03/);
   });

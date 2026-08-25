@@ -3,9 +3,7 @@ import { describe, it } from "node:test";
 import {
   applyHandover,
   currentOwnerOf,
-  datesBetween,
   handoverHistory,
-  idleDayAdjustments,
   isInvolved,
   lateDaysByOwner,
   originalOwnerOf,
@@ -15,7 +13,7 @@ import {
   type ProjectHandover
 } from "../lib/project-handover.ts";
 import { splitReviewByOwner } from "../lib/project-review.ts";
-import type { ProjectProgress, WorkProject } from "../lib/work-projects.ts";
+import type { WorkProject } from "../lib/work-projects.ts";
 
 function baseProject(over: Partial<WorkProject> = {}): WorkProject {
   return {
@@ -45,10 +43,6 @@ function handover(over: Partial<ProjectHandover> & Pick<ProjectHandover, "from" 
     by: "ice@x.com",
     ...over
   };
-}
-
-function progress(date: string, by = "ICE"): ProjectProgress {
-  return { id: `pg-${date}-${by}`, date, at: `${date}T09:00:00.000Z`, by, percent: 20, note: "ทำต่อ" };
 }
 
 describe("ผู้รับผิดชอบปัจจุบัน / ประวัติ", () => {
@@ -176,47 +170,4 @@ describe("KPI ตามช่วงที่ถือครองงาน", () 
     assert.equal(late[0].points, -6);
   });
 
-  it("วันที่เงียบ (ไม่มีอัปเดต) หัก owner ของวันนั้นวันละ 1 และไม่นับวันนี้", () => {
-    const project = baseProject({
-      assignees: ["ICE", "Boom"],
-      currentOwner: "Boom",
-      progress: [progress("2026-08-10")],
-      handovers: [handover({ from: "ICE", to: "Boom", date: "2026-08-12" })]
-    });
-    const adjustments = idleDayAdjustments(project, "2026-08-13", 1, "2026-08-01");
-    assert.deepEqual(
-      adjustments.map((item) => [item.workDate, item.employeeName, item.points]),
-      [
-        ["2026-08-11", "ICE", -1],
-        ["2026-08-12", "Boom", -1]
-      ]
-    );
-  });
-
-  it("หักวันเงียบซ้ำไม่ได้ — id เดิมเสมอสำหรับ (งาน, วัน, คน)", () => {
-    const project = baseProject({ progress: [] });
-    const first = idleDayAdjustments(project, "2026-08-12", 1, "2026-08-01");
-    const second = idleDayAdjustments(project, "2026-08-12", 1, "2026-08-01");
-    assert.deepEqual(first.map((item) => item.id), second.map((item) => item.id));
-    assert.equal(new Set(first.map((item) => item.id)).size, first.length);
-  });
-
-  it("ปิดกติกาวันเงียบได้ด้วยการตั้งค่าเป็น 0 และงานที่ปิดแล้วไม่โดนหัก", () => {
-    const project = baseProject({ progress: [] });
-    assert.deepEqual(idleDayAdjustments(project, "2026-08-13", 0, "2026-08-01"), []);
-    assert.deepEqual(idleDayAdjustments(baseProject({ status: "done", progress: [] }), "2026-08-13", 1, "2026-08-01"), []);
-  });
-
-  it("ไม่หักเลยกำหนดสิ้นสุดงาน (ช่วงนั้นคิดเป็นวันล่าช้าอยู่แล้ว)", () => {
-    const project = baseProject({ progress: [] });
-    const adjustments = idleDayAdjustments(project, "2026-08-20", 1, "2026-08-01");
-    assert.deepEqual(adjustments.map((item) => item.workDate), datesBetween("2026-08-10", "2026-08-14"));
-  });
-
-  it("ไม่หักย้อนหลังก่อนวันที่กติกาเริ่มใช้ (คะแนนผูกกับเงินเดือน)", () => {
-    const project = baseProject({ progress: [] });
-    const adjustments = idleDayAdjustments(project, "2026-08-20", 1, "2026-08-13");
-    assert.deepEqual(adjustments.map((item) => item.workDate), ["2026-08-13", "2026-08-14"]);
-    assert.deepEqual(idleDayAdjustments(project, "2026-08-20", 1, "2026-09-01"), []);
-  });
 });

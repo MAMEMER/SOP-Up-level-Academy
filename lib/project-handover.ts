@@ -6,12 +6,11 @@
 //
 // KPI ผูกกับ "คนที่ถือครองงานในวันนั้น" ไม่ใช่คนที่ถูกสั่งงานคนแรก:
 //   - วันล่าช้า  → หักตามอัตราเดิมของระบบ (project-review.ts) แต่กระจายตาม owner รายวัน
-//   - วันที่งานยังอยู่ในกำหนดแต่ไม่มี activity เลย → หัก owner ของวันนั้นวันละ 1 (idleDay)
+//   - วันที่เงียบ (ไม่มีอัปเดต) → กติกา Auto KPI ใน lib/assigned-work-auto-kpi.ts ใช้ owner ของวันนั้น
 // ทั้งสองอย่างคิดจากข้อมูลในเอกสารตรงๆ (deterministic id) จึง idempotent — กดซ้ำ/รีรันไม่บวกซ้ำ.
 
 import { displayNameFor } from "./employee-directory.ts";
-import type { ScoreAdjustment } from "./score-adjustments.ts";
-import { addDays, daysBetween, hasProgressOn, isIsoDate, type WorkProject } from "./work-projects.ts";
+import { addDays, daysBetween, isIsoDate, type WorkProject } from "./work-projects.ts";
 
 /** accepted = ส่งต่อปกติ (ผู้รับรับงานอัตโนมัติ) · forced = แอดมินบังคับเปลี่ยนผู้รับผิดชอบ */
 export type ProjectHandoverStatus = "accepted" | "forced";
@@ -175,39 +174,4 @@ export function lateDaysByOwner(project: WorkProject, dueDate: string, submitted
     grouped.set(owner, [...(grouped.get(owner) || []), date]);
   }
   return [...grouped.entries()].map(([assignee, dates]) => ({ assignee, days: dates }));
-}
-
-/**
- * กติกา "วันเงียบ" เริ่มมีผลวันไหน — งานที่ค้างมาก่อนหน้านี้ไม่ถูกหักย้อนหลัง เพราะตอนนั้น
- * ยังไม่มีกติกานี้ให้พนักงานรู้ตัว (คะแนนหมวดนี้ผูกกับเงินเดือน จึงไม่ย้อนหลังเด็ดขาด).
- */
-export const IDLE_RULE_EFFECTIVE_FROM = "2026-08-25";
-
-/**
- * วันที่งานยังอยู่ในกำหนดแต่ไม่มีใครอัปเดตความคืบหน้าเลย — หัก owner ของวันนั้นวันละ `perDay`.
- * นับเฉพาะวันที่ผ่านไปแล้ว (ไม่นับวันนี้ ยังมีเวลาเหลือ) และเฉพาะงานหลายวันที่ยังไม่ปิด —
- * งานวันเดียวตัดสินด้วยกำหนดส่งอยู่แล้ว หักซ้ำสองทางไม่ได้.
- */
-export function idleDayAdjustments(project: WorkProject, today: string, perDay = 1, since = IDLE_RULE_EFFECTIVE_FROM): ScoreAdjustment[] {
-  if (project.status !== "active") return [];
-  if (perDay <= 0) return [];
-  const lastScored = daysBetween(project.endDate, addDays(today, -1)) < 0 ? addDays(today, -1) : project.endDate;
-  const firstScored = daysBetween(project.startDate, since) > 0 ? since : project.startDate;
-  const out: ScoreAdjustment[] = [];
-  for (const date of datesBetween(firstScored, lastScored)) {
-    if (hasProgressOn(project, date)) continue;
-    const owner = ownerOnDate(project, date);
-    if (!owner) continue;
-    out.push({
-      id: `ph-idle-${project.id}-${date}-${owner}`.replace(/[^a-zA-Z0-9-]/g, "-"),
-      workDate: date,
-      employeeName: owner,
-      category: "assigned_work",
-      points: -Math.abs(perDay),
-      reason: `งานที่มอบหมาย: ${project.title} — ไม่มีอัปเดตความคืบหน้าในวันนั้น`,
-      recordedAt: `${date}T23:59:59.000Z`,
-      recordedBy: "system"
-    });
-  }
-  return out;
 }

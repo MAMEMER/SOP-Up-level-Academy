@@ -14,7 +14,7 @@ export type ChecklistLateSubmission = { employeeName: string; workDate: string; 
 export type ChecklistKpiInput = {
   /** days where at least one phase was submitted — a scheduled day missing here is a missing_day */
   submittedDays: ChecklistDay[];
-  /** each หัวข้อ handed in after its own deadline — 2 points each */
+  /** each หัวข้อ handed in after its own deadline — 1 point each */
   lateSubmissions: ChecklistLateSubmission[];
 };
 
