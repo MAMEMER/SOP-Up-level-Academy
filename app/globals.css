@@ -6786,3 +6786,33 @@ main .page > section, main > section { margin-top: 16px !important; }
   font-family: inherit; font-size: 13px; cursor: pointer;
 }
 .coaching__ack:focus-visible, .coaching__del:focus-visible { outline: 2px solid var(--color-orange); outline-offset: 2px; border-radius: 12px; }
+
+/* ── เสียงจากสมาชิก (ชม/แนะนำ/ติ) ────────────────────────────────────────── */
+.feedback { display: flex; flex-direction: column; gap: 10px; }
+.feedback__head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.feedback__head .self-review__label { margin: 0; }
+.feedback__tally { font-size: 12px; color: var(--color-ink-soft); }
+.feedback__pending {
+  padding: 2px 10px; border-radius: 999px; background: rgba(224,134,0,0.14);
+  color: #8a5200; font-size: 12px; font-weight: 700;
+}
+.feedback__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.feedback__item {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px;
+  background: #fff; border: 1px solid rgba(45,49,66,0.08); border-left: 4px solid rgba(45,49,66,0.2);
+}
+.feedback__item.is-praise { border-left-color: #2E9E5B; background: rgba(46,158,91,0.05); }
+.feedback__item.is-suggestion { border-left-color: #2F80ED; }
+.feedback__item.is-complaint { border-left-color: #E08600; }
+.feedback__meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--color-ink-soft); }
+.feedback__kind { font-weight: 700; color: var(--color-ink); }
+.feedback__state { color: var(--color-ink-soft); }
+.feedback__state.is-on { color: #2E7D43; font-weight: 700; }
+.feedback__message { margin: 0; font-size: 14px; line-height: 1.65; color: var(--color-ink); white-space: pre-wrap; }
+.feedback__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.feedback__actions button {
+  min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid rgba(45,49,66,0.15);
+  background: #fff; color: var(--color-ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.feedback__actions .feedback__hide { border-color: transparent; color: #C0303A; font-weight: 400; }
+.feedback__actions button:focus-visible { outline: 2px solid var(--color-orange); outline-offset: 2px; }
