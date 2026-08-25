@@ -176,16 +176,23 @@ export function lateDaysByOwner(project: WorkProject, dueDate: string, submitted
 }
 
 /**
+ * กติกา "วันเงียบ" เริ่มมีผลวันไหน — งานที่ค้างมาก่อนหน้านี้ไม่ถูกหักย้อนหลัง เพราะตอนนั้น
+ * ยังไม่มีกติกานี้ให้พนักงานรู้ตัว (คะแนนหมวดนี้ผูกกับเงินเดือน จึงไม่ย้อนหลังเด็ดขาด).
+ */
+export const IDLE_RULE_EFFECTIVE_FROM = "2026-08-25";
+
+/**
  * วันที่งานยังอยู่ในกำหนดแต่ไม่มีใครอัปเดตความคืบหน้าเลย — หัก owner ของวันนั้นวันละ `perDay`.
  * นับเฉพาะวันที่ผ่านไปแล้ว (ไม่นับวันนี้ ยังมีเวลาเหลือ) และเฉพาะงานหลายวันที่ยังไม่ปิด —
  * งานวันเดียวตัดสินด้วยกำหนดส่งอยู่แล้ว หักซ้ำสองทางไม่ได้.
  */
-export function idleDayAdjustments(project: WorkProject, today: string, perDay = 1): ScoreAdjustment[] {
+export function idleDayAdjustments(project: WorkProject, today: string, perDay = 1, since = IDLE_RULE_EFFECTIVE_FROM): ScoreAdjustment[] {
   if (project.status !== "active") return [];
   if (perDay <= 0) return [];
   const lastScored = daysBetween(project.endDate, addDays(today, -1)) < 0 ? addDays(today, -1) : project.endDate;
+  const firstScored = daysBetween(project.startDate, since) > 0 ? since : project.startDate;
   const out: ScoreAdjustment[] = [];
-  for (const date of datesBetween(project.startDate, lastScored)) {
+  for (const date of datesBetween(firstScored, lastScored)) {
     if (hasProgressOn(project, date)) continue;
     const owner = ownerOnDate(project, date);
     if (!owner) continue;

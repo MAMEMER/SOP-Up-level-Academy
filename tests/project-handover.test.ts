@@ -183,7 +183,7 @@ describe("KPI ตามช่วงที่ถือครองงาน", () 
       progress: [progress("2026-08-10")],
       handovers: [handover({ from: "ICE", to: "Boom", date: "2026-08-12" })]
     });
-    const adjustments = idleDayAdjustments(project, "2026-08-13");
+    const adjustments = idleDayAdjustments(project, "2026-08-13", 1, "2026-08-01");
     assert.deepEqual(
       adjustments.map((item) => [item.workDate, item.employeeName, item.points]),
       [
@@ -195,21 +195,28 @@ describe("KPI ตามช่วงที่ถือครองงาน", () 
 
   it("หักวันเงียบซ้ำไม่ได้ — id เดิมเสมอสำหรับ (งาน, วัน, คน)", () => {
     const project = baseProject({ progress: [] });
-    const first = idleDayAdjustments(project, "2026-08-12");
-    const second = idleDayAdjustments(project, "2026-08-12");
+    const first = idleDayAdjustments(project, "2026-08-12", 1, "2026-08-01");
+    const second = idleDayAdjustments(project, "2026-08-12", 1, "2026-08-01");
     assert.deepEqual(first.map((item) => item.id), second.map((item) => item.id));
     assert.equal(new Set(first.map((item) => item.id)).size, first.length);
   });
 
   it("ปิดกติกาวันเงียบได้ด้วยการตั้งค่าเป็น 0 และงานที่ปิดแล้วไม่โดนหัก", () => {
     const project = baseProject({ progress: [] });
-    assert.deepEqual(idleDayAdjustments(project, "2026-08-13", 0), []);
-    assert.deepEqual(idleDayAdjustments(baseProject({ status: "done", progress: [] }), "2026-08-13"), []);
+    assert.deepEqual(idleDayAdjustments(project, "2026-08-13", 0, "2026-08-01"), []);
+    assert.deepEqual(idleDayAdjustments(baseProject({ status: "done", progress: [] }), "2026-08-13", 1, "2026-08-01"), []);
   });
 
   it("ไม่หักเลยกำหนดสิ้นสุดงาน (ช่วงนั้นคิดเป็นวันล่าช้าอยู่แล้ว)", () => {
     const project = baseProject({ progress: [] });
-    const adjustments = idleDayAdjustments(project, "2026-08-20");
+    const adjustments = idleDayAdjustments(project, "2026-08-20", 1, "2026-08-01");
     assert.deepEqual(adjustments.map((item) => item.workDate), datesBetween("2026-08-10", "2026-08-14"));
+  });
+
+  it("ไม่หักย้อนหลังก่อนวันที่กติกาเริ่มใช้ (คะแนนผูกกับเงินเดือน)", () => {
+    const project = baseProject({ progress: [] });
+    const adjustments = idleDayAdjustments(project, "2026-08-20", 1, "2026-08-13");
+    assert.deepEqual(adjustments.map((item) => item.workDate), ["2026-08-13", "2026-08-14"]);
+    assert.deepEqual(idleDayAdjustments(project, "2026-08-20", 1, "2026-09-01"), []);
   });
 });

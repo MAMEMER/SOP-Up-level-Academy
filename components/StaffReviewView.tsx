@@ -5,6 +5,7 @@ import { MyShiftToday } from "./MyShiftToday.tsx";
 import { ChecklistView } from "./ChecklistView.tsx";
 import { MyAssignedWork } from "./MyAssignedWork.tsx";
 import { MyProjects } from "./MyProjects.tsx";
+import { TaskFocusBoard } from "./TaskFocusBoard.tsx";
 import { TodayTaskList } from "./TodayTaskList.tsx";
 import { cardStoreWorkflow } from "../lib/card-store-workflow.ts";
 import { fetchShiftForStaffDate } from "../lib/shift-schedule-store.ts";
@@ -82,6 +83,9 @@ function StaffBoard({ branch, staff, date }: { branch: string; staff: StaffOptio
       <p className="staff-review__as-note">
         กำลังดูมุมมองของ <strong>{staff.displayName}</strong> — บล็อกเดียวกับที่เขาเห็นตอน login (อ่านอย่างเดียว)
       </p>
+
+      {/* งานค้างของคนนี้มาก่อน — เห็นทันทีว่าอะไรเลยกำหนด อะไรใกล้ครบ (ใบงาน YrTvFzXr) */}
+      <TaskFocusBoard branch={branch} staffCode={staff.code} today={date} />
 
       <MyShiftToday staffCode={staff.code} branch={branch} workDate={date} />
 
