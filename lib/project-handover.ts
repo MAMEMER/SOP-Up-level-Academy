@@ -101,6 +101,8 @@ export function validateHandover(
 ): string | null {
   if (project.status !== "active") return "งานนี้ปิดแล้ว ส่งต่อไม่ได้";
   if (!input.to || !input.to.trim()) return "ต้องเลือกคนรับงาน";
+  // รหัสพนักงานมาจาก body — กันค่าที่ไม่ใช่รหัสจริงหลุดไปเป็นเจ้าของงาน (งานจะไปค้างกับคนที่ไม่มีตัวตน)
+  if (input.to.length > 40 || /[/\s]/.test(input.to)) return "รหัสพนักงานไม่ถูกต้อง";
   if (!isIsoDate(input.date)) return "วันที่ส่งต่อไม่ถูกต้อง";
   const owner = currentOwnerOf(project);
   if (!actor.isAdmin && actor.staffCode !== owner) return "ส่งต่อได้เฉพาะงานที่คุณเป็นผู้รับผิดชอบตอนนี้";

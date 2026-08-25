@@ -6621,7 +6621,8 @@ main .page > section, main > section { margin-top: 16px !important; }
 .focus-strip__item.is-zero { opacity: 0.5; }
 
 .focus-board__group { display: flex; flex-direction: column; gap: 8px; }
-.focus-board__group-label { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-soft); }
+/* หัวกลุ่มใช้สีหมึกเต็ม ไม่ใช่สีจาง — 12px ตัวหนาบนพื้นอ่อนต้องอ่านออกกลางแดดในร้าน */
+.focus-board__group-label { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink); }
 .focus-board__empty { margin: 0; font-size: 13.5px; color: var(--color-ink-soft); }
 
 .focus-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -6659,4 +6660,14 @@ main .page > section, main > section { margin-top: 16px !important; }
 .focus-board__toggle {
   align-self: flex-start; min-height: 44px; border: none; background: none; padding: 0;
   color: var(--color-orange); font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+}
+
+/* โฟกัสคีย์บอร์ดของบล็อกใหม่ (focus board + ส่งต่องาน) ต้องเห็นชัด — เว็บนี้ใช้บนแท็บเล็ตหน้าร้านด้วย */
+.focus-card__cta:focus-visible,
+.focus-board__toggle:focus-visible,
+.project-handover__open:focus-visible,
+.project-handover__cancel:focus-visible {
+  outline: 2px solid var(--color-orange);
+  outline-offset: 2px;
+  border-radius: 12px;
 }
