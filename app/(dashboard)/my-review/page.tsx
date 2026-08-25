@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CoachingNotes } from "../../../components/CoachingNotes.tsx";
 import { SelfReviewBoard } from "../../../components/SelfReviewBoard.tsx";
 import { requireUser } from "../../../lib/auth.ts";
 import { branchFor, displayNameFor, employeeCodeForEmail, employeeCodes, employeeDirectory } from "../../../lib/employee-directory.ts";
@@ -102,6 +103,16 @@ export default async function MyReviewPage({ searchParams }: PageProps) {
           <button type="submit">ดู</button>
         </form>
       ) : null}
+
+      {/* คำแนะนำจากหัวหน้า — เจ้าของเขียนถึงคนที่กำลังเปิดดูอยู่ พนักงานเห็นของตัวเองพร้อมรูป */}
+      <CoachingNotes
+        staffCode={selectedCode}
+        staffName={displayNameFor(selectedCode)}
+        branch={branch}
+        period={period.startDate.slice(0, 7)}
+        isAdmin={isOwner}
+        readOnly={user.isImpersonating}
+      />
 
       {review ? (
         <SelfReviewBoard review={review} periodLabel={period.label} />

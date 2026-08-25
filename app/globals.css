@@ -6743,3 +6743,46 @@ main .page > section, main > section { margin-top: 16px !important; }
 .self-review__plus { font-weight: 700; color: #2E7D43; font-variant-numeric: tabular-nums; }
 .self-review__minus { font-weight: 700; color: #C0303A; font-variant-numeric: tabular-nums; }
 .self-review__empty { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+
+/* ── คำแนะนำจากหัวหน้า (บนหน้าประเมินผลงาน) ─────────────────────────────── */
+.coaching { display: flex; flex-direction: column; gap: 10px; }
+.coaching__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.coaching__head .self-review__label { margin: 0; }
+.coaching__pending {
+  padding: 2px 10px; border-radius: 999px; background: rgba(224,134,0,0.14);
+  color: #8a5200; font-size: 12px; font-weight: 700;
+}
+.coaching__form { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: #fff; border: 1px solid rgba(45,49,66,0.08); }
+.coaching__form label { font-size: 13px; color: var(--color-ink-soft); }
+.coaching__form textarea {
+  width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255,199,142,0.6); background: #fff; color: var(--color-ink);
+  font-family: inherit; min-height: 88px; resize: vertical;
+}
+.coaching__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.coaching__sent { font-size: 12.5px; font-weight: 600; color: #2E7D43; }
+
+.coaching__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.coaching__item {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px;
+  background: #fff; border: 1px solid rgba(45,49,66,0.08); border-left: 4px solid rgba(45,49,66,0.2);
+}
+.coaching__item.is-new { border-left-color: #E08600; background: rgba(224,134,0,0.05); }
+.coaching__meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--color-ink-soft); }
+.coaching__read { color: #2E7D43; font-weight: 700; }
+.coaching__note { margin: 0; font-size: 14px; line-height: 1.65; color: var(--color-ink); white-space: pre-wrap; }
+.coaching__photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.coaching__photos img {
+  width: 96px; height: 96px; object-fit: cover; border-radius: 12px; display: block;
+  border: 1px solid rgba(45,49,66,0.1);
+}
+.coaching__item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.coaching__ack {
+  min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid rgba(45,49,66,0.15);
+  background: #fff; color: var(--color-ink); font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+}
+.coaching__del {
+  min-height: 44px; padding: 0 12px; border: none; background: none; color: #C0303A;
+  font-family: inherit; font-size: 13px; cursor: pointer;
+}
+.coaching__ack:focus-visible, .coaching__del:focus-visible { outline: 2px solid var(--color-orange); outline-offset: 2px; border-radius: 12px; }
