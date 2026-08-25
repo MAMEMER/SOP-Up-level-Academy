@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ProjectHandoverPanel } from "./ProjectHandoverPanel.tsx";
 import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
 import { ProjectReviewPanel } from "./ProjectReviewPanel.tsx";
@@ -178,6 +179,17 @@ function ProjectRow({
           );
         })}
       </div>
+
+      {/* ใครถืองานอยู่ตอนนี้ + ประวัติการส่งต่อ · แอดมินเปลี่ยนตัวคนได้จากตรงนี้ */}
+      <ProjectHandoverPanel
+        project={project}
+        branch={project.branch}
+        today={today}
+        staffCode={null}
+        isAdmin
+        staffOptions={staff.map((person) => ({ code: person.code, displayName: person.displayName }))}
+        onDone={onChanged}
+      />
 
       {/* เป้าคือวันละอย่างน้อย 1 ครั้งจากใครก็ได้ในทีม — ไม่ใช่ทุกคนต้องลงของตัวเอง */}
       {needsToday ? (

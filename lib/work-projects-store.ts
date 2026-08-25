@@ -126,3 +126,31 @@ export async function reviewRequestFix(input: { id: string; assignee: string; re
 export async function deleteProjectReview(id: string, reviewId: string): Promise<void> {
   await post({ action: "deleteReview", id, reviewId });
 }
+
+/** คนที่ลงกะไว้วันถัดไป (ทั้งกะเปิด-กะปิด) — ใช้เป็นตัวเลือกคนรับงานต่อ */
+export async function fetchHandoverCandidates(
+  branch: string,
+  date: string
+): Promise<{ date: string; candidates: Array<{ staffCode: string; shift: "s1" | "s2" }> }> {
+  return getJson<{ date: string; candidates: Array<{ staffCode: string; shift: "s1" | "s2" }> }>({
+    action: "handoverCandidates",
+    branch,
+    date
+  });
+}
+
+/** ส่งต่องานให้คนถัดไป — ผู้รับรับงานอัตโนมัติ, ประวัติเดิมไม่หาย */
+export async function handoverProject(input: {
+  id: string;
+  to: string;
+  date: string;
+  note?: string;
+  attachments?: string[];
+}): Promise<void> {
+  await post({ action: "handoverProject", ...input });
+}
+
+/** แอดมินบังคับเปลี่ยนผู้รับผิดชอบ — ต้องมีเหตุผล และถูกบันทึกลง log */
+export async function forceProjectOwner(input: { id: string; to: string; date: string; note: string }): Promise<void> {
+  await post({ action: "forceProjectOwner", ...input });
+}

@@ -4,8 +4,10 @@ import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
 import {
   MAX_PROJECT_PROGRESS,
   WORK_PROJECTS_COLLECTION,
+  addDays,
   clampPercent,
   isIsoDate,
+  projectMode,
   validateProgressInput,
   validateProjectDraft,
   type ProjectHistoryEntry,
@@ -20,8 +22,11 @@ import {
   computeReviewPoints,
   effectiveDue,
   hasOpenRevision,
-  reviewEntriesFor
+  reviewEntriesFor,
+  splitReviewByOwner
 } from "../../../lib/project-review.ts";
+import { applyHandover, currentOwnerOf, handoverSummary, validateHandover } from "../../../lib/project-handover.ts";
+import { fetchShiftAssignmentsForDate } from "../../../lib/shift-plan-server.ts";
 import type { ProjectReviewEntry } from "../../../lib/work-projects.ts";
 
 // Server route for งานแบบโปรเจกต์ (หลายวัน + ส่ง progress รายวัน). Same shape as
@@ -99,6 +104,16 @@ export async function GET(request: Request) {
         const snap = await db().collection(WORK_PROJECTS_COLLECTION).doc(id).get();
         return NextResponse.json({ project: snap.exists ? (snap.data() as WorkProject) : null });
       }
+      // ── ใครควรเป็นคนรับงานต่อ: คนที่ลงกะไว้ในวันถัดไป (ทั้งกะเปิดและกะปิด) ───────
+      // ยังไม่ได้วางกะของวันนั้น → คืนลิสต์ว่าง แล้วให้ UI ถอยไปใช้รายชื่อทีมทั้งสาขา
+      case "handoverCandidates": {
+        if (!branch) return badRequest("missing_branch");
+        const from = isIsoDate(p.get("date")) ? (p.get("date") as string) : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+        const nextDay = addDays(from, 1);
+        const shifts = await fetchShiftAssignmentsForDate(branch, nextDay);
+        const candidates = shifts ? [...shifts.entries()].map(([staffCode, shift]) => ({ staffCode, shift })) : [];
+        return NextResponse.json({ date: nextDay, candidates });
+      }
       default:
         return badRequest("unknown_action");
     }
@@ -156,6 +171,9 @@ export async function POST(request: Request) {
           mode: body.mode === "group" ? "group" : "single",
           ...(timingFromBody(body) ? { timing: timingFromBody(body) } : {}),
           ...(answerFromBody(body) ? { answer: answerFromBody(body) } : {}),
+          // ผู้รับผิดชอบคนแรก = คนแรกในรายชื่อ (งานกลุ่มก็ยังต้องมีคนถือ ไว้ใช้ตอนส่งต่อ/คิด KPI)
+          originalOwner: draft.assignees[0],
+          currentOwner: draft.assignees[0],
           createdBy: user.actualEmail,
           createdAt: nowIso,
           updatedAt: nowIso,
@@ -198,8 +216,11 @@ export async function POST(request: Request) {
         if (assignees.length === 0) return badRequest("ต้องเหลือผู้รับผิดชอบอย่างน้อย 1 คน");
         const project = await load(id);
         if (project instanceof NextResponse) return project;
+        // ถอดคนที่ถืองานอยู่ออก → ยกงานให้คนแรกที่เหลือ ไม่งั้นงานจะไม่มีเจ้าของและส่งต่อไม่ได้
+        const owner = currentOwnerOf(project);
         await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
           assignees,
+          ...(assignees.includes(owner) ? {} : { currentOwner: assignees[0] }),
           updatedAt: nowIso,
           history: stamp(project, { action: "assignees", detail: `${project.assignees.join(", ")} เป็น ${assignees.join(", ")}` })
         });
@@ -275,6 +296,11 @@ export async function POST(request: Request) {
         if (project instanceof NextResponse) return project;
         // เฉพาะคนที่ถูกมอบหมาย (หรือแอดมิน) — เอาตัวตนจาก session ไม่เชื่อ body
         if (!isAdmin(user) && !project.assignees.includes(staffCode)) return forbidden();
+        // งานเดี่ยวที่ส่งต่อมาแล้ว: คนที่ส่งงานได้คือ owner ปัจจุบันเท่านั้น — เจ้าของเดิมยังอยู่ใน
+        // รายชื่อเพื่อดูประวัติ แต่ไม่ควรมาส่งงานทับคนที่ถืองานอยู่ (งานกลุ่มยังใครส่งก็ได้เหมือนเดิม)
+        if (!isAdmin(user) && projectMode(project) === "single" && (project.handovers || []).length > 0 && currentOwnerOf(project) !== staffCode) {
+          return badRequest("งานนี้ส่งต่อให้คนอื่นแล้ว — ผู้รับผิดชอบปัจจุบันเป็นคนส่งงาน");
+        }
         const percent = clampPercent(Number(body.percent));
         const note = str(body.note).trim();
         const invalid = validateProgressInput({ percent, note });
@@ -350,6 +376,38 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      // ── ส่งต่องานให้คนถัดไป (owner ปัจจุบัน หรือแอดมิน) ─────────────────────
+      // ผู้รับ "รับงานอัตโนมัติ" ตามใบงาน — งานเปลี่ยนมือทันทีโดยไม่ต้องรอกดตอบรับ ส่วนประวัติ
+      // ผู้รับผิดชอบเดิม + progress + หลักฐานทั้งหมดยังอยู่ครบในเอกสารเดิม.
+      case "handoverProject":
+      case "forceProjectOwner": {
+        const forced = body.action === "forceProjectOwner";
+        if (forced && !isAdmin(user)) return forbidden();
+        const id = docId(body.id);
+        if (!id) return badRequest("missing_id");
+        const project = await load(id);
+        if (project instanceof NextResponse) return project;
+        const input = {
+          to: str(body.to).trim(),
+          date: isIsoDate(body.date) ? (body.date as string) : nowIso.slice(0, 10),
+          note: str(body.note).trim(),
+          attachments: safeUrls(body.attachments),
+          forced
+        };
+        const invalid = validateHandover(project, input, { staffCode, isAdmin: isAdmin(user) });
+        if (invalid) return badRequest(invalid);
+        const patch = applyHandover(project, input, { at: nowIso, by: user.actualEmail, ...(user.actualName ? { byName: user.actualName } : {}) });
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
+          currentOwner: patch.currentOwner,
+          originalOwner: patch.originalOwner,
+          assignees: patch.assignees,
+          handovers: patch.handovers,
+          updatedAt: nowIso,
+          history: stamp(project, { action: "handover", detail: handoverSummary(patch.entry) })
+        });
+        return NextResponse.json({ ok: true, currentOwner: patch.currentOwner });
+      }
+
       // ── แอดมิน "ยืนยันผ่าน" งานของคนคนหนึ่ง → คิดคะแนน KPI ให้อัตโนมัติ ──────
       // เร็ว/ตรงเวลา/แก้ทัน/ช้า คิดจากวันส่งจริงเทียบกำหนดที่มีผล (เดิม หรือกำหนดแก้ไข).
       case "reviewApprove": {
@@ -363,26 +421,33 @@ export async function POST(request: Request) {
         const submittedDate = isIsoDate(body.submittedDate) ? (body.submittedDate as string) : nowIso.slice(0, 10);
         const dueDate = effectiveDue(project, assignee);
         const hadRevision = hasOpenRevision(reviewEntriesFor(project, assignee));
-        const comp = computeReviewPoints({ verdict: "approve", dueDate, submittedDate, hadRevision });
-        const entry: ProjectReviewEntry = {
-          id: `rv__${nowIso}__${assignee}`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
-          assignee,
-          outcome: comp.outcome,
+        // งานที่เคยส่งต่อและส่งช้า → หักคนละส่วนตามวันที่แต่ละคนถือครองงานจริง
+        // งานที่ไม่เคยส่งต่อ → ได้รายการเดียวเหมือนเดิม
+        const splits = splitReviewByOwner(project, { assignee, dueDate, submittedDate, hadRevision });
+        const note = str(body.note).trim();
+        const entries: ProjectReviewEntry[] = splits.map((split, index) => ({
+          id: `rv__${nowIso}__${split.assignee}__${index}`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
+          assignee: split.assignee,
+          outcome: split.outcome,
           dueDate,
           submittedDate,
-          daysLate: comp.daysLate,
-          points: comp.points,
-          ...(str(body.note).trim() ? { note: str(body.note).trim() } : {}),
+          daysLate: split.daysLate,
+          points: split.points,
+          ...(note ? { note } : {}),
           confirmedBy: user.actualEmail,
           ...(user.actualName ? { confirmedByName: user.actualName } : {}),
           confirmedAt: nowIso
-        };
+        }));
+        const totalPoints = entries.reduce((sum, entry) => sum + entry.points, 0);
         await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
-          reviews: [...(project.reviews || []), entry],
+          reviews: [...(project.reviews || []), ...entries],
           updatedAt: nowIso,
-          history: stamp(project, { action: "review", detail: `ยืนยันผ่าน ${assignee}: ${comp.outcome} (${comp.points >= 0 ? "+" : ""}${comp.points})` })
+          history: stamp(project, {
+            action: "review",
+            detail: `ยืนยันผ่าน ${entries.map((entry) => `${entry.assignee}: ${entry.outcome} (${entry.points >= 0 ? "+" : ""}${entry.points})`).join(" · ")}`
+          })
         });
-        return NextResponse.json({ ok: true, points: comp.points, outcome: comp.outcome });
+        return NextResponse.json({ ok: true, points: totalPoints, outcome: entries[0]?.outcome, entries: entries.length });
       }
 
       // ── แอดมิน "ให้แก้ไข" งานของคนคนหนึ่ง → หัก −1 ทันที + ตั้งกำหนดส่งใหม่ ────

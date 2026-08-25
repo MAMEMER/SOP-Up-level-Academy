@@ -15,6 +15,7 @@
 // การเขียน ledger จริงทำที่ /api/work-projects (Admin SDK, ตัวตนจาก session).
 
 import { displayNameFor } from "./employee-directory.ts";
+import { lateDaysByOwner } from "./project-handover.ts";
 import type { ScoreAdjustment } from "./score-adjustments.ts";
 import { daysBetween, projectMode, type ProjectReviewEntry, type ProjectReviewOutcome, type WorkProject } from "./work-projects.ts";
 
@@ -64,6 +65,33 @@ export function computeReviewPoints(input: ReviewVerdictInput, rates: ProjectSco
   }
   if (lateDays < 0) return { outcome: "early_pass", points: Math.abs(rates.earlyBonus), daysLate: 0 };
   return { outcome: "ontime_pass", points: 0, daysLate: 0 };
+}
+
+/**
+ * ผลตรวจ 1 ครั้ง แตกเป็นรายการรายคนตาม "ใครถือครองงานในวันที่ล่าช้าวันนั้น" (ใบงาน iDBqn3jE).
+ *
+ * งานที่ไม่เคยส่งต่อจะได้รายการเดียวของคนที่ถูกตรวจ — ผลลัพธ์เท่าเดิมทุกประการ. งานที่ส่งต่อแล้ว
+ * และส่งช้า จะหักคนละส่วนตามจำนวนวันที่แต่ละคนถือครองจริง แทนที่จะเทให้คนสุดท้ายคนเดียว.
+ */
+export type ReviewSplitEntry = ReviewComputation & { assignee: string; lateDates?: string[] };
+
+export function splitReviewByOwner(
+  project: WorkProject,
+  input: { assignee: string; dueDate: string; submittedDate?: string; hadRevision: boolean },
+  rates: ProjectScoreRates = PROJECT_SCORE
+): ReviewSplitEntry[] {
+  const comp = computeReviewPoints({ verdict: "approve", ...input }, rates);
+  if (comp.outcome !== "late") return [{ ...comp, assignee: input.assignee }];
+  const submitted = input.submittedDate || input.dueDate;
+  const shares = lateDaysByOwner(project, input.dueDate, submitted);
+  if (shares.length <= 1) return [{ ...comp, assignee: shares[0]?.assignee || input.assignee }];
+  return shares.map((share) => ({
+    assignee: share.assignee,
+    outcome: "late" as const,
+    daysLate: share.days.length,
+    points: -Math.abs(rates.latePerDay) * share.days.length,
+    lateDates: share.days
+  }));
 }
 
 // ---- อ่าน ledger รายคน --------------------------------------------------------

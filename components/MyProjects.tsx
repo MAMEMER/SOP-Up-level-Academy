@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
+import { ProjectHandoverPanel } from "./ProjectHandoverPanel.tsx";
 import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
-import { displayNameFor } from "../lib/employee-directory.ts";
+import { displayNameFor, employeeDirectory } from "../lib/employee-directory.ts";
 import { addProjectProgress, deleteProjectProgress, fetchProjectsForStaff, setProjectPercent } from "../lib/work-projects-store.ts";
 import { ANSWER_KIND_LABEL, answerNeedsInput } from "../lib/checklist-overrides.ts";
 import {
@@ -68,6 +69,11 @@ export function MyProjects({
     void load();
   }, [load]);
 
+  // ตัวเลือกสำรองตอนส่งต่องาน (ใช้เมื่อยังไม่ได้วางกะของวันถัดไป)
+  const staffOptions = employeeDirectory
+    .filter((entry) => entry.branch === branch)
+    .map((entry) => ({ code: entry.code, displayName: entry.displayName }));
+
   if (!staffCode) return <p className="assign-work__empty">บัญชีนี้ยังไม่ผูกกับรหัสพนักงาน — ยังไม่มีงานที่มอบหมาย</p>;
   if (loading) return <p className="assign-work__empty">กำลังโหลด…</p>;
   if (loadError) return <p className="project-progress-form__error">{loadError}</p>;
@@ -119,6 +125,19 @@ export function MyProjects({
                   {progressAuthorsOn(project, today).map(displayNameFor).join(", ")} · ทำต่อแล้วส่งเพิ่มได้เรื่อยๆ
                 </p>
               )
+            ) : null}
+
+            {/* ส่งต่องาน — อยู่ในการ์ดเดียวกับงาน ไม่ต้องไปอีกหน้า */}
+            {!readOnly ? (
+              <ProjectHandoverPanel
+                project={project}
+                branch={branch}
+                today={today}
+                staffCode={staffCode}
+                isAdmin={isAdmin}
+                staffOptions={staffOptions}
+                onDone={load}
+              />
             ) : null}
 
             {project.status === "active" && !readOnly ? (

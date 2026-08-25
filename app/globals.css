@@ -5993,6 +5993,33 @@ main .page > section, main > section { margin-top: 16px !important; }
 .admin-percent__save { align-self: flex-start; }
 .admin-percent__ok { font-size: 12.5px; font-weight: 600; color: #2E9E5B; }
 
+/* ส่งต่องาน — อยู่ในการ์ดงานที่มอบหมาย ไม่แยกหน้า (ใบงาน iDBqn3jE) */
+.project-handover { display: flex; flex-direction: column; gap: 8px; }
+.project-handover__owner { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+.project-handover__owner strong { color: var(--color-ink); }
+.project-handover__log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.project-handover__log li { display: flex; gap: 8px; font-size: 12.5px; color: var(--color-ink-soft); }
+.project-handover__log-date { font-variant-numeric: tabular-nums; color: var(--color-ink); font-weight: 700; white-space: nowrap; }
+.project-handover__open {
+  align-self: flex-start; min-height: 44px; border: 1px solid rgba(255,199,142,0.7); background: #fff;
+  border-radius: 12px; padding: 0 14px; color: var(--color-ink); font-family: inherit; font-size: 13.5px;
+  font-weight: 700; cursor: pointer;
+}
+.project-handover__form { display: flex; flex-direction: column; gap: 10px; }
+.project-handover__form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--color-ink-soft); }
+.project-handover__form select,
+.project-handover__form textarea {
+  width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255,199,142,0.6); background: #fff; color: var(--color-ink);
+  font-family: inherit; min-height: 44px; resize: vertical;
+}
+.project-handover__hint { margin: 0; font-size: 12px; color: var(--color-ink-soft); }
+.project-handover__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.project-handover__cancel {
+  min-height: 44px; border: none; background: none; padding: 0 6px; color: var(--color-ink-soft);
+  font-family: inherit; font-size: 13px; cursor: pointer;
+}
+
 .project-progress-form { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed rgba(255,199,142,0.6); padding-top: 12px; }
 .project-progress-form textarea,
 .project-progress-form input[type="text"],

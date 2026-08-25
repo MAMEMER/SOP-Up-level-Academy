@@ -6,6 +6,7 @@ import { fetchScoreAdjustments } from "./score-adjustment-store.ts";
 import { fetchKpiRules } from "./kpi-rules-store.ts";
 import { fetchAllWorkProjects } from "./work-projects-server-store.ts";
 import { projectReviewsToAdjustments } from "./project-review.ts";
+import { idleDayAdjustments } from "./project-handover.ts";
 
 /**
  * Every manual KPI input in one object.
@@ -27,11 +28,16 @@ export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStor
   // ผลตรวจงานที่มอบหมายรายคน (หน้า /admin/projects) เข้า KPI ผ่าน channel เดียวกับ
   // owner corrections — พนักงานจึงโดนหัก/ได้คืนคะแนนจริงในหน้าคะแนนพนักงานโดยไม่ต้องแก้ engine.
   const projectReviewAdjustments = projectReviewsToAdjustments(projects);
+  // งานที่ยังอยู่ในกำหนดแต่เงียบทั้งวัน — หักผู้รับผิดชอบ "ของวันนั้น" (ส่งต่องานแล้วก็ตามตัวถูกคน).
+  // คิดสดจากเอกสารงานทุกครั้ง ไม่เขียนลง Firestore: id เป็น deterministic ต่อ (งาน, วัน, คน)
+  // จึงไม่มีทางหักซ้ำแม้หน้าคะแนนจะถูกเปิดกี่รอบ.
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  const idleAdjustments = projects.flatMap((project) => idleDayAdjustments(project, today, kpiRules.assignedWork.idleDay));
   return {
     ...manual,
     stockCheckRecords,
     checklistAuditRecords,
-    scoreAdjustments: [...(scoreAdjustments || []), ...projectReviewAdjustments],
+    scoreAdjustments: [...(scoreAdjustments || []), ...projectReviewAdjustments, ...idleAdjustments],
     kpiRules
   };
 }
