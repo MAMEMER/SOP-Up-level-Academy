@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CoachingNotes } from "../../../components/CoachingNotes.tsx";
 import { SelfReviewBoard } from "../../../components/SelfReviewBoard.tsx";
+import { StaffFeedbackPanel } from "../../../components/StaffFeedbackPanel.tsx";
 import { requireUser } from "../../../lib/auth.ts";
 import { branchFor, displayNameFor, employeeCodeForEmail, employeeCodes, employeeDirectory } from "../../../lib/employee-directory.ts";
 import { currentReviewPeriod, getPerformanceScoreRows } from "../../../lib/performance-score-data.ts";
@@ -113,6 +114,9 @@ export default async function MyReviewPage({ searchParams }: PageProps) {
         isAdmin={isOwner}
         readOnly={user.isImpersonating}
       />
+
+      {/* เสียงจากสมาชิก (ชม/แนะนำ/ติ) ที่ส่งมาจากเว็บกิลด์ — ไม่ผูกกับคะแนน */}
+      <StaffFeedbackPanel staffCode={selectedCode} isAdmin={isOwner} readOnly={user.isImpersonating} />
 
       {review ? (
         <SelfReviewBoard review={review} periodLabel={period.label} />
