@@ -7,6 +7,7 @@ import {
   visibleForStaff,
   type StaffFeedback
 } from "../../../lib/staff-feedback.ts";
+import { feedHeadline, postGuildFeedHeadline } from "../../../lib/guild-feed-server.ts";
 
 // เสียงจากสมาชิกถึงพนักงาน — ฝั่งอ่าน/คัดกรองของเว็บ SOP (สมาชิกส่งจากเว็บกิลด์).
 //  - พนักงาน: เห็นเฉพาะของตัวเอง เฉพาะที่ถูกเปิดให้เห็นแล้ว และ **ไม่มีชื่อผู้ส่ง**
@@ -61,12 +62,21 @@ export async function POST(request: Request) {
         const visible = body.visible === true;
         const snap = await ref.get();
         if (!snap.exists) return badRequest("not_found");
+        const current = snap.data() as StaffFeedback & { feedPostedAt?: string };
         await ref.update({
           visibleToStaff: visible,
           reviewedBy: user.actualEmail,
           reviewedAt: nowIso,
           ...(visible ? { hidden: false } : {})
         });
+        // ปล่อยให้พนักงานเห็นแล้ว = ขึ้นฟีดสมาชิกด้วย แต่บอกแค่ "ใครได้รับอะไรจากใคร"
+        // ไม่มีเนื้อหาข้างใน. feedPostedAt กันโพสต์ซ้ำเมื่อกดปิด-เปิดหลายรอบ
+        if (visible && !current.feedPostedAt) {
+          const posted = await postGuildFeedHeadline(
+            feedHeadline({ staffName: current.staffName, kind: current.kind, memberName: current.memberName })
+          );
+          if (posted) await ref.update({ feedPostedAt: nowIso });
+        }
         return NextResponse.json({ ok: true });
       }
       // สแปม/ไม่เกี่ยวกับงาน — ซ่อนถาวร ไม่ลบทิ้งเพื่อให้ตรวจย้อนได้

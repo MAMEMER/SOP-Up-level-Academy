@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { DigitalClock } from "./DigitalClock.tsx";
+import { NotificationBell } from "./NotificationBell.tsx";
 import { NavMenu } from "./NavMenu.tsx";
 import type { CurrentUser } from "../lib/auth.ts";
 import { isOwner } from "../lib/owner.ts";
@@ -62,6 +63,8 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
             </p>
           </div>
           <div className="topbar-actions">
+            {/* งานใหม่ · งานส่งต่อ · งานส่งของ · คำแนะนำหัวหน้า · เสียงจากลูกค้า — ที่เดียว */}
+            <NotificationBell />
             <DigitalClock />
             <div className="user-chip">{user.email}</div>
             <form action={logOut}>
