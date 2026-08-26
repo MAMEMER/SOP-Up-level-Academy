@@ -22,7 +22,7 @@ import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
 import { requireUser } from "../lib/auth.ts";
 import { isOwner } from "../lib/owner.ts";
 import { deleteScoreAdjustment, saveScoreAdjustment } from "../lib/score-adjustment-store.ts";
-import { adjustmentCategoryOptions } from "../lib/score-adjustments.ts";
+import { adjustmentCategoryOptions, isManualScoreAdjustment } from "../lib/score-adjustments.ts";
 import type { DeductionRecord, ScoreCategoryKey } from "../lib/performance-score.ts";
 import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
 import { displayNameFor, employeeDirectory } from "../lib/employee-directory.ts";
@@ -245,6 +245,7 @@ type InputStatus =
   | "adjust-saved"
   | "adjust-removed"
   | "adjust-error"
+  | "adjust-derived"
   | "adjust-denied"
   | "adjust-missing-reason"
   | "adjust-missing-points";
@@ -252,6 +253,7 @@ type InputStatus =
 const adjustStatusMessages: Record<string, { tone: "success" | "warning"; text: string }> = {
   "adjust-saved": { tone: "success", text: "แก้คะแนนแล้ว — คะแนนรวมและยอดหักเงินอัปเดตทันที" },
   "adjust-removed": { tone: "success", text: "ยกเลิกการแก้คะแนนแล้ว" },
+  "adjust-derived": { tone: "warning", text: "รายการนี้มาจากผลตรวจงานที่มอบหมาย (/admin/projects) — ยกเลิกที่นี่ไม่ได้ ต้องไปแก้ที่หน้าตรวจงาน" },
   "adjust-denied": { tone: "warning", text: "แก้คะแนนได้เฉพาะเจ้าของ และต้องไม่อยู่ในโหมดดูแทนพนักงาน" },
   "adjust-missing-reason": { tone: "warning", text: "ต้องใส่เหตุผลทุกครั้งที่แก้คะแนน" },
   "adjust-missing-points": { tone: "warning", text: "ใส่จำนวนคะแนนที่ต้องการคืนหรือหักเพิ่ม (ไม่ใช่ 0)" },
@@ -361,9 +363,15 @@ async function deleteScoreAdjustmentAction(formData: FormData) {
   const user = await requireUser();
   if (!isOwner(user.actualEmail) || user.isImpersonating) redirect(withInputStatus(redirectTo, "adjust-denied"));
 
+  const adjustmentId = stringValue(formData, "adjustmentId");
+  // Derived rows (project reviews `pr-adjust-…`, auto no-progress `awnp-…`) are merged into
+  // the same list but are not stored docs — deleting one silently no-ops and it re-appears
+  // on the next render. Refuse instead of reporting a false "ยกเลิกแล้ว".
+  if (!isManualScoreAdjustment(adjustmentId)) redirect(withInputStatus(redirectTo, "adjust-derived"));
+
   let inputStatus: InputStatus = "adjust-removed";
   try {
-    await deleteScoreAdjustment(stringValue(formData, "adjustmentId"));
+    await deleteScoreAdjustment(adjustmentId);
   } catch {
     inputStatus = "adjust-error";
   }
@@ -823,11 +831,18 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                     <span key={adjustment.id}>
                       {adjustment.workDate} · {adjustment.points > 0 ? `+${adjustment.points}` : adjustment.points} ·{" "}
                       {adjustment.reason} ({adjustment.recordedBy})
-                      <form action={deleteScoreAdjustmentAction}>
-                        <input type="hidden" name="redirectTo" value={redirectTo} />
-                        <input type="hidden" name="adjustmentId" value={adjustment.id} />
-                        <button type="submit" className="staff-form__delete">ยกเลิก</button>
-                      </form>
+                      {/* Only owner-entered adjustments are their own doc → deletable here.
+                          Derived rows (ผลตรวจงานที่มอบหมาย / auto no-progress) must be changed
+                          at /admin/projects, else "ยกเลิก" no-ops and the row re-appears. */}
+                      {isManualScoreAdjustment(adjustment.id) ? (
+                        <form action={deleteScoreAdjustmentAction}>
+                          <input type="hidden" name="redirectTo" value={redirectTo} />
+                          <input type="hidden" name="adjustmentId" value={adjustment.id} />
+                          <button type="submit" className="staff-form__delete">ยกเลิก</button>
+                        </form>
+                      ) : (
+                        <small className="performance-adjust-source-note">มาจากตรวจงานที่มอบหมาย — แก้ที่ /admin/projects</small>
+                      )}
                     </span>
                   ))}
                 </div>

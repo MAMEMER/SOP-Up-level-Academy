@@ -42,6 +42,17 @@ function adjustmentId(input: { workDate: string; employeeName: string; category:
   return `adjust-${input.workDate}-${input.employeeName}-${input.category}-${recordedAt}`.replace(/[^a-zA-Z0-9-]/g, "-");
 }
 
+/**
+ * True only for owner-entered adjustments that live as their own Firestore doc and can be
+ * deleted. Derived adjustments merged into the same list — project reviews (`pr-adjust-…`,
+ * from /admin/projects) and auto no-progress penalties (`awnp-…`) — are NOT stored here, so
+ * a delete of their id silently no-ops and the row re-appears on the next render (the
+ * "ยกเลิกไม่ได้" bug). Those must be changed at their source, not cancelled here.
+ */
+export function isManualScoreAdjustment(id: string) {
+  return id.startsWith("adjust-");
+}
+
 export function buildScoreAdjustment(input: ScoreAdjustmentInput, recordedAt = new Date().toISOString()): ScoreAdjustment {
   return {
     ...input,

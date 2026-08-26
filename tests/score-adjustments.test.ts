@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildScoreAdjustment, scoreAdjustmentsToRecords, totalAdjustmentPoints } from "../lib/score-adjustments.ts";
+import { buildScoreAdjustment, isManualScoreAdjustment, scoreAdjustmentsToRecords, totalAdjustmentPoints } from "../lib/score-adjustments.ts";
 import { calculateEmployeePerformanceScore } from "../lib/performance-score.ts";
 
 const baseInput = {
@@ -87,5 +87,24 @@ describe("owner score adjustments", () => {
     assert.equal(record.reason, "หักผิด");
     assert.equal(totalAdjustmentPoints([record]), 2);
     assert.equal(scoreAdjustmentsToRecords([record])[0].points, -2);
+  });
+});
+
+describe("deletable vs derived adjustments", () => {
+  it("owner-entered adjustment ids are deletable", () => {
+    const record = buildScoreAdjustment({
+      workDate: "2026-08-10",
+      employeeName: "ICE",
+      category: "checklist",
+      points: 2,
+      reason: "clock-in ไม่ sync",
+      recordedBy: "owner@example.com"
+    });
+    assert.equal(isManualScoreAdjustment(record.id), true);
+  });
+
+  it("derived project-review and auto no-progress ids are NOT deletable (would re-appear)", () => {
+    assert.equal(isManualScoreAdjustment("pr-adjust-proj1-review9"), false);
+    assert.equal(isManualScoreAdjustment("awnp-proj1-ICE-2026-08-10"), false);
   });
 });
