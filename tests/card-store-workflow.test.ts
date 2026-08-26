@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cardStoreWorkflow, phasesForShift, stockWorkSummaryCards, workflowManualHref } from "../lib/card-store-workflow.ts";
+import { builtinDetailIndex, cardStoreWorkflow, phasesForShift, stockWorkSummaryCards, workflowManualHref } from "../lib/card-store-workflow.ts";
 
 describe("card store workflow content", () => {
   it("covers the full day from opening preparation to closing", () => {
@@ -125,5 +125,36 @@ describe("daily checklist overrides", () => {
     const { applyChecklistOverrides } = await import("../lib/daily-checklist.ts");
     const out = applyChecklistOverrides(cardStoreWorkflow, { "close-store": [] });
     assert.deepEqual(out.find((p) => p.id === "close-store")?.checklist, []);
+  });
+});
+
+describe("built-in detail panels bind to item identity, not position", () => {
+  it("maps each default stock item text to its own panel slot", () => {
+    const stock = cardStoreWorkflow.find((p) => p.id === "stock-work")!;
+    stock.checklist.forEach((item, index) => {
+      assert.equal(builtinDetailIndex("stock-work", item), index);
+    });
+  });
+
+  it("keeps a reordered/deleted stock item paired with the correct panel (ticket zKnOARcZJEHuZC9o4zxT)", () => {
+    // Live bangkae override: the owner deleted the first built-in stock item, shifting every
+    // remaining item up one position. Old position-based code paired the reorder item with the
+    // refill panel. Identity mapping must still resolve each surviving item to its own panel.
+    const liveOverride = [
+      "นับจำนวนจริงหน้าร้านและห้อง Stock",
+      "สรุปรายวันสินค้าใกล้หมดจาก StoreHub Supply Needs เฉพาะชื่อและจำนวนที่เหลือ", // owner-reworded → no panel
+      "เติมสินค้าบนชั้น",
+      "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"
+    ];
+    const slots = liveOverride.map((item) => builtinDetailIndex("stock-work", item));
+    // "นับจำนวนจริง..." → panel 1 (พื้นที่ที่นับ); reworded supply-needs line → -1 (owner หลักฐาน);
+    // "เติมสินค้าบนชั้น" → panel 3 (refill); "สรุปรายการ...สั่งเพิ่ม" → panel 4 (reorder). No collisions.
+    assert.deepEqual(slots, [1, -1, 3, 4]);
+    // The reported symptom: the reorder item must NOT land on the refill panel (slot 3).
+    assert.notEqual(builtinDetailIndex("stock-work", "สรุปรายการน้ำ/ขนมที่ต้องสั่งเพิ่ม"), 3);
+  });
+
+  it("returns -1 for an item the owner added that no built-in panel backs", () => {
+    assert.equal(builtinDetailIndex("stock-work", "งานพิเศษที่เจ้าของเพิ่มเอง"), -1);
   });
 });

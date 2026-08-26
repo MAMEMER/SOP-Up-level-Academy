@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { workflowManualHref, type WorkflowPhase } from "../lib/card-store-workflow.ts";
+import { builtinDetailIndex, cardStoreWorkflow, workflowManualHref, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import {
   canAdminUnlockWorkflowRecord,
   canEditWorkflowRecord,
@@ -33,6 +33,24 @@ import { dailyScopeKey, shiftWorkDate } from "../lib/work-records.ts";
 
 function itemKey(phaseId: string, index: number) {
   return `${phaseId}:${index}`;
+}
+
+// The built-in detail panels (StoreHub Stock Take radios, refill checklist, ปิดร้าน cash photo, ฯลฯ)
+// are bound to item IDENTITY via builtinDetailIndex() (see card-store-workflow.ts) instead of raw
+// position, so owner reordering/deletion at /admin/checklist-config can't mismatch panel↔item. An
+// item whose text matches no built-in item (renamed or owner-added) has no code panel and falls back
+// to the owner-defined หลักฐาน panel — exactly like `evidence`/`guides` follow the item text.
+
+// Built-in stock items whose panels also carry a submit-gate — resolved from the default checklist
+// so a wording change in card-store-workflow.ts keeps the gates in sync automatically.
+const STOCK_CHECKLIST = cardStoreWorkflow.find((phase) => phase.id === "stock-work")?.checklist ?? [];
+const STOCK_TAKE_ITEM = (STOCK_CHECKLIST[0] ?? "").trim(); // StoreHub Stock Take status panel
+const STOCK_REORDER_ITEM = (STOCK_CHECKLIST[4] ?? "").trim(); // "รายการที่ต้องสั่งเพิ่ม" panel
+
+// True when the phase still contains the built-in item whose text is `text` (so its panel and its
+// submit-gate should apply). Used to skip a validation when the owner has removed that item.
+function phaseHasBuiltinItem(phase: WorkflowPhase, text: string): boolean {
+  return phase.checklist.some((item) => item.trim() === text);
 }
 
 // รายการของหัวข้อ built-in บางข้อมี detail panel เฉพาะทาง (รูปเงินสด, เลข track ฯลฯ) เขียนไว้ในโค้ด
@@ -1226,6 +1244,9 @@ export function WorkflowChecklist({
 
   function stockReorderListMissing(phase: WorkflowPhase) {
     if (phase.id !== "stock-work") return false;
+    // Only gate on the reorder note when the reorder item (which shows the "มี/ไม่มี" panel) is
+    // still in the checklist — the owner may have removed it at /admin/checklist-config.
+    if (!phaseHasBuiltinItem(phase, STOCK_REORDER_ITEM)) return false;
     return (
       details[detailKey(workDate, "stock-reorder-status")] === "มี" &&
       !notes[noteKey(workDate, phase.id)]?.trim()
@@ -1234,6 +1255,9 @@ export function WorkflowChecklist({
 
   function missingStockTakeApproval(phase: WorkflowPhase) {
     if (phase.id !== "stock-work") return false;
+    // The StoreHub Stock Take status panel only renders while its item is present; if the owner
+    // removed that item, don't hold submit hostage to a status the staff can no longer set.
+    if (!phaseHasBuiltinItem(phase, STOCK_TAKE_ITEM)) return false;
     const status = details[detailKey(workDate, "stocktake-status")];
     return status !== "In Progress" && status !== "Completed";
   }
@@ -1358,11 +1382,14 @@ export function WorkflowChecklist({
                     phase.id === "close-store" && details[detailKey(workDate, "closing-no-order")] === "ไม่มีออเดอร์";
                   const daytimeNoOrderActive =
                     phase.id === "daytime-work" && details[detailKey(workDate, "shipping-no-order")] === "ไม่มีออเดอร์";
+                  // Bind the built-in panel to the item's identity, not its position, so owner
+                  // reordering/deletion in /admin/checklist-config can't mismatch panel↔item.
+                  const detailIndex = builtinDetailIndex(phase.id, item);
                   const disabledByNoOrder =
                     Boolean(noOrderKey && checked[noOrderKey] && key !== noOrderKey) ||
-                    (closeNoOrderActive && index === 0) ||
+                    (closeNoOrderActive && detailIndex === 0) ||
                     daytimeNoOrderActive;
-                  const hasDetail = itemHasHardcodedDetail(phase.id, index);
+                  const hasDetail = detailIndex >= 0 && itemHasHardcodedDetail(phase.id, detailIndex);
                   // หลักฐานที่ owner ตั้งไว้ที่ /admin/checklist-config — แสดงเฉพาะรายการที่ไม่มี panel เฉพาะทางอยู่แล้ว
                   const itemEvidence = hasDetail ? undefined : evidenceForItem(evidence, phase.id, item);
                   // รายละเอียด + ปุ่มลิงก์ ที่ owner ตั้งไว้ — แสดงได้กับทุกรายการ (ไม่ชนกับ panel เฉพาะทาง)
@@ -1384,7 +1411,7 @@ export function WorkflowChecklist({
                         <>
                           {phase.id === "open-store" ? (
                             <OpenStoreTaskDetails
-                              index={index}
+                              index={detailIndex}
                               canEdit={canEdit}
                               userEmail={userEmail}
                               workDate={workDate}
@@ -1392,10 +1419,10 @@ export function WorkflowChecklist({
                               updateDetail={updateDetail}
                             />
                           ) : null}
-                          {phase.id === "guild-chat-exp" ? <GuildChatExpTaskDetails index={index} /> : null}
+                          {phase.id === "guild-chat-exp" ? <GuildChatExpTaskDetails index={detailIndex} /> : null}
                           {phase.id === "stock-work" ? (
                             <StockTaskDetails
-                              index={index}
+                              index={detailIndex}
                               canEdit={canEdit}
                               workDate={workDate}
                               details={details}
@@ -1406,7 +1433,7 @@ export function WorkflowChecklist({
                           ) : null}
                           {phase.id === "daytime-work" ? (
                             <ShippingTaskDetails
-                              index={index}
+                              index={detailIndex}
                               canEdit={canEdit}
                               workDate={workDate}
                               details={details}
@@ -1417,7 +1444,7 @@ export function WorkflowChecklist({
                           ) : null}
                           {phase.id === "close-store" ? (
                             <CloseStoreTaskDetails
-                              index={index}
+                              index={detailIndex}
                               canEdit={canEdit}
                               workDate={workDate}
                               details={details}

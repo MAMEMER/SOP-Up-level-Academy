@@ -313,3 +313,27 @@ export const managerReviewItems = [
 export function workflowChecklistTotal() {
   return cardStoreWorkflow.reduce((sum, phase) => sum + phase.checklist.length, 0);
 }
+
+// Built-in detail panels in the checklist UI (StoreHub Stock Take radios, refill list, ปิดร้าน cash
+// photo, ฯลฯ) are written per phase. They used to be selected by an item's POSITION, but the owner
+// can reorder / delete / move items at /admin/checklist-config, which shifts positions and pairs an
+// item with the wrong panel (bug: "สรุปรายการที่ต้องสั่งเพิ่ม" showed the "เติมสินค้าบนชั้น" panel).
+// This maps each phase's default item text → its panel slot, so the UI can bind panels to item
+// IDENTITY instead of position — the same way `evidence`/`guides` follow the item text.
+const BUILTIN_DETAIL_INDEX: Record<string, Map<string, number>> = (() => {
+  const map: Record<string, Map<string, number>> = {};
+  for (const phase of cardStoreWorkflow) {
+    const byText = new Map<string, number>();
+    phase.checklist.forEach((item, index) => {
+      const key = item.trim();
+      if (!byText.has(key)) byText.set(key, index); // first occurrence wins
+    });
+    map[phase.id] = byText;
+  }
+  return map;
+})();
+
+/** The built-in-panel slot for this item, or -1 when the item has no code panel (custom/renamed). */
+export function builtinDetailIndex(phaseId: string, item: string): number {
+  return BUILTIN_DETAIL_INDEX[phaseId]?.get(item.trim()) ?? -1;
+}
