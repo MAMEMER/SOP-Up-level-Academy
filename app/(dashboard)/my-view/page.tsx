@@ -22,6 +22,9 @@ import { MyProjects } from "../../../components/MyProjects.tsx";
 import { TaskFocusBoard } from "../../../components/TaskFocusBoard.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
+import { DeliveryOrdersBoard } from "../../../components/DeliveryOrdersBoard.tsx";
+import { fetchShiftForStaff, syncDeliveryTasks } from "../../../lib/delivery-tasks-server.ts";
+import { deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-tasks.ts";
 import { fetchPerformanceDailyStore } from "../../../lib/performance-daily-store.ts";
 
 // KPI window follows the calendar: 1st of this month → today (Asia/Bangkok)
@@ -86,6 +89,19 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   // exactly what that one employee would see (self-view), never the whole team.
   const assignedWorkFeed = assignedWorkFeedForViewer(feed, { isAdmin: false, employeeCode: selectedCode });
 
+  // งานส่งของ (ออเดอร์เว็บกิลด์) ที่กะของพนักงานคนนี้ต้องส่ง — เห็นได้จาก My View เลย
+  // ไม่ต้องกลับไปหน้าหลัก. self-view → isAdmin:false เพื่อกรองเฉพาะงานของกะเขา
+  const [deliveryAll, shiftToday] = await Promise.all([
+    syncDeliveryTasks(branch),
+    fetchShiftForStaff(branch, workDate, selectedCode)
+  ]);
+  const deliveryTasks = sortDeliveryTasks(
+    deliveryAll.filter((task) =>
+      deliveryTaskVisibleTo(task, { isAdmin: false, staffCode: selectedCode, shiftToday, today: workDate })
+    ),
+    workDate
+  );
+
   return (
     <main className="page">
       <section className="board-hero">
@@ -131,6 +147,8 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
+      {/* เหลือเฉพาะ "งานที่มอบหมาย" — Daily/Stock/Weekly/Monthly ถูกตัดออกเพราะซ้ำกับสรุป
+          "คุณมีงานวันนี้" ด้านบน (DashboardChecklistStatus) ทำให้หน้ากระชับขึ้น */}
       <DashboardTaskSections
         phases={cardStoreWorkflow}
         assignedWorkRecords={assignedWorkRecords}
@@ -139,6 +157,16 @@ export default async function MyViewPage({ searchParams }: PageProps) {
         canManageAssignedWork={false}
         staffCode={selectedCode}
         branch={branch}
+        sections={["assigned"]}
+      />
+
+      {/* งานส่งของ ออเดอร์เว็บกิลด์ — เห็นจาก My View ได้เลย */}
+      <DeliveryOrdersBoard
+        branch={branch}
+        initialTasks={deliveryTasks}
+        initialToday={workDate}
+        initialShift={shiftToday}
+        canAct={!user.isImpersonating}
       />
     </main>
   );

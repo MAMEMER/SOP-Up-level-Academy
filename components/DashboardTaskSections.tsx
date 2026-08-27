@@ -64,6 +64,10 @@ function plannedCardClass(planned: DuePlannedTask | undefined, submitted: boolea
   return planned.overdueDays > 0 ? "workflow-status-orange" : "workflow-status-white";
 }
 
+/** Which article groups to render. Defaults to all — my-view passes a subset to stay concise. */
+export type DashboardTaskSectionKey = "assigned" | "daily" | "stock" | "weekly" | "monthly";
+const ALL_SECTIONS: DashboardTaskSectionKey[] = ["assigned", "daily", "stock", "weekly", "monthly"];
+
 export function DashboardTaskSections({
   phases,
   assignedWorkRecords = [],
@@ -71,7 +75,8 @@ export function DashboardTaskSections({
   workDate: currentWorkDate,
   canManageAssignedWork = false,
   staffCode = null,
-  branch
+  branch,
+  sections = ALL_SECTIONS
 }: {
   phases: WorkflowPhase[];
   assignedWorkRecords?: AssignedWorkRecord[];
@@ -81,7 +86,11 @@ export function DashboardTaskSections({
   /** The staffer this dashboard belongs to — used to show only their กะ's daily หัวข้อ. */
   staffCode?: string | null;
   branch?: string;
+  /** Restrict which article groups render. my-view keeps only "assigned" to avoid duplicating
+   *  the "คุณมีงานวันนี้" summary above (Daily task) and the standalone stock/weekly/monthly lists. */
+  sections?: DashboardTaskSectionKey[];
 }) {
+  const show = new Set(sections);
   const { records } = useWorkflowRecords();
   const [monthlyStatus, setMonthlyStatus] = useState<Record<string, MonthlyTaskStatus>>({});
   const [monthLabel, setMonthLabel] = useState<string>("");
@@ -147,6 +156,7 @@ export function DashboardTaskSections({
 
   return (
     <section className="task-sections">
+      {show.has("assigned") ? (
       <article id="assigned-work" className="task-section assigned-work-task">
         <div className="task-section-head">
           <div>
@@ -250,7 +260,9 @@ export function DashboardTaskSections({
           )}
         </div>
       </article>
+      ) : null}
 
+      {show.has("daily") ? (
       <article id="daily-task" className="task-section daily-task">
         <div className="task-section-head">
           <div>
@@ -285,9 +297,11 @@ export function DashboardTaskSections({
           })}
         </div>
       </article>
+      ) : null}
 
       {/* Stock work: Daily / Weekly / Monthly เป็นกลุ่มงานแยกชัดเจน ใช้ pattern เดียวกับแถบงานอื่น
           Weekly + Monthly stock แสดงเสมอ (ไม่ผูกกับกะรายวัน) ส่วน Daily stock ขึ้นเฉพาะเมื่อกะมี stock-work */}
+      {show.has("stock") ? (
       <article className="task-section stock-task">
         <div className="task-section-head">
           <div>
@@ -369,7 +383,9 @@ export function DashboardTaskSections({
           })()}
         </div>
       </article>
+      ) : null}
 
+      {show.has("weekly") ? (
       <article id="weekly-task" className="task-section weekly-task">
         <div className="task-section-head">
           <div>
@@ -426,7 +442,9 @@ export function DashboardTaskSections({
           })}
         </div>
       </article>
+      ) : null}
 
+      {show.has("monthly") ? (
       <article id="monthly-task" className="task-section monthly-task">
         <div className="task-section-head">
           <div>
@@ -458,6 +476,7 @@ export function DashboardTaskSections({
           })}
         </div>
       </article>
+      ) : null}
     </section>
   );
 }
