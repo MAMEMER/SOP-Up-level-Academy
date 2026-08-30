@@ -78,6 +78,8 @@ describe("dashboard task sections UI", () => {
     assert.equal(source.includes("IG"), true);
     assert.equal(source.includes("Line group"), true);
     assert.equal(source.includes("Shopee"), true);
+    assert.equal(source.includes("เว็บทางร้าน"), true);
+    assert.equal(source.includes("store-web"), true);
     assert.equal(source.includes("ไม่มีออเดอร์"), true);
   });
 

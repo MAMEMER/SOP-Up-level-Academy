@@ -337,7 +337,13 @@ function ShippingTaskDetails({
   onNoOrderChange: (isNoOrder: boolean) => void;
 }) {
   if (index === 0) {
-    const channels = ["Facebook", "IG", "Line group", "Shopee"] as const;
+    const channels = [
+      { label: "Facebook", key: "facebook" },
+      { label: "IG", key: "ig" },
+      { label: "Line group", key: "line-group" },
+      { label: "Shopee", key: "shopee" },
+      { label: "เว็บทางร้าน", key: "store-web" }
+    ] as const;
 
     return (
       <div className="detail-panel">
@@ -356,16 +362,16 @@ function ShippingTaskDetails({
         </label>
         <div className="detail-grid">
           {channels.map((channel) => {
-            const key = `shipping-channel-${channel.toLowerCase().replaceAll(" ", "-")}`;
+            const key = `shipping-channel-${channel.key}`;
             return (
-              <label key={channel} className="detail-check">
+              <label key={channel.key} className="detail-check">
                 <input
                   type="checkbox"
                   checked={!noOrder && details[detailKey(workDate, key)] === "มี"}
                   disabled={!canEdit || noOrder}
                   onChange={(event) => updateDetail(key, event.target.checked ? "มี" : "")}
                 />
-                <span>{channel}</span>
+                <span>{channel.label}</span>
               </label>
             );
           })}
