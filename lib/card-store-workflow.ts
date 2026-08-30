@@ -320,6 +320,22 @@ export function workflowChecklistTotal() {
 // item with the wrong panel (bug: "สรุปรายการที่ต้องสั่งเพิ่ม" showed the "เติมสินค้าบนชั้น" panel).
 // This maps each phase's default item text → its panel slot, so the UI can bind panels to item
 // IDENTITY instead of position — the same way `evidence`/`guides` follow the item text.
+// Legacy/alternate wordings of built-in checklist items. When the owner saved a checklist
+// override at /admin/checklist-config BEFORE a default item was reworded, their stored item keeps
+// the OLD text. Panels are bound to item text IDENTITY (commit 1431f32), so without these aliases
+// an old-text item resolves to NO panel — and the staff loses its input UI "แบบเดิม"
+// (ticket KnaD1nJqHBumocwNRyor: สาขา bangkae kept the pre-ac5a497 "สินค้าใกล้หมด" wording, so the
+// "แนบรูป/สรุป" panel disappeared). Each entry maps a legacy item text → its current default text,
+// so the legacy text points at the same panel slot. Add a new line here whenever a default
+// checklist item is reworded.
+const BUILTIN_ITEM_ALIASES: Record<string, Record<string, string>> = {
+  "stock-work": {
+    // ac5a497 reworded item #2 (เพิ่มแนบรูปแทนพิมพ์ในข้อแจ้งเตือนสินค้าใกล้หมด)
+    "สรุปรายวันสินค้าใกล้หมดจาก StoreHub Supply Needs เฉพาะชื่อและจำนวนที่เหลือ":
+      "แจ้งเตือนสินค้าใกล้หมดจาก StoreHub Supply Needs — แนบรูปหน้าจอหรือสรุปชื่อและจำนวนที่เหลือ"
+  }
+};
+
 const BUILTIN_DETAIL_INDEX: Record<string, Map<string, number>> = (() => {
   const map: Record<string, Map<string, number>> = {};
   for (const phase of cardStoreWorkflow) {
@@ -329,6 +345,16 @@ const BUILTIN_DETAIL_INDEX: Record<string, Map<string, number>> = (() => {
       if (!byText.has(key)) byText.set(key, index); // first occurrence wins
     });
     map[phase.id] = byText;
+  }
+  // Point each known legacy wording at the same slot as its current default text.
+  for (const [phaseId, aliases] of Object.entries(BUILTIN_ITEM_ALIASES)) {
+    const byText = map[phaseId];
+    if (!byText) continue;
+    for (const [legacy, current] of Object.entries(aliases)) {
+      const slot = byText.get(current.trim());
+      const key = legacy.trim();
+      if (slot !== undefined && !byText.has(key)) byText.set(key, slot);
+    }
   }
   return map;
 })();
