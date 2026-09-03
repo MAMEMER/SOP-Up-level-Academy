@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { ProjectHandoverPanel } from "./ProjectHandoverPanel.tsx";
 import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
@@ -19,6 +20,16 @@ import {
   updateProjectDates
 } from "../lib/work-projects-store.ts";
 import {
+  PROJECT_MONTH_PARAM,
+  isLatestMonth,
+  latestSelectableMonth,
+  resolveProjectMonth,
+  shiftMonth,
+  splitProjectsByMonth,
+  summarizeProjects,
+  thaiMonthLabel
+} from "../lib/project-month.ts";
+import {
   MODE_LABEL,
   PROJECT_STATUS_LABEL,
   addDays,
@@ -34,20 +45,31 @@ import {
 
 // หน้าเจ้าของสำหรับงานแบบโปรเจกต์: สั่งงานเป็นช่วงเวลา (ตั้งแต่วันไหนถึงวันไหน รวมกี่วัน ใครทำบ้าง)
 // แล้วตามความคืบหน้าเป็นรายวัน. ยืด/ลดเวลา และเพิ่มคนช่วยได้ตลอดโดยไม่ต้องสร้างงานใหม่.
+//
+// กระดานล็อกให้ดู "ทีละเดือน" (ค่าเริ่มต้น = เดือนก่อนหน้า) — งานต่างเดือนห้ามปนกัน และตัวเลข
+// สรุปทุกตัวคิดจากเดือนที่เลือกเท่านั้น. เดือนที่เลือกถูกเก็บบน URL (?month=2026-08) เพื่อให้
+// แชร์ลิงก์/รีเฟรชแล้วยังอยู่เดือนเดิม. ดูตรรกะเดือนทั้งหมดใน lib/project-month.ts
 export function ProjectBoard({
   branch,
   staff,
   teams = [],
-  today
+  today,
+  month: initialMonth
 }: {
   branch: string;
   staff: StaffOption[];
   teams?: TeamOption[];
   today: string;
+  /** เดือนที่เลือก (YYYY-MM) — เพจ resolve มาจาก ?month= ให้แล้ว */
+  month: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [rows, setRows] = useState<WorkProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [month, setMonth] = useState(() => resolveProjectMonth(initialMonth, today));
+  const latestMonth = latestSelectableMonth(today);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +86,33 @@ export function ProjectBoard({
     void load();
   }, [load]);
 
+  // เพจส่งเดือนใหม่มา (กด back/forward หรือเปิดลิงก์ที่แชร์กันมา) — ตามให้ตรงเสมอ
+  useEffect(() => {
+    setMonth(resolveProjectMonth(initialMonth, today));
+  }, [initialMonth, today]);
+
+  // เก็บเดือนที่เลือกไว้บน URL — ไม่ยิงโหลดข้อมูลใหม่ (กระดานกรองฝั่ง client อยู่แล้ว)
+  const selectMonth = useCallback(
+    (next: string) => {
+      const safe = resolveProjectMonth(next, today);
+      setMonth(safe);
+      setOpenId(null);
+      router.replace(`${pathname}?${PROJECT_MONTH_PARAM}=${safe}`, { scroll: false });
+    },
+    [pathname, router, today]
+  );
+
+  const { inMonth, invalid } = useMemo(() => splitProjectsByMonth(rows, month), [rows, month]);
+  const summary = useMemo(() => summarizeProjects(inMonth, today), [inMonth, today]);
+  const atLatestMonth = isLatestMonth(month, today);
+
+  // งานที่ไม่มีวันที่/วันที่เสีย เกิดจากข้อมูลเก่าหรือการเขียนที่พลาด — ต้องรู้ ไม่ใช่ซ่อนเงียบๆ
+  useEffect(() => {
+    if (invalid.length) {
+      console.warn(`[projects] ${invalid.length} งานไม่มีวันที่ของงานที่ใช้ได้:`, invalid.map((row) => row.id));
+    }
+  }, [invalid]);
+
   return (
     <div className="assign-work">
       <ProjectAssignForm
@@ -76,14 +125,64 @@ export function ProjectBoard({
       />
 
       <section className="assign-work__list">
-        <p className="assign-work__label">งานที่มอบหมายทั้งหมด</p>
+        <p className="assign-work__label">งานที่มอบหมาย · {thaiMonthLabel(month)}</p>
+
+        <div className="project-month">
+          <div className="project-month__nav">
+            <button
+              type="button"
+              className="project-month__step"
+              aria-label="เดือนก่อนหน้า"
+              onClick={() => selectMonth(shiftMonth(month, -1))}
+            >
+              ‹ ก่อนหน้า
+            </button>
+            {/* ตัวเลือกเดือนของเบราว์เซอร์เป็นภาษาอังกฤษ — เดือนไทยต้องอ่านได้ตลอดจากตรงนี้ */}
+            <strong className="project-month__current">{thaiMonthLabel(month)}</strong>
+            <button
+              type="button"
+              className="project-month__step"
+              aria-label="เดือนถัดไป"
+              disabled={atLatestMonth}
+              title={atLatestMonth ? "ดูล่วงหน้าไม่ได้ — เดือนนี้ใหม่สุดแล้ว" : undefined}
+              onClick={() => selectMonth(shiftMonth(month, 1))}
+            >
+              ถัดไป ›
+            </button>
+          </div>
+
+          <label className="project-month__pick">
+            <span>เลือกเดือน</span>
+            <input
+              type="month"
+              value={month}
+              max={latestMonth}
+              onChange={(event) => selectMonth(event.target.value)}
+            />
+          </label>
+
+          <div className="project-month__summary">
+            <span>ทั้งหมด <strong>{summary.total}</strong></span>
+            <span>เสร็จแล้ว <strong>{summary.done}</strong></span>
+            <span>รอส่ง <strong>{summary.pending}</strong></span>
+            <span className={summary.overdue ? "is-late" : undefined}>เกินกำหนด <strong>{summary.overdue}</strong></span>
+            {summary.cancelled ? <span>ยกเลิก <strong>{summary.cancelled}</strong></span> : null}
+          </div>
+
+          {atLatestMonth ? null : (
+            <p className="project-month__note">
+              กำลังดูย้อนหลัง — งานที่สั่งใหม่วันนี้จะไปอยู่เดือน {thaiMonthLabel(latestMonth)}
+            </p>
+          )}
+        </div>
+
         {loading ? (
           <p className="assign-work__empty">กำลังโหลด…</p>
-        ) : rows.length === 0 ? (
-          <p className="assign-work__empty">ยังไม่มีงานที่มอบหมาย</p>
+        ) : inMonth.length === 0 ? (
+          <p className="assign-work__empty">ยังไม่มีงานที่มอบหมายในเดือน{thaiMonthLabel(month)}</p>
         ) : (
           <div className="project-list">
-            {rows.map((project) => (
+            {inMonth.map((project) => (
               <ProjectRow
                 key={project.id}
                 project={project}
@@ -96,6 +195,20 @@ export function ProjectBoard({
             ))}
           </div>
         )}
+
+        {/* งานที่วันที่เสีย/หาย — ไม่ปนเข้ารายการเดือนไหน แต่ต้องเห็นเพื่อไปแก้ */}
+        {!loading && invalid.length ? (
+          <details className="project-month__invalid">
+            <summary>ต้องตรวจสอบข้อมูล · {invalid.length} งาน (ไม่มีวันที่ของงาน จึงไม่ถูกนับในเดือนไหนเลย)</summary>
+            <ul>
+              {invalid.map((project) => (
+                <li key={project.id}>
+                  {project.title} · {project.assignees.map(displayNameFor).join(", ") || "ไม่มีผู้รับผิดชอบ"}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
     </div>
   );

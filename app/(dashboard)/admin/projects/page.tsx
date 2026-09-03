@@ -3,13 +3,16 @@ import Link from "next/link";
 import { ProjectBoard } from "../../../../components/ProjectBoard.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
+import { resolveProjectMonth } from "../../../../lib/project-month.ts";
 import { buildTeamOptions } from "../../../../lib/team-options.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
 // ตัวเลข % / วันที่เหลือ ต้องสดเสมอ — เจ้าของใช้ตัดสินใจว่าจะยืดเวลาให้หรือเพิ่มคนช่วย
 export const dynamic = "force-dynamic";
 
-export default async function AdminProjectsPage() {
+type PageProps = { searchParams?: Promise<{ month?: string }> };
+
+export default async function AdminProjectsPage({ searchParams }: PageProps) {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
@@ -17,6 +20,10 @@ export default async function AdminProjectsPage() {
     .filter((entry) => entry.branch === "bangkae")
     .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType }));
   const teams = buildTeamOptions(employeeDirectory);
+
+  // เดือนที่จะเปิดดู — ค่าเริ่มต้นคือเดือนก่อนหน้า, ค่าบน URL ที่เพี้ยนหรือเป็นอนาคตถูกตีกลับ
+  const today = formatWorkDate();
+  const month = resolveProjectMonth((await searchParams)?.month, today);
 
   return (
     <main className="page">
@@ -30,7 +37,7 @@ export default async function AdminProjectsPage() {
           </p>
         </div>
       </section>
-      <ProjectBoard branch="bangkae" staff={staff} teams={teams} today={formatWorkDate()} />
+      <ProjectBoard branch="bangkae" staff={staff} teams={teams} today={today} month={month} />
     </main>
   );
 }

@@ -6056,6 +6056,49 @@ main .page > section, main > section { margin-top: 16px !important; }
 
 /* ── งานแบบโปรเจกต์ (หลายวัน + progress รายวัน) ───────────────────────────── */
 
+/* แถบเลือกเดือนของกระดานงานที่มอบหมาย — มือถือเรียงลง, จอกว้างเรียงแถวเดียว */
+.project-month { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.project-month__nav {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; max-width: 420px;
+}
+.project-month__current {
+  flex: 1; min-width: 140px; text-align: center; font-size: 16px; font-weight: 800; color: var(--color-ink);
+}
+.project-month__step {
+  min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.project-month__step:hover:not(:disabled) { background: rgba(255, 140, 66, 0.12); }
+/* ปุ่มปิดใช้งานต้องยังอ่านออก — ใช้สีเทาทึบแทน opacity (opacity ทำ contrast ตกต่ำกว่า 3:1) */
+.project-month__step:disabled {
+  cursor: not-allowed; color: #6B6F7D; background: #F1F1F4; border-color: rgba(0, 0, 0, 0.08);
+}
+.project-month__pick { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-ink-soft); }
+.project-month__pick input {
+  min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff; font: inherit; font-size: 16px; color: inherit;
+}
+.project-month__summary { display: flex; flex-wrap: wrap; gap: 8px; }
+.project-month__summary span {
+  padding: 6px 12px; border-radius: 999px; background: rgba(0, 0, 0, 0.04);
+  font-size: 13px; color: var(--color-ink-soft);
+}
+.project-month__summary strong { margin-left: 4px; font-size: 15px; font-weight: 800; color: var(--color-ink); }
+.project-month__summary span.is-late { background: rgba(211, 47, 47, 0.1); color: #b3261e; }
+.project-month__summary span.is-late strong { color: #b3261e; }
+.project-month__note { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+.project-month__invalid { margin-top: 16px; font-size: 13px; color: var(--color-ink-soft); }
+.project-month__invalid summary { cursor: pointer; font-weight: 600; }
+.project-month__invalid ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+@media (min-width: 720px) {
+  /* จอกว้าง: ปุ่มเดือน + ตัวเลือกเดือน อยู่แถวเดียวกัน ตัวเลขสรุปลงมาบรรทัดล่าง */
+  .project-month { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 18px; }
+  .project-month__nav { width: auto; }
+  .project-month__summary, .project-month__note { flex-basis: 100%; }
+}
+
 .project-list { display: flex; flex-direction: column; gap: 18px; }
 
 .project-card { display: flex; flex-direction: column; gap: 12px; padding: 18px; }
