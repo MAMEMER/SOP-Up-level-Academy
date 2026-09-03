@@ -28,6 +28,7 @@ export const staffGroups: NavGroup[] = [
     label: "เช็คลิสต์และตาราง",
     links: [
       { href: "/checklist", label: "เช็คลิสต์" },
+      { href: "/supplies", label: "ของที่ต้องสั่ง" },
       { href: "/schedule", label: "ตารางกะ" },
       { href: "/training", label: "คู่มืองาน" }
     ]

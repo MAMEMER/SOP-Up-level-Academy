@@ -3713,6 +3713,91 @@ a {
   cursor: not-allowed;
 }
 
+/* หน้า "ของที่ต้องสั่ง" (/supplies) — บล็อกละหัวข้อ ไม่ใส่กรอบการ์ดซ้อนกัน */
+.supply-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.supply-total {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 140, 66, 0.24);
+}
+
+.supply-total > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.supply-total strong {
+  color: #173526;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.supply-total-amount {
+  color: #b45309;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.supply-total-warn,
+.supply-total-ok {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.supply-total-warn {
+  color: #b45309;
+}
+
+.supply-total-ok {
+  color: #2e7d4f;
+}
+
+.supply-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 140, 66, 0.18);
+}
+
+.supply-row:last-child {
+  border-bottom: none;
+}
+
+.supply-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.supply-row-main small,
+.supply-row-order small {
+  color: #8a7a63;
+  font-size: 11px;
+}
+
+.supply-row-order {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
 .detail-upload {
   border: 1px dashed rgba(46, 125, 79, 0.28);
   border-radius: 8px;

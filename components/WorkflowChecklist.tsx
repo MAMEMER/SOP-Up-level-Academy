@@ -597,7 +597,14 @@ function CloseStoreTaskDetails({
   return null;
 }
 
-type SupplyNeedItem = { name: string; remaining: number; reorderPoint?: number; unit?: string };
+type SupplyNeedItem = {
+  name: string;
+  remaining: number;
+  reorderPoint?: number;
+  orderQty?: number;
+  estimatedCost?: number;
+  unit?: string;
+};
 type SupplyNeedsState =
   | { status: "loading" }
   | { status: "not_configured" }
@@ -674,7 +681,10 @@ function SupplyNeedsAlert({ canEdit, onUseSummary }: { canEdit: boolean; onUseSu
   }
 
   const summary = state.items
-    .map((item) => `${item.name} | ${item.remaining}${item.unit ? ` ${item.unit}` : ""}`)
+    .map((item) => {
+      const order = item.orderQty ? ` | สั่ง ${item.orderQty}` : "";
+      return `${item.name} | เหลือ ${item.remaining}${item.unit ? ` ${item.unit}` : ""}${order}`;
+    })
     .join("\n");
 
   return (
@@ -690,6 +700,7 @@ function SupplyNeedsAlert({ canEdit, onUseSummary }: { canEdit: boolean; onUseSu
             <span className="supply-alert-qty">
               เหลือ {item.remaining}
               {item.unit ? ` ${item.unit}` : ""}
+              {item.orderQty ? ` · สั่ง ${item.orderQty}` : ""}
             </span>
           </li>
         ))}
@@ -787,6 +798,9 @@ function StockTaskDetails({
           <small>แนบรูปหน้าจอ StoreHub Supply Needs ได้เลย (เร็วและแม่นกว่า) หรือจะพิมพ์สรุปเองก็ได้</small>
         </div>
         <SupplyNeedsAlert canEdit={canEdit} onUseSummary={(summary) => updateDetail("supply-needs-summary", summary)} />
+        <a href="/supplies" className="detail-action-link">
+          ดูของที่ต้องสั่งทั้งหมด (พร้อมมูลค่า)
+        </a>
         <a href={supplyNeedsUrl} target="_blank" rel="noreferrer" className="detail-action-link">
           เปิด StoreHub Supply Needs
         </a>

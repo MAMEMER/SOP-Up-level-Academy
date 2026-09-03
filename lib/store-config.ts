@@ -11,6 +11,10 @@ export type BranchConfig = {
   openTimeWeekend: string;
   /** hours after shift start a morning stock count may still begin without penalty */
   stockCountGraceHours: number;
+  /** StoreHub store id — ใช้เรียก GET /inventory/{storeId} เพื่อดูของที่ต้องสั่ง */
+  storeHubStoreId?: string;
+  /** ยอดสั่งซื้อขั้นต่ำต่อรอบ (บาท) — Makro ต้องยอด 100+ ถึงจะสั่งได้ */
+  supplyMinOrderValue?: number;
 };
 
 export const branchConfigs: BranchConfig[] = [
@@ -19,7 +23,9 @@ export const branchConfigs: BranchConfig[] = [
     displayName: "Up Level Academy (บางแค)",
     openTimeWeekday: "11:00", // จ–ศ กะแรก 11:00
     openTimeWeekend: "09:00", // ส–อา กะแรก 09:00
-    stockCountGraceHours: 4
+    stockCountGraceHours: 4,
+    storeHubStoreId: "6a268170c008ab000760e21a", // "Up level Academy" (บางแค) — สาขาหลักใน StoreHub
+    supplyMinOrderValue: 100
   }
 ];
 

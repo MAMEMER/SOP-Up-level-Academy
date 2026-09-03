@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildSupplyNeeds,
   filterNearEmpty,
   parseSupplyNeeds,
   summariseSupplyNeeds,
@@ -86,5 +87,85 @@ describe("summariseSupplyNeeds", () => {
       { name: "น้ำ", remaining: 2, unit: "ขวด" }
     ]);
     assert.equal(text, "Sleeve | 3\nน้ำ | 2 ขวด");
+  });
+});
+
+describe("buildSupplyNeeds (StoreHub Open API)", () => {
+  const products = [
+    { id: "p1", name: "ทีพลัส ชาอูหลง (490 ml)", category: "Drink", cost: 25 },
+    { id: "p2", name: "Oreo", category: "Snack", cost: 10 },
+    { id: "p3", name: "ทิวลี่", category: "Snack", cost: 4 },
+    { id: "p4", name: "การ์ดใบเดี่ยว", category: "Lorcana S1", cost: 0, unitPrice: 0 },
+    { id: "p5", name: "Up shield", category: "อุปกรณ์" },
+    { id: "p6", name: "เลย์คลาสสิค", category: "Snack", unitPrice: 20 }
+  ];
+
+  it("keeps only products with a reorder point, and only those at or below it", () => {
+    const { needs, trackedCount } = buildSupplyNeeds(
+      [
+        { productId: "p1", quantityOnHand: 0, warningStock: 3, idealStock: 6 },
+        { productId: "p2", quantityOnHand: 2, warningStock: 6, idealStock: 12 },
+        { productId: "p3", quantityOnHand: 31, warningStock: 24, idealStock: 36 }, // above reorder point
+        { productId: "p4", quantityOnHand: 1 } // single card, no reorder point → ignored
+      ],
+      products
+    );
+    assert.deepEqual(
+      needs.map((item) => item.name),
+      ["ทีพลัส ชาอูหลง (490 ml)", "Oreo"]
+    );
+    assert.equal(trackedCount, 3);
+  });
+
+  it("computes order quantity and value from idealStock and cost", () => {
+    const { needs, estimatedTotal } = buildSupplyNeeds(
+      [
+        { productId: "p1", quantityOnHand: 0, warningStock: 3, idealStock: 6 },
+        { productId: "p2", quantityOnHand: 2, warningStock: 6, idealStock: 12 }
+      ],
+      products
+    );
+    assert.equal(needs[0].orderQty, 6);
+    assert.equal(needs[0].estimatedCost, 150);
+    assert.equal(needs[0].costSource, "cost");
+    assert.equal(needs[1].orderQty, 10);
+    assert.equal(needs[1].estimatedCost, 100);
+    assert.equal(estimatedTotal, 250);
+  });
+
+  it("falls back to the pre-VAT selling price when no cost is set, and flags items with neither", () => {
+    const { needs, missingCostCount } = buildSupplyNeeds(
+      [
+        { productId: "p6", quantityOnHand: 1, warningStock: 3, idealStock: 6 },
+        { productId: "p5", quantityOnHand: 60, warningStock: 800, idealStock: 2000 }
+      ],
+      products
+    );
+    const lays = needs.find((item) => item.name === "เลย์คลาสสิค");
+    assert.equal(lays?.costSource, "price");
+    assert.equal(lays?.estimatedCost, 100);
+    const shield = needs.find((item) => item.name === "Up shield");
+    assert.equal(shield?.costSource, "none");
+    assert.equal(shield?.estimatedCost, undefined);
+    assert.equal(missingCostCount, 1);
+  });
+
+  it("sorts the emptiest shelf first and lists near-empty items separately", () => {
+    const { needs, watch } = buildSupplyNeeds(
+      [
+        { productId: "p2", quantityOnHand: 2, warningStock: 6, idealStock: 12 }, // ratio 0.33
+        { productId: "p1", quantityOnHand: 0, warningStock: 3, idealStock: 6 }, // ratio 0
+        { productId: "p3", quantityOnHand: 31, warningStock: 24, idealStock: 36 } // ratio 1.29 → watch
+      ],
+      products
+    );
+    assert.deepEqual(
+      needs.map((item) => item.name),
+      ["ทีพลัส ชาอูหลง (490 ml)", "Oreo"]
+    );
+    assert.deepEqual(
+      watch.map((item) => item.name),
+      ["ทิวลี่"]
+    );
   });
 });

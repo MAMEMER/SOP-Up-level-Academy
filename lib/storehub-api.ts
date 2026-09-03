@@ -15,6 +15,11 @@ export function hasStoreHubCreds(): boolean {
   return Boolean(process.env.STOREHUB_USER && process.env.STOREHUB_PASS);
 }
 
+/** GET เส้นทางใดก็ได้บน StoreHub Open API (server-only). ใช้ร่วมกันทั้งไฟล์นี้และ supply-needs. */
+export async function storeHubGet<T>(path: string): Promise<T> {
+  return shFetch<T>(path);
+}
+
 async function shFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { Authorization: authHeader(), Accept: "application/json" },

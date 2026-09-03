@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySession } from "../../../../lib/session-jwt.ts";
 import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
-import { fetchSupplyNeeds, hasSupplyNeedsFeed } from "../../../../lib/storehub-supply-needs.ts";
+import { fetchSupplyNeeds, hasSupplyNeedsSource } from "../../../../lib/storehub-supply-needs.ts";
 
 // ดึงรายการสินค้าใกล้หมดจาก StoreHub Supply Needs feed แล้วส่งให้ SOP แสดงเป็นแจ้งเตือน
 // พนักงานเห็นรายการที่ต้องสั่งได้เลย โดยไม่ต้อง copy CSV มาวางเอง.
@@ -16,7 +16,7 @@ async function isLoggedIn(): Promise<boolean> {
 
 export async function GET(request: Request) {
   if (!(await isLoggedIn())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  if (!hasSupplyNeedsFeed()) {
+  if (!hasSupplyNeedsSource()) {
     return NextResponse.json({ error: "supply_needs_not_configured" }, { status: 503 });
   }
 

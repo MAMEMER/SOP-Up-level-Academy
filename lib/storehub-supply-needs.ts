@@ -1,17 +1,33 @@
-// StoreHub "Supply Needs" feed → รายการสินค้าใกล้หมด สำหรับแจ้งเตือนพนักงานอัตโนมัติใน SOP.
+// "ของที่ต้องสั่ง" — รายการสินค้าที่คงเหลือถึง/ต่ำกว่าจุดสั่งซื้อ สำหรับแจ้งพนักงานอัตโนมัติใน SOP.
 //
-// StoreHub Open API (Basic auth, api.storehubhq.com) ไม่มี endpoint สำหรับ stock/supply-needs
-// (ยืนยันจากงานเดิม) ข้อมูล Supply Needs อยู่ในหน้า backoffice
-// https://uplevel.storehubhq.com/stocks/supplyNeeds เท่านั้น ซึ่ง export เป็นลิงก์ JSON/CSV ได้.
+// แหล่งข้อมูลหลัก = **StoreHub Open API** (Basic auth, api.storehubhq.com) ซึ่งมีของครบพอดี:
+//   GET /stores              → รายชื่อสาขา
+//   GET /inventory/{storeId} → [{ productId, quantityOnHand, warningStock, idealStock }]
+//   GET /products            → ชื่อ/หมวดของสินค้า (ไม่มี query param ต้องดึงทั้งก้อน)
+// warningStock = จุดสั่งซื้อ · idealStock = จำนวนที่อยากให้มี → "ต้องสั่งเพิ่มกี่ชิ้น" = ideal − คงเหลือ.
+// (หมายเหตุเดิมในไฟล์นี้เขียนว่า API ไม่มี stock endpoint — ผิด ยืนยันสดแล้ว 2026-09-03 ว่ามี /inventory)
 //
-// วิธีใช้: ตั้งค่า env `STOREHUB_SUPPLY_NEEDS_URL` ให้ชี้ไปที่ลิงก์ export (JSON หรือ CSV) ของ
-// Supply Needs (เช่น StoreHub scheduled export หรือ Google Sheet ที่ publish เป็น CSV).
-// ระบบจะดึง → กรองเฉพาะรายการที่ใกล้หมด → ส่งให้ SOP แสดงเป็นแจ้งเตือน โดยไม่ต้อง copy CSV เอง.
+// แหล่งสำรอง: ถ้าไม่ได้ตั้ง STOREHUB_USER/PASS แต่ตั้ง `STOREHUB_SUPPLY_NEEDS_URL` (ลิงก์ export
+// JSON/CSV ของหน้า backoffice https://uplevel.storehubhq.com/stocks/supplyNeeds) ระบบจะดึงจากลิงก์นั้นแทน.
+
+import { hasStoreHubCreds, storeHubGet } from "./storehub-api.ts";
+import { branchConfig } from "./store-config.ts";
 
 export type SupplyNeedItem = {
   name: string;
   remaining: number;
   reorderPoint?: number;
+  /** จำนวนที่ควรมีในสต๊อก (StoreHub idealStock) */
+  idealStock?: number;
+  /** ต้องสั่งเพิ่มกี่ชิ้นถึงจะเต็ม = idealStock − คงเหลือ */
+  orderQty?: number;
+  /** ต้นทุนต่อชิ้น (บาท) จาก StoreHub */
+  unitCost?: number;
+  /** มูลค่าที่ต้องสั่งของรายการนี้ = orderQty × unitCost */
+  estimatedCost?: number;
+  /** ต้นทุนมาจากไหน: cost = ช่องต้นทุน · price = เดาจากราคาขายก่อน VAT · none = ไม่มีข้อมูล */
+  costSource?: "cost" | "price" | "none";
+  category?: string;
   unit?: string;
 };
 
@@ -49,6 +65,11 @@ const DEFAULT_THRESHOLD = 5;
 
 export function hasSupplyNeedsFeed(): boolean {
   return Boolean(process.env.STOREHUB_SUPPLY_NEEDS_URL);
+}
+
+/** มีทางดึง "ของที่ต้องสั่ง" ได้ไหม — API ก่อน ถ้าไม่มี creds ค่อยดูลิงก์ export สำรอง */
+export function hasSupplyNeedsSource(): boolean {
+  return hasStoreHubCreds() || hasSupplyNeedsFeed();
 }
 
 function stringField(row: Row, keys: string[], fallback = ""): string {
@@ -174,10 +195,183 @@ export function summariseSupplyNeeds(items: SupplyNeedItem[]): string {
 export type SupplyNeedsResult = {
   fetchedAt: string;
   items: SupplyNeedItem[];
+  /** มาจากไหน — "api" = StoreHub Open API, "feed" = ลิงก์ export สำรอง */
+  source?: "api" | "feed";
+  /** รายการที่ยังไม่ถึงจุดสั่งซื้อแต่เหลือน้อย (เตือนล่วงหน้า ไม่ต้องสั่งวันนี้) */
+  watch?: SupplyNeedItem[];
+  /** ตั้งจุดสั่งซื้อไว้กี่รายการ — ถ้าน้อยผิดปกติแปลว่ายังไม่ได้ตั้งค่าใน StoreHub */
+  trackedCount?: number;
+  /** มูลค่ารวมโดยประมาณของของที่ต้องสั่ง (บาท) */
+  estimatedTotal?: number;
+  /** ยอดขั้นต่ำต่อรอบของสาขา (Makro 100 บาท) */
+  minOrderValue?: number;
+  /** ต้องสั่งเพิ่มอีกกี่บาทถึงจะถึงยอดขั้นต่ำ (0 = ถึงแล้ว) */
+  shortOfMinimum?: number;
+  /** มีของกี่รายการที่ยังไม่ได้ใส่ต้นทุนใน StoreHub → ยอดรวมต่ำกว่าจริง */
+  missingCostCount?: number;
 };
 
-/** ดึง Supply Needs จาก feed URL แล้วคืนเฉพาะรายการใกล้หมด. โยน error ถ้าไม่ได้ตั้งค่า/ดึงไม่ได้. */
+export type StoreHubInventoryRow = {
+  productId?: string;
+  quantityOnHand?: number;
+  warningStock?: number;
+  idealStock?: number;
+};
+
+export type StoreHubProductRow = {
+  id?: string;
+  name?: string;
+  category?: string;
+  subCategory?: string;
+  /** ต้นทุนต่อชิ้นที่ตั้งไว้ใน StoreHub */
+  cost?: number;
+  /** ราคาขายก่อน VAT (ราคาหน้าร้าน = unitPrice × 1.07) */
+  unitPrice?: number;
+};
+
+function toNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * ต้นทุนต่อชิ้นที่ใช้ประเมินมูลค่า: ใช้ช่อง "ต้นทุน" ก่อน ถ้าไม่ได้กรอกไว้ (0/ว่าง)
+ * ค่อยเดาจากราคาขายก่อน VAT — ระบุที่มาไว้เสมอ เพื่อให้รู้ว่าตัวไหนเป็นตัวเลขเดา.
+ */
+function unitCostOf(product: StoreHubProductRow | undefined): { cost: number; source: "cost" | "price" | "none" } {
+  const cost = toNumber(product?.cost);
+  if (cost > 0) return { cost, source: "cost" };
+  const price = toNumber(product?.unitPrice);
+  if (price > 0) return { cost: price, source: "price" };
+  return { cost: 0, source: "none" };
+}
+
+/**
+ * รวม inventory + products ของ StoreHub เป็นรายการ "ของที่ต้องสั่ง".
+ * นับเฉพาะสินค้าที่ **ตั้งจุดสั่งซื้อไว้** (warningStock > 0) เพราะสต๊อกส่วนใหญ่เป็นการ์ดใบเดี่ยว
+ * ที่ไม่ได้สั่งซื้อซ้ำ — ถ้าไม่กรอง รายการจะกลายเป็นการ์ด 5 พันใบและไม่มีใครอ่าน.
+ * เรียงจาก "ขาดหนักสุด" ก่อน: สัดส่วนคงเหลือ/จุดสั่งซื้อ น้อยสุดขึ้นก่อน แล้วค่อยดูจำนวนที่ต้องสั่ง.
+ */
+export function buildSupplyNeeds(
+  inventory: StoreHubInventoryRow[],
+  products: StoreHubProductRow[]
+): {
+  needs: SupplyNeedItem[];
+  watch: SupplyNeedItem[];
+  trackedCount: number;
+  estimatedTotal: number;
+  missingCostCount: number;
+} {
+  const nameById = new Map<string, StoreHubProductRow>();
+  for (const product of products) {
+    if (product?.id) nameById.set(product.id, product);
+  }
+
+  const tracked: Array<{ item: SupplyNeedItem; ratio: number }> = [];
+  for (const row of inventory) {
+    const productId = row?.productId;
+    const reorderPoint = toNumber(row?.warningStock);
+    if (!productId || reorderPoint <= 0) continue;
+    const product = nameById.get(productId);
+    const name = (product?.name || "").trim();
+    if (!name) continue;
+    const remaining = toNumber(row?.quantityOnHand);
+    const idealStock = toNumber(row?.idealStock);
+    const orderQty = idealStock > 0 ? Math.max(idealStock - remaining, 0) : 0;
+    const { cost, source } = unitCostOf(product);
+    const item: SupplyNeedItem = {
+      name,
+      remaining,
+      reorderPoint,
+      ...(idealStock > 0 ? { idealStock, orderQty } : {}),
+      ...(cost > 0 ? { unitCost: round2(cost), estimatedCost: round2(orderQty * cost) } : {}),
+      costSource: source,
+      ...(product?.category ? { category: product.category } : {})
+    };
+    tracked.push({ item, ratio: remaining / reorderPoint });
+  }
+
+  tracked.sort((a, b) => a.ratio - b.ratio || (b.item.orderQty ?? 0) - (a.item.orderQty ?? 0));
+
+  const needs = tracked.filter((entry) => entry.ratio <= 1).map((entry) => entry.item);
+  // เตือนล่วงหน้า: ยังไม่ถึงจุดสั่งซื้อแต่เหลือไม่ถึง 1.5 เท่าของจุดสั่งซื้อ
+  const watch = tracked.filter((entry) => entry.ratio > 1 && entry.ratio <= 1.5).map((entry) => entry.item);
+  const estimatedTotal = round2(needs.reduce((sum, item) => sum + (item.estimatedCost ?? 0), 0));
+  // ของที่ต้องสั่งแต่ไม่มีต้นทุนในระบบ → ยอดรวมต่ำกว่าจริง ต้องบอกให้รู้ ไม่ใช่เงียบ
+  const missingCostCount = needs.filter((item) => (item.orderQty ?? 0) > 0 && !item.unitCost).length;
+  return { needs, watch, trackedCount: tracked.length, estimatedTotal, missingCostCount };
+}
+
+// แคชในหน่วยความจำของ instance — StoreHub จำกัด 3 calls/sec และ /products คือก้อน ~3MB
+// ที่ไม่มี query param ให้กรอง จึงไม่ควรดึงใหม่ทุกครั้งที่พนักงานเปิดหน้า.
+const PRODUCTS_TTL_MS = 15 * 60 * 1000;
+const INVENTORY_TTL_MS = 3 * 60 * 1000;
+let productsCache: { at: number; rows: StoreHubProductRow[] } | null = null;
+let inventoryCache: { at: number; storeId: string; rows: StoreHubInventoryRow[] } | null = null;
+
+async function cachedProducts(): Promise<StoreHubProductRow[]> {
+  const now = Date.now();
+  if (productsCache && now - productsCache.at < PRODUCTS_TTL_MS) return productsCache.rows;
+  const raw = await storeHubGet<StoreHubProductRow[]>("/products");
+  // เก็บเฉพาะฟิลด์ที่ใช้ ไม่งั้นก้อน 3MB ค้างอยู่ในหน่วยความจำทั้งก้อน
+  const rows = (Array.isArray(raw) ? raw : []).map((product) => ({
+    id: product?.id,
+    name: product?.name,
+    category: product?.category,
+    cost: product?.cost,
+    unitPrice: product?.unitPrice
+  }));
+  productsCache = { at: now, rows };
+  return rows;
+}
+
+async function cachedInventory(storeId: string): Promise<StoreHubInventoryRow[]> {
+  const now = Date.now();
+  if (inventoryCache && inventoryCache.storeId === storeId && now - inventoryCache.at < INVENTORY_TTL_MS) {
+    return inventoryCache.rows;
+  }
+  const raw = await storeHubGet<StoreHubInventoryRow[]>(`/inventory/${storeId}`);
+  const rows = Array.isArray(raw) ? raw : [];
+  inventoryCache = { at: now, storeId, rows };
+  return rows;
+}
+
+/** ดึง "ของที่ต้องสั่ง" สดจาก StoreHub Open API. โยน error ถ้าไม่ได้ตั้ง creds หรือดึงไม่ได้. */
+export async function fetchSupplyNeedsFromApi(branchKey = "bangkae"): Promise<SupplyNeedsResult> {
+  if (!hasStoreHubCreds()) throw new Error("STOREHUB_USER/STOREHUB_PASS is not configured");
+  const storeId = branchConfig(branchKey).storeHubStoreId;
+  if (!storeId) throw new Error(`branch ${branchKey} has no storeHubStoreId`);
+
+  const [inventory, products] = await Promise.all([cachedInventory(storeId), cachedProducts()]);
+  const { needs, watch, trackedCount, estimatedTotal, missingCostCount } = buildSupplyNeeds(inventory, products);
+  const minOrderValue = branchConfig(branchKey).supplyMinOrderValue ?? 0;
+  return {
+    fetchedAt: new Date().toISOString(),
+    items: needs,
+    watch,
+    trackedCount,
+    estimatedTotal,
+    missingCostCount,
+    minOrderValue,
+    shortOfMinimum: round2(Math.max(minOrderValue - estimatedTotal, 0)),
+    source: "api"
+  };
+}
+
+/**
+ * ดึงรายการของที่ต้องสั่ง — ใช้ StoreHub Open API ก่อน (สดเสมอ ไม่ต้องดูแล cookie)
+ * ถ้าไม่มี creds ค่อยถอยไปใช้ลิงก์ export สำรอง.
+ */
 export async function fetchSupplyNeeds(threshold = DEFAULT_THRESHOLD): Promise<SupplyNeedsResult> {
+  if (hasStoreHubCreds()) return fetchSupplyNeedsFromApi();
+  return fetchSupplyNeedsFromFeed(threshold);
+}
+
+/** ดึง Supply Needs จาก feed URL แล้วคืนเฉพาะรายการใกล้หมด. โยน error ถ้าไม่ได้ตั้งค่า/ดึงไม่ได้. */
+export async function fetchSupplyNeedsFromFeed(threshold = DEFAULT_THRESHOLD): Promise<SupplyNeedsResult> {
   const url = process.env.STOREHUB_SUPPLY_NEEDS_URL;
   if (!url) throw new Error("STOREHUB_SUPPLY_NEEDS_URL is not configured");
 
@@ -200,7 +394,7 @@ export async function fetchSupplyNeeds(threshold = DEFAULT_THRESHOLD): Promise<S
   const body = await res.text();
   const payload: unknown = contentType.includes("json") ? safeJson(body) : body;
   const items = filterNearEmpty(parseSupplyNeeds(payload), threshold);
-  return { fetchedAt: new Date().toISOString(), items };
+  return { fetchedAt: new Date().toISOString(), items, source: "feed" };
 }
 
 function safeJson(text: string): unknown {
