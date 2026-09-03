@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { AssignedDailyList } from "../../components/AssignedDailyList.tsx";
+import { SupplyNeedsBanner } from "../../components/SupplyNeedsBanner.tsx";
 import { MyProjects } from "../../components/MyProjects.tsx";
 import { TodayTaskList } from "../../components/TodayTaskList.tsx";
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
@@ -75,7 +77,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* บนสุด: เหลืออะไรบ้างวันนี้ แบบนับเป็นตัวเลข ไม่ใช่ลิสต์ยาว */}
+      {/* ของที่ต้องสั่ง — บนสุดของหน้า เพราะลืมสั่งแล้วของขาดหน้าร้านทันที
+          Suspense กันไม่ให้การเรียก StoreHub หน่วงงานของตัวเองที่เหลือทั้งหน้า */}
+      <Suspense fallback={null}>
+        <SupplyNeedsBanner />
+      </Suspense>
+
+      {/* เหลืออะไรบ้างวันนี้ แบบนับเป็นตัวเลข ไม่ใช่ลิสต์ยาว */}
       <TodaySummary
         phases={cardStoreWorkflow}
         branch={branch}
