@@ -13,7 +13,7 @@ export type BranchConfig = {
   stockCountGraceHours: number;
   /** StoreHub store id — ใช้เรียก GET /inventory/{storeId} เพื่อดูของที่ต้องสั่ง */
   storeHubStoreId?: string;
-  /** ยอดสั่งซื้อขั้นต่ำต่อรอบ (บาท) — Makro ต้องยอด 100+ ถึงจะสั่งได้ */
+  /** ยอดสั่งซื้อขั้นต่ำต่อรอบ (บาท) — Makro ต้องยอด 1,000+ ถึงจะสั่งได้ */
   supplyMinOrderValue?: number;
 };
 
@@ -25,7 +25,7 @@ export const branchConfigs: BranchConfig[] = [
     openTimeWeekend: "09:00", // ส–อา กะแรก 09:00
     stockCountGraceHours: 4,
     storeHubStoreId: "6a268170c008ab000760e21a", // "Up level Academy" (บางแค) — สาขาหลักใน StoreHub
-    supplyMinOrderValue: 100
+    supplyMinOrderValue: 1000
   }
 ];
 

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildOrderPlan,
   buildSupplyNeeds,
+  tallySoldQuantities,
+  withSales,
   filterNearEmpty,
   parseSupplyNeeds,
   summariseSupplyNeeds,
@@ -167,5 +170,69 @@ describe("buildSupplyNeeds (StoreHub Open API)", () => {
       watch.map((item) => item.name),
       ["ทิวลี่"]
     );
+  });
+});
+
+describe("tallySoldQuantities", () => {
+  it("adds up quantities per product and skips cancelled bills", () => {
+    const sold = tallySoldQuantities([
+      { items: [{ productId: "p1", quantity: 2 }, { productId: "p2", quantity: 1 }] },
+      { items: [{ productId: "p1", quantity: 3 }] },
+      { isCancelled: true, items: [{ productId: "p1", quantity: 99 }] },
+      { items: [{ quantity: 5 }, { productId: "p3" }] }
+    ]);
+    assert.deepEqual(sold, { p1: 5, p2: 1 });
+  });
+});
+
+describe("buildOrderPlan (ดันยอดให้ถึงขั้นต่ำ)", () => {
+  // ต้องสั่ง: 60 บาท · เหลืออีก 3 ตัวที่ยังไม่ถึงจุดสั่งซื้อ ใช้ดันยอดได้
+  const tracked = [
+    { name: "ต้องสั่ง A", productId: "a", remaining: 0, reorderPoint: 3, stockRatio: 0, idealStock: 6, orderQty: 6, unitCost: 10, estimatedCost: 60 },
+    { name: "ขายดีแต่ยังไม่เต็ม", productId: "b", remaining: 8, reorderPoint: 6, stockRatio: 1.33, idealStock: 12, orderQty: 4, unitCost: 20, estimatedCost: 80, sold30d: 50 },
+    { name: "เต็มสต๊อกแต่ขายดีสุด", productId: "c", remaining: 30, reorderPoint: 12, stockRatio: 2.5, idealStock: 24, orderQty: 0, unitCost: 5, estimatedCost: 0, sold30d: 120 },
+    { name: "ขายไม่ออก", productId: "d", remaining: 20, reorderPoint: 8, stockRatio: 2.5, idealStock: 12, orderQty: 0, unitCost: 20, estimatedCost: 0, sold30d: 0 }
+  ];
+
+  it("ยอดถึงขั้นต่ำอยู่แล้ว → ไม่เสนออะไรเพิ่ม", () => {
+    const plan = buildOrderPlan(tracked, 50);
+    assert.equal(plan.mustTotal, 60);
+    assert.deepEqual(plan.suggested, []);
+    assert.equal(plan.reachedMinimum, true);
+  });
+
+  it("เติมของที่ยังไม่เต็มก่อน แล้วค่อยไล่ของขายดี", () => {
+    const plan = buildOrderPlan(tracked, 200);
+    assert.deepEqual(
+      plan.suggested.map((item) => [item.name, item.orderQty]),
+      // เติมของที่ยังไม่เต็มก่อน เพดาน = หนึ่งเดือนของยอดขาย (50) พอดันยอดได้ในตัวเดียว
+      [["ขายดีแต่ยังไม่เต็ม", 7]]
+    );
+    assert.equal(plan.grandTotal, 200);
+    assert.equal(plan.reachedMinimum, true);
+  });
+
+  it("ตัดจำนวนรายการสุดท้ายให้พอดี ไม่สั่งเกิน", () => {
+    const plan = buildOrderPlan(tracked, 100);
+    assert.deepEqual(plan.suggested.map((item) => [item.name, item.orderQty]), [["ขายดีแต่ยังไม่เต็ม", 2]]);
+    assert.equal(plan.grandTotal, 100);
+  });
+
+  it("ของในระบบไม่พอดันยอด → บอกตรงๆ ว่ายังขาดเท่าไร", () => {
+    const plan = buildOrderPlan(tracked, 5000);
+    assert.equal(plan.reachedMinimum, false);
+    assert.ok(plan.shortOfMinimum > 0);
+  });
+
+  it("withSales จับยอดขายเข้ารายการด้วย productId", () => {
+    const [first, second] = withSales(
+      [
+        { name: "A", productId: "a", remaining: 1 },
+        { name: "ไม่มี id", remaining: 1 }
+      ],
+      { a: 7 }
+    );
+    assert.equal(first.sold30d, 7);
+    assert.equal(second.sold30d, 0);
   });
 });

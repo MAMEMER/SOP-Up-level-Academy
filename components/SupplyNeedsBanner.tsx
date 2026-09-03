@@ -7,31 +7,42 @@ import { fetchSupplyNeeds, hasSupplyNeedsSource } from "../lib/storehub-supply-n
 export async function SupplyNeedsBanner() {
   if (!hasSupplyNeedsSource()) return null;
 
-  let items: Awaited<ReturnType<typeof fetchSupplyNeeds>>["items"] = [];
-  let total = 0;
+  let result: Awaited<ReturnType<typeof fetchSupplyNeeds>>;
   try {
-    const result = await fetchSupplyNeeds();
-    items = result.items;
-    total = result.estimatedTotal ?? 0;
+    result = await fetchSupplyNeeds();
   } catch {
     return null;
   }
-  if (items.length === 0) return null;
 
-  const preview = items.slice(0, 3).map((item) => item.name);
-  const rest = items.length - preview.length;
+  const must = result.plan?.must ?? result.items;
+  if (must.length === 0) return null;
+
+  const plan = result.plan;
+  const grandTotal = plan?.grandTotal ?? result.estimatedTotal ?? 0;
+  const baht = (value: number) => value.toLocaleString("th-TH", { maximumFractionDigits: 0 });
+  const preview = must.slice(0, 3).map((item) => item.name);
+  const rest = must.length - preview.length;
 
   return (
     <Link href="/supplies" className="supply-banner">
       <span className="supply-banner-title">
-        ของที่ต้องสั่ง {items.length} รายการ
-        {total > 0 ? ` · ≈ ${total.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท` : ""}
+        ของที่ต้องสั่ง {must.length} รายการ
+        {grandTotal > 0 ? ` · ทั้งบิล ≈ ${baht(grandTotal)} บาท` : ""}
       </span>
       <span className="supply-banner-items">
         {preview.join(" · ")}
         {rest > 0 ? ` และอีก ${rest} รายการ` : ""}
       </span>
-      <span className="supply-banner-cta">ดูรายการที่ต้องสั่ง →</span>
+      {plan && plan.minOrderValue > 0 ? (
+        <span className="supply-banner-items">
+          {plan.reachedMinimum
+            ? plan.suggested.length > 0
+              ? `เสนอของขายดีเพิ่ม ${plan.suggested.length} รายการ ให้ถึงขั้นต่ำ ${baht(plan.minOrderValue)} บาท`
+              : `ถึงยอดขั้นต่ำ ${baht(plan.minOrderValue)} บาทแล้ว`
+            : `ยังขาดอีก ${baht(plan.shortOfMinimum)} บาทถึงจะสั่งได้`}
+        </span>
+      ) : null}
+      <span className="supply-banner-cta">ดูแผนการสั่ง →</span>
     </Link>
   );
 }

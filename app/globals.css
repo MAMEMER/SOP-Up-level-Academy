@@ -3757,6 +3757,16 @@ a {
   margin-top: 20px;
 }
 
+.supply-alert-head.suggest {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 140, 66, 0.24);
+}
+
+.supply-alert-head.suggest strong {
+  color: #2e7d4f;
+}
+
 .supply-total {
   display: flex;
   flex-direction: column;

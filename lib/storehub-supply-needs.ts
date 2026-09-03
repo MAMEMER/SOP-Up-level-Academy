@@ -29,6 +29,29 @@ export type SupplyNeedItem = {
   costSource?: "cost" | "price" | "none";
   category?: string;
   unit?: string;
+  /** StoreHub productId — ใช้จับคู่กับยอดขาย */
+  productId?: string;
+  /** ขายไปกี่ชิ้นใน 30 วันล่าสุด */
+  sold30d?: number;
+  /** คงเหลือ ÷ จุดสั่งซื้อ — ≤1 คือถึงจุดต้องสั่งแล้ว */
+  stockRatio?: number;
+  /** เหตุผลที่แนะนำให้สั่งตัวนี้ (เฉพาะรายการที่ระบบเสนอเพิ่ม) */
+  note?: string;
+};
+
+/** แผนการสั่งของหนึ่งรอบ: ของที่ต้องสั่งจริง + ของที่เสนอให้หยิบเพิ่มเพื่อให้ถึงยอดขั้นต่ำ */
+export type SupplyOrderPlan = {
+  /** ถึงจุดสั่งซื้อแล้ว ยังไงก็ต้องสั่ง */
+  must: SupplyNeedItem[];
+  /** ข้อเสนอ: หยิบเพิ่มเพื่อให้บิลถึงยอดขั้นต่ำ เรียงจากของขายดี */
+  suggested: SupplyNeedItem[];
+  mustTotal: number;
+  suggestedTotal: number;
+  grandTotal: number;
+  minOrderValue: number;
+  /** ยังขาดอีกกี่บาทถึงยอดขั้นต่ำ หลังรวมข้อเสนอแล้ว (0 = ถึงแล้ว) */
+  shortOfMinimum: number;
+  reachedMinimum: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -209,6 +232,8 @@ export type SupplyNeedsResult = {
   shortOfMinimum?: number;
   /** มีของกี่รายการที่ยังไม่ได้ใส่ต้นทุนใน StoreHub → ยอดรวมต่ำกว่าจริง */
   missingCostCount?: number;
+  /** แผนการสั่งรอบนี้ (ของที่ต้องสั่ง + ของที่เสนอให้หยิบเพิ่ม) — มีเฉพาะเมื่อดึงผ่าน API */
+  plan?: SupplyOrderPlan;
 };
 
 export type StoreHubInventoryRow = {
@@ -261,6 +286,8 @@ export function buildSupplyNeeds(
 ): {
   needs: SupplyNeedItem[];
   watch: SupplyNeedItem[];
+  /** ทุกรายการที่ตั้งจุดสั่งซื้อไว้ เรียงจากขาดหนักสุด — ใช้ต่อในการเสนอของเพิ่ม */
+  tracked: SupplyNeedItem[];
   trackedCount: number;
   estimatedTotal: number;
   missingCostCount: number;
@@ -284,14 +311,16 @@ export function buildSupplyNeeds(
     const { cost, source } = unitCostOf(product);
     const item: SupplyNeedItem = {
       name,
+      productId,
       remaining,
       reorderPoint,
+      stockRatio: remaining / reorderPoint,
       ...(idealStock > 0 ? { idealStock, orderQty } : {}),
       ...(cost > 0 ? { unitCost: round2(cost), estimatedCost: round2(orderQty * cost) } : {}),
       costSource: source,
       ...(product?.category ? { category: product.category } : {})
     };
-    tracked.push({ item, ratio: remaining / reorderPoint });
+    tracked.push({ item, ratio: item.stockRatio ?? 0 });
   }
 
   tracked.sort((a, b) => a.ratio - b.ratio || (b.item.orderQty ?? 0) - (a.item.orderQty ?? 0));
@@ -302,7 +331,87 @@ export function buildSupplyNeeds(
   const estimatedTotal = round2(needs.reduce((sum, item) => sum + (item.estimatedCost ?? 0), 0));
   // ของที่ต้องสั่งแต่ไม่มีต้นทุนในระบบ → ยอดรวมต่ำกว่าจริง ต้องบอกให้รู้ ไม่ใช่เงียบ
   const missingCostCount = needs.filter((item) => (item.orderQty ?? 0) > 0 && !item.unitCost).length;
-  return { needs, watch, trackedCount: tracked.length, estimatedTotal, missingCostCount };
+  return {
+    needs,
+    watch,
+    tracked: tracked.map((entry) => entry.item),
+    trackedCount: tracked.length,
+    estimatedTotal,
+    missingCostCount
+  };
+}
+
+/** ใส่ยอดขาย 30 วันเข้าไปในรายการ (จับคู่ด้วย productId) */
+export function withSales(items: SupplyNeedItem[], sold: Record<string, number>): SupplyNeedItem[] {
+  return items.map((item) => ({ ...item, sold30d: item.productId ? sold[item.productId] ?? 0 : 0 }));
+}
+
+/**
+ * วางแผนการสั่งของหนึ่งรอบ.
+ *
+ * ของที่ถึงจุดสั่งซื้อแล้ว = ต้องสั่งอยู่แล้ว. ถ้ารวมกันยังไม่ถึงยอดขั้นต่ำของซัพพลายเออร์
+ * (Makro ต้อง 1,000 บาท) ระบบจะ **เสนอ** ของที่ควรหยิบเพิ่ม โดยเลือกจาก:
+ *   1. ของที่ยังไม่ถึงจุดสั่งซื้อแต่ต่ำกว่าจำนวนที่ควรมี — เติมให้เต็มก่อน ไม่ใช่ซื้อของไม่จำเป็น
+ *   2. ของขายดี (ยอดขาย 30 วัน) — ยังไงก็ขายออก ไม่จม
+ * แล้วตัดจำนวนของรายการสุดท้ายให้พอดีถึงยอดขั้นต่ำ ไม่สั่งเกินโดยไม่จำเป็น.
+ */
+export function buildOrderPlan(tracked: SupplyNeedItem[], minOrderValue: number): SupplyOrderPlan {
+  const must = tracked.filter((item) => (item.stockRatio ?? 0) <= 1);
+  const mustTotal = round2(must.reduce((sum, item) => sum + (item.estimatedCost ?? 0), 0));
+
+  const suggested: SupplyNeedItem[] = [];
+  let running = mustTotal;
+
+  if (minOrderValue > 0 && running < minOrderValue) {
+    const pool = tracked
+      .filter((item) => (item.stockRatio ?? 0) > 1 && (item.unitCost ?? 0) > 0)
+      .map((item) => {
+        const gap = Math.max((item.idealStock ?? 0) - item.remaining, 0);
+        // เพดานต่อรายการ = เติมให้เต็ม หรือหนึ่งเดือนของยอดขาย แล้วแต่อะไรมากกว่า —
+        // ของที่ขายหมดใน 1 เดือนไม่ถือว่าจม แต่มากกว่านั้นคือเอาเงินไปแช่ไว้ในสต๊อก
+        const monthly = Math.ceil(item.sold30d ?? 0);
+        return { item, maxQty: Math.max(gap, monthly, 1), belowIdeal: gap > 0 };
+      })
+      .filter((entry) => entry.maxQty > 0)
+      // เติมของที่ยังไม่เต็มก่อน แล้วค่อยไล่ตามของขายดี
+      .sort(
+        (a, b) =>
+          Number(b.belowIdeal) - Number(a.belowIdeal) || (b.item.sold30d ?? 0) - (a.item.sold30d ?? 0)
+      );
+
+    for (const entry of pool) {
+      if (running >= minOrderValue) break;
+      const unitCost = entry.item.unitCost ?? 0;
+      const needed = Math.ceil((minOrderValue - running) / unitCost);
+      const qty = Math.min(entry.maxQty, Math.max(needed, 1));
+      const cost = round2(qty * unitCost);
+      suggested.push({
+        ...entry.item,
+        orderQty: qty,
+        estimatedCost: cost,
+        note: entry.belowIdeal
+          ? `เหลือ ${entry.item.remaining} จากที่ควรมี ${entry.item.idealStock} · ขาย ${entry.item.sold30d ?? 0} ชิ้น/30 วัน`
+          : `ขายดี ${entry.item.sold30d ?? 0} ชิ้น/30 วัน — เติมให้บิลถึงยอดขั้นต่ำ`
+      });
+      running = round2(running + cost);
+    }
+
+    // ถ้าเติมทุกตัวจนเต็มเพดานแล้วยังไม่ถึงขั้นต่ำ ก็ปล่อยให้ยอดขาดไว้แล้วรายงานตามจริง —
+    // ไม่ยัดของขายดีเพิ่มแบบไม่มีเพดาน เพราะนั่นคือเอาเงินไปจมกับของที่ขายไม่ทัน
+  }
+
+  const suggestedTotal = round2(suggested.reduce((sum, item) => sum + (item.estimatedCost ?? 0), 0));
+  const grandTotal = round2(mustTotal + suggestedTotal);
+  return {
+    must,
+    suggested,
+    mustTotal,
+    suggestedTotal,
+    grandTotal,
+    minOrderValue,
+    shortOfMinimum: round2(Math.max(minOrderValue - grandTotal, 0)),
+    reachedMinimum: minOrderValue <= 0 || grandTotal >= minOrderValue
+  };
 }
 
 // แคชในหน่วยความจำของ instance — StoreHub จำกัด 3 calls/sec และ /products คือก้อน ~3MB
@@ -339,24 +448,69 @@ async function cachedInventory(storeId: string): Promise<StoreHubInventoryRow[]>
   return rows;
 }
 
+export type StoreHubTransaction = {
+  storeId?: string;
+  isCancelled?: boolean;
+  items?: Array<{ productId?: string; quantity?: number }>;
+};
+
+/** รวมจำนวนที่ขายไปต่อสินค้า จากรายการขาย (ข้ามบิลที่ยกเลิก) */
+export function tallySoldQuantities(transactions: StoreHubTransaction[]): Record<string, number> {
+  const sold: Record<string, number> = {};
+  for (const transaction of transactions) {
+    if (transaction?.isCancelled) continue;
+    for (const line of transaction?.items ?? []) {
+      const productId = line?.productId;
+      const quantity = toNumber(line?.quantity);
+      if (!productId || quantity <= 0) continue;
+      sold[productId] = (sold[productId] ?? 0) + quantity;
+    }
+  }
+  return sold;
+}
+
+const SALES_TTL_MS = 60 * 60 * 1000;
+const SALES_WINDOW_DAYS = 30;
+let salesCache: { at: number; storeId: string; sold: Record<string, number> } | null = null;
+
+async function cachedSales(storeId: string): Promise<Record<string, number>> {
+  const now = Date.now();
+  if (salesCache && salesCache.storeId === storeId && now - salesCache.at < SALES_TTL_MS) return salesCache.sold;
+  const to = new Date(now).toISOString();
+  const from = new Date(now - SALES_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const raw = await storeHubGet<StoreHubTransaction[]>(
+    `/transactions?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+  );
+  const sold = tallySoldQuantities((Array.isArray(raw) ? raw : []).filter((t) => !t.storeId || t.storeId === storeId));
+  salesCache = { at: now, storeId, sold };
+  return sold;
+}
+
 /** ดึง "ของที่ต้องสั่ง" สดจาก StoreHub Open API. โยน error ถ้าไม่ได้ตั้ง creds หรือดึงไม่ได้. */
 export async function fetchSupplyNeedsFromApi(branchKey = "bangkae"): Promise<SupplyNeedsResult> {
   if (!hasStoreHubCreds()) throw new Error("STOREHUB_USER/STOREHUB_PASS is not configured");
   const storeId = branchConfig(branchKey).storeHubStoreId;
   if (!storeId) throw new Error(`branch ${branchKey} has no storeHubStoreId`);
 
-  const [inventory, products] = await Promise.all([cachedInventory(storeId), cachedProducts()]);
-  const { needs, watch, trackedCount, estimatedTotal, missingCostCount } = buildSupplyNeeds(inventory, products);
+  const [inventory, products, sold] = await Promise.all([
+    cachedInventory(storeId),
+    cachedProducts(),
+    // ยอดขายใช้แค่จัดอันดับของที่จะเสนอเพิ่ม — ถ้าดึงไม่ได้ก็ยังบอกของที่ต้องสั่งได้
+    cachedSales(storeId).catch(() => ({}) as Record<string, number>)
+  ]);
+  const { watch, tracked, trackedCount, estimatedTotal, missingCostCount } = buildSupplyNeeds(inventory, products);
   const minOrderValue = branchConfig(branchKey).supplyMinOrderValue ?? 0;
+  const plan = buildOrderPlan(withSales(tracked, sold), minOrderValue);
   return {
     fetchedAt: new Date().toISOString(),
-    items: needs,
-    watch,
+    items: plan.must,
+    watch: withSales(watch, sold),
+    plan,
     trackedCount,
     estimatedTotal,
     missingCostCount,
     minOrderValue,
-    shortOfMinimum: round2(Math.max(minOrderValue - estimatedTotal, 0)),
+    shortOfMinimum: plan.shortOfMinimum,
     source: "api"
   };
 }

@@ -10,8 +10,8 @@ import {
   type SupplyNeedsResult
 } from "../../../lib/storehub-supply-needs.ts";
 
-// หน้า "ของที่ต้องสั่ง" — ดึงสดจาก StoreHub (คงเหลือ vs จุดสั่งซื้อ) แล้วบอกให้ชัดว่า
-// ต้องสั่งอะไร กี่ชิ้น เป็นเงินเท่าไร และยอดถึงขั้นต่ำของ Makro (100 บาท) หรือยัง.
+// หน้า "ของที่ต้องสั่ง" — ดึงสดจาก StoreHub (คงเหลือ vs จุดสั่งซื้อ) แล้วเสนอเป็นแผนการสั่งหนึ่งรอบ:
+// ของที่ยังไงก็ต้องสั่ง + ของที่ควรหยิบเพิ่มให้บิลถึงยอดขั้นต่ำของ Makro โดยเลือกจากของขายดี.
 export const dynamic = "force-dynamic";
 
 const storeHubSupplyNeedsUrl = "https://uplevel.storehubhq.com/stocks/supplyNeeds/v2/web";
@@ -32,16 +32,18 @@ function orderLine(item: SupplyNeedItem): string {
   return `${item.name} × ${qty}${money}`;
 }
 
-function SupplyRow({ item }: { item: SupplyNeedItem }) {
+function SupplyRow({ item, showNote }: { item: SupplyNeedItem; showNote?: boolean }) {
   const qty = item.orderQty ?? 0;
   return (
     <li className="supply-row">
       <div className="supply-row-main">
         <span className="supply-alert-name">{item.name}</span>
         <small>
-          เหลือ {item.remaining}
-          {item.reorderPoint ? ` · จุดสั่งซื้อ ${item.reorderPoint}` : ""}
-          {item.category ? ` · ${item.category}` : ""}
+          {showNote && item.note
+            ? item.note
+            : `เหลือ ${item.remaining}${item.reorderPoint ? ` · จุดสั่งซื้อ ${item.reorderPoint}` : ""}${
+                item.category ? ` · ${item.category}` : ""
+              }`}
         </small>
       </div>
       <div className="supply-row-order">
@@ -74,13 +76,17 @@ export default async function SuppliesPage() {
     }
   }
 
-  const needs = result?.items ?? [];
-  const watch = result?.watch ?? [];
-  const total = result?.estimatedTotal ?? 0;
-  const minimum = result?.minOrderValue ?? config.supplyMinOrderValue ?? 0;
-  const short = result?.shortOfMinimum ?? 0;
-  const copyText = needs.map(orderLine).join("\n");
-  const guessedPriceCount = needs.filter((item) => item.costSource === "price").length;
+  const plan = result?.plan ?? null;
+  const must = plan?.must ?? result?.items ?? [];
+  const suggested = plan?.suggested ?? [];
+  const minimum = plan?.minOrderValue ?? config.supplyMinOrderValue ?? 0;
+  const mustTotal = plan?.mustTotal ?? result?.estimatedTotal ?? 0;
+  const grandTotal = plan?.grandTotal ?? mustTotal;
+  const short = plan?.shortOfMinimum ?? Math.max(minimum - grandTotal, 0);
+  const reached = plan?.reachedMinimum ?? grandTotal >= minimum;
+
+  const copyText = [...must, ...suggested].map(orderLine).join("\n");
+  const guessedPriceCount = [...must, ...suggested].filter((item) => item.costSource === "price").length;
 
   return (
     <main className="page">
@@ -92,7 +98,8 @@ export default async function SuppliesPage() {
           <p className="eyebrow">StoreHub</p>
           <h2>ของที่ต้องสั่ง</h2>
           <p>
-            ดึงสดจากสต๊อก StoreHub ของ {config.displayName} — ของที่คงเหลือถึงหรือต่ำกว่าจุดสั่งซื้อ พร้อมจำนวนที่ต้องสั่งและมูลค่าโดยประมาณ
+            ดึงสดจากสต๊อก {config.displayName} — ของที่ถึงจุดสั่งซื้อแล้ว บวกข้อเสนอว่าควรหยิบอะไรเพิ่ม
+            ให้บิลถึงยอดขั้นต่ำ {baht(minimum)} บาท
             {result?.fetchedAt ? ` · อัปเดต ${formatFetchedAt(result.fetchedAt)}` : ""}
           </p>
         </div>
@@ -107,37 +114,59 @@ export default async function SuppliesPage() {
         </section>
       ) : null}
 
-      {result && needs.length === 0 ? (
+      {result && must.length === 0 ? (
         <section className="supply-panel">
           <p className="detail-hint">ตอนนี้ไม่มีของที่ถึงจุดสั่งซื้อ — ยังไม่ต้องสั่งอะไร</p>
         </section>
       ) : null}
 
-      {needs.length > 0 ? (
+      {must.length > 0 ? (
         <section className="supply-panel">
           <div className="supply-total">
             <div>
-              <strong>ต้องสั่ง {needs.length} รายการ</strong>
-              <span className="supply-total-amount">≈ {baht(total)} บาท</span>
+              <strong>รวมทั้งบิล</strong>
+              <span className="supply-total-amount">≈ {baht(grandTotal)} บาท</span>
             </div>
             {minimum > 0 ? (
-              <p className={short > 0 ? "supply-total-warn" : "supply-total-ok"}>
-                {short > 0
-                  ? `ยอดขั้นต่ำ Makro ${baht(minimum)} บาท — ยังขาดอีก ${baht(short)} บาท ต้องสั่งของเพิ่มหรือรอรอบหน้า`
-                  : `ถึงยอดขั้นต่ำ Makro ${baht(minimum)} บาทแล้ว สั่งได้เลย`}
+              <p className={reached ? "supply-total-ok" : "supply-total-warn"}>
+                {reached
+                  ? `ถึงยอดขั้นต่ำ ${baht(minimum)} บาทแล้ว สั่งได้เลย`
+                  : `ยังขาดอีก ${baht(short)} บาทถึงจะสั่งได้ — ของในระบบมีไม่พอจะดันยอด ต้องเลือกของนอกรายการเพิ่มเอง`}
               </p>
             ) : null}
-            {result?.missingCostCount ? (
-              <p className="detail-hint">
-                มี {result.missingCostCount} รายการที่ยังไม่ได้ใส่ต้นทุนใน StoreHub — ยอดจริงจะสูงกว่านี้
-              </p>
-            ) : null}
+            <p className="detail-hint">
+              ต้องสั่งจริง ≈ {baht(mustTotal)} บาท
+              {suggested.length > 0 ? ` · เสนอให้หยิบเพิ่ม ≈ ${baht(plan?.suggestedTotal ?? 0)} บาท` : ""}
+              {result?.missingCostCount
+                ? ` · มี ${result.missingCostCount} รายการที่ยังไม่ได้ใส่ต้นทุนใน StoreHub ยอดจริงจะสูงกว่านี้`
+                : ""}
+            </p>
+          </div>
+
+          <div className="supply-alert-head">
+            <strong>ยังไงก็ต้องสั่ง {must.length} รายการ</strong>
+            <small>ถึงหรือต่ำกว่าจุดสั่งซื้อแล้ว</small>
           </div>
           <ul className="supply-alert-list">
-            {needs.map((item) => (
-              <SupplyRow key={`${item.name}-${item.reorderPoint ?? 0}`} item={item} />
+            {must.map((item) => (
+              <SupplyRow key={`must-${item.productId ?? item.name}`} item={item} />
             ))}
           </ul>
+
+          {suggested.length > 0 ? (
+            <>
+              <div className="supply-alert-head suggest">
+                <strong>เสนอให้หยิบเพิ่ม {suggested.length} รายการ</strong>
+                <small>เติมของที่ใกล้พร่อง + ของขายดี ให้บิลถึงขั้นต่ำ ไม่ใช่ซื้อของจม</small>
+              </div>
+              <ul className="supply-alert-list">
+                {suggested.map((item) => (
+                  <SupplyRow key={`add-${item.productId ?? item.name}`} item={item} showNote />
+                ))}
+              </ul>
+            </>
+          ) : null}
+
           {guessedPriceCount > 0 ? (
             <p className="detail-hint">* ประมาณจากราคาขาย เพราะยังไม่ได้ใส่ต้นทุนไว้ใน StoreHub</p>
           ) : null}
@@ -150,24 +179,10 @@ export default async function SuppliesPage() {
         </section>
       ) : null}
 
-      {watch.length > 0 ? (
-        <section className="supply-panel">
-          <div className="supply-alert-head">
-            <strong>ใกล้ถึงจุดสั่งซื้อ {watch.length} รายการ</strong>
-            <small>ยังไม่ต้องสั่งวันนี้ แต่ถ้าสั่งรอบนี้อยู่แล้วก็หยิบไปด้วยได้</small>
-          </div>
-          <ul className="supply-alert-list">
-            {watch.map((item) => (
-              <SupplyRow key={`${item.name}-${item.reorderPoint ?? 0}`} item={item} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       {result?.trackedCount ? (
         <p className="detail-hint">
           ระบบดูให้เฉพาะสินค้าที่ตั้ง &quot;จุดสั่งซื้อ&quot; ไว้ใน StoreHub ตอนนี้มี {result.trackedCount} รายการ —
-          ของที่ยังไม่ได้ตั้งจะไม่ขึ้นเตือน ตั้งเพิ่มได้ที่หน้าสินค้าใน StoreHub
+          ของที่ยังไม่ได้ตั้งจะไม่ขึ้นเตือนและเอามาดันยอดไม่ได้ ตั้งเพิ่มได้ที่หน้าสินค้าใน StoreHub
         </p>
       ) : null}
     </main>
