@@ -148,6 +148,51 @@ describe("projectNoProgressAdjustments — Auto KPI ข้อ 3 (ไม่อั
   });
 });
 
+describe("ใบงาน YOW — หักเฉพาะวันที่เข้าทำงานจริงตามกะ (workedDays)", () => {
+  it("ส่ง workedDays → หักเฉพาะวันที่คนนั้นเข้ากะจริง ไม่หักวันหยุด", () => {
+    // งานเดี่ยว ICE 09-01..09-08 เงียบทุกวัน แต่เข้ากะจริงแค่ 09-02, 09-04, 09-07
+    const project = baseProject({ assignees: ["ICE"], mode: "single" });
+    const workedDays = new Set(["ICE:2026-09-02", "ICE:2026-09-04", "ICE:2026-09-07"]);
+    const out = projectNoProgressAdjustments([project], { ...OPTS, workedDays });
+    assert.deepEqual(out.map((a) => a.workDate), ["2026-09-02", "2026-09-04", "2026-09-07"]);
+  });
+
+  it("เข้ากะจริงแต่ 'อัปเดตงาน' วันนั้น → ไม่โดนหัก", () => {
+    // เข้ากะ 09-02 และ 09-04 แต่ลง progress วันที่ 09-02 → เหลือหักแค่ 09-04
+    const project = baseProject({
+      assignees: ["ICE"],
+      mode: "single",
+      progress: [progress("2026-09-02", "ICE")]
+    });
+    const workedDays = new Set(["ICE:2026-09-02", "ICE:2026-09-04"]);
+    const out = projectNoProgressAdjustments([project], { ...OPTS, workedDays });
+    assert.deepEqual(out.map((a) => a.workDate), ["2026-09-04"]);
+  });
+
+  it("workedDays แยกรายคน — งานกลุ่มก็หักเฉพาะวันที่คนนั้นเข้ากะ", () => {
+    const project = baseProject(); // group ICE + Boom
+    const workedDays = new Set(["ICE:2026-09-03", "Boom:2026-09-05"]);
+    const out = projectNoProgressAdjustments([project], { ...OPTS, workedDays });
+    assert.deepEqual(
+      out.map((a) => [a.workDate, a.employeeName]).sort(),
+      [
+        ["2026-09-03", "ICE"],
+        ["2026-09-05", "Boom"]
+      ].sort()
+    );
+  });
+
+  it("workedDays ว่าง → ไม่หักเลย (ดึง attendance ไม่ได้ = ปลอดภัยกว่าหักเกิน)", () => {
+    const out = projectNoProgressAdjustments([baseProject()], { ...OPTS, workedDays: new Set() });
+    assert.equal(out.length, 0);
+  });
+
+  it("ไม่ส่ง workedDays → พฤติกรรมเดิม (ไม่กรองด้วยการเข้างาน)", () => {
+    const out = projectNoProgressAdjustments([baseProject()], OPTS);
+    assert.equal(out.length, 16); // เท่ากับเทสต์แรกสุด
+  });
+});
+
 describe("งานที่ส่งต่อแล้ว — หักเฉพาะคนที่ถือครองในวันนั้น", () => {
   it("งานเดี่ยวที่ส่งต่อกลางทาง ไม่หักสองหัวในวันเดียวกัน", () => {
     const project: WorkProject = {
