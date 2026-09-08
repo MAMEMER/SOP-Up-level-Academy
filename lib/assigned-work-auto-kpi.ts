@@ -59,6 +59,15 @@ export type NoProgressOptions = {
   ratePerDay?: number;
   /** เริ่มนับตั้งแต่วันไหน (กันหักย้อนหลัง) — ค่าเริ่มต้น ASSIGNED_WORK_AUTO_KPI_START */
   startFrom?: string;
+  /**
+   * วันที่พนักงาน "เข้าทำงานจริงตามกะ" (มีกะ + ตอกบัตรเข้างาน) — key = `${employeeName}:${workDate}`.
+   * ใบงาน YOW: หักเฉพาะวันที่พนักงานเข้าทำงานจริงแต่ไม่อัปเดตงาน — ไม่หักวันที่ไม่ได้เข้ากะ
+   * (วันหยุด/OFF/ลา) แม้งานจะยังอยู่ในช่วงเวลาที่กำหนด. เป็น key เดียวกับหมวด Checklist
+   * (schedule ∩ clock-in) เพื่อให้สองระบบตัดสิน "วันทำงานจริง" เหมือนกัน.
+   * - ถ้าส่งมา → หักเฉพาะวันที่อยู่ในเซ็ตนี้เท่านั้น
+   * - ถ้า "ไม่ส่ง" (undefined) → ไม่กรองด้วยการเข้างาน (พฤติกรรมเดิม, ใช้ในเทสต์ pure logic)
+   */
+  workedDays?: Set<string>;
 };
 
 /**
@@ -74,11 +83,14 @@ export type NoProgressOptions = {
  *  - งานเดี่ยว: เจ้าของงานต้องอัปเดตเอง คนอื่นลงแทนไม่นับ — งานที่ส่งต่อแล้ว (lib/project-handover.ts)
  *    หักเฉพาะ "คนที่ถือครองงานในวันนั้น" ไม่ใช่ทุกคนที่เคยมีชื่อ ไม่งั้นวันเดียวโดนหักสองหัว
  *  - งานยกเลิก (cancelled): ข้ามทั้งงาน
+ *  - เข้างานจริง (opts.workedDays): หักเฉพาะวันที่คนนั้น "เข้าทำงานจริงตามกะ" — วันหยุด/OFF/ลา
+ *    ไม่โดนหักแม้งานยังอยู่ในกำหนด (ใบงาน YOW)
  */
 export function projectNoProgressAdjustments(projects: WorkProject[], opts: NoProgressOptions): ScoreAdjustment[] {
   const ratePerDay = Math.abs(Math.round(opts.ratePerDay ?? 1));
   if (ratePerDay === 0) return [];
   const startFrom = opts.startFrom ?? ASSIGNED_WORK_AUTO_KPI_START;
+  const workedDays = opts.workedDays;
   const yesterday = addDays(opts.today, -1);
   const out: ScoreAdjustment[] = [];
 
@@ -116,6 +128,9 @@ export function projectNoProgressAdjustments(projects: WorkProject[], opts: NoPr
       const maxDays = Math.min(span, 400);
       for (let offset = 0; offset <= maxDays; offset += 1) {
         const date = addDays(start, offset);
+        // ใบงาน YOW: หักเฉพาะวันที่พนักงาน "เข้าทำงานจริงตามกะ" — วันหยุด/OFF/ลา ไม่หัก
+        // แม้งานยังอยู่ในกำหนด (ถ้าไม่ส่ง workedDays มา = ไม่กรอง = พฤติกรรมเดิม)
+        if (workedDays && !workedDays.has(`${assignee}:${date}`)) continue;
         // งานเดี่ยวที่เคยส่งต่อ: วันนั้นเป็นภาระของ owner ณ วันนั้นคนเดียว
         if (!isGroup && (project.handovers || []).length > 0 && ownerOnDate(project, date) !== assignee) continue;
         const updated = isGroup ? teamDates.has(date) : (personDatesForSingle as Set<string>).has(date);
