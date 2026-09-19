@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CoachingNotes } from "../../../components/CoachingNotes.tsx";
 import { SelfReviewBoard } from "../../../components/SelfReviewBoard.tsx";
+import { FlowerGarden } from "../../../components/FlowerGarden.tsx";
 import { StaffFeedbackPanel } from "../../../components/StaffFeedbackPanel.tsx";
 import { requireUser } from "../../../lib/auth.ts";
 import { branchFor, displayNameFor, employeeCodeForEmail, employeeCodes, employeeDirectory } from "../../../lib/employee-directory.ts";
@@ -114,6 +115,10 @@ export default async function MyReviewPage({ searchParams }: PageProps) {
         isAdmin={isOwner}
         readOnly={user.isImpersonating}
       />
+
+      {/* ดอกไม้ที่ลูกค้าให้จากจอหน้าเคาน์เตอร์ — จำนวนอย่างเดียว ไม่ผูกกับคะแนน
+          และไม่มีทางรู้ว่าใครให้ (server ตัดฟิลด์ผู้ให้ทิ้งก่อนส่ง) */}
+      <FlowerGarden staffCode={selectedCode} />
 
       {/* เสียงจากสมาชิก (ชม/แนะนำ/ติ) ที่ส่งมาจากเว็บกิลด์ — ไม่ผูกกับคะแนน */}
       <StaffFeedbackPanel staffCode={selectedCode} isAdmin={isOwner} readOnly={user.isImpersonating} />
