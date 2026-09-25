@@ -62,9 +62,12 @@ function tintColor(hex: string, pct: number): string {
 const CELL_OPTIONS: { value: string; label: string; cell: CellValue }[] = [
   { value: "off", label: "OFF", cell: { assignment: "off" } },
   { value: "s1|09:00", label: "ก1 09:00", cell: { assignment: "s1", startTime: "09:00" } },
+  { value: "s1|09:30", label: "ก1 09:30", cell: { assignment: "s1", startTime: "09:30" } },
   { value: "s1|11:00", label: "ก1 11:00", cell: { assignment: "s1", startTime: "11:00" } },
   { value: "s2|11:30", label: "ก2 11:30", cell: { assignment: "s2", startTime: "11:30" } },
-  { value: "s2|13:00", label: "ก2 13:00", cell: { assignment: "s2", startTime: "13:00" } }
+  { value: "s2|13:00", label: "ก2 13:00", cell: { assignment: "s2", startTime: "13:00" } },
+  { value: "s2|14:00", label: "ก2 14:00", cell: { assignment: "s2", startTime: "14:00" } },
+  { value: "s2|15:00", label: "ก2 15:00", cell: { assignment: "s2", startTime: "15:00" } }
 ];
 
 function cellToValue(cell: CellValue | undefined): string {

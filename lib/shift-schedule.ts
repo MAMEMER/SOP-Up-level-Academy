@@ -20,8 +20,8 @@ export const SHIFT_WORK_HOURS = 9;
 
 /** Allowed entry times per shift (dropdown options). */
 export const SHIFT_START_OPTIONS: Record<ShiftCode, string[]> = {
-  s1: ["09:00", "11:00"],
-  s2: ["11:30", "13:00"]
+  s1: ["09:00", "09:30", "11:00"],
+  s2: ["11:30", "13:00", "14:00", "15:00"]
 };
 
 /** The default (first) start time for a shift. */

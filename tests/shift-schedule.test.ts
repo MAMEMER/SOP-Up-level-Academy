@@ -13,9 +13,9 @@ import {
 } from "../lib/shift-schedule.ts";
 
 describe("shift time options", () => {
-  it("exposes exactly the two allowed start times per shift", () => {
-    assert.deepEqual(SHIFT_START_OPTIONS.s1, ["09:00", "11:00"]);
-    assert.deepEqual(SHIFT_START_OPTIONS.s2, ["11:30", "13:00"]);
+  it("exposes the allowed start times per shift", () => {
+    assert.deepEqual(SHIFT_START_OPTIONS.s1, ["09:00", "09:30", "11:00"]);
+    assert.deepEqual(SHIFT_START_OPTIONS.s2, ["11:30", "13:00", "14:00", "15:00"]);
   });
 
   it("defaults to the first option of each shift", () => {
@@ -25,15 +25,21 @@ describe("shift time options", () => {
 
   it("validates start times against the shift's dropdown", () => {
     assert.equal(isValidShiftStart("s1", "09:00"), true);
+    assert.equal(isValidShiftStart("s1", "09:30"), true);
     assert.equal(isValidShiftStart("s1", "11:30"), false);
     assert.equal(isValidShiftStart("s2", "13:00"), true);
+    assert.equal(isValidShiftStart("s2", "14:00"), true);
+    assert.equal(isValidShiftStart("s2", "15:00"), true);
   });
 
   it("adds 9 hours to compute the end time, wrapping at midnight", () => {
     assert.equal(shiftEndTime("09:00"), "18:00");
+    assert.equal(shiftEndTime("09:30"), "18:30");
     assert.equal(shiftEndTime("11:00"), "20:00");
     assert.equal(shiftEndTime("11:30"), "20:30");
     assert.equal(shiftEndTime("13:00"), "22:00");
+    assert.equal(shiftEndTime("14:00"), "23:00");
+    assert.equal(shiftEndTime("15:00"), "00:00");
   });
 });
 
