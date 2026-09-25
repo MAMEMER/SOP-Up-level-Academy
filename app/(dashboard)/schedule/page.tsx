@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { MyScheduleView } from "../../../components/MyScheduleView.tsx";
 import { requireUser } from "../../../lib/auth.ts";
-import { branchFor, employeeDirectory, resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
+import { resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
+import { listStaff } from "../../../lib/staff-store.ts";
+import { branchConfigs } from "../../../lib/store-config.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
+
+export const dynamic = "force-dynamic";
 
 // ตารางกะ (staff, read-only). The editable planner stays at /admin/schedule — this page
 // only reads. Any signed-in staffer may see the whole branch roster: they need to know
@@ -11,12 +15,19 @@ import { formatWorkDate } from "../../../lib/workflow-records.ts";
 export default async function SchedulePage() {
   const user = await requireUser();
   const myStaffCode = resolveEmployeeByEmail(user.email) ?? null;
-  const branch = myStaffCode ? branchFor(myStaffCode) : "bangkae";
   const today = formatWorkDate();
 
-  const staff = employeeDirectory
-    .filter((entry) => entry.branch === branch)
-    .map((entry) => ({ code: entry.code, displayName: entry.displayName }));
+  // ทุกคนที่ลงกะได้ ไม่แยกตามสาขาบ้าน — คนสลับไปช่วยอีกสาขาได้ ตารางจึงต้องเห็นทั้งร้าน
+  const records = await listStaff();
+  const staff = records
+    .filter((record) => record.active && record.onSchedule && record.code)
+    .map((record) => ({ code: record.code, displayName: record.displayName || record.name }));
+  const branches = branchConfigs.map((entry) => ({
+    key: entry.key,
+    shortName: entry.shortName,
+    tag: entry.tag,
+    color: entry.color
+  }));
 
   return (
     <main className="page">
@@ -35,7 +46,7 @@ export default async function SchedulePage() {
       </section>
       <MyScheduleView
         staff={staff}
-        branch={branch}
+        branches={branches}
         myStaffCode={myStaffCode}
         today={today}
         initialMonth={today.slice(0, 7)}

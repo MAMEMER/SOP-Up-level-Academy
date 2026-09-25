@@ -59,6 +59,8 @@ export type ScheduleCell = {
   label: string;
   /** css modifier: s1 | s2 | off | leave | blank */
   tone: "s1" | "s2" | "off" | "leave" | "blank";
+  /** สาขาที่เข้ากะวันนั้น (null เมื่อไม่ได้ทำงาน) */
+  branch: string | null;
 };
 
 const LEAVE_LABELS: Record<string, string> = {
@@ -78,7 +80,8 @@ export function scheduleCell(workDate: string, plan: PlanCell | undefined): Sche
       startTime,
       timeRange: `${startTime}-${shiftEndTime(startTime)}`,
       label: startTime,
-      tone: assignment
+      tone: assignment,
+      branch: plan?.branch ?? null
     };
   }
   if (assignment && isLeaveAssignment(assignment)) {
@@ -88,13 +91,14 @@ export function scheduleCell(workDate: string, plan: PlanCell | undefined): Sche
       startTime: null,
       timeRange: null,
       label: LEAVE_LABELS[assignment] ?? "ลา",
-      tone: "leave"
+      tone: "leave",
+      branch: null
     };
   }
   if (assignment === "off") {
-    return { workDate, assignment, startTime: null, timeRange: null, label: "หยุด", tone: "off" };
+    return { workDate, assignment, startTime: null, timeRange: null, label: "หยุด", tone: "off", branch: null };
   }
-  return { workDate, assignment: null, startTime: null, timeRange: null, label: "—", tone: "blank" };
+  return { workDate, assignment: null, startTime: null, timeRange: null, label: "—", tone: "blank", branch: null };
 }
 
 export type ScheduleRow = {
@@ -185,7 +189,15 @@ export function dayActivityChips(event: DayEventInput | undefined): ActivityChip
 export type CalendarCell = {
   day: ScheduleDay | null; // null = padding before the 1st / after the last
   /** everyone rostered that day, earliest entry time first */
-  working: { staffCode: string; displayName: string; timeRange: string; isMe: boolean; tone: "s1" | "s2" }[];
+  working: {
+    staffCode: string;
+    displayName: string;
+    timeRange: string;
+    isMe: boolean;
+    tone: "s1" | "s2";
+    /** สาขาที่คนนั้นเข้ากะวันนั้น */
+    branch: string | null;
+  }[];
   /** events/งานประจำ the owner put on that date in the planner */
   activities: ActivityChip[];
   /** the free-text note typed on the planner's กิจกรรม row, if any */
@@ -221,7 +233,8 @@ export function calendarWeeks(
           displayName: row.displayName,
           timeRange: cell.timeRange,
           isMe: row.isMe,
-          tone: cell.tone
+          tone: cell.tone,
+          branch: cell.branch
         };
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
@@ -249,13 +262,16 @@ export function calendarWeeks(
 export const calendarWeekdayLabels = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"] as const;
 
 /** Who works on one date, with their hours — the "ใครเข้ากับฉันวันนี้" line. */
-export function workingOn(rows: ScheduleRow[], workDate: string): { displayName: string; timeRange: string }[] {
+export function workingOn(
+  rows: ScheduleRow[],
+  workDate: string
+): { displayName: string; timeRange: string; branch: string | null }[] {
   return rows
     .map((row) => {
       const cell = row.cells.find((item) => item.workDate === workDate);
-      return cell?.timeRange ? { displayName: row.displayName, timeRange: cell.timeRange } : null;
+      return cell?.timeRange ? { displayName: row.displayName, timeRange: cell.timeRange, branch: cell.branch } : null;
     })
-    .filter((entry): entry is { displayName: string; timeRange: string } => entry !== null)
+    .filter((entry): entry is { displayName: string; timeRange: string; branch: string | null } => entry !== null)
     .sort((a, b) => a.timeRange.localeCompare(b.timeRange));
 }
 

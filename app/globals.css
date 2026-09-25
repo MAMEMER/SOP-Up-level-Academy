@@ -7182,3 +7182,106 @@ main .page > section, main > section { margin-top: 16px !important; }
 .task-progress__range::-moz-range-thumb {
   width: 22px; height: 22px; border-radius: 999px; background: var(--color-orange); border: 2px solid #fff;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   หน้า Login — ให้เข้าธีมครีมของทั้งเว็บ
+   ธีม Guild ที่ต่อท้ายไฟล์นี้ตั้ง `.page { background: transparent }` ซึ่งทับพื้นหลัง
+   น้ำเงินเดิมของหน้า login จนหายไป แต่ตัวหนังสือยังเป็นสีขาว → อ่านไม่ออกบนพื้นครีม
+   (Champ: "ฟ้อนสีขาวกลืนหายไปกับพื้นหลัง"). แก้โดยย้ายหน้า login มาใช้สีตัวอักษรของธีม
+   ───────────────────────────────────────────────────────────────────────────── */
+.auth-page { background: transparent; padding: 24px; }
+.auth-page::before { border-color: rgba(255, 199, 142, 0.55); border-radius: 22px; }
+
+.auth-brand { color: var(--color-ink); }
+.auth-brand h1 { color: var(--color-ink); text-shadow: none; }
+.auth-brand p { color: var(--color-ink-soft); }
+.auth-brand span,
+.auth-panel-head p { color: var(--color-orange); }
+.auth-brand img { filter: drop-shadow(0 12px 20px rgba(45, 49, 66, 0.18)); }
+
+.auth-panel {
+  border: 1px solid rgba(255, 199, 142, 0.7);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 40px rgba(45, 49, 66, 0.12);
+}
+.auth-panel-head h2 { color: var(--color-ink); }
+.auth-panel-head span { color: var(--color-ink-soft); }
+
+.auth-panel button.auth-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--color-orange), #FFB067);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(255, 140, 66, 0.3);
+}
+.auth-panel button.auth-google:hover { background: linear-gradient(135deg, #F97A2B, #FFA452); }
+.auth-panel button.auth-google:disabled { opacity: 0.6; cursor: not-allowed; }
+/* โลโก้ Google บนพื้นส้มต้องมีแผ่นรองขาว ไม่งั้นตัว G จมไปกับปุ่ม */
+.auth-panel button.auth-google img {
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+/* ── ตารางกะหลายสาขา — แยกสีให้เห็นชัดว่าใครอยู่สาขาไหน ─────────────────────── */
+.shift-planner__branches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.shift-planner__branches button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px;
+  border-radius: 999px; border: 1.5px solid rgba(45,49,66,0.2); background: #fff;
+  color: var(--color-ink); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.shift-planner__branches button.is-active { color: #fff; }
+.shift-planner__branches button.is-active .shift-planner__branch-dot { background: #fff !important; }
+.shift-planner__branch-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
+
+.shift-planner__branch-tag {
+  position: absolute; top: 2px; right: 3px; z-index: 1;
+  padding: 1px 5px; border-radius: 999px; color: #fff; font-size: 9px; font-weight: 700; line-height: 1.4;
+  pointer-events: none;
+}
+.shift-planner__cell { position: relative; }
+.shift-planner__cell--conflict { outline: 2px solid #E24C4B; outline-offset: -2px; }
+.shift-planner__count-split { display: inline-flex; gap: 6px; font-weight: 700; }
+
+.shift-planner__target {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 10px 0 0; font-size: 12.5px; color: var(--color-ink-soft);
+}
+.shift-planner__target select { min-height: 44px; border-radius: 10px; border: 1px solid rgba(255,199,142,0.9); padding: 0 10px; font-family: inherit; }
+
+.shift-planner__times { margin-top: 12px; padding: 14px; border: 1px dashed rgba(255,199,142,0.9); border-radius: 16px; background: var(--color-cream); }
+.shift-planner__times-head { margin: 0 0 12px; font-size: 13px; color: var(--color-ink-soft); }
+.shift-planner__times-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.shift-planner__times-card { border: 1.5px solid; border-radius: 14px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.shift-planner__times-branch { display: flex; align-items: center; gap: 7px; margin: 0; font-weight: 700; font-size: 14px; }
+.shift-planner__times-shift { display: flex; flex-direction: column; gap: 6px; }
+.shift-planner__times-label { font-size: 12px; font-weight: 700; color: var(--color-ink-soft); }
+.shift-planner__times-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.shift-planner__time-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 10px; border-radius: 999px;
+  background: var(--color-cream-2); border: 1px solid rgba(255,199,142,0.9); font-size: 12.5px; font-weight: 600;
+}
+.shift-planner__time-chip button {
+  width: 22px; height: 22px; border-radius: 999px; border: 0; background: rgba(45,49,66,0.08);
+  color: var(--color-ink-soft); font-size: 13px; line-height: 1; cursor: pointer;
+}
+.shift-planner__times-add { display: flex; gap: 8px; flex-wrap: wrap; }
+.shift-planner__times-add input { min-height: 44px; border-radius: 10px; border: 1px solid rgba(255,199,142,0.9); padding: 0 10px; font-family: inherit; font-size: 16px; }
+.shift-planner__times-add button { min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer; }
+.shift-planner__times-close { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--color-ink-soft); }
+.shift-planner__times-close input { min-height: 44px; border-radius: 10px; border: 1px solid rgba(255,199,142,0.9); padding: 0 10px; font-family: inherit; font-size: 16px; }
+.shift-planner__times-close small { flex: 1 1 100%; font-size: 11.5px; }
+
+.shift-planner__issue--branch_overlap { color: #A32320; font-weight: 700; }
+.shift-planner__issue--branch_hop { color: #A8500F; }
+.shift-planner__issue--no_closer { color: #A8500F; }
+.staff-calendar__branch-dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; flex: 0 0 auto; margin-right: 4px; }
+.staff-calendar__team li { display: flex; align-items: center; gap: 2px; }

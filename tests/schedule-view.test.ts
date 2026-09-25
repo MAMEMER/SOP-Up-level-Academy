@@ -101,8 +101,9 @@ describe("staff schedule — rows", () => {
   it("lists who works a given day, earliest first", () => {
     const rows = buildScheduleRows(staff, plans, days, "ICE");
     assert.deepEqual(workingOn(rows, "2026-08-03"), [
-      { displayName: "ICE", timeRange: "09:00-18:00" },
-      { displayName: "Boom", timeRange: "13:00-22:00" }
+      // branch = null เมื่อตารางเก่ายังไม่ได้ระบุสาขา (ก่อนมีสาขา 2)
+      { displayName: "ICE", timeRange: "09:00-18:00", branch: null },
+      { displayName: "Boom", timeRange: "13:00-22:00", branch: null }
     ]);
     assert.deepEqual(workingOn(rows, "2026-08-09"), []);
   });
