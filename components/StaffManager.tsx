@@ -82,7 +82,12 @@ function StaffForm({
 
           <label className="staff-form__toggle">
             <input type="checkbox" name="onRoster" defaultChecked={record ? record.onRoster : true} />
-            อยู่ในตารางกะ (ขึ้นใน KPI / มอบหมายงาน)
+            คิด KPI / มอบหมายงาน (พนักงานประจำร้าน)
+          </label>
+
+          <label className="staff-form__toggle">
+            <input type="checkbox" name="onSchedule" defaultChecked={record ? record.onSchedule : true} />
+            ลงกะได้ (ขึ้นในตารางกะ — เจ้าของลงช่วยหน้าร้านได้โดยไม่ถูกคิดคะแนน)
           </label>
 
           <label className="staff-form__toggle">

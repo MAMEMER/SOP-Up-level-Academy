@@ -1,6 +1,7 @@
 import "server-only";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { isWorkingAssignment, type ShiftAssignment, type ShiftCode } from "./shift-schedule.ts";
+import { allBranchKeys } from "./store-config.ts";
 import {
   addWorkDays,
   bangkokWorkDate,
@@ -130,13 +131,32 @@ export async function fetchShiftWindows(branch: string, workDate: string): Promi
   };
 }
 
-/** กะที่พนักงานคนนี้ลงไว้วันนั้น (null = วันหยุด / ลา / ยังไม่ลงตาราง) */
+/**
+ * กะที่พนักงานคนนี้ลงไว้วันนั้น (null = วันหยุด / ลา / ยังไม่ลงตาราง).
+ * มองข้ามสาขา: คนที่สลับไปช่วยอีกสาขาต้องยังเห็นงานของกะตัวเอง — หาในสาขาที่ส่งมาก่อน
+ * แล้วค่อยไล่สาขาที่เหลือ.
+ */
 export async function fetchShiftForStaff(branch: string, workDate: string, staffCode: string): Promise<ShiftCode | null> {
+  return (await fetchShiftPlacement(branch, workDate, staffCode))?.shift ?? null;
+}
+
+/** กะ + สาขาที่เข้าวันนั้น (ใช้ตอนต้องบอกพนักงานว่าวันนี้อยู่สาขาไหน) */
+export async function fetchShiftPlacement(
+  branch: string,
+  workDate: string,
+  staffCode: string
+): Promise<{ shift: ShiftCode; branch: string } | null> {
   if (!hasAdminCredentials() || !staffCode) return null;
-  const snapshot = await adminDb().collection(SHIFTS).doc(`${branch}__${workDate}__${staffCode}`).get();
-  if (!snapshot.exists) return null;
-  const assignment = (snapshot.data() as { assignment?: ShiftAssignment }).assignment;
-  return assignment && isWorkingAssignment(assignment) ? assignment : null;
+  const order = [branch, ...allBranchKeys().filter((key) => key !== branch)];
+  const snapshots = await Promise.all(
+    order.map((key) => adminDb().collection(SHIFTS).doc(`${key}__${workDate}__${staffCode}`).get())
+  );
+  for (let index = 0; index < snapshots.length; index += 1) {
+    if (!snapshots[index].exists) continue;
+    const assignment = (snapshots[index].data() as { assignment?: ShiftAssignment }).assignment;
+    if (assignment && isWorkingAssignment(assignment)) return { shift: assignment, branch: order[index] };
+  }
+  return null;
 }
 
 function taskId(orderId: string): string {

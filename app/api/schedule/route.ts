@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { actor, badRequest, canWriteNow, db, forbidden, isAdmin, readOnly } from "../../../lib/api-firestore.ts";
 import { FieldValue } from "firebase-admin/firestore";
 import type { ShiftAssignment } from "../../../lib/shift-schedule.ts";
+import {
+  BRANCH_SHIFTS_COLLECTION,
+  cleanStartList,
+  defaultBranchShiftConfig,
+  isHhMm,
+  normalizeBranchShiftConfig,
+  type BranchShiftConfig
+} from "../../../lib/branch-shift-config.ts";
+import { allBranchKeys } from "../../../lib/store-config.ts";
 
 // Server route for the shift planner collections (fix 1). Replaces the client Firestore
 // store (lib/shift-schedule-store.ts). Reads: any signed-in user (the staff dashboard
@@ -36,12 +45,32 @@ export async function GET(request: Request) {
       case "monthPlan": {
         const month = p.get("month") || "";
         if (!month) return badRequest("missing_month");
-        const [plans, events, actuals] = await Promise.all([
-          byMonth(SHIFTS, branch, month),
-          byMonth(EVENTS, branch, month),
-          byMonth(ACTUAL, branch, month)
-        ]);
-        return NextResponse.json({ plans, events, actuals });
+        // branch=all → ดึงทุกสาขาในคำขอเดียว (หน้าตารางโหมด "ทุกสาขา")
+        const keys = branch === "all" ? allBranchKeys() : [branch];
+        const perBranch = await Promise.all(
+          keys.map(async (key) => {
+            const [plans, events, actuals] = await Promise.all([
+              byMonth(SHIFTS, key, month),
+              byMonth(EVENTS, key, month),
+              byMonth(ACTUAL, key, month)
+            ]);
+            return { plans, events, actuals };
+          })
+        );
+        return NextResponse.json({
+          plans: perBranch.flatMap((data) => data.plans),
+          events: perBranch.flatMap((data) => data.events),
+          actuals: perBranch.flatMap((data) => data.actuals)
+        });
+      }
+      // เวลากะของทุกสาขา (เจ้าของแก้เองได้ที่หน้า /admin/schedule)
+      case "branchShifts": {
+        const keys = allBranchKeys();
+        const snaps = await Promise.all(keys.map((key) => db().collection(BRANCH_SHIFTS_COLLECTION).doc(key).get()));
+        const configs: BranchShiftConfig[] = keys.map((key, index) =>
+          snaps[index].exists ? normalizeBranchShiftConfig(key, snaps[index].data()) : defaultBranchShiftConfig(key)
+        );
+        return NextResponse.json({ configs });
       }
       case "storeAudit": {
         const month = p.get("month") || "";
@@ -111,6 +140,40 @@ export async function POST(request: Request) {
         await db().collection(SHIFTS).doc(shiftDocId(branch, workDate, staffCode)).set(record);
         return NextResponse.json({ ok: true });
       }
+      // เจ้าของตั้งเวลาเข้างานของแต่ละกะเอง (ช่วงเปิดสาขาใหม่เวลายังไม่นิ่ง)
+      case "saveBranchShifts": {
+        const branch = str(body.branch);
+        if (!branch || !allBranchKeys().includes(branch)) return badRequest("unknown_branch");
+        const starts = (body.starts || {}) as { s1?: unknown; s2?: unknown };
+        const fallback = defaultBranchShiftConfig(branch);
+        const s1 = cleanStartList(starts.s1);
+        const s2 = cleanStartList(starts.s2);
+        const config: BranchShiftConfig = {
+          branch,
+          starts: { s1: s1.length ? s1 : fallback.starts.s1, s2: s2.length ? s2 : fallback.starts.s2 },
+          ...(isHhMm(body.closeTime) ? { closeTime: body.closeTime } : fallback.closeTime ? { closeTime: fallback.closeTime } : {}),
+          workHours:
+            typeof body.workHours === "number" && body.workHours > 0 && body.workHours <= 12
+              ? body.workHours
+              : fallback.workHours
+        };
+        await db().collection(BRANCH_SHIFTS_COLLECTION).doc(branch).set({ ...config, updatedAt: nowIso, updatedBy });
+        return NextResponse.json({ ok: true, config });
+      }
+
+      // ย้ายคนไปอีกสาขาในวันเดียวกัน — ลบกะของสาขาอื่นทิ้ง ไม่งั้นจะค้างเป็นลงสองที่
+      case "clearOtherBranchCells": {
+        const branch = str(body.branch);
+        const workDate = str(body.workDate);
+        const staffCode = str(body.staffCode);
+        if (!branch || !workDate || !staffCode) return badRequest("missing_params");
+        const others = allBranchKeys().filter((key) => key !== branch);
+        await Promise.all(
+          others.map((key) => db().collection(SHIFTS).doc(shiftDocId(key, workDate, staffCode)).delete())
+        );
+        return NextResponse.json({ ok: true, cleared: others.length });
+      }
+
       case "saveDayEvent": {
         const branch = str(body.branch);
         const workDate = str(body.workDate);

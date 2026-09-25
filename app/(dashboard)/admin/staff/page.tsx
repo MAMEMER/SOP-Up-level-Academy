@@ -29,8 +29,10 @@ async function saveStaffAction(formData: FormData) {
   if (!email.includes("@")) redirectWithStatus("invalid_email");
 
   const onRoster = formData.get("onRoster") === "on";
+  const onSchedule = formData.get("onSchedule") === "on";
   const code = stringValue(formData, "code");
-  if (onRoster && !code) redirectWithStatus("code_required");
+  // ทั้ง KPI และตารางกะ join ด้วย code — ไม่มี code ก็ลงตารางไม่ได้
+  if ((onRoster || onSchedule) && !code) redirectWithStatus("code_required");
 
   try {
     await saveStaff({
@@ -40,6 +42,7 @@ async function saveStaffAction(formData: FormData) {
       role: stringValue(formData, "role") as StaffRecord["role"],
       departmentId: stringValue(formData, "departmentId") || null,
       onRoster,
+      onSchedule,
       code,
       displayName: stringValue(formData, "displayName"),
       employmentType: stringValue(formData, "employmentType") as StaffRecord["employmentType"],

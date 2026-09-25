@@ -19,8 +19,16 @@ export type StaffRecord = {
   name: string;
   role: Role;
   departmentId: string | null;
-  /** true when this person is on the shift roster (admins-only accounts are false) */
+  /**
+   * true = อยู่ใน roster ของ KPI (คิดคะแนน / หักเงินเดือน). บัญชีแอดมินล้วนเป็น false.
+   * อย่าเปิดให้เจ้าของเพียงเพื่อจะลงกะ — ใช้ `onSchedule` แทน.
+   */
   onRoster: boolean;
+  /**
+   * true = ขึ้นในตารางกะ ลงเวรได้. คนละเรื่องกับ `onRoster`: เจ้าของ (แชมป์ / เนม) ลงกะช่วย
+   * หน้าร้านได้โดยไม่ถูกคิด KPI หรือหักเงินเดือน. คนที่อยู่ roster อยู่แล้วถือว่าลงกะได้เสมอ.
+   */
+  onSchedule: boolean;
   /** canonical short code used by KPI, the planner and work records */
   code: string;
   /** name as it appears in the schedule sheet */
@@ -66,6 +74,7 @@ export function seedStaffRecords(): StaffRecord[] {
       role: user.role,
       departmentId: user.departmentId,
       onRoster: Boolean(roster),
+      onSchedule: Boolean(roster),
       code: roster?.code || "",
       displayName: roster?.displayName || user.name,
       employmentType: roster?.employmentType || "part_time",
@@ -82,6 +91,8 @@ export function sanitizeStaffRecord(input: Partial<StaffRecord> & { email: strin
   const employeeId = String(input.employeeId || "").trim().toUpperCase();
   const onRoster = input.onRoster !== false;
   const code = String(input.code || "").trim();
+  // คนที่อยู่ roster ลงกะได้เสมอ · คนอื่น (เจ้าของ/แอดมิน) เปิดทีละคนที่ /admin/staff
+  const onSchedule = (onRoster && Boolean(code)) || (input.onSchedule === true && Boolean(code));
   return {
     email,
     employeeId,
@@ -89,6 +100,7 @@ export function sanitizeStaffRecord(input: Partial<StaffRecord> & { email: strin
     role,
     departmentId: input.departmentId ?? (role === "admin" ? "admin" : "front-store"),
     onRoster: onRoster && Boolean(code),
+    onSchedule,
     code,
     displayName: String(input.displayName || "").trim() || code || String(input.name || "").trim(),
     employmentType: input.employmentType === "full_time" ? "full_time" : "part_time",

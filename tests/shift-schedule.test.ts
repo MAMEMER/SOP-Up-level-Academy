@@ -4,10 +4,13 @@ import {
   SHIFT_START_OPTIONS,
   auditPlan,
   defaultShiftStart,
+  findBranchConflicts,
   findShiftImbalances,
+  findUncoveredClosings,
   findUnderstaffedDays,
   isValidShiftStart,
   shiftEndTime,
+  shiftStartOptions,
   summariseStaff,
   type PlanCell
 } from "../lib/shift-schedule.ts";
@@ -69,7 +72,8 @@ describe("balance audit", () => {
     const dates = ["2026-08-01", "2026-08-02", "2026-08-03"];
     const issues = findUnderstaffedDays(cells, dates);
     assert.equal(issues.length, 1);
-    assert.equal(issues[0].ref, "2026-08-01");
+    // ref ผูกสาขาด้วย เพราะคนไม่พอเป็นเรื่องรายสาขา ไม่ใช่รายวันของทั้งบริษัท
+    assert.equal(issues[0].ref, "2026-08-01__bangkae");
   });
 
   it("flags a person stuck on one shift", () => {
@@ -96,5 +100,79 @@ describe("balance audit", () => {
     ];
     const issues = auditPlan(cells, ["2026-08-01", "2026-08-02"], ["ICE", "Boom"]);
     assert.deepEqual(issues, []);
+  });
+});
+
+describe("สองสาขา — เวลาเข้างานและการทับซ้อน", () => {
+  it("เสนาเฟสต์เข้างาน 09:30 (ก่อนร้านเปิด 10:00) และกะ 2 เลิก 22:00 พอดี", () => {
+    assert.deepEqual(shiftStartOptions("s1", "senafest"), ["09:30", "10:00"]);
+    assert.equal(defaultShiftStart("s1", "senafest"), "09:30");
+    assert.equal(shiftEndTime("09:30"), "18:30");
+    assert.equal(shiftEndTime("13:00"), "22:00");
+    assert.equal(isValidShiftStart("s1", "09:00", "senafest"), false);
+    // บางแคไม่เปลี่ยน
+    assert.equal(defaultShiftStart("s1"), "09:00");
+    assert.equal(defaultShiftStart("s1", "bangkae"), "09:00");
+  });
+
+  it("คนเดียว วันเดียว สองสาขา เวลาชนกัน = ผิด ต้องแก้", () => {
+    const issues = findBranchConflicts([
+      { staffCode: "Leo", workDate: "2026-10-05", assignment: "s1", startTime: "09:00", branch: "bangkae" },
+      { staffCode: "Leo", workDate: "2026-10-05", assignment: "s2", startTime: "13:00", branch: "senafest" }
+    ]);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].kind, "branch_overlap");
+  });
+
+  it("สองสาขาในวันเดียวแต่เวลาไม่ชน = เตือนอย่างเดียว", () => {
+    // บางแค 09:00–18:00 จบก่อน แล้วไปเสนาเฟสต์ 18:30–03:30 (ไม่ชนกัน)
+    const issues = findBranchConflicts([
+      { staffCode: "Leo", workDate: "2026-10-05", assignment: "s1", startTime: "09:00", branch: "bangkae" },
+      { staffCode: "Leo", workDate: "2026-10-05", assignment: "s2", startTime: "18:30", branch: "senafest" }
+    ]);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].kind, "branch_hop");
+  });
+
+  it("สาขาเดียวกันวันเดียวกัน ไม่นับว่าทับซ้อนข้ามสาขา", () => {
+    assert.deepEqual(
+      findBranchConflicts([
+        { staffCode: "Leo", workDate: "2026-10-05", assignment: "s1", startTime: "09:00", branch: "bangkae" },
+        { staffCode: "Boom", workDate: "2026-10-05", assignment: "s2", startTime: "13:00", branch: "bangkae" }
+      ]),
+      []
+    );
+  });
+
+  it("คนไม่พอ นับแยกรายสาขา — บางแคครบแต่เสนาเฟสต์เหลือคนเดียว", () => {
+    const cells: PlanCell[] = [
+      { staffCode: "ICE", workDate: "2026-10-05", assignment: "s1", startTime: "09:00", branch: "bangkae" },
+      { staffCode: "Boom", workDate: "2026-10-05", assignment: "s2", startTime: "13:00", branch: "bangkae" },
+      { staffCode: "Leo", workDate: "2026-10-05", assignment: "s1", startTime: "09:30", branch: "senafest" }
+    ];
+    const issues = findUnderstaffedDays(cells, ["2026-10-05"]);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].ref, "2026-10-05__senafest");
+  });
+
+  it("เสนาเฟสต์ต้องมีคนอยู่ถึงปิดร้าน 22:00", () => {
+    const early: PlanCell[] = [
+      { staffCode: "Leo", workDate: "2026-10-05", assignment: "s1", startTime: "09:30", branch: "senafest" },
+      { staffCode: "Pee", workDate: "2026-10-05", assignment: "s2", startTime: "12:30", branch: "senafest" }
+    ];
+    assert.equal(findUncoveredClosings(early, ["2026-10-05"]).length, 1); // 12:30 → 21:30 ยังไม่ถึง 22:00
+    const covered: PlanCell[] = [
+      { staffCode: "Leo", workDate: "2026-10-05", assignment: "s1", startTime: "09:30", branch: "senafest" },
+      { staffCode: "Pee", workDate: "2026-10-05", assignment: "s2", startTime: "13:00", branch: "senafest" }
+    ];
+    assert.deepEqual(findUncoveredClosings(covered, ["2026-10-05"]), []);
+  });
+
+  it("ตารางเก่าที่ยังไม่มีสาขา ถือเป็นบางแค และไม่ถูกเช็คเวลาปิดร้าน", () => {
+    const cells: PlanCell[] = [
+      { staffCode: "ICE", workDate: "2026-08-01", assignment: "s1", startTime: "09:00" },
+      { staffCode: "Boom", workDate: "2026-08-01", assignment: "s2", startTime: "11:30" }
+    ];
+    assert.deepEqual(auditPlan(cells, ["2026-08-01"], ["ICE", "Boom"]), []);
   });
 });

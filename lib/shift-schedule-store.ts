@@ -7,6 +7,7 @@
 // types and function signatures are unchanged — callers did not have to change.
 
 import type { ShiftAssignment } from "./shift-schedule.ts";
+import type { BranchShiftConfig } from "./branch-shift-config.ts";
 
 export type PlanDoc = {
   branch: string;
@@ -86,9 +87,36 @@ export async function fetchStoreAudit(branch: string, month: string): Promise<St
   return rows;
 }
 
-/** Loads every plan / event / actual doc for a branch-month. */
+/** Loads every plan / event / actual doc for a branch-month. ใช้ branch = "all" เพื่อดึงทุกสาขา. */
 export async function loadMonthPlan(branch: string, month: string): Promise<MonthPlan> {
   return getJson<MonthPlan>({ action: "monthPlan", branch, month });
+}
+
+/** เวลาเข้างานของแต่ละกะ ทุกสาขา (ค่าเริ่มต้นจากโค้ดเมื่อยังไม่เคยตั้ง) */
+export async function fetchBranchShiftConfigs(): Promise<BranchShiftConfig[]> {
+  const { configs } = await getJson<{ configs: BranchShiftConfig[] }>({ action: "branchShifts", branch: "all" });
+  return configs;
+}
+
+/** บันทึกเวลากะของสาขาหนึ่ง — คืนค่าที่ server ล้างแล้ว */
+export async function saveBranchShiftConfig(config: BranchShiftConfig): Promise<BranchShiftConfig> {
+  const res = await fetch("/api/schedule", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "saveBranchShifts", ...config })
+  });
+  if (!res.ok) throw new Error(`branch shifts write failed: ${res.status}`);
+  const data = (await res.json()) as { config: BranchShiftConfig };
+  return data.config;
+}
+
+/** ลบกะของสาขาอื่นในวัน-คนเดียวกัน (ใช้ตอนย้ายคนข้ามสาขา) */
+export async function clearOtherBranchCells(input: {
+  branch: string;
+  workDate: string;
+  staffCode: string;
+}): Promise<void> {
+  await post({ action: "clearOtherBranchCells", ...input });
 }
 
 /** Loads a single staff-day plan cell (for the staff "my shift today" view). */

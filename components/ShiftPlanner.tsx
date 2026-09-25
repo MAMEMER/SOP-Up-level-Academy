@@ -2,13 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  SHIFT_START_OPTIONS,
   auditPlan,
   summariseStaff,
   type PlanCell,
   type ShiftAssignment,
   type ShiftCode
 } from "../lib/shift-schedule.ts";
+import {
+  addStartOption,
+  defaultBranchShiftConfig,
+  endTimeFor,
+  removeStartOption,
+  type BranchShiftConfig
+} from "../lib/branch-shift-config.ts";
 import { generateMonthPlan } from "../lib/shift-auto.ts";
 import Link from "next/link";
 import {
@@ -21,8 +27,11 @@ import {
   holidayName
 } from "../lib/planner-activities.ts";
 import {
+  clearOtherBranchCells,
+  fetchBranchShiftConfigs,
   loadMonthPlan,
   savePlanCell,
+  saveBranchShiftConfig,
   saveDayEvent,
   setActualStatus,
   setSwap,
@@ -37,9 +46,14 @@ type StaffEntry = {
   displayName: string;
   employmentType: "full_time" | "part_time";
   branch: string;
+  /** false = ลงกะได้แต่ไม่ถูกคิด KPI (เจ้าของที่มาช่วยหน้าร้าน) */
+  scoredByKpi?: boolean;
 };
 
-type CellValue = { assignment: ShiftAssignment; startTime?: string };
+export type PlannerBranch = { key: string; label: string; shortName: string; tag: string; color: string };
+
+/** หนึ่งช่องในตาราง = กะ + เวลาเข้า + สาขาที่เข้ากะวันนั้น */
+type CellValue = { assignment: ShiftAssignment; startTime?: string; branch?: string };
 
 // A single dropdown encodes shift + entry time so the owner picks in one click.
 // PLAN dropdown = the planned shift only. Leave/absent is what ACTUALLY happened on the
@@ -59,24 +73,48 @@ function tintColor(hex: string, pct: number): string {
   return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }
 
-const CELL_OPTIONS: { value: string; label: string; cell: CellValue }[] = [
-  { value: "off", label: "OFF", cell: { assignment: "off" } },
-  { value: "s1|09:00", label: "ก1 09:00", cell: { assignment: "s1", startTime: "09:00" } },
-  { value: "s1|11:00", label: "ก1 11:00", cell: { assignment: "s1", startTime: "11:00" } },
-  { value: "s2|11:30", label: "ก2 11:30", cell: { assignment: "s2", startTime: "11:30" } },
-  { value: "s2|13:00", label: "ก2 13:00", cell: { assignment: "s2", startTime: "13:00" } }
-];
+type CellOption = { value: string; label: string; cell: CellValue; branch?: string };
 
-function cellToValue(cell: CellValue | undefined): string {
+const OFF_OPTION: CellOption = { value: "off", label: "OFF", cell: { assignment: "off" } };
+
+/**
+ * ตัวเลือกของช่องหนึ่ง = OFF + ทุกกะของทุกสาขาที่กำลังดูอยู่. เวลาเข้างานมาจากค่าที่เจ้าของ
+ * ตั้งไว้ต่อสาขา (แก้ได้ที่แผง "เวลากะ") ไม่ได้ฝังในโค้ด — ช่วงเปิดสาขาใหม่เวลายังไม่นิ่ง.
+ */
+function buildCellOptions(branches: PlannerBranch[], configs: Record<string, BranchShiftConfig>): CellOption[] {
+  const options: CellOption[] = [OFF_OPTION];
+  for (const branch of branches) {
+    const config = configs[branch.key] ?? defaultBranchShiftConfig(branch.key);
+    for (const shift of ["s1", "s2"] as ShiftCode[]) {
+      for (const start of config.starts[shift]) {
+        options.push({
+          // ในช่องตารางที่แคบมาก ป้ายสีของสาขาบอกอยู่แล้วว่าสาขาไหน — label จึงสั้นที่สุด
+          value: `${branch.key}|${shift}|${start}`,
+          label: `${shift === "s1" ? "ก1" : "ก2"} ${start}`,
+          cell: { assignment: shift, startTime: start, branch: branch.key },
+          branch: branch.key
+        });
+      }
+    }
+  }
+  return options;
+}
+
+function cellToValue(cell: CellValue | undefined, fallbackBranch: string): string {
   if (!cell || cell.assignment === "off") return "off";
   if (cell.assignment === "s1" || cell.assignment === "s2") {
-    return `${cell.assignment}|${cell.startTime ?? SHIFT_START_OPTIONS[cell.assignment][0]}`;
+    const branch = cell.branch || fallbackBranch;
+    const start = cell.startTime ?? defaultBranchShiftConfig(branch).starts[cell.assignment][0];
+    return `${branch}|${cell.assignment}|${start}`;
   }
   return cell.assignment;
 }
 
 function valueToCell(value: string): CellValue {
-  return CELL_OPTIONS.find((option) => option.value === value)?.cell ?? { assignment: "off" };
+  if (value === "off" || !value.includes("|")) return { assignment: "off" };
+  const [branch, assignment, startTime] = value.split("|");
+  if (assignment !== "s1" && assignment !== "s2") return { assignment: "off" };
+  return { assignment, startTime, branch };
 }
 
 function cellKey(workDate: string, staffCode: string): string {
@@ -116,14 +154,27 @@ function isPast(workDate: string): boolean {
 export function ShiftPlanner({
   staff,
   plannedBy,
-  branch
+  branches
 }: {
   staff: StaffEntry[];
   plannedBy: string;
-  branch: string;
+  branches: PlannerBranch[];
 }) {
   const [month, setMonth] = useState(currentMonth);
+  // "all" = ดูรวมทุกสาขาในตารางเดียว · หรือเลือกดูทีละสาขา
+  const [view, setView] = useState<string>(branches.length > 1 ? "all" : branches[0]?.key ?? "bangkae");
+  // สาขาที่คำสั่งระดับวัน (กิจกรรม / preset / ดึง clock-in) จะลงให้ — โหมดรวมต้องเลือกเอง
+  const [targetBranch, setTargetBranch] = useState<string>(branches[0]?.key ?? "bangkae");
+  const [shiftConfigs, setShiftConfigs] = useState<Record<string, BranchShiftConfig>>(() =>
+    Object.fromEntries(branches.map((entry) => [entry.key, defaultBranchShiftConfig(entry.key)]))
+  );
+  const [showTimes, setShowTimes] = useState(false);
+  const [newStart, setNewStart] = useState<Record<string, string>>({});
   const [plans, setPlans] = useState<Record<string, CellValue>>({});
+  // ทุกแถวที่อ่านมาจริง (ไม่ยุบ) — ใช้ตรวจว่าคนเดียวถูกลงกะหลายสาขาในวันเดียวไหม
+  const [rawPlans, setRawPlans] = useState<PlanCell[]>([]);
+  // ช่องที่เพิ่งแก้ในจอนี้ (`${staff}__${date}`) — กะสาขาอื่นของช่องนั้นถูกลบไปแล้วจริง
+  const [movedKeys, setMovedKeys] = useState<Set<string>>(new Set());
   const [events, setEvents] = useState<Record<string, { title: string; activities: DayActivity[] }>>({});
   const [actuals, setActuals] = useState<Record<string, ActualDoc>>({});
   const [loading, setLoading] = useState(true);
@@ -147,18 +198,53 @@ export function ShiftPlanner({
   const [swapTarget, setSwapTarget] = useState("");
   const [swapNote, setSwapNote] = useState("");
 
+  // สาขาที่ใช้เขียนข้อมูลระดับวัน (กิจกรรม/preset/clock-in): โหมดสาขาเดียวใช้สาขานั้นตรงๆ
+  const branch = view === "all" ? targetBranch : view;
   const dates = useMemo(() => monthDates(month), [month]);
+  const viewBranches = useMemo(
+    () => (view === "all" ? branches : branches.filter((entry) => entry.key === view)),
+    [branches, view]
+  );
+  const cellOptions = useMemo(() => buildCellOptions(viewBranches, shiftConfigs), [viewBranches, shiftConfigs]);
+  const branchByKey = useMemo(() => Object.fromEntries(branches.map((entry) => [entry.key, entry])), [branches]);
+
+  // เวลากะที่เจ้าของตั้งไว้ (ยังไม่เคยตั้ง = ค่าเริ่มต้นจากโค้ด)
+  useEffect(() => {
+    let alive = true;
+    fetchBranchShiftConfigs()
+      .then((configs) => {
+        if (!alive) return;
+        setShiftConfigs(Object.fromEntries(configs.map((config) => [config.branch, config])));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError(null);
-    loadMonthPlan(branch, month)
+    loadMonthPlan(view, month)
       .then((data) => {
         if (!alive) return;
         const planMap: Record<string, CellValue> = {};
+        setRawPlans(
+          (data.plans as PlanDoc[]).map((plan) => ({
+            workDate: plan.workDate,
+            staffCode: plan.staffCode,
+            assignment: plan.assignment,
+            startTime: plan.startTime,
+            branch: plan.branch
+          }))
+        );
         for (const plan of data.plans as PlanDoc[]) {
-          planMap[cellKey(plan.workDate, plan.staffCode)] = { assignment: plan.assignment, startTime: plan.startTime };
+          const key = cellKey(plan.workDate, plan.staffCode);
+          // กันข้อมูลเก่าที่คนเดียวถูกลงไว้สองสาขา: เก็บกะที่ทำงานจริงไว้ก่อน OFF
+          const existing = planMap[key];
+          if (existing && existing.assignment !== "off" && plan.assignment === "off") continue;
+          planMap[key] = { assignment: plan.assignment, startTime: plan.startTime, branch: plan.branch };
         }
         const eventMap: Record<string, { title: string; activities: DayActivity[] }> = {};
         const gameLabels = new Set(gamePresets.map((g) => g.label));
@@ -179,7 +265,7 @@ export function ShiftPlanner({
     return () => {
       alive = false;
     };
-  }, [branch, month, reloadNonce]);
+  }, [view, month, reloadNonce]);
 
   // Near-real-time clock-in: when the schedule table is opened for the CURRENT month,
   // pull fresh StoreHub clock-ins in the background so the ACTUAL row reflects today's
@@ -221,26 +307,71 @@ export function ShiftPlanner({
     () =>
       Object.entries(plans).map(([key, value]) => {
         const [workDate, staffCode] = key.split("__");
-        return { workDate, staffCode, assignment: value.assignment, startTime: value.startTime };
+        return { workDate, staffCode, assignment: value.assignment, startTime: value.startTime, branch: value.branch };
       }),
     [plans]
   );
 
   const staffCodes = staff.map((entry) => entry.code);
-  const issues = useMemo(() => auditPlan(planCells, dates, staffCodes), [planCells, dates, staffCodes]);
-  const understaffedDates = new Set(issues.filter((i) => i.kind === "understaffed").map((i) => i.ref));
+  /**
+   * ตรวจจากแถวจริงทั้งหมด: `planCells` ยุบเหลือหนึ่งช่องต่อคน-วัน (ตารางมีช่องเดียว) ถ้าตรวจจาก
+   * ก้อนนั้น การลงซ้อนสองสาขาจะหายไปก่อนถูกเตือน. แถวที่แก้ในจอนี้ทับของเดิมด้วยคีย์เดียวกัน.
+   */
+  const auditCells = useMemo(() => {
+    const full = new Map<string, PlanCell>();
+    for (const cell of rawPlans) {
+      // ช่องที่เพิ่งแก้ในจอนี้ = กะสาขาอื่นของวันนั้นถูกลบไปแล้ว ไม่ต้องเอามานับเป็นการซ้อน
+      if (movedKeys.has(`${cell.staffCode}__${cell.workDate}`)) continue;
+      full.set(`${cell.staffCode}__${cell.workDate}__${cell.branch ?? ""}`, cell);
+    }
+    for (const cell of planCells) {
+      full.set(`${cell.staffCode}__${cell.workDate}__${cell.branch ?? ""}`, cell);
+    }
+    return [...full.values()];
+  }, [planCells, rawPlans, movedKeys]);
+  const issues = useMemo(() => auditPlan(auditCells, dates, staffCodes), [auditCells, dates, staffCodes]);
+  // ref ของ understaffed เป็น `${date}__${branch}` — ตัดเอาเฉพาะวันไว้ไฮไลต์หัวคอลัมน์
+  const understaffedDates = new Set(
+    issues.filter((i) => i.kind === "understaffed").map((i) => i.ref.split("__")[0])
+  );
+  const conflictKeys = new Set(
+    issues.filter((i) => i.kind === "branch_overlap" || i.kind === "branch_hop").map((i) => i.ref)
+  );
 
   async function onCellChange(workDate: string, staffCode: string, rawValue: string) {
     const key = cellKey(workDate, staffCode);
+    const previous = plans[key];
     const cell = valueToCell(rawValue);
-    setPlans((prev) => ({ ...prev, [key]: cell }));
+    // OFF ไม่มีสาขาของตัวเอง — ใช้สาขาเดิมของช่องนั้น เพื่อให้ลบถูก doc
+    const cellBranchKey = cell.branch || previous?.branch || branch;
+    setPlans((prev) => ({ ...prev, [key]: { ...cell, branch: cellBranchKey } }));
+    setMovedKeys((prev) => new Set(prev).add(`${staffCode}__${workDate}`));
     setSavingKey(key);
     try {
-      await savePlanCell({ branch, workDate, staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy });
+      await savePlanCell({
+        branch: cellBranchKey,
+        workDate,
+        staffCode,
+        assignment: cell.assignment,
+        startTime: cell.startTime,
+        updatedBy: plannedBy
+      });
+      // ย้ายสาขา = ลบกะของสาขาเดิมทิ้ง ไม่งั้นค้างเป็น "ลงสองสาขาวันเดียว"
+      if (cell.assignment !== "off") await clearOtherBranchCells({ branch: cellBranchKey, workDate, staffCode });
     } catch {
       setError("บันทึกไม่สำเร็จ");
     } finally {
       setSavingKey((current) => (current === key ? null : current));
+    }
+  }
+
+  async function persistShiftTimes(next: BranchShiftConfig) {
+    setShiftConfigs((prev) => ({ ...prev, [next.branch]: next }));
+    try {
+      const saved = await saveBranchShiftConfig(next);
+      setShiftConfigs((prev) => ({ ...prev, [saved.branch]: saved }));
+    } catch {
+      setError("บันทึกเวลากะไม่สำเร็จ");
     }
   }
 
@@ -459,8 +590,42 @@ export function ShiftPlanner({
           <strong>{month}</strong>
           <button type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="เดือนถัดไป">›</button>
         </div>
+        {branches.length > 1 ? (
+          <div className="shift-planner__branches" role="group" aria-label="เลือกสาขา">
+            <button
+              type="button"
+              className={view === "all" ? "is-active" : ""}
+              onClick={() => setView("all")}
+              style={view === "all" ? { background: "var(--color-ink)", borderColor: "var(--color-ink)" } : undefined}
+            >
+              ทุกสาขา
+            </button>
+            {branches.map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                className={view === entry.key ? "is-active" : ""}
+                onClick={() => {
+                  setView(entry.key);
+                  setTargetBranch(entry.key);
+                }}
+                style={
+                  view === entry.key
+                    ? { background: entry.color, borderColor: entry.color }
+                    : { borderColor: entry.color, color: entry.color }
+                }
+              >
+                <span className="shift-planner__branch-dot" style={{ background: entry.color }} />
+                {entry.shortName}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="shift-planner__bar-right">
           <p className="shift-planner__hint">กะ1 = เปิดร้าน · กะ2 = ปิดร้าน · ทำงาน 9 ชม.</p>
+          <button type="button" className="shift-planner__auto-btn" onClick={() => setShowTimes((v) => !v)}>
+            ⏱ ตั้งเวลากะ
+          </button>
           <button type="button" className="shift-planner__auto-btn" onClick={() => setShowAuto((v) => !v)}>
             ⚡ จัดกะอัตโนมัติ
           </button>
@@ -500,6 +665,87 @@ export function ShiftPlanner({
       ) : null}
 
       {syncMsg ? <p className="shift-planner__sync-msg">{syncMsg}</p> : null}
+
+      {showTimes ? (
+        <section className="shift-planner__times">
+          <p className="shift-planner__times-head">
+            เวลาเข้างานของแต่ละกะ — เพิ่ม/ลบได้เอง เวลาเลิกงานคิดจากกะละ {shiftConfigs[branches[0]?.key ?? ""]?.workHours ?? 9} ชั่วโมงอัตโนมัติ
+          </p>
+          <div className="shift-planner__times-grid">
+            {branches.map((entry) => {
+              const config = shiftConfigs[entry.key] ?? defaultBranchShiftConfig(entry.key);
+              return (
+                <div key={entry.key} className="shift-planner__times-card" style={{ borderColor: entry.color }}>
+                  <p className="shift-planner__times-branch" style={{ color: entry.color }}>
+                    <span className="shift-planner__branch-dot" style={{ background: entry.color }} />
+                    {entry.label}
+                  </p>
+                  {(["s1", "s2"] as ShiftCode[]).map((shift) => (
+                    <div key={shift} className="shift-planner__times-shift">
+                      <span className="shift-planner__times-label">{shift === "s1" ? "กะ 1 (เปิดร้าน)" : "กะ 2 (ปิดร้าน)"}</span>
+                      <div className="shift-planner__times-list">
+                        {config.starts[shift].map((start) => (
+                          <span key={start} className="shift-planner__time-chip">
+                            {start}–{endTimeFor(config, start)}
+                            <button
+                              type="button"
+                              aria-label={`ลบเวลา ${start}`}
+                              onClick={() => void persistShiftTimes(removeStartOption(config, shift, start))}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="shift-planner__times-add">
+                        <input
+                          type="time"
+                          value={newStart[`${entry.key}|${shift}`] ?? ""}
+                          onChange={(e) => setNewStart((prev) => ({ ...prev, [`${entry.key}|${shift}`]: e.target.value }))}
+                          aria-label={`เวลาเข้างานใหม่ ${shift === "s1" ? "กะ 1" : "กะ 2"} ${entry.shortName}`}
+                        />
+                        <button
+                          type="button"
+                          className="btn-soft"
+                          onClick={() => {
+                            const time = newStart[`${entry.key}|${shift}`] ?? "";
+                            if (!time) return;
+                            void persistShiftTimes(addStartOption(config, shift, time));
+                            setNewStart((prev) => ({ ...prev, [`${entry.key}|${shift}`]: "" }));
+                          }}
+                        >
+                          เพิ่มเวลา
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <label className="shift-planner__times-close">
+                    ร้านปิด
+                    <input
+                      type="time"
+                      value={config.closeTime ?? ""}
+                      onChange={(e) => void persistShiftTimes({ ...config, closeTime: e.target.value })}
+                    />
+                    <small>ใส่ไว้เพื่อให้ระบบเตือนวันที่ไม่มีใครอยู่ถึงเวลาปิดร้าน</small>
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {view === "all" ? (
+        <p className="shift-planner__target">
+          กิจกรรม / งานประจำ / ดึง clock-in จะลงที่สาขา
+          <select value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)}>
+            {branches.map((entry) => (
+              <option key={entry.key} value={entry.key}>{entry.shortName}</option>
+            ))}
+          </select>
+          (การลงกะในตารางเลือกสาขาได้ในช่องแต่ละวันอยู่แล้ว)
+        </p>
+      ) : null}
 
       <div className="shift-planner__preset-bar">
         <span className="shift-planner__preset-label">ลงกิจกรรมประจำ:</span>
@@ -704,22 +950,50 @@ export function ShiftPlanner({
                     </th>
                     {dates.map((date) => {
                       const key = cellKey(date, entry.code);
-                      const value = cellToValue(plans[key]);
-                      const working = value.startsWith("s");
+                      const cell = plans[key];
+                      const value = cellToValue(cell, branch);
+                      const working = cell?.assignment === "s1" || cell?.assignment === "s2";
+                      const cellBranchKey = cell?.branch || branches[0]?.key || "bangkae";
+                      const cellBranch = branchByKey[cellBranchKey];
+                      // สีของช่อง = สีสาขา (แยกสาขาให้เห็นชัด) ไม่ใช่สีประจำตัวพนักงาน
+                      const tone = working ? cellBranch?.color ?? color : color;
+                      const conflicted = conflictKeys.has(`${entry.code}__${date}`);
                       const actual = actuals[key];
                       const actualStatus = actual?.leaveType === "personal" ? "leave_personal" : actual?.leaveType === "sick" ? "leave_sick" : actual?.absent ? "absent" : "normal";
                       const late = actualStatus === "normal" && actual?.clockIn && plans[key]?.startTime && actual.clockIn > (plans[key]?.startTime ?? "");
                       return (
-                        <td key={date} className="shift-planner__cell" style={{ background: working ? `${color}14` : undefined }}>
+                        <td
+                          key={date}
+                          className={`shift-planner__cell${conflicted ? " shift-planner__cell--conflict" : ""}`}
+                          style={{ background: working ? `${tone}18` : undefined }}
+                        >
+                          {working && viewBranches.length > 1 ? (
+                            <span className="shift-planner__branch-tag" style={{ background: tone }}>
+                              {cellBranch?.tag ?? cellBranchKey.slice(0, 2)}
+                            </span>
+                          ) : null}
                           <select
                             value={value}
                             onChange={(e) => onCellChange(date, entry.code, e.target.value)}
                             disabled={savingKey === key}
-                            className={value.startsWith("s1") ? "sel-s1" : value.startsWith("s2") ? "sel-s2" : "sel-off"}
-                            style={working ? { borderColor: color, color } : undefined}
+                            className={
+                              cell?.assignment === "s1" ? "sel-s1" : cell?.assignment === "s2" ? "sel-s2" : "sel-off"
+                            }
+                            style={working ? { borderColor: tone, color: tone } : undefined}
                           >
-                            {CELL_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
+                            {/* ช่องที่ลงไว้ด้วยเวลาที่ถูกลบออกจากตัวเลือกไปแล้ว ยังต้องแสดงค่าเดิมได้ */}
+                            {cellOptions.some((option) => option.value === value) ? null : (
+                              <option value={value}>{`${cellBranch?.tag ?? ""} ${cell?.assignment === "s1" ? "ก1" : "ก2"} ${cell?.startTime ?? ""}`.trim()}</option>
+                            )}
+                            <option value="off">OFF</option>
+                            {viewBranches.map((entry) => (
+                              <optgroup key={entry.key} label={entry.shortName}>
+                                {cellOptions
+                                  .filter((option) => option.branch === entry.key)
+                                  .map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                              </optgroup>
                             ))}
                           </select>
                           {actual?.swappedTo ? (
@@ -759,10 +1033,27 @@ export function ShiftPlanner({
               <tr>
                 <th className="shift-planner__sticky">เข้างาน/วัน</th>
                 {dates.map((date) => {
-                  const count = planCells.filter((cell) => cell.workDate === date && (cell.assignment === "s1" || cell.assignment === "s2")).length;
+                  const working = planCells.filter(
+                    (cell) => cell.workDate === date && (cell.assignment === "s1" || cell.assignment === "s2")
+                  );
+                  const perBranch = viewBranches.map((entry) => ({
+                    entry,
+                    count: working.filter((cell) => (cell.branch || branches[0]?.key) === entry.key).length
+                  }));
+                  const short = perBranch.some((row) => row.count > 0 && row.count < 2);
                   return (
-                    <td key={date} className={count > 0 && count < 2 ? "shift-planner__count shift-planner__count--warn" : "shift-planner__count"}>
-                      {count || ""}
+                    <td key={date} className={short ? "shift-planner__count shift-planner__count--warn" : "shift-planner__count"}>
+                      {viewBranches.length > 1 ? (
+                        <span className="shift-planner__count-split">
+                          {perBranch.map((row) => (
+                            <span key={row.entry.key} style={{ color: row.count ? row.entry.color : undefined }}>
+                              {row.count || "–"}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        working.length || ""
+                      )}
                     </td>
                   );
                 })}

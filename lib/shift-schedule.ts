@@ -10,6 +10,8 @@
 // This module is pure (no Firestore / no DOM) so it can be unit-tested and reused by
 // both the grid UI and any server-side balance check.
 
+import { branchConfig, branchShortName } from "./store-config.ts";
+
 /** Shift 1 = opening shift (เปิดร้าน). Shift 2 = closing shift (ปิดร้าน). */
 export type ShiftCode = "s1" | "s2";
 
@@ -18,20 +20,29 @@ export type ShiftAssignment = "s1" | "s2" | "off" | "leave_personal" | "leave_si
 
 export const SHIFT_WORK_HOURS = 9;
 
-/** Allowed entry times per shift (dropdown options). */
+/**
+ * เวลาเข้างานของสาขาหลัก (บางแค) — คงไว้เพื่อความเข้ากันได้ของโค้ดเดิม.
+ * โค้ดใหม่ควรใช้ `shiftStartOptions(shift, branch)` เพราะแต่ละสาขาเข้างานคนละเวลา.
+ */
 export const SHIFT_START_OPTIONS: Record<ShiftCode, string[]> = {
   s1: ["09:00", "11:00"],
   s2: ["11:30", "13:00"]
 };
 
+/** เวลาเข้างานที่เลือกได้ของกะนั้นในสาขานั้น (ไม่ระบุสาขา = สาขาหลัก) */
+export function shiftStartOptions(shift: ShiftCode, branch?: string): string[] {
+  if (!branch) return SHIFT_START_OPTIONS[shift];
+  return branchConfig(branch).shiftStarts[shift] ?? SHIFT_START_OPTIONS[shift];
+}
+
 /** The default (first) start time for a shift. */
-export function defaultShiftStart(shift: ShiftCode): string {
-  return SHIFT_START_OPTIONS[shift][0];
+export function defaultShiftStart(shift: ShiftCode, branch?: string): string {
+  return shiftStartOptions(shift, branch)[0];
 }
 
 /** True when `start` is a valid dropdown option for the given shift. */
-export function isValidShiftStart(shift: ShiftCode, start: string): boolean {
-  return SHIFT_START_OPTIONS[shift].includes(start);
+export function isValidShiftStart(shift: ShiftCode, start: string, branch?: string): boolean {
+  return shiftStartOptions(shift, branch).includes(start);
 }
 
 /** Adds `SHIFT_WORK_HOURS` to an "HH:MM" start and returns the "HH:MM" end. */
@@ -65,6 +76,8 @@ export type PlanCell = {
   assignment: ShiftAssignment;
   /** entry time HH:MM — only meaningful when assignment is s1/s2 */
   startTime?: string;
+  /** สาขาที่เข้ากะวันนั้น — ไม่ระบุ = สาขาหลักเดิม (ตารางที่วางไว้ก่อนมีสาขา 2) */
+  branch?: string;
 };
 
 /** Per-staff totals shown in the summary column. */
@@ -103,7 +116,7 @@ export function summariseStaff(staffCode: string, cells: PlanCell[]): StaffSumma
 
 /** A flagged problem the planner should surface to the owner. */
 export type BalanceIssue = {
-  kind: "understaffed" | "shift_imbalance";
+  kind: "understaffed" | "shift_imbalance" | "branch_overlap" | "branch_hop" | "no_closer";
   /** workDate for understaffed, staffCode for shift_imbalance */
   ref: string;
   message: string;
@@ -111,22 +124,127 @@ export type BalanceIssue = {
 
 export const MIN_STAFF_PER_DAY = 2;
 
+/** สาขาของเซลล์ (ตารางเก่าที่ยังไม่มีสาขา = สาขาหลัก) */
+export function cellBranch(cell: PlanCell, fallback = "bangkae"): string {
+  return cell.branch || fallback;
+}
+
+/** นาทีของวันจาก "HH:MM" (คืน null เมื่อรูปแบบผิด) */
+function minutesOf(time: string | undefined): number | null {
+  const match = (time || "").match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/** ช่วงเวลาทำงานของเซลล์เป็นนาที [start, end) — กะยาว 9 ชั่วโมงเท่ากันทุกสาขา */
+export function cellWindow(cell: PlanCell, fallbackBranch = "bangkae"): { start: number; end: number } | null {
+  if (!isWorkingAssignment(cell.assignment)) return null;
+  const start = minutesOf(cell.startTime || defaultShiftStart(cell.assignment, cellBranch(cell, fallbackBranch)));
+  if (start === null) return null;
+  return { start, end: start + SHIFT_WORK_HOURS * 60 };
+}
+
 /**
  * Every working day (a day that has at least one assignment) must have at least
- * MIN_STAFF_PER_DAY people on a working shift. Returns one issue per short day.
+ * MIN_STAFF_PER_DAY people on a working shift — **นับแยกรายสาขา** เพราะสองสาขาเปิดพร้อมกัน
+ * คนที่อยู่เสนาเฟสต์ช่วยบางแคไม่ได้. ตารางเก่าที่ไม่มีสาขาถูกนับเป็นสาขาหลัก.
  */
-export function findUnderstaffedDays(cells: PlanCell[], workDates: string[]): BalanceIssue[] {
+export function findUnderstaffedDays(cells: PlanCell[], workDates: string[], fallbackBranch = "bangkae"): BalanceIssue[] {
   const issues: BalanceIssue[] = [];
+  const branches = [...new Set(cells.map((cell) => cellBranch(cell, fallbackBranch)))];
   for (const date of workDates) {
-    const working = cells.filter((cell) => cell.workDate === date && isWorkingAssignment(cell.assignment));
-    const anyAssignment = cells.some((cell) => cell.workDate === date && cell.assignment !== "off");
-    if (!anyAssignment) continue; // untouched day — don't nag about a blank future date
-    if (working.length < MIN_STAFF_PER_DAY) {
-      issues.push({
-        kind: "understaffed",
-        ref: date,
-        message: `${date}: มีคนเข้างานแค่ ${working.length} คน (ต้องอย่างน้อย ${MIN_STAFF_PER_DAY})`
+    for (const branch of branches) {
+      const ofDay = cells.filter((cell) => cell.workDate === date && cellBranch(cell, fallbackBranch) === branch);
+      const anyAssignment = ofDay.some((cell) => cell.assignment !== "off");
+      if (!anyAssignment) continue; // ยังไม่ได้แตะวันนั้นของสาขานี้ — ไม่ต้องเตือน
+      const working = ofDay.filter((cell) => isWorkingAssignment(cell.assignment));
+      if (working.length < MIN_STAFF_PER_DAY) {
+        issues.push({
+          kind: "understaffed",
+          ref: `${date}__${branch}`,
+          message: `${date} ${branchShortName(branch)}: มีคนเข้างานแค่ ${working.length} คน (ต้องอย่างน้อย ${MIN_STAFF_PER_DAY})`
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+/**
+ * คนคนเดียวถูกลงกะสองสาขาในวันเดียวกัน.
+ *  - เวลาเหลื่อมกันจริง → `branch_overlap` = ผิดแน่ ต้องแก้ (อยู่สองที่พร้อมกันไม่ได้)
+ *  - เวลาไม่ชนกัน → `branch_hop` = เตือน (ต้องวิ่งข้ามสาขาในวันเดียว ตั้งใจหรือเปล่า)
+ */
+export function findBranchConflicts(cells: PlanCell[], fallbackBranch = "bangkae"): BalanceIssue[] {
+  const issues: BalanceIssue[] = [];
+  const byPerson = new Map<string, PlanCell[]>();
+  for (const cell of cells) {
+    if (!isWorkingAssignment(cell.assignment)) continue;
+    const key = `${cell.staffCode}__${cell.workDate}`;
+    byPerson.set(key, [...(byPerson.get(key) ?? []), cell]);
+  }
+
+  for (const [key, dayCells] of byPerson) {
+    const branches = [...new Set(dayCells.map((cell) => cellBranch(cell, fallbackBranch)))];
+    if (branches.length < 2) continue;
+    const [staffCode, workDate] = key.split("__");
+    const label = branches.map((branch) => branchShortName(branch)).join(" + ");
+
+    let overlapped = false;
+    for (let i = 0; i < dayCells.length && !overlapped; i += 1) {
+      for (let j = i + 1; j < dayCells.length; j += 1) {
+        if (cellBranch(dayCells[i], fallbackBranch) === cellBranch(dayCells[j], fallbackBranch)) continue;
+        const a = cellWindow(dayCells[i], fallbackBranch);
+        const b = cellWindow(dayCells[j], fallbackBranch);
+        if (a && b && a.start < b.end && b.start < a.end) {
+          overlapped = true;
+          break;
+        }
+      }
+    }
+
+    issues.push(
+      overlapped
+        ? {
+            kind: "branch_overlap",
+            ref: key,
+            message: `${workDate} ${staffCode}: ลงกะ ${label} เวลาชนกัน — อยู่สองสาขาพร้อมกันไม่ได้`
+          }
+        : {
+            kind: "branch_hop",
+            ref: key,
+            message: `${workDate} ${staffCode}: วันเดียวลงทั้ง ${label} — ต้องวิ่งข้ามสาขา เช็คอีกที`
+          }
+    );
+  }
+  return issues;
+}
+
+/**
+ * ทุกวันที่ร้านเปิด ต้องมีคนอยู่จนถึงเวลาปิดร้านของสาขานั้น — ไม่งั้นไม่มีคนปิดร้าน.
+ * (กะ 9 ชั่วโมง เข้าเช้าเกินไปจะเลิกก่อนร้านปิด)
+ */
+export function findUncoveredClosings(cells: PlanCell[], workDates: string[], fallbackBranch = "bangkae"): BalanceIssue[] {
+  const issues: BalanceIssue[] = [];
+  const branches = [...new Set(cells.map((cell) => cellBranch(cell, fallbackBranch)))];
+  for (const date of workDates) {
+    for (const branch of branches) {
+      const ofDay = cells.filter((cell) => cell.workDate === date && cellBranch(cell, fallbackBranch) === branch);
+      const working = ofDay.filter((cell) => isWorkingAssignment(cell.assignment));
+      if (working.length === 0) continue;
+      const closeAt = minutesOf(branchConfig(branch).closeTime);
+      if (closeAt === null) continue;
+      const covered = working.some((cell) => {
+        const window = cellWindow(cell, fallbackBranch);
+        return window ? window.end >= closeAt : false;
       });
+      if (!covered) {
+        issues.push({
+          kind: "no_closer",
+          ref: `${date}__${branch}`,
+          message: `${date} ${branchShortName(branch)}: ไม่มีใครอยู่ถึงเวลาปิดร้าน ${branchConfig(branch).closeTime}`
+        });
+      }
     }
   }
   return issues;
@@ -146,8 +264,18 @@ export function findShiftImbalances(summaries: StaffSummary[]): BalanceIssue[] {
     }));
 }
 
-/** All balance issues for a month plan. */
-export function auditPlan(cells: PlanCell[], workDates: string[], staffCodes: string[]): BalanceIssue[] {
+/** All balance issues for a month plan (รวมทุกสาขาที่อยู่ในลิสต์ที่ส่งเข้ามา). */
+export function auditPlan(
+  cells: PlanCell[],
+  workDates: string[],
+  staffCodes: string[],
+  fallbackBranch = "bangkae"
+): BalanceIssue[] {
   const summaries = staffCodes.map((code) => summariseStaff(code, cells));
-  return [...findUnderstaffedDays(cells, workDates), ...findShiftImbalances(summaries)];
+  return [
+    ...findBranchConflicts(cells, fallbackBranch),
+    ...findUnderstaffedDays(cells, workDates, fallbackBranch),
+    ...findUncoveredClosings(cells, workDates, fallbackBranch),
+    ...findShiftImbalances(summaries)
+  ];
 }

@@ -24,19 +24,22 @@ import {
 
 export function MyScheduleView({
   staff,
-  branch,
+  branches,
   myStaffCode,
   today,
   initialMonth
 }: {
   staff: StaffEntry[];
-  branch: string;
+  /** ทุกสาขาที่มีในร้าน — ใช้แยกสีและกรองมุมมอง */
+  branches: { key: string; shortName: string; tag: string; color: string }[];
   myStaffCode: string | null;
   /** YYYY-MM-DD in Bangkok, resolved on the server so the highlight never drifts */
   today: string;
   initialMonth: string;
 }) {
   const [month, setMonth] = useState(initialMonth);
+  // "all" = เห็นทุกสาขาในปฏิทินเดียว (คนที่สลับไปช่วยอีกสาขาจะได้ไม่หายไป)
+  const [view, setView] = useState<string>("all");
   const [plans, setPlans] = useState<PlanCell[]>([]);
   const [events, setEvents] = useState<DayEventInput[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +49,7 @@ export function MyScheduleView({
     let alive = true;
     setLoading(true);
     setError(null);
-    loadMonthPlan(branch, month)
+    loadMonthPlan("all", month)
       .then((data) => {
         if (!alive) return;
         setPlans(
@@ -54,7 +57,8 @@ export function MyScheduleView({
             staffCode: plan.staffCode,
             workDate: plan.workDate,
             assignment: plan.assignment,
-            startTime: plan.startTime
+            startTime: plan.startTime,
+            branch: plan.branch
           }))
         );
         // กิจกรรมที่แอดมินลงไว้ในหน้าตารางกะ (อีเวนต์เกม + งาน Stock ประจำ)
@@ -71,10 +75,16 @@ export function MyScheduleView({
     return () => {
       alive = false;
     };
-  }, [branch, month]);
+  }, [month]);
 
   const days = monthDays(month);
-  const rows = buildScheduleRows(staff, plans, days, myStaffCode);
+  const branchByKey = Object.fromEntries(branches.map((entry) => [entry.key, entry]));
+  // กรองตามสาขาที่เลือกดู — กะของสาขาอื่นถูกซ่อน แต่ "ฉัน" ยังเห็นกะตัวเองเสมอ
+  const visiblePlans =
+    view === "all"
+      ? plans
+      : plans.filter((plan) => (plan.branch || branches[0]?.key) === view || plan.staffCode === myStaffCode);
+  const rows = buildScheduleRows(staff, visiblePlans, days, myStaffCode);
   const weeks = calendarWeeks(rows, days, events);
   const myRow = rows.find((row) => row.isMe);
   const showsToday = today.startsWith(month);
@@ -89,6 +99,34 @@ export function MyScheduleView({
           <strong>{monthLabel(month)}</strong>
           <button type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="เดือนถัดไป">›</button>
         </div>
+        {branches.length > 1 ? (
+          <div className="shift-planner__branches" role="group" aria-label="เลือกสาขา">
+            <button
+              type="button"
+              className={view === "all" ? "is-active" : ""}
+              onClick={() => setView("all")}
+              style={view === "all" ? { background: "var(--color-ink)", borderColor: "var(--color-ink)" } : undefined}
+            >
+              ทุกสาขา
+            </button>
+            {branches.map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                className={view === entry.key ? "is-active" : ""}
+                onClick={() => setView(entry.key)}
+                style={
+                  view === entry.key
+                    ? { background: entry.color, borderColor: entry.color }
+                    : { borderColor: entry.color, color: entry.color }
+                }
+              >
+                <span className="shift-planner__branch-dot" style={{ background: entry.color }} />
+                {entry.shortName}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <p className="staff-schedule__note">ดูอย่างเดียว · แก้ไขได้เฉพาะผู้มีสิทธิ์จัดการ</p>
       </header>
 
@@ -98,7 +136,7 @@ export function MyScheduleView({
             <small>กะของฉันวันนี้</small>
             <strong>
               {todayCell?.timeRange
-                ? `${todayCell.timeRange} · ${shiftLabel(todayCell.assignment === "s2" ? "s2" : "s1")}`
+                ? `${todayCell.timeRange} · ${branchByKey[todayCell.branch ?? ""]?.shortName ?? ""} · ${shiftLabel(todayCell.assignment === "s2" ? "s2" : "s1")}`
                 : todayCell?.tone === "off"
                   ? "วันหยุด"
                   : todayCell?.tone === "leave"
@@ -115,7 +153,15 @@ export function MyScheduleView({
           {todayTeam.length ? (
             <div>
               <small>เข้างานวันนี้</small>
-              <strong>{todayTeam.map((entry) => `${entry.displayName} ${entry.timeRange}`).join(" · ")}</strong>
+              <strong>
+                {todayTeam
+                  .map((entry) =>
+                    `${entry.displayName} ${entry.timeRange}${
+                      branches.length > 1 && entry.branch ? ` (${branchByKey[entry.branch]?.shortName ?? entry.branch})` : ""
+                    }`
+                  )
+                  .join(" · ")}
+              </strong>
             </div>
           ) : null}
         </div>
@@ -148,8 +194,16 @@ export function MyScheduleView({
                   </div>
 
                   {cell.mine?.timeRange ? (
-                    <p className="staff-calendar__mine">
+                    <p
+                      className="staff-calendar__mine"
+                      style={
+                        cell.mine.branch && branchByKey[cell.mine.branch]
+                          ? { color: branchByKey[cell.mine.branch].color }
+                          : undefined
+                      }
+                    >
                       ฉัน {cell.mine.timeRange}
+                      {branches.length > 1 && cell.mine.branch ? ` · ${branchByKey[cell.mine.branch]?.tag ?? ""}` : ""}
                     </p>
                   ) : cell.mine?.tone === "off" ? (
                     <p className="staff-calendar__mine is-off">หยุด</p>
@@ -185,6 +239,13 @@ export function MyScheduleView({
                       .filter((entry) => !entry.isMe)
                       .map((entry) => (
                         <li key={entry.staffCode} className={`tone-${entry.tone}`}>
+                          {branches.length > 1 && entry.branch ? (
+                            <span
+                              className="staff-calendar__branch-dot"
+                              style={{ background: branchByKey[entry.branch]?.color }}
+                              title={branchByKey[entry.branch]?.shortName}
+                            />
+                          ) : null}
                           <span>{entry.displayName}</span>
                           <small>{entry.timeRange}</small>
                         </li>
