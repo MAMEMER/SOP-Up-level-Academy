@@ -7472,7 +7472,7 @@ main .page > section, main > section { margin-top: 16px !important; }
   background: rgba(255, 255, 255, 0.6) !important;
 }
 @media (max-width: 860px) {
-  .topbar { flex-direction: row !important; flex-wrap: wrap; align-items: center !important; gap: 8px 12px !important; padding: 10px 2px 4px !important; margin-bottom: 0; }
+  .topbar { flex-direction: row !important; flex-wrap: wrap; align-items: center !important; gap: 8px 12px !important; padding: 10px 20px 4px !important; margin-bottom: 0; }
   .topbar > div:first-child { flex: 1 1 100%; display: flex; align-items: baseline; gap: 10px; min-width: 0; }
   .topbar h1 { font-size: 20px !important; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar > div:first-child > p { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -7555,3 +7555,31 @@ main .page > section, main > section { margin-top: 16px !important; }
 .phase-shipping .phase-icon, .phase-content .phase-icon { background: #92650a; }
 .phase-online .phase-icon { background: #0e7490; }
 .delivery-board__filter.is-on { color: var(--color-cta-1); }
+
+/* ===== Single help FAB (replaces the stacked chat + bug discs) ===== */
+.support-fab {
+  position: fixed; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 60;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.support-fab.is-away { transform: translateY(150%); opacity: 0; pointer-events: none; }
+.support-fab-btn {
+  width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
+  display: grid; place-items: center; color: var(--color-ink-soft, #5c5d7a);
+  background: rgba(255,255,255,0.92); border: 1px solid var(--color-sun);
+  box-shadow: 0 6px 16px rgba(45,49,66,0.14); backdrop-filter: blur(6px);
+}
+.support-fab-btn:hover { color: var(--color-ink, #2d3142); }
+.support-fab-btn:focus-visible, .support-fab-menu button:focus-visible { outline: 2px solid var(--color-orange-deep); outline-offset: 2px; }
+.support-fab-menu {
+  min-width: 12rem; padding: 6px; border-radius: 16px;
+  background: rgba(255,255,255,0.97); border: 1px solid var(--color-sun);
+  box-shadow: 0 12px 32px rgba(45,49,66,0.18);
+}
+.support-fab-menu button {
+  width: 100%; min-height: 44px; display: flex; align-items: center; gap: 10px;
+  padding: 0 12px; border: 0; border-radius: 12px; background: transparent; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 700; color: var(--color-ink, #2d3142); text-align: left;
+}
+.support-fab-menu button:hover { background: var(--color-cream-2, #fff6e5); }
+.support-fab-menu button svg { color: var(--color-orange-deep); }

@@ -4,6 +4,7 @@
 // a key is set, else a built-in site guide). Plain CSS, Guild tokens.
 
 import { useEffect, useRef, useState } from "react";
+import { OPEN_CHAT_EVENT } from "./SupportFab.tsx";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -14,6 +15,11 @@ const GREETING: Msg = {
 
 export function HelpChat() {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_CHAT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, onOpen);
+  }, []);
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,13 +53,6 @@ export function HelpChat() {
 
   return (
     <>
-      <button className="fab fab-chat" aria-label="ถามผู้ช่วย" title="ถามผู้ช่วย" onClick={() => setOpen((v) => !v)}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-          <path d="M8 12h.01M12 12h.01M16 12h.01" />
-        </svg>
-      </button>
-
       {open && (
         <div className="chat-panel">
           <div className="chat-head">
