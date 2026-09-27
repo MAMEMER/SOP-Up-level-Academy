@@ -7434,3 +7434,4 @@ main .page > section, main > section { margin-top: 16px !important; }
 .sdoc-pill.is-on_drive { background: rgba(22, 163, 74, 0.14); color: #15803d; }
 .sdoc-retry { display: inline-flex; flex-direction: column; gap: 2px; }
 .sdoc-retry small { font-size: 12px; color: var(--color-ink-soft); }
+.sdoc-upload:focus-within { outline: 2px solid var(--color-orange); outline-offset: 2px; }

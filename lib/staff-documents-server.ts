@@ -225,31 +225,42 @@ export async function pushToDrive(docId: string, options: { attempts?: number } 
     return getDocRecord(docId);
   }
 
-  // สำเร็จ → ลบข้อมูลส่วนตัวออกจาก Firestore ก่อน แล้วค่อยลบไฟล์ใน Storage
-  const filesOnDrive = Array.from(new Set([...(record.filesOnDrive || []), ...pending.files.map((file) => file.kind)]));
-  await ref.update(
-    stripUndefined({
-      status: "on_drive",
-      driveSyncedAt: new Date().toISOString(),
-      driveFolderUrl: result.folderUrl,
-      sheetUrl: result.sheetUrl,
-      driveError: FieldValue.delete(),
-      filesOnDrive,
-      pending: FieldValue.delete()
-    })
-  );
+  // สำเร็จ → ลบข้อมูลส่วนตัวออกจาก Firestore ก่อน แล้วค่อยลบไฟล์ใน Storage.
+  // ทำใน transaction: ถ้าระหว่างนี้พนักงานกดส่งฉบับใหม่เข้ามา (pending เปลี่ยน) ห้ามลบฉบับใหม่ทิ้ง
+  const pushedPaths = new Set(pending.files.map((file) => file.storagePath).filter(Boolean) as string[]);
+  const stillCurrent = await adminDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.data() as StaffDocRecord | undefined;
+    const filesOnDrive = Array.from(new Set([...(current?.filesOnDrive || []), ...pending.files.map((file) => file.kind)]));
+    if (current?.pending?.submissionId !== pending.submissionId) {
+      tx.update(ref, stripUndefined({ filesOnDrive, driveFolderUrl: result.folderUrl, sheetUrl: result.sheetUrl }));
+      for (const file of current?.pending?.files || []) if (file.storagePath) pushedPaths.delete(file.storagePath);
+      return false;
+    }
+    tx.update(
+      ref,
+      stripUndefined({
+        status: "on_drive",
+        driveSyncedAt: new Date().toISOString(),
+        driveFolderUrl: result.folderUrl,
+        sheetUrl: result.sheetUrl,
+        driveError: FieldValue.delete(),
+        filesOnDrive,
+        pending: FieldValue.delete()
+      })
+    );
+    return true;
+  });
   await ref
     .collection(STAFF_DOCS_HISTORY)
     .doc(pending.submissionId)
     .set({ driveStatus: "on_drive", driveSyncedAt: new Date().toISOString() }, { merge: true })
     .catch(() => undefined);
-  await deleteStorageFor(docId).catch(() => undefined);
+  const bucket = adminBucket();
+  await Promise.all(Array.from(pushedPaths).map((path) => bucket.file(path).delete({ ignoreNotFound: true }).catch(() => undefined)));
+  // ฉบับใหม่เข้ามาระหว่างส่ง → ส่งฉบับใหม่ต่อเลย
+  if (!stillCurrent) return pushToDrive(docId, { attempts: 1 });
   return getDocRecord(docId);
-}
-
-/** ลบทุกไฟล์ใต้โฟลเดอร์ของคนนี้ใน Storage (รวมไฟล์ที่อัปแล้วไม่ได้กดส่ง) */
-export async function deleteStorageFor(docId: string): Promise<void> {
-  await adminBucket().deleteFiles({ prefix: storagePrefixFor(docId), force: true });
 }
 
 /** ข้อมูลเดิมจากชีตใน Drive — ใช้ตอนกด "แก้ไข" หลังขึ้นไดรฟ์แล้ว (ของตัวเองเท่านั้น) */
