@@ -20,7 +20,8 @@ export const staffGroups: NavGroup[] = [
       { href: "/tasks", label: "งานวันนี้" },
       // ส่งต่องานย้ายเข้ามาอยู่ในการ์ดของ "งานที่มอบหมาย" แล้ว (ใบงาน iDBqn3jE) — หน้า /handoff
       // เดิมยังเปิดได้จากลิงก์ตรงเพื่อดูงานที่ค้างอยู่ในระบบเก่า แต่ไม่ต้องมีเมนูซ้ำอีกช่อง
-      { href: "/projects", label: "งานที่มอบหมาย" }
+      { href: "/projects", label: "งานที่มอบหมาย" },
+      { href: "/my-documents", label: "เอกสารของฉัน" }
     ]
   },
   {
@@ -55,7 +56,8 @@ export const adminGroups: NavGroup[] = [
     label: "พนักงาน",
     links: [
       { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
-      { href: "/admin/staff", label: "จัดการพนักงาน" }
+      { href: "/admin/staff", label: "จัดการพนักงาน" },
+      { href: "/admin/staff-documents", label: "เอกสารพนักงาน" }
     ]
   },
   {

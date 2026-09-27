@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AssignedDailyList } from "../../components/AssignedDailyList.tsx";
 import { SupplyNeedsBanner } from "../../components/SupplyNeedsBanner.tsx";
+import { StaffDocsBanner } from "../../components/StaffDocsBanner.tsx";
 import { MyProjects } from "../../components/MyProjects.tsx";
 import { TodayTaskList } from "../../components/TodayTaskList.tsx";
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
@@ -76,6 +77,9 @@ export default async function HomePage() {
           {user.role === "admin" ? <Link href="/admin" className="btn-soft">หน้ารวมงานจัดการ</Link> : null}
         </div>
       </section>
+
+      {/* ทำด่วน: เอกสารประกันสังคม — ขึ้นจนกว่าพนักงานคนนี้จะส่ง (เตือนอย่างเดียว ไม่ผูก KPI) */}
+      <StaffDocsBanner email={user.email} />
 
       {/* ของที่ต้องสั่ง — บนสุดของหน้า เพราะลืมสั่งแล้วของขาดหน้าร้านทันที
           Suspense กันไม่ให้การเรียก StoreHub หน่วงงานของตัวเองที่เหลือทั้งหน้า */}
