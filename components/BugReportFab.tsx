@@ -7,6 +7,7 @@
 import { useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase-client.ts";
+import { Bug, CircleCheck, Lightbulb } from "lucide-react";
 
 type TicketType = "bug" | "suggestion";
 type Status = "idle" | "submitting" | "sent";
@@ -138,12 +139,12 @@ export function BugReportFab() {
             <p className="fab-sub">เว็บเพิ่งเปิด เจอปัญหาหรืออยากแนะนำ แจ้งได้เลย — ทีมงานเห็นทันที</p>
 
             {status === "sent" ? (
-              <div className="fab-sent">✅ ส่งแล้ว ขอบคุณ! ทีมงานจะรีบดูให้</div>
+              <div className="fab-sent"><CircleCheck className="ui-inline-icon" size={16} aria-hidden="true" /> ส่งแล้ว ขอบคุณ! ทีมงานจะรีบดูให้</div>
             ) : (
               <div className="fab-body">
                 <div className="fab-typerow">
-                  <button type="button" className={`fab-type ${type === "bug" ? "on" : ""}`} onClick={() => setType("bug")}>🐛 บัค</button>
-                  <button type="button" className={`fab-type ${type === "suggestion" ? "on" : ""}`} onClick={() => setType("suggestion")}>💡 แนะนำ</button>
+                  <button type="button" className={`fab-type ${type === "bug" ? "on" : ""}`} onClick={() => setType("bug")}><Bug className="ui-inline-icon" size={14} aria-hidden="true" /> บัค</button>
+                  <button type="button" className={`fab-type ${type === "suggestion" ? "on" : ""}`} onClick={() => setType("suggestion")}><Lightbulb className="ui-inline-icon" size={14} aria-hidden="true" /> แนะนำ</button>
                 </div>
                 <label className="fab-label">หัวข้อ (ไม่บังคับ)
                   <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { OpsSummary } from "../lib/ops-summary.ts";
 import { workflowVisualStatus } from "../lib/workflow-records.ts";
 import { OpsAssignmentsPanel } from "./OpsAssignmentsPanel.tsx";
+import { TriangleAlert } from "lucide-react";
 
 const severityLabel: Record<string, string> = {
   fixed_immediately: "แก้ได้ทันที",
@@ -98,14 +99,14 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
                         title={offShift ? `${record.phaseTitle} ไม่อยู่ในกะที่ลงตาราง (${person.scheduledShiftLabel})` : undefined}
                       >
                         {record.phaseTitle} · {record.completed}/{record.total} · {phaseStatusLabel[visual] || visual}
-                        {offShift ? " · ⚠ นอกกะ" : ""}
+                        {offShift ? <> · <TriangleAlert className="ui-inline-icon" size={14} aria-hidden="true" /> นอกกะ</> : ""}
                       </span>
                     );
                   })}
                 </div>
                 {person.offShiftPhaseIds.length ? (
                   <p className="owner-ops__note owner-ops__note--warn">
-                    ⚠ มีงานที่ติ๊กนอกกะที่ลงตาราง ({person.scheduledShiftLabel}) — ตรวจสอบว่าลงกะถูกหรือติ๊ก checklist ผิดกะ
+                    <TriangleAlert className="ui-inline-icon" size={14} aria-hidden="true" /> มีงานที่ติ๊กนอกกะที่ลงตาราง ({person.scheduledShiftLabel}) — ตรวจสอบว่าลงกะถูกหรือติ๊ก checklist ผิดกะ
                   </p>
                 ) : null}
               </article>

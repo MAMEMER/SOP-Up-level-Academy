@@ -6,6 +6,7 @@ import {
   weeklyEventDaysLabel,
   weeklyEvents
 } from "../../../lib/weekly-event-tasks.ts";
+import { Lock } from "lucide-react";
 
 export default async function WeeklyTaskPage() {
   await requireUser();
@@ -38,7 +39,7 @@ export default async function WeeklyTaskPage() {
                   {active ? (
                     <em>{event.schedule}</em>
                   ) : (
-                    <em>🔒 ยังไม่ถึงกำหนด · จัดวัน{weeklyEventDaysLabel(event)}</em>
+                    <em><Lock className="ui-inline-icon" size={14} aria-hidden="true" /> ยังไม่ถึงกำหนด · จัดวัน{weeklyEventDaysLabel(event)}</em>
                   )}
                 </div>
               </>

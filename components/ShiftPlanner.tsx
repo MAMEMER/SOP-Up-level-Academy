@@ -40,6 +40,7 @@ import {
   type EventDoc,
   type PlanDoc
 } from "../lib/shift-schedule-store.ts";
+import { Save, TriangleAlert, Zap } from "lucide-react";
 
 type StaffEntry = {
   code: string;
@@ -627,7 +628,7 @@ export function ShiftPlanner({
             ⏱ ตั้งเวลากะ
           </button>
           <button type="button" className="shift-planner__auto-btn" onClick={() => setShowAuto((v) => !v)}>
-            ⚡ จัดกะอัตโนมัติ
+            <Zap className="ui-inline-icon" size={14} aria-hidden="true" /> จัดกะอัตโนมัติ
           </button>
           <button type="button" className="shift-planner__auto-btn" onClick={syncClockIn}>
             ดึง clock-in StoreHub
@@ -644,7 +645,7 @@ export function ShiftPlanner({
       </header>
       <div className="shift-planner__save-bar">
         <span className="shift-planner__autosave-note">บันทึกอัตโนมัติทุกการแก้ไข</span>
-        <button type="button" className="shift-planner__save-btn" onClick={saveAll}>💾 บันทึกทั้งหมด</button>
+        <button type="button" className="shift-planner__save-btn" onClick={saveAll}><Save className="ui-inline-icon" size={14} aria-hidden="true" /> บันทึกทั้งหมด</button>
       </div>
 
       {swapCell ? (
@@ -852,7 +853,7 @@ export function ShiftPlanner({
       {issues.length > 0 ? (
         <div className="shift-planner__warn">
           <button type="button" className="shift-planner__warn-toggle" onClick={() => setShowIssues((v) => !v)}>
-            ⚠️ {issues.length} คำเตือน {showIssues ? "▲" : "▼"}
+            <TriangleAlert className="ui-inline-icon" size={14} aria-hidden="true" /> {issues.length} คำเตือน {showIssues ? "▲" : "▼"}
           </button>
           {showIssues ? (
             <ul className="shift-planner__issues">
