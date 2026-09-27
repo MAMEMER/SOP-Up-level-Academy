@@ -13,6 +13,8 @@ import { deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-
 import type { DeliveryTask } from "../../../lib/delivery-tasks.ts";
 import { getShopSyncStatus } from "../../../lib/shop-sync-status.ts";
 import { ShopStockSyncPanel } from "../../../components/ShopStockSyncPanel.tsx";
+import { docIdFor, eligibleStaff, listDocRecords } from "../../../lib/staff-documents-server.ts";
+import { docsStatus } from "../../../lib/staff-documents.ts";
 
 const ADMIN_BRANCH = "bangkae";
 
@@ -58,6 +60,11 @@ export default async function AdminHubPage() {
   // หน้าจัดการพนักงานย้ายมาอยู่ที่ /admin/staff ตอน /admin กลายเป็น hub — เลยยกปุ่มลัด
   // ขึ้นมาไว้บนสุดให้กดเข้าได้ทันที ไม่ต้องเลื่อนลงไปหาการ์ดเล็กๆ ท้ายหน้า (SOP bug: หน้าจัดการพนักงานหาย)
   const canManageStaff = canManageStaffAccounts(user.actualEmail);
+
+  // เอกสารประกันสังคมที่พนักงานยังไม่ส่ง — อ่านพลาดก็แค่ไม่มีตัวเลข ไม่ทำให้ hub พัง
+  const docsMissing = await Promise.all([eligibleStaff(), listDocRecords()])
+    .then(([people, records]) => people.filter((person) => docsStatus(records.get(docIdFor(person))) === "not_submitted").length)
+    .catch(() => 0);
 
   const waitingReview = summary.assignments.filter((item) => item.status === "submitted").length;
   const openWork = summary.assignments.filter((item) => item.status === "open").length;
@@ -148,6 +155,12 @@ export default async function AdminHubPage() {
           detail: "เพิ่ม / แก้ / ปิดบัญชี · อีเมลที่ login ได้ · รหัสพนักงาน · ชื่อใน StoreHub",
           staffAdminOnly: true,
           badge: { count: summary.staff.length + summary.noRecordStaff.length, label: "คน" }
+        },
+        {
+          href: "/admin/staff-documents",
+          title: "เอกสารพนักงาน",
+          detail: "ใครส่งเอกสารประกันสังคม + บัญชีเงินเดือนแล้วบ้าง · ลิงก์โฟลเดอร์ในไดรฟ์",
+          badge: docsMissing ? { count: docsMissing, label: "ยังไม่ส่ง" } : undefined
         }
       ]
     }

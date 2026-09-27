@@ -15,6 +15,7 @@ import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../../lib/a
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { resolveStaffViewSelection } from "../../../lib/staff-view.ts";
+import { StaffDocsBanner } from "../../../components/StaffDocsBanner.tsx";
 import { StaffScoreCard } from "../../../components/StaffScoreCard.tsx";
 import { MyShiftToday } from "../../../components/MyShiftToday.tsx";
 import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
@@ -112,6 +113,9 @@ export default async function MyViewPage({ searchParams }: PageProps) {
           <button type="submit">ดู</button>
         </form>
       ) : null}
+
+      {/* ทำด่วน: เอกสารประกันสังคม ของพนักงานคนที่กำลังดูอยู่ */}
+      <StaffDocsBanner email={employeeDirectory.find((entry) => entry.code === selectedCode)?.email} />
 
       {/* งานที่ต้องลงมือตอนนี้มาก่อนทุกอย่างเสมอ — คะแนน/ประวัติเลื่อนลงไปอยู่ล่าง (ใบงาน YrTvFzXr) */}
       <TaskFocusBoard branch={branch} staffCode={selectedCode} today={workDate} />
