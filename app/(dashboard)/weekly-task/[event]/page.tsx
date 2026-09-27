@@ -8,6 +8,7 @@ import {
   weeklyEventDaysLabel,
   weeklyEvents
 } from "../../../../lib/weekly-event-tasks.ts";
+import { Lock } from "lucide-react";
 
 export default async function WeeklyEventPage({
   params
@@ -48,7 +49,7 @@ export default async function WeeklyEventPage({
       ) : (
         <section className="workflow-panel">
           <div className="empty-state">
-            <p className="empty-state-title">🔒 ยังไม่ถึงกำหนดทำกิจกรรมนี้</p>
+            <p className="empty-state-title"><Lock className="ui-inline-icon" size={16} aria-hidden="true" /> ยังไม่ถึงกำหนดทำกิจกรรมนี้</p>
             <p>
               {event.name} จัดทุกวัน{weeklyEventDaysLabel(event)} — เข้าไปทำ checklist ได้เฉพาะวันจัดกิจกรรมเท่านั้น
             </p>

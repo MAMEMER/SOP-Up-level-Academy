@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { loadMonthPlan } from "../lib/shift-schedule-store.ts";
 import { shiftLabel } from "../lib/shift-schedule.ts";
 import type { PlanCell } from "../lib/shift-schedule.ts";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   buildScheduleRows,
   calendarWeekdayLabels,
@@ -95,9 +96,9 @@ export function MyScheduleView({
     <section className="staff-schedule">
       <header className="staff-schedule__bar">
         <div className="staff-schedule__month">
-          <button type="button" onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="เดือนก่อน">‹</button>
+          <button type="button" onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="เดือนก่อน"><ChevronLeft size={20} aria-hidden="true" /></button>
           <strong>{monthLabel(month)}</strong>
-          <button type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="เดือนถัดไป">›</button>
+          <button type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="เดือนถัดไป"><ChevronRight size={20} aria-hidden="true" /></button>
         </div>
         {branches.length > 1 ? (
           <div className="shift-planner__branches" role="group" aria-label="เลือกสาขา">
@@ -118,7 +119,7 @@ export function MyScheduleView({
                 style={
                   view === entry.key
                     ? { background: entry.color, borderColor: entry.color }
-                    : { borderColor: entry.color, color: entry.color }
+                    : { borderColor: entry.color, color: "var(--color-ink)" }
                 }
               >
                 <span className="shift-planner__branch-dot" style={{ background: entry.color }} />
@@ -198,7 +199,7 @@ export function MyScheduleView({
                       className="staff-calendar__mine"
                       style={
                         cell.mine.branch && branchByKey[cell.mine.branch]
-                          ? { color: branchByKey[cell.mine.branch].color }
+                          ? { boxShadow: `inset 3px 0 0 ${branchByKey[cell.mine.branch].color}`, color: "var(--color-ink)" }
                           : undefined
                       }
                     >

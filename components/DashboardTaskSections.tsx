@@ -31,6 +31,7 @@ import {
   type WeeklyEvent
 } from "../lib/weekly-event-tasks.ts";
 import { fetchWeeklyEventPayload, tickKey, weeklyEventPeriodKey } from "../lib/weekly-event-store.ts";
+import { Lock } from "lucide-react";
 
 const statusText = {
   white: "ยังไม่เริ่ม",
@@ -397,7 +398,7 @@ export function DashboardTaskSections({
                   {active ? (
                     <em>ถึงกำหนดวันนี้ · {event.schedule} · {completed}/{total}</em>
                   ) : (
-                    <em>🔒 ยังไม่ถึงกำหนด · จัดวัน{weeklyEventDaysLabel(event)}</em>
+                    <em><Lock className="ui-inline-icon" size={14} aria-hidden="true" /> ยังไม่ถึงกำหนด · จัดวัน{weeklyEventDaysLabel(event)}</em>
                   )}
                 </div>
               </>

@@ -14,6 +14,7 @@ import {
 import { assignmentStatusClass, assignmentStatusLabel } from "../lib/assignment-view.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { isTeamSelected, toggleTeamSelection, type TeamOption } from "../lib/team-options.ts";
+import { CircleCheck, MapPin, NotebookPen, UserRound } from "lucide-react";
 
 type StaffOption = { code: string; displayName: string; employmentType: "full_time" | "part_time" };
 
@@ -330,12 +331,12 @@ export function AssignWork({
                   <div className="assign-work__item-main">
                     <strong>{row.title}</strong>
                     <em>
-                      👤 {displayNameFor(row.staffCode)}
+                      <UserRound className="ui-inline-icon" size={14} aria-hidden="true" /> {displayNameFor(row.staffCode)}
                       {row.dueTime ? ` · ⏰ ภายใน ${row.dueTime}` : ""}
                     </em>
-                    {row.detail ? <em>📝 {row.detail}</em> : null}
-                    {row.location ? <em>📍 ที่ไหน: {row.location}</em> : null}
-                    {row.expectedResult ? <em>✅ ผลลัพธ์: {row.expectedResult}</em> : null}
+                    {row.detail ? <em><NotebookPen className="ui-inline-icon" size={14} aria-hidden="true" /> {row.detail}</em> : null}
+                    {row.location ? <em><MapPin className="ui-inline-icon" size={14} aria-hidden="true" /> ที่ไหน: {row.location}</em> : null}
+                    {row.expectedResult ? <em><CircleCheck className="ui-inline-icon" size={14} aria-hidden="true" /> ผลลัพธ์: {row.expectedResult}</em> : null}
                     {row.trackingNumber ? <em>เลขแทค/พัสดุ: {row.trackingNumber}</em> : null}
                     {row.attachments?.length ? (
                       <em>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, googleProvider, db } from "../../../lib/firebase-client.ts";
+import { CircleCheck } from "lucide-react";
 
 // The account Google returned but the SOP allow-list rejected. Captured so we can show
 // the user exactly which email was denied and let them ask an admin to approve THAT
@@ -124,7 +125,7 @@ export default function LoginPage() {
               <p className="auth-denied-email">{denied.email || "(ไม่ทราบอีเมล)"}</p>
               {requestState === "sent" ? (
                 <p className="auth-denied-ok">
-                  ✅ ส่งคำขอให้แอดมินแล้ว — รอแอดมินอนุมัติอีเมลนี้ แล้วลองเข้าสู่ระบบอีกครั้ง
+                  <CircleCheck className="ui-inline-icon" size={14} aria-hidden="true" /> ส่งคำขอให้แอดมินแล้ว — รอแอดมินอนุมัติอีเมลนี้ แล้วลองเข้าสู่ระบบอีกครั้ง
                 </p>
               ) : (
                 <>

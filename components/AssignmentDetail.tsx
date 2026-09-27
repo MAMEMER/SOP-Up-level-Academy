@@ -15,6 +15,7 @@ import {
   submitAssignment,
   type WorkAssignment
 } from "../lib/work-assignments-store.ts";
+import { CircleCheck, MapPin } from "lucide-react";
 
 function nowIso() {
   return new Date().toISOString();
@@ -253,13 +254,13 @@ export function AssignmentDetail({
           </div>
           {record.location ? (
             <div>
-              <dt>📍 ที่ไหน</dt>
+              <dt><MapPin className="ui-inline-icon" size={14} aria-hidden="true" /> ที่ไหน</dt>
               <dd>{record.location}</dd>
             </div>
           ) : null}
           {record.expectedResult ? (
             <div>
-              <dt>✅ ส่งผลลัพธ์แบบไหน</dt>
+              <dt><CircleCheck className="ui-inline-icon" size={14} aria-hidden="true" /> ส่งผลลัพธ์แบบไหน</dt>
               <dd style={{ whiteSpace: "pre-wrap" }}>{record.expectedResult}</dd>
             </div>
           ) : null}
