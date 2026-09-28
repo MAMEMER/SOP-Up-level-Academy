@@ -19,14 +19,6 @@ export const FLOWER_BILLS_COLLECTION = "flower_bills";
 /** 5 กลีบ = 1 ดอก (ตรงกับฝั่งกิลด์ — ห้ามแยกค่ากัน) */
 export const PETALS_PER_FLOWER = 5;
 
-/**
- * เกณฑ์เดือนหนึ่งคิดจาก **ครึ่งหนึ่ง** ของดอกไม้ที่แจกได้ทั้งเดือน
- *
- * แชมป์ตั้งไว้ครึ่งเดียวเพราะในความเป็นจริงลูกค้าไม่ได้ให้ทุกบิล — ตั้งเกณฑ์ที่ 100%
- * ก็คือตั้งเป้าที่ไม่มีวันถึง แล้วตัวเลขจะกลายเป็นแค่ตัวทำให้ทุกคนดูแย่เท่ากัน
- */
-export const TARGET_SHARE_OF_POTENTIAL = 0.5;
-
 export type GrantKind = "flower" | "leaf";
 
 /** ดอกไม้/ใบไม้แห้งหนึ่งครั้งที่พนักงานได้รับ — **ไม่มีฟิลด์ผู้ให้โดยตั้งใจ** */
@@ -60,17 +52,7 @@ export function bloomLabel(petals: number): string {
   return `${sign}${rest} กลีบ`;
 }
 
-/**
- * ดอกไม้ที่พนักงานคนหนึ่ง "ควรจะได้" ในเดือนนั้น
- *
- * ครึ่งหนึ่งของกลีบที่บิลทั้งเดือนแจกได้ หารจำนวนพนักงาน — ตัวเลขนี้ไม่ใช่คะแนน
- * แต่เป็นเส้นให้หัวหน้าเห็นว่าใครได้น้อยกว่าที่ควร แล้วค่อยไปคุยว่าเกิดอะไรขึ้น
- */
-export function monthlyTargetPetals(potentialPetals: number, staffCount: number): number {
-  const potential = Math.max(0, Math.floor(potentialPetals));
-  const people = Math.max(1, Math.floor(staffCount));
-  return Math.floor((potential * TARGET_SHARE_OF_POTENTIAL) / people);
-}
+// เป้ารายเดือนอยู่ที่ lib/flower-target.ts — เจ้าของตั้ง % ของยอดขายเองได้
 
 export type GardenSummary = {
   /** กลีบจากดอกไม้ */

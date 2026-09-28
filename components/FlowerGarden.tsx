@@ -22,7 +22,7 @@ type Payload = {
   summary: GardenSummary | null;
   targetPetals: number;
   potentialPetals?: number;
-  staffCount?: number;
+  minPercentOfSales?: number;
   month: string;
 };
 
@@ -83,16 +83,15 @@ export function FlowerGarden({ staffCode }: { staffCode: string }) {
         {data.targetPetals > 0 ? (
           <div className={below ? "flower-garden-target is-below" : "flower-garden-target"}>
             <strong>{pct}%</strong>
-            <span>ของเกณฑ์เดือนนี้ ({data.targetPetals} กลีบ)</span>
+            <span>ของเป้าเดือนนี้ ({data.targetPetals} กลีบ)</span>
           </div>
         ) : null}
       </div>
 
       {data.targetPetals > 0 ? (
         <p className="flower-garden-note">
-          เกณฑ์คิดจากครึ่งหนึ่งของกลีบที่บิลทั้งเดือนแจกได้
-          {data.potentialPetals ? ` (${data.potentialPetals} กลีบ)` : ""} หารพนักงาน {data.staffCount ?? "—"} คน
-          {below ? " — ได้น้อยกว่าเกณฑ์ ไว้คุยกันตอนประเมินว่าเกิดอะไรขึ้น" : ""}
+          เป้าขั้นต่ำ = {data.minPercentOfSales ?? 10}% ของยอดขายทั้งร้านเดือนนี้ต่อคน · ใครได้มากที่สุดรับรางวัลพิเศษ
+          {below ? " — ยังไม่ถึงเป้า ชวนลูกค้ากดให้ดอกไม้ทุกบิล" : ""}
         </p>
       ) : null}
 
