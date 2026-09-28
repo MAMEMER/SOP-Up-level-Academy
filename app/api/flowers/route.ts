@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { actor, db, isAdmin } from "../../../lib/api-firestore.ts";
 import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
-import { employeeCodes } from "../../../lib/employee-directory.ts";
+import { getFlowerMonth } from "../../../lib/flower-target-server.ts";
 import {
-  FLOWER_BILLS_COLLECTION,
   FLOWER_GRANTS_COLLECTION,
   bangkokMonth,
-  monthlyTargetPetals,
   newestFirst,
   summarise,
   type FlowerReceived
@@ -66,19 +64,15 @@ export async function GET(request: Request) {
     const all = snap.docs.map((doc) => stripGiver(doc.id, doc.data() as GrantDoc));
     const items = newestFirst(all.filter((item) => bangkokMonth(item.createdAt) === month));
 
-    // เกณฑ์ของเดือน = ครึ่งหนึ่งของกลีบที่บิลทั้งเดือนแจกได้ หารจำนวนพนักงาน
-    const billSnap = await db().collection(FLOWER_BILLS_COLLECTION).get();
-    const potentialPetals = billSnap.docs
-      .map((doc) => doc.data() as { petals?: number; transactionTime?: string })
-      .filter((bill) => bangkokMonth(str(bill.transactionTime)) === month)
-      .reduce((sum, bill) => sum + (Number(bill.petals) || 0), 0);
+    // เป้าของเดือน = % ของยอดขายทั้งร้านที่เจ้าของตั้งไว้ที่ /admin/flower-target (ต่อคน)
+    const flowerMonth = await getFlowerMonth(month);
 
     return NextResponse.json({
       items,
       summary: summarise(items),
-      targetPetals: monthlyTargetPetals(potentialPetals, employeeCodes.length),
-      potentialPetals,
-      staffCount: employeeCodes.length,
+      targetPetals: flowerMonth.targetPetals,
+      ...(admin ? { potentialPetals: flowerMonth.potentialPetals } : {}),
+      minPercentOfSales: flowerMonth.settings.minPercentOfSales,
       month,
       isAdminView: admin
     });

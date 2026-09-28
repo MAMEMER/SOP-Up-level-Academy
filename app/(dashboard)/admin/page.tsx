@@ -141,6 +141,12 @@ export default async function AdminHubPage() {
           detail: "KPI 5 หมวด · incentive · เหตุผลการหักคะแนนรายวัน",
           ownerOnly: false
         },
+        {
+          href: "/admin/flower-target",
+          title: "เป้าดอกไม้",
+          detail: "แต่ละคนต้องได้ดอกไม้กี่ % ของยอดขาย · รางวัลคนได้มากสุด · อันดับเดือนนี้",
+          ownerOnly: true
+        },
         { href: "/admin/kpi-rules", title: "กติกาให้คะแนน", detail: "ดู logic การบวก/หักคะแนนทั้งหมด · เจ้าของปรับเรตได้" },
         { href: "/monthly-summary", title: "สรุปรายเดือน", detail: "งานที่ส่งตรวจทั้งเดือน และความครบถ้วนของ checklist" }
       ]
@@ -239,6 +245,7 @@ export default async function AdminHubPage() {
           <div className="admin-hub__tools">
             {group.tools
               .filter((tool) => !tool.staffAdminOnly || canManageStaffAccounts(user.actualEmail))
+              .filter((tool) => !tool.ownerOnly || owner)
               .map((tool) => (
               <Link key={tool.href} href={tool.href} className="admin-hub__tool">
                 <div>

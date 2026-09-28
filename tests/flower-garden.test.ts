@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  bangkokMonth, bloomLabel, monthlyTargetPetals, newestFirst, signedPetals, summarise, targetPercent,
+  bangkokMonth, bloomLabel, newestFirst, signedPetals, summarise, targetPercent,
   type FlowerReceived
 } from "../lib/flower-garden.ts";
 
@@ -18,13 +18,6 @@ test("ดอกไม้กับใบไม้แห้งหักล้า�
   assert.equal(s.netPetals, 7);
   assert.equal(s.bouquets, 1);
   assert.equal(s.leaves, 1);
-});
-
-test("เกณฑ์เดือน = ครึ่งหนึ่งของที่แจกได้ หารพนักงาน", () => {
-  assert.equal(monthlyTargetPetals(1000, 5), 100); // 1000/2 = 500 → 5 คน = 100
-  assert.equal(monthlyTargetPetals(999, 4), 124);  // ปัดลง ไม่ปัดขึ้นให้เกณฑ์สูงเกินจริง
-  assert.equal(monthlyTargetPetals(0, 5), 0);
-  assert.equal(monthlyTargetPetals(100, 0), 50);   // ไม่มีพนักงาน = หารด้วย 0 ไม่ได้ ใช้ 1
 });
 
 test("เทียบเกณฑ์ — เดือนที่ยังไม่มีบิลต้องไม่โชว์เปอร์เซ็นต์ลวง", () => {
