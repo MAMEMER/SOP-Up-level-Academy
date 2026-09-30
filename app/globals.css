@@ -7672,3 +7672,11 @@ main .page > section, main > section { margin-top: 16px !important; }
 }
 .stock-loss-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (min-width: 640px) { .stock-loss-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.stock-loss-range { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 8px 0 4px; }
+.stock-loss-range label { display: flex; flex-direction: column; gap: 4px; flex: 1 1 140px; min-width: 0; font-size: 13px; color: var(--color-ink-soft); }
+.stock-loss-range input { min-height: 44px; font-size: 16px; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(45, 49, 66, 0.2); background: #fff; color: var(--color-ink); }
+.stock-loss-range button { min-height: 44px; flex: 0 0 auto; }
+.stock-loss-range button {
+  padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer;
+  background: linear-gradient(135deg, var(--color-cta-1), var(--color-cta-2)); color: #fff;
+}
