@@ -147,6 +147,12 @@ export default async function AdminHubPage() {
           detail: "แต่ละคนต้องได้ดอกไม้กี่ % ของยอดขาย · รางวัลคนได้มากสุด · อันดับเดือนนี้",
           ownerOnly: true
         },
+        {
+          href: "/admin/stock-loss",
+          title: "ของหาย น้ำ/ขนม",
+          detail: "มูลค่าของที่หายรายรอบ · รายการที่หาย · จุดที่ควรตาม",
+          ownerOnly: true
+        },
         { href: "/admin/kpi-rules", title: "กติกาให้คะแนน", detail: "ดู logic การบวก/หักคะแนนทั้งหมด · เจ้าของปรับเรตได้" },
         { href: "/monthly-summary", title: "สรุปรายเดือน", detail: "งานที่ส่งตรวจทั้งเดือน และความครบถ้วนของ checklist" }
       ]

@@ -7645,3 +7645,30 @@ main .page > section, main > section { margin-top: 16px !important; }
 .flower-target-board li.is-below .flower-target-bar i { background: #db2777; }
 .flower-target-value { display: flex; flex-direction: column; align-items: flex-end; font-size: 14px; font-weight: 600; white-space: nowrap; }
 .flower-target-value small { font-size: 12px; font-weight: 400; color: var(--color-ink-soft); }
+
+/* ของหาย น้ำ/ขนม (/admin/stock-loss) */
+.stock-loss-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.stock-loss-tabs a {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px;
+  border: 1px solid rgba(45, 49, 66, 0.15); color: var(--color-ink-soft); font-weight: 600; text-decoration: none;
+}
+.stock-loss-tabs a.is-active { background: var(--color-ink); border-color: var(--color-ink); color: #fff; }
+.stock-loss-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.stock-loss-list li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px;
+  min-height: 48px; padding: 8px 0; border-bottom: 1px solid rgba(45, 49, 66, 0.1);
+}
+.stock-loss-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-weight: 600; }
+.stock-loss-name small { font-size: 13px; font-weight: 400; color: var(--color-ink-soft); line-height: 1.4; }
+.stock-loss-qty { font-size: 14px; color: var(--color-ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.stock-loss-value { white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 5.5em; text-align: right; }
+.stock-loss-findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.stock-loss-findings li { display: flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--color-sun); padding: 2px 0 2px 12px; }
+.stock-loss-findings span { font-size: 14px; color: var(--color-ink-soft); line-height: 1.6; }
+@media (max-width: 480px) {
+  .stock-loss-list li { grid-template-columns: minmax(0, 1fr) auto; }
+  .stock-loss-qty { grid-column: 1; grid-row: 2; }
+  .stock-loss-value { grid-column: 2; grid-row: 1 / span 2; }
+}
+.stock-loss-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .stock-loss-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
