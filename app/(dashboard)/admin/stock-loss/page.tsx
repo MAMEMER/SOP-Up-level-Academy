@@ -45,7 +45,7 @@ export default async function StockLossPage({ searchParams }: PageProps) {
 
       <section className="sdoc-section">
         <p className="eyebrow">{report.period} · {report.days} วัน</p>
-        <div className="flower-target-stats">
+        <div className="flower-target-stats stock-loss-stats">
           <div><small>มูลค่าที่หาย</small><strong>{baht(totals.value)}฿</strong></div>
           <div><small>จำนวน</small><strong>{totals.qty} ชิ้น</strong></div>
           <div><small>เฉลี่ยต่อวัน</small><strong>{baht(Math.round(totals.perDay))}฿</strong></div>
