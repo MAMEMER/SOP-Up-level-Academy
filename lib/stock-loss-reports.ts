@@ -28,6 +28,29 @@ export type StockLossReport = {
 
 export const STOCK_LOSS_REPORTS: StockLossReport[] = [
   {
+    id: "2026-09b",
+    label: "17 – 30 ก.ย.",
+    period: "17 – 30 ก.ย. 2026",
+    days: 14,
+    exactCount: 16,
+    countErrors: 2,
+    items: [
+      { name: "Coke Zero", qty: 2, unitPrice: 18.46, labelPrice: 20 },
+      { name: "เลย์ ร็อค มันฝรั่งแท้", qty: 1, unitPrice: 23.38, labelPrice: 25 },
+      { name: "Coke", qty: 1, unitPrice: 17.19, labelPrice: 20 }
+    ],
+    findings: [
+      {
+        title: "หายน้อยลงชัดเจน",
+        detail: "เหลือ 4 ชิ้นใน 14 วัน จากรอบก่อน 22 ชิ้น · Coke/Coke Zero ยังเป็นตัวที่หายเหมือนเดิม แต่เหลือ 3 กระป๋อง"
+      },
+      {
+        title: "ทีพลัส น้ำผึ้ง เจอเกิน 6 ขวด 22 ก.ย.",
+        detail: "นับได้มากกว่าระบบ 6 ขวดโดยไม่มีรับเข้า — น่าจะลืมกดรับเข้าตอนของมาส่ง ไม่ใช่ของหาย"
+      }
+    ]
+  },
+  {
     id: "2026-09a",
     label: "31 ส.ค. – 16 ก.ย.",
     period: "31 ส.ค. – 16 ก.ย. 2026",
