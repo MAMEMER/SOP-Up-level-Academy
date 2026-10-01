@@ -7680,3 +7680,23 @@ main .page > section, main > section { margin-top: 16px !important; }
   padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer;
   background: linear-gradient(135deg, var(--color-cta-1), var(--color-cta-2)); color: #fff;
 }
+
+/* ดอกไม้ย้อนหลัง (/flowers + หน้าเจ้าของ) */
+.flower-history { margin-top: 24px; }
+.flower-target-board li.is-me { background: rgba(47, 122, 79, 0.07); border-radius: 12px; }
+.flower-target-name a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.flower-history-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.flower-history-row {
+  display: grid; grid-template-columns: 8em 7.5em 9em 6em minmax(0, 1fr); gap: 8px 20px; align-items: center;
+  min-height: 56px; padding: 10px 0; border-bottom: 1px solid rgba(45, 49, 66, 0.1); color: inherit; text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.flower-history-row:hover { background: rgba(45, 49, 66, 0.03); }
+.flower-history-row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-weight: 600; }
+.flower-history-row small { font-size: 12px; font-weight: 400; color: var(--color-ink-soft); }
+.flower-history-winner { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .flower-history-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flower-history-month, .flower-history-winner { grid-column: 1 / -1; }
+}
+.flower-history .flower-target-stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }

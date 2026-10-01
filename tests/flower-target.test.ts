@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  DEFAULT_FLOWER_TARGET, billCounts, daysLeftInMonth, leaderboard, sanitizeFlowerTarget, targetPetalsPerPerson
+  DEFAULT_FLOWER_TARGET, billCounts, daysLeftInMonth, flowerMonthsSince, isFlowerMonth, leaderboard, sanitizeFlowerTarget, targetPetalsPerPerson
 } from "../lib/flower-target.ts";
 
 test("ค่าเริ่มต้น = 10% ของยอดขาย นับตั้งแต่วันที่มีระบบดอกไม้", () => {
@@ -45,4 +45,18 @@ test("อันดับ — คนที่ยังได้ 0 ก็ติด
 test("วันที่เหลือของเดือน นับวันนี้ด้วย", () => {
   assert.equal(daysLeftInMonth(Date.parse("2026-09-28T05:00:00Z")), 3);
   assert.equal(daysLeftInMonth(Date.parse("2026-09-30T18:00:00Z")), 31); // 1 ต.ค. ไทยแล้ว
+});
+
+test("เดือนย้อนหลัง — ตั้งแต่เริ่มระบบถึงเดือนนี้ ใหม่ก่อน ข้ามปีได้", () => {
+  assert.deepEqual(flowerMonthsSince("2026-09-17", Date.parse("2026-10-01T03:00:00Z")), ["2026-10", "2026-09"]);
+  assert.deepEqual(flowerMonthsSince("2026-09-17", Date.parse("2026-09-30T18:00:00Z")), ["2026-10", "2026-09"]); // 1 ต.ค. ไทย
+  assert.deepEqual(flowerMonthsSince("2026-11-01", Date.parse("2027-01-10T03:00:00Z")), ["2027-01", "2026-12", "2026-11"]);
+  assert.deepEqual(flowerMonthsSince("2026-11-01", Date.parse("2026-10-10T03:00:00Z")), []);
+});
+
+test("เดือนจาก query string ต้องเป็น YYYY-MM จริง", () => {
+  assert.equal(isFlowerMonth("2026-09"), true);
+  assert.equal(isFlowerMonth("2026-13"), false);
+  assert.equal(isFlowerMonth("2026-9"), false);
+  assert.equal(isFlowerMonth(undefined), false);
 });

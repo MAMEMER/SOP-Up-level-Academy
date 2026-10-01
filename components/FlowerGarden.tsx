@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { thaiMonthLabel } from "../lib/flower-target.ts";
 import {
   bloomLabel,
   flowerDateLabel,
+  bangkokMonth,
   targetPercent,
   type FlowerReceived,
   type GardenSummary
@@ -26,20 +29,23 @@ type Payload = {
   month: string;
 };
 
-export function FlowerGarden({ staffCode }: { staffCode: string }) {
+/** month ว่าง = เดือนนี้ · ใส่ YYYY-MM เพื่อดูเดือนก่อน (หน้า /flowers) */
+export function FlowerGarden({ staffCode, month }: { staffCode: string; month?: string }) {
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/flowers?staffCode=${encodeURIComponent(staffCode)}`, { cache: "no-store" });
+      const qs = new URLSearchParams({ staffCode });
+      if (month) qs.set("month", month);
+      const res = await fetch(`/api/flowers?${qs.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData((await res.json()) as Payload);
       setError("");
     } catch (cause) {
       setError(String(cause));
     }
-  }, [staffCode]);
+  }, [staffCode, month]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -64,12 +70,15 @@ export function FlowerGarden({ staffCode }: { staffCode: string }) {
   const net = summary?.netPetals ?? 0;
   const pct = targetPercent(net, data.targetPetals);
   const below = pct !== null && pct < 100;
+  const isCurrent = data.month === bangkokMonth();
+  const monthText = isCurrent ? "เดือนนี้" : `เดือน ${thaiMonthLabel(data.month)}`;
 
   return (
     <section className="flower-garden">
       <h2>สวนดอกไม้</h2>
       <p className="flower-garden-note">
-        ดอกไม้ที่ลูกค้าให้ในเดือนนี้ — ไม่ผูกกับคะแนน KPI และไม่มีใครรู้ว่าใครเป็นคนให้
+        ดอกไม้ที่ลูกค้าให้ใน{monthText} — ไม่ผูกกับคะแนน KPI และไม่มีใครรู้ว่าใครเป็นคนให้
+        {month ? null : <> · <Link href="/flowers">ดูย้อนหลัง + อันดับทั้งร้าน</Link></>}
       </p>
 
       <div className="flower-garden-head">
@@ -83,15 +92,15 @@ export function FlowerGarden({ staffCode }: { staffCode: string }) {
         {data.targetPetals > 0 ? (
           <div className={below ? "flower-garden-target is-below" : "flower-garden-target"}>
             <strong>{pct}%</strong>
-            <span>ของเป้าเดือนนี้ ({data.targetPetals} กลีบ)</span>
+            <span>ของเป้า{monthText} ({data.targetPetals} กลีบ)</span>
           </div>
         ) : null}
       </div>
 
       {data.targetPetals > 0 ? (
         <p className="flower-garden-note">
-          เป้าขั้นต่ำ = {data.minPercentOfSales ?? 10}% ของยอดขายทั้งร้านเดือนนี้ต่อคน · ใครได้มากที่สุดรับรางวัลพิเศษ
-          {below ? " — ยังไม่ถึงเป้า ชวนลูกค้ากดให้ดอกไม้ทุกบิล" : ""}
+          เป้าขั้นต่ำ = {data.minPercentOfSales ?? 10}% ของยอดขายทั้งร้าน{monthText} ต่อคน · ใครได้มากที่สุดรับรางวัลพิเศษ
+          {below && isCurrent ? " — ยังไม่ถึงเป้า ชวนลูกค้ากดให้ดอกไม้ทุกบิล" : ""}
         </p>
       ) : null}
 
@@ -122,7 +131,7 @@ export function FlowerGarden({ staffCode }: { staffCode: string }) {
           ))}
         </ul>
       ) : (
-        <p className="flower-garden-note">เดือนนี้ยังไม่มีดอกไม้ — ลูกค้าให้ได้จากจอหน้าเคาน์เตอร์</p>
+        <p className="flower-garden-note">{monthText} ยังไม่มีดอกไม้{isCurrent ? " — ลูกค้าให้ได้จากจอหน้าเคาน์เตอร์" : ""}</p>
       )}
     </section>
   );
