@@ -9,7 +9,8 @@ export type NavGroup = { key: string; label: string; links: NavLink[] };
 export const quickLinks: NavLink[] = [
   { href: "/", label: "หน้าหลัก" },
   { href: "/my-view", label: "งานของฉัน" },
-  { href: "/my-review", label: "ผลงานของฉัน" }
+  { href: "/my-review", label: "ผลงานของฉัน" },
+  { href: "/flowers", label: "ดอกไม้" }
 ];
 
 export const staffGroups: NavGroup[] = [

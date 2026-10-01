@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { actor, db, isAdmin } from "../../../lib/api-firestore.ts";
 import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
 import { getFlowerMonth } from "../../../lib/flower-target-server.ts";
+import { isFlowerMonth } from "../../../lib/flower-target.ts";
 import {
   FLOWER_GRANTS_COLLECTION,
   bangkokMonth,
@@ -53,7 +54,8 @@ export async function GET(request: Request) {
   const requested = str(new URL(request.url).searchParams.get("staffCode")).trim();
   const admin = isAdmin(user);
   const target = admin ? requested || staffCode : staffCode;
-  const month = str(new URL(request.url).searchParams.get("month")).trim() || bangkokMonth();
+  const askedMonth = str(new URL(request.url).searchParams.get("month")).trim();
+  const month = isFlowerMonth(askedMonth) ? askedMonth : bangkokMonth();
 
   if (!target || !hasAdminCredentials()) {
     return NextResponse.json({ items: [], summary: null, targetPetals: 0, month });

@@ -95,3 +95,35 @@ export function daysLeftInMonth(now: number = Date.now()): number {
   const last = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + 1, 0)).getUTCDate();
   return last - local.getUTCDate() + 1;
 }
+
+/** YYYY-MM ที่ใช้ได้จริง — กันค่าแปลกๆ จาก query string */
+export function isFlowerMonth(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
+/**
+ * ทุกเดือนตั้งแต่เริ่มระบบดอกไม้จนถึงเดือนปัจจุบัน (ตามเวลาไทย) — ใหม่ก่อน
+ * ใช้ทำแท็บดูย้อนหลัง เดือนก่อนเริ่มระบบไม่มีบิลให้ดู จึงไม่ต้องโชว์
+ */
+export function flowerMonthsSince(startDate: string, now: number = Date.now()): string[] {
+  const local = new Date(now + 7 * 3600 * 1000);
+  let y = local.getUTCFullYear();
+  let m = local.getUTCMonth() + 1;
+  const start = /^\d{4}-\d{2}/.test(startDate) ? startDate.slice(0, 7) : FLOWER_SYSTEM_START.slice(0, 7);
+  const months: string[] = [];
+  for (let guard = 0; guard < 120; guard += 1) {
+    const key = `${y}-${String(m).padStart(2, "0")}`;
+    if (key < start) break;
+    months.push(key);
+    m -= 1;
+    if (m === 0) { m = 12; y -= 1; }
+  }
+  return months;
+}
+
+/** "ก.ย. 2569" */
+export function thaiMonthLabel(month: string): string {
+  if (!isFlowerMonth(month)) return month;
+  return new Intl.DateTimeFormat("th-TH", { month: "short", year: "numeric", timeZone: "Asia/Bangkok" })
+    .format(new Date(`${month}-15T12:00:00+07:00`));
+}
