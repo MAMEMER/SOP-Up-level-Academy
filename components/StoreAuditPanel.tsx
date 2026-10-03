@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchStoreAudit, type StoreAuditDoc } from "../lib/shift-schedule-store.ts";
+import { branchShortName } from "../lib/store-config.ts";
 
 // Store open/close audit — separate from the staff shift table. Sourced from the
 // Uplevel Academy store account's StoreHub clock-in/out (store open = earliest login,
@@ -41,8 +42,8 @@ export function StoreAuditPanel({ branch }: { branch: string }) {
       <div className="store-audit__head">
         <div>
           <p className="eyebrow">Store audit</p>
-          <h3>เปิด–ปิดร้าน (ไอดีร้าน)</h3>
-          <p className="store-audit__sub">จากบัญชี Uplevel Academy — แยกจากตารางกะพนักงาน</p>
+          <h3>เปิด–ปิดร้าน {branchShortName(branch)} (ไอดีร้าน)</h3>
+          <p className="store-audit__sub">จากบัญชีร้านใน StoreHub — แยกจากตารางกะพนักงาน</p>
         </div>
         <input type="month" value={monthLabel} onChange={(e) => setMonth(e.target.value)} />
       </div>

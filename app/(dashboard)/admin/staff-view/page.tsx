@@ -5,14 +5,17 @@ import { TaskFocusBoard } from "../../../../components/TaskFocusBoard.tsx";
 import { ViewAsSwitcher } from "../../../../components/ViewAsSwitcher.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
+import { resolveAdminBranch } from "../../../../lib/admin-branch.ts";
+import { AdminBranchSwitch } from "../../../../components/AdminBranchSwitch.tsx";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
-export default async function AdminStaffViewPage() {
+export default async function AdminStaffViewPage({ searchParams }: { searchParams?: Promise<{ branch?: string }> }) {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
+  const branch = await resolveAdminBranch((searchParams ? await searchParams : {}).branch);
+
   const staff = employeeDirectory
-    .filter((entry) => entry.branch === "bangkae")
     .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType, email: entry.email }));
 
   return (
@@ -25,15 +28,19 @@ export default async function AdminStaffViewPage() {
           <p>งานที่ต้องตามตอนนี้ของทั้งทีมอยู่บนสุด · เลือกพนักงาน + วัน เพื่อดูงานของเขาแบบรวดเดียว</p>
         </div>
       </section>
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={branch} />
+        <small>ข้อมูลในหน้านี้เป็นของสาขาที่เลือก</small>
+      </div>
 
       {/* ภาพรวมทีม: งานเกินกำหนด / ใกล้ครบกำหนด / รอตรวจ ต้องเห็นก่อนเลื่อนหา (ใบงาน YrTvFzXr) */}
-      <TaskFocusBoard branch="bangkae" staffCode={null} today={formatWorkDate()} scope="team" />
+      <TaskFocusBoard key={`f-${branch}`} branch={branch} staffCode={null} today={formatWorkDate()} scope="team" />
       <ViewAsSwitcher
         staff={staff
           .filter((entry): entry is typeof entry & { email: string } => Boolean(entry.email))
           .map((entry) => ({ email: entry.email, displayName: entry.displayName }))}
       />
-      <StaffReviewView branch="bangkae" staff={staff} defaultDate={formatWorkDate()} />
+      <StaffReviewView key={branch} branch={branch} staff={staff} defaultDate={formatWorkDate()} />
     </main>
   );
 }

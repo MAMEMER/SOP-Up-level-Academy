@@ -29,3 +29,24 @@ test("mergeActuals collapses duplicate clock-ins to the earliest", () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].clockIn, "09:35");
 });
+
+import { branchForStoreHubStore, teamRecordName, isTeamRecordName } from "../lib/store-config.ts";
+import { DELIVERY_BRANCH } from "../lib/delivery-tasks.ts";
+
+test("storeId ของเครื่อง POS บอกสาขาที่ตอกบัตรจริง", () => {
+  assert.equal(branchForStoreHubStore("6a268170c008ab000760e21a"), "bangkae");
+  assert.equal(branchForStoreHubStore("6aaa02f0a568500007542756"), "senafest");
+  assert.equal(branchForStoreHubStore("6a268172c008ab000760e2cb"), undefined); // Digital Store
+  assert.equal(branchForStoreHubStore(undefined), undefined);
+});
+
+test("งานทีมแยกชื่อตามสาขา", () => {
+  assert.equal(teamRecordName("bangkae"), "ทีม บางแค");
+  assert.equal(teamRecordName("senafest"), "ทีม เสนาเฟสต์");
+  assert.equal(isTeamRecordName("ทีม บางแค"), true);
+  assert.equal(isTeamRecordName("UP-003"), false);
+});
+
+test("ออเดอร์ออนไลน์เป็นงานของเสนาเฟสต์", () => {
+  assert.equal(DELIVERY_BRANCH, "senafest");
+});

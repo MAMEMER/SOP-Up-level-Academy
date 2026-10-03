@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ManagerReviewBoard } from "../../../components/ManagerReviewBoard.tsx";
-import { branchFor, employeeCodeForEmail } from "../../../lib/employee-directory.ts";
+import { resolveAdminBranch } from "../../../lib/admin-branch.ts";
+import { AdminBranchSwitch } from "../../../components/AdminBranchSwitch.tsx";
 import { requireUser } from "../../../lib/auth.ts";
 
 export const dynamic = "force-dynamic";
 
-export default async function ManagerReviewPage() {
+export default async function ManagerReviewPage({ searchParams }: { searchParams?: Promise<{ branch?: string }> }) {
   const user = await requireUser();
   // เฉพาะ role admin (เจ้าของร้าน) เท่านั้น — พนักงาน/leader เข้าไม่ได้.
   if (user.role !== "admin") redirect("/");
 
-  const staffCode = employeeCodeForEmail(user.email);
-  const branch = staffCode ? branchFor(staffCode) : "bangkae";
+  const branch = await resolveAdminBranch((searchParams ? await searchParams : {}).branch);
 
   return (
     <main className="page">
@@ -28,7 +28,10 @@ export default async function ManagerReviewPage() {
         </div>
       </section>
 
-      <ManagerReviewBoard branch={branch} />
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={branch} />
+      </div>
+      <ManagerReviewBoard key={branch} branch={branch} />
     </main>
   );
 }

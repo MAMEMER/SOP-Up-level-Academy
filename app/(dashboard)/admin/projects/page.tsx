@@ -5,19 +5,22 @@ import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { resolveProjectMonth } from "../../../../lib/project-month.ts";
 import { buildTeamOptions } from "../../../../lib/team-options.ts";
+import { resolveAdminBranch } from "../../../../lib/admin-branch.ts";
+import { AdminBranchSwitch } from "../../../../components/AdminBranchSwitch.tsx";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
 // ตัวเลข % / วันที่เหลือ ต้องสดเสมอ — เจ้าของใช้ตัดสินใจว่าจะยืดเวลาให้หรือเพิ่มคนช่วย
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams?: Promise<{ month?: string }> };
+type PageProps = { searchParams?: Promise<{ month?: string; branch?: string }> };
 
 export default async function AdminProjectsPage({ searchParams }: PageProps) {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
+  const branch = await resolveAdminBranch((await searchParams)?.branch);
+
   const staff = employeeDirectory
-    .filter((entry) => entry.branch === "bangkae")
     .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType }));
   const teams = buildTeamOptions(employeeDirectory);
 
@@ -37,7 +40,11 @@ export default async function AdminProjectsPage({ searchParams }: PageProps) {
           </p>
         </div>
       </section>
-      <ProjectBoard branch="bangkae" staff={staff} teams={teams} today={today} month={month} />
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={branch} />
+        <small>ข้อมูลในหน้านี้เป็นของสาขาที่เลือก</small>
+      </div>
+      <ProjectBoard key={branch} branch={branch} staff={staff} teams={teams} today={today} month={month} />
     </main>
   );
 }

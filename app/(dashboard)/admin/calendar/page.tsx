@@ -4,17 +4,20 @@ import { TaskCalendar } from "../../../../components/TaskCalendar.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { buildTeamOptions } from "../../../../lib/team-options.ts";
+import { resolveAdminBranch } from "../../../../lib/admin-branch.ts";
+import { AdminBranchSwitch } from "../../../../components/AdminBranchSwitch.tsx";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminCalendarPage() {
+export default async function AdminCalendarPage({ searchParams }: { searchParams?: Promise<{ branch?: string }> }) {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
+  const branch = await resolveAdminBranch((searchParams ? await searchParams : {}).branch);
+
   // ปฏิทินมอบหมายงานเดี่ยว/กลุ่มได้จากวันที่กด จึงต้องรู้จักคนและทีมเหมือนหน้า /admin/projects
   const staff = employeeDirectory
-    .filter((entry) => entry.branch === "bangkae")
     .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType }));
   const teams = buildTeamOptions(employeeDirectory);
 
@@ -31,7 +34,11 @@ export default async function AdminCalendarPage() {
           </p>
         </div>
       </section>
-      <TaskCalendar branch="bangkae" today={formatWorkDate()} staff={staff} teams={teams} />
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={branch} />
+        <small>ข้อมูลในหน้านี้เป็นของสาขาที่เลือก</small>
+      </div>
+      <TaskCalendar key={branch} branch={branch} today={formatWorkDate()} staff={staff} teams={teams} />
     </main>
   );
 }

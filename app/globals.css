@@ -7700,3 +7700,70 @@ main .page > section, main > section { margin-top: 16px !important; }
   .flower-history-month, .flower-history-winner { grid-column: 1 / -1; }
 }
 .flower-history .flower-target-stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+
+/* ปุ่มสลับสาขาบนหน้าแอดมิน */
+.admin-branch-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(45, 49, 66, 0.06);
+  max-width: 100%;
+}
+.admin-branch-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ink-soft);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.admin-branch-switch button i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--branch-color);
+}
+.admin-branch-switch button.is-active {
+  background: #fff;
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(45, 49, 66, 0.12);
+}
+.admin-branch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 16px;
+}
+.admin-branch-bar small { color: var(--color-ink-soft); }
+.admin-branch-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+}
+.admin-branch-col {
+  min-width: 0;
+  border-top: 4px solid var(--branch-color);
+  padding-top: 10px;
+}
+.admin-branch-col > h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.admin-branch-col > h3 i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--branch-color);
+}

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { SuppliesCopyButton } from "../../../components/SuppliesCopyButton.tsx";
 import { requireUser } from "../../../lib/auth.ts";
-import { branchFor, resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
+import { resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
+import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
+import { formatWorkDate } from "../../../lib/workflow-records.ts";
 import { branchConfig } from "../../../lib/store-config.ts";
 import {
   fetchSupplyNeeds,
@@ -61,7 +63,8 @@ function SupplyRow({ item, showNote }: { item: SupplyNeedItem; showNote?: boolea
 export default async function SuppliesPage() {
   const user = await requireUser();
   const staffCode = resolveEmployeeByEmail(user.email);
-  const branch = staffCode ? branchFor(staffCode) : "bangkae";
+  // สต็อกของสาขาที่เข้ากะวันนี้ — ไม่ใช่สาขาประจำ (ไปช่วยอีกสาขาก็เห็นของที่สาขานั้นต้องสั่ง)
+  const branch = await workBranchFor(staffCode, formatWorkDate());
   const config = branchConfig(branch);
 
   let result: SupplyNeedsResult | null = null;
@@ -70,7 +73,7 @@ export default async function SuppliesPage() {
     error = "ยังไม่ได้ตั้งค่าเชื่อม StoreHub บนเซิร์ฟเวอร์ (STOREHUB_USER / STOREHUB_PASS)";
   } else {
     try {
-      result = await fetchSupplyNeeds();
+      result = await fetchSupplyNeeds(undefined, branch);
     } catch (caught) {
       error = caught instanceof Error ? caught.message : String(caught);
     }

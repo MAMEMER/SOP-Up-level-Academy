@@ -10,6 +10,7 @@ import {
 } from "../../../../lib/performance-service-records.ts";
 import type { AssignedWork } from "../../../../lib/performance-score.ts";
 import { fetchPerformanceDailyStore } from "../../../../lib/performance-daily-store.ts";
+import { isTeamRecordName } from "../../../../lib/store-config.ts";
 
 function assignedStatus(value: string): AssignedWork["status"] {
   if (value === "early_quality" || value === "on_time" || value === "needs_revision" || value === "late_one_day" || value === "not_finished") return value;
@@ -41,7 +42,7 @@ const assignedStatusText: Record<AssignedWork["status"], string> = {
 function canAccessAssignedWork(recordEmployeeName: string, user: Awaited<ReturnType<typeof requireUser>>) {
   if (user.role === "admin") return true;
   const employeeCode = employeeCodeForEmail(user.email);
-  return Boolean(employeeCode && (recordEmployeeName === employeeCode || recordEmployeeName === "ทีม บางแค"));
+  return Boolean(employeeCode && (recordEmployeeName === employeeCode || isTeamRecordName(recordEmployeeName)));
 }
 
 async function submitAssignedWorkAction(formData: FormData) {

@@ -10,6 +10,7 @@
 
 import { gamePreset, taskPreset } from "./planner-activities.ts";
 import {
+  defaultShiftStart,
   isLeaveAssignment,
   isWorkingAssignment,
   shiftEndTime,
@@ -73,7 +74,7 @@ export function scheduleCell(workDate: string, plan: PlanCell | undefined): Sche
   const assignment = plan?.assignment ?? null;
 
   if (assignment && isWorkingAssignment(assignment)) {
-    const startTime = plan?.startTime || (assignment === "s1" ? "09:00" : "11:30");
+    const startTime = plan?.startTime || defaultShiftStart(assignment, plan?.branch);
     return {
       workDate,
       assignment,

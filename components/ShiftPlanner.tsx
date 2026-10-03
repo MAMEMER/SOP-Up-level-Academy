@@ -594,29 +594,43 @@ export function ShiftPlanner({
   // Generate a whole month in one click, then the owner tweaks by hand. Writes every
   // cell to Firestore, overwriting the current month's plan.
   async function applyAuto() {
-    if (!window.confirm(`จัดกะอัตโนมัติทับแผนเดือน ${month} ทั้งหมด? (ปรับเองทีหลังได้)`)) return;
+    // จัดให้เฉพาะคนประจำสาขาที่กำลังดู (ดูรวม = ทุกคน) และลงกะที่สาขาประจำของแต่ละคน —
+    // เดิมลงทุกคนไปสาขาเดียว ทำให้คนบางแคไปโผล่ตารางเสนาฯ ทั้งเดือน
+    const homeOf = (code: string) => staff.find((s) => s.code === code)?.branch || branches[0]?.key || "bangkae";
+    const planStaff = view === "all" ? staff : staff.filter((s) => homeOf(s.code) === view);
+    const scopeLabel = view === "all" ? "ทุกสาขา" : branches.find((b) => b.key === view)?.shortName ?? view;
+    if (!window.confirm(`จัดกะอัตโนมัติทับแผนเดือน ${month} ของ${scopeLabel} (${planStaff.length} คน)? (ปรับเองทีหลังได้)`)) return;
     setAutoBusy(true);
     setError(null);
     try {
-      const cells = generateMonthPlan({
-        month,
-        staff: staff.map((s) => ({
-          code: s.code,
-          daysOff: autoDaysOff[s.code] ?? [],
-          ...(autoStart[s.code] ? { startShift: autoStart[s.code] as ShiftCode } : {})
-        }))
+      // จัดแยกทีละสาขา — กติกา "อย่างน้อย 2 คน/วัน มีทั้งกะ 1 และกะ 2" ต้องจริงในแต่ละสาขา ไม่ใช่แค่รวมกัน
+      const homes = [...new Set(planStaff.map((s) => homeOf(s.code)))];
+      const cells = homes.flatMap((home) =>
+        generateMonthPlan({
+          month,
+          staff: planStaff
+            .filter((s) => homeOf(s.code) === home)
+            .map((s) => ({
+              code: s.code,
+              daysOff: autoDaysOff[s.code] ?? [],
+              ...(autoStart[s.code] ? { startShift: autoStart[s.code] as ShiftCode } : {})
+            }))
+        })
+      );
+      // เวลาเข้างานเริ่มต้นต้องเป็นของสาขาประจำคนนั้น (เสนาฯ ก1 09:30 ไม่ใช่ 09:00 ของบางแค)
+      const placed = cells.map((cell) => {
+        const home = homeOf(cell.staffCode);
+        const startTime =
+          cell.assignment === "s1" || cell.assignment === "s2" ? (shiftConfigs[home] ?? defaultBranchShiftConfig(home)).starts[cell.assignment][0] : cell.startTime;
+        return { ...cell, branch: home, startTime };
       });
-      // optimistic local update
-      const nextPlans: Record<string, CellValue> = {};
-      for (const cell of cells) nextPlans[cellKey(cell.workDate, cell.staffCode)] = { assignment: cell.assignment, startTime: cell.startTime, branch };
-      setPlans(nextPlans);
-      // persist all cells
-      // จัดอัตโนมัติ = ทั้งเดือนลงสาขานี้ (savePlanCell ลบกะค้างของสาขาอื่นวันเดียวกันให้เอง)
+      // persist all cells (savePlanCell ลบกะค้างของสาขาอื่นวันเดียวกันให้เอง) แล้วโหลดใหม่ทั้งเดือน
       await Promise.all(
-        cells.map((cell) =>
-          savePlanCell({ branch, workDate: cell.workDate, staffCode: cell.staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy })
+        placed.map((cell) =>
+          savePlanCell({ branch: cell.branch, workDate: cell.workDate, staffCode: cell.staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy })
         )
       );
+      setReloadNonce((n) => n + 1);
       setShowAuto(false);
     } catch {
       setError("จัดกะอัตโนมัติไม่สำเร็จ");

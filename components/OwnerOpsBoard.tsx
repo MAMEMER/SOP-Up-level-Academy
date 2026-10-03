@@ -22,7 +22,7 @@ function percent(done: number, total: number) {
   return total > 0 ? Math.round((done / total) * 100) : 0;
 }
 
-export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwner: boolean }) {
+export function OwnerOpsBoard({ summary, isOwner, branch = "bangkae" }: { summary: OpsSummary; isOwner: boolean; branch?: string }) {
   const { daily, weekly, monthly } = summary;
   const openAssignments = summary.assignments.filter((item) => item.status === "open");
   const needsReview = summary.assignments.filter((item) => item.status === "submitted");
@@ -124,7 +124,7 @@ export function OwnerOpsBoard({ summary, isOwner }: { summary: OpsSummary; isOwn
       </section>
 
       <div className="owner-ops__row">
-        <OpsAssignmentsPanel workDate={summary.workDate} initialGroups={summary.assignmentGroups} />
+        <OpsAssignmentsPanel workDate={summary.workDate} initialGroups={summary.assignmentGroups} branch={branch} />
 
         <section className="owner-ops__panel">
           <div className="section-heading">

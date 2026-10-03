@@ -4,6 +4,7 @@ import { buildAdminNotifications, type AdminNotification, type NotificationInput
 import { deliveryTaskState, type DeliveryTask } from "./delivery-tasks.ts";
 import { syncDeliveryTasks } from "./delivery-tasks-server.ts";
 import { restListCollection } from "./firestore-rest.ts";
+import { branchShortName } from "./store-config.ts";
 import { dailyScopeKey } from "./work-records.ts";
 import { listRecordsForScopeKey } from "./work-records-store.ts";
 import type { OpsSummary } from "./ops-summary.ts";
@@ -117,9 +118,9 @@ type AssignmentRow = { branch?: string; workDate?: string; status?: string };
  * งานที่มอบหมายต้องนับข้ามวัน — `getOpsSummary` อ่านเฉพาะ workDate ของวันนี้ ใบที่เลย
  * กำหนดมาจากวันก่อนจึงไม่เคยโผล่ ซึ่งเป็นใบที่ต้องตามที่สุด
  */
-async function assignmentCounts(branch: string, today: string): Promise<NotificationInput["assignments"]> {
+async function assignmentCounts(branches: string[], today: string): Promise<NotificationInput["assignments"]> {
   const rows = await restListCollection<AssignmentRow>("work_assignments");
-  const mine = rows.filter((row) => row.branch === branch);
+  const mine = rows.filter((row) => branches.includes(row.branch || "bangkae"));
   return {
     waitingReview: mine.filter((row) => row.status === "submitted").length,
     overdue: mine.filter(
@@ -135,18 +136,18 @@ async function assignmentCounts(branch: string, today: string): Promise<Notifica
  * บอร์ดงานส่งของด้วย) — จะได้ไม่ยิง query ซ้ำในหน้าเดียว.
  */
 export async function getAdminNotifications(
-  summary: OpsSummary,
+  summaries: Array<{ branch: string; summary: OpsSummary }>,
   workDate: string,
-  branch = "bangkae",
   deliveryTasks?: DeliveryTask[]
 ): Promise<AdminNotification[]> {
+  const branches = summaries.map((entry) => entry.branch);
   const [deliveries, lostPresses, tickets, assignments, guild] = await Promise.all([
     deliveryTasks
       ? Promise.resolve(deliveryTasks)
-      : safe(() => syncDeliveryTasks(branch), [] as DeliveryTask[]),
+      : safe(() => syncDeliveryTasks(), [] as DeliveryTask[]),
     safe(() => pressesWithoutRecord(workDate), [] as Array<{ staffName: string; phaseTitle: string }>),
     safe(() => openTicketCount(), 0),
-    safe(() => assignmentCounts(branch, workDate), { waitingReview: 0, overdue: 0 }),
+    safe(() => assignmentCounts(branches, workDate), { waitingReview: 0, overdue: 0 }),
     safe(() => guildCounts(), {
       expClaims: 0,
       questSubmissions: 0,
@@ -158,13 +159,21 @@ export async function getAdminNotifications(
     })
   ]);
 
+  // หลายสาขา: รวมตัวเลขของทุกสาขาที่กำลังดู · ชื่อคนที่ยังไม่เริ่มต่อท้ายด้วยสาขาให้รู้ว่าต้องตามที่ไหน
+  const all = summaries.map((entry) => entry.summary);
+  const tagged = summaries.length > 1;
   return buildAdminNotifications({
-    storageReady: summary.storageReady,
+    storageReady: all.every((summary) => summary.storageReady),
     deliveries: deliveryCounts(deliveries, workDate),
     pressesWithoutRecord: lostPresses,
     assignments,
-    handoffs: { open: summary.handoffs.filter((item) => item.status === "open").length },
-    checklist: { latePhases: summary.daily.latePhases, notStartedStaff: summary.noRecordStaff },
+    handoffs: { open: all.reduce((sum, summary) => sum + summary.handoffs.filter((item) => item.status === "open").length, 0) },
+    checklist: {
+      latePhases: all.reduce((sum, summary) => sum + summary.daily.latePhases, 0),
+      notStartedStaff: summaries.flatMap(({ branch, summary }) =>
+        summary.noRecordStaff.map((name) => (tagged ? `${name} (${branchShortName(branch)})` : name))
+      )
+    },
     bugReports: { open: tickets },
     guild
   });

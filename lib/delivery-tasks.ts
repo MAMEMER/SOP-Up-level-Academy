@@ -16,6 +16,12 @@ import { defaultShiftStart, shiftEndTime, type ShiftCode } from "./shift-schedul
 /** เวลาตัดรอบ: ออเดอร์ที่จ่ายตั้งแต่เวลานี้ไปถือว่ากะปัจจุบันอาจส่งไม่ทัน */
 export const DELIVERY_CUTOFF = "15:00";
 
+/**
+ * สาขาที่แพ็คและส่งออเดอร์ออนไลน์ทั้งหมด (เจ้าของร้านกำหนด 3 ต.ค. 2026). ใบงานส่งของสร้างใต้สาขานี้
+ * สาขาเดียว — สาขาอื่นไม่ sync ไม่เห็นบอร์ด ไม่ได้แจ้งเตือน (ก่อนหน้านี้สาขาที่เปิดหน้าแรกก่อนแย่งไปได้).
+ */
+export const DELIVERY_BRANCH = "senafest";
+
 /** ต้องส่งภายใน 1 วันนับจากวันที่จ่ายเงิน */
 export const DELIVERY_DUE_DAYS = 1;
 
@@ -134,7 +140,7 @@ type ShiftCell = { staffCode: string; shift: ShiftCode; startTime?: string };
  * รวม plan cell ของวันหนึ่งเป็นช่วงเวลาต่อกะ. start = คนที่เข้าเร็วสุด, end = คนที่เลิกช้าสุด
  * เพื่อให้ "กะนี้ยังอยู่ร้านไหม" ครอบคลุมทุกคนในกะ. กะที่ไม่มีใครลงจะไม่ถูกสร้าง.
  */
-export function buildShiftWindows(workDate: string, cells: ShiftCell[]): ShiftWindow[] {
+export function buildShiftWindows(workDate: string, cells: ShiftCell[], branch?: string): ShiftWindow[] {
   const byShift = new Map<ShiftCode, ShiftCell[]>();
   for (const cell of cells) {
     const list = byShift.get(cell.shift);
@@ -149,7 +155,7 @@ export function buildShiftWindows(workDate: string, cells: ShiftCell[]): ShiftWi
     let earliest = Number.POSITIVE_INFINITY;
     let latest = Number.NEGATIVE_INFINITY;
     for (const cell of list) {
-      const start = (cell.startTime && minutesOfDay(cell.startTime) !== null ? cell.startTime : null) ?? defaultShiftStart(shift);
+      const start = (cell.startTime && minutesOfDay(cell.startTime) !== null ? cell.startTime : null) ?? defaultShiftStart(shift, branch);
       const startMin = minutesOfDay(start) ?? 0;
       const endMin = minutesOfDay(shiftEndTime(start)) ?? startMin;
       // กะไม่เคยข้ามเที่ยงคืน (s2 เข้าช้าสุด 13:00 + 9 ชม. = 22:00) แต่กันไว้ให้ end > start เสมอ

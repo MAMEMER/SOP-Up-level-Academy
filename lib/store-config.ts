@@ -42,7 +42,7 @@ export const branchConfigs: BranchConfig[] = [
     color: "#FF8C42", // ส้ม = สาขาแม่
     openTimeWeekday: "11:00", // จ–ศ กะแรก 11:00
     openTimeWeekend: "09:00", // ส–อา กะแรก 09:00
-    shiftStarts: { s1: ["09:00", "11:00"], s2: ["11:30", "13:00"] },
+    shiftStarts: { s1: ["09:00", "09:30", "11:00"], s2: ["11:30", "13:00", "14:00", "15:00"] },
     stockCountGraceHours: 4,
     storeHubStoreId: "6a268170c008ab000760e21a", // "Up level Academy" (บางแค) — สาขาหลักใน StoreHub
     supplyMinOrderValue: 1000
@@ -60,9 +60,28 @@ export const branchConfigs: BranchConfig[] = [
     closeTime: "22:00",
     shiftStarts: { s1: ["09:30", "10:00"], s2: ["12:30", "13:00"] },
     stockCountGraceHours: 4,
+    storeHubStoreId: "6aaa02f0a568500007542756", // "Uplevel SENAfest" — มีเครื่อง POS #2 ของตัวเอง
     supplyMinOrderValue: 1000
   }
 ];
+
+/**
+ * ชื่อ "พนักงาน" ของงานทีมในบันทึกงานแบบเก่า (assignedWorkRecords) — "ทีม บางแค" / "ทีม เสนาเฟสต์".
+ * งานทีมของสาขาไหน ขึ้นเฉพาะคนที่เข้ากะสาขานั้นวันนั้น
+ */
+export function teamRecordName(key: string): string {
+  return `ทีม ${branchShortName(key)}`;
+}
+
+export function isTeamRecordName(name: string): boolean {
+  return branchConfigs.some((branch) => teamRecordName(branch.key) === name);
+}
+
+/** storeId ของ StoreHub → key สาขา (undefined = สโตร์ที่ไม่ใช่หน้าร้าน เช่น Digital Store) */
+export function branchForStoreHubStore(storeId: string | null | undefined): string | undefined {
+  if (!storeId) return undefined;
+  return branchConfigs.find((branch) => branch.storeHubStoreId === storeId)?.key;
+}
 
 /** สาขาทั้งหมด เรียงตามลำดับที่ใช้บนหน้าจอ */
 export function allBranchKeys(): string[] {

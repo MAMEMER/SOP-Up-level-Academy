@@ -3,21 +3,22 @@ import { redirect } from "next/navigation";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { fetchStockRunsForBranch } from "../../../../lib/stock-runs-server.ts";
+import { resolveAdminBranch } from "../../../../lib/admin-branch.ts";
+import { AdminBranchSwitch } from "../../../../components/AdminBranchSwitch.tsx";
 import { StockRunAssign } from "../../../../components/StockRunAssign.tsx";
-
-const ADMIN_BRANCH = "bangkae";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminStockRunsPage() {
+export default async function AdminStockRunsPage({ searchParams }: { searchParams?: Promise<{ branch?: string }> }) {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
+  const branch = await resolveAdminBranch((searchParams ? await searchParams : {}).branch);
+
   const staff = employeeDirectory
-    .filter((entry) => entry.branch === ADMIN_BRANCH)
     .map((entry) => ({ code: entry.code, displayName: entry.displayName }));
 
-  const runs = await fetchStockRunsForBranch(ADMIN_BRANCH);
+  const runs = await fetchStockRunsForBranch(branch);
 
   return (
     <main className="page">
@@ -34,8 +35,12 @@ export default async function AdminStockRunsPage() {
           </p>
         </div>
       </section>
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={branch} />
+        <small>ข้อมูลในหน้านี้เป็นของสาขาที่เลือก</small>
+      </div>
 
-      <StockRunAssign branch={ADMIN_BRANCH} staff={staff} initialRuns={runs} />
+      <StockRunAssign key={branch} branch={branch} staff={staff} initialRuns={runs} />
     </main>
   );
 }

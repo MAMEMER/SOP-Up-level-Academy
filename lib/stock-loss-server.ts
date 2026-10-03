@@ -22,9 +22,15 @@ type StocktakeDoc = {
   supplier?: string;
   /** JSON: [sku, name, expected, counted][] */
   items: string;
+  /** ชื่อสโตร์ใน BackOffice (sync ตั้งแต่ 3 ต.ค. 2026) — รอบที่ไม่มีค่านี้ = ก่อนมีเสนาฯ = บางแค */
+  storeName?: string;
 };
 
-async function loadCounts(from: number, to: number): Promise<{ counts: StockCount[]; syncedAt?: number }> {
+function stocktakeBranch(storeName: string | undefined): string {
+  return /sena/i.test(storeName || "") ? "senafest" : "bangkae";
+}
+
+async function loadCounts(from: number, to: number, branchKey: string): Promise<{ counts: StockCount[]; syncedAt?: number }> {
   const db = adminDb();
   const snap = await db
     .collection(STOCKTAKE_COLLECTION)
@@ -35,6 +41,8 @@ async function loadCounts(from: number, to: number): Promise<{ counts: StockCoun
   for (const doc of snap.docs) {
     const data = doc.data() as StocktakeDoc;
     if (data.status !== "Completed") continue;
+    // ผลนับต้องเทียบกับยอดขายของสโตร์เดียวกัน — ไม่งั้นนับของเสนาฯ ไปหักกับยอดขายบางแค
+    if (stocktakeBranch(data.storeName) !== branchKey) continue;
     let items: [string, string, number, number][] = [];
     try {
       items = JSON.parse(data.items);
@@ -106,6 +114,6 @@ export async function getStockLossReport(from: number, to: number, branchKey = "
   if (!hasStoreHubCreds()) throw new Error("ยังไม่ได้ตั้ง StoreHub API");
   const storeId = branchConfig(branchKey).storeHubStoreId;
   if (!storeId) throw new Error("สาขานี้ไม่มี StoreHub store id");
-  const [{ counts, syncedAt }, { sales, labels }] = await Promise.all([loadCounts(from, to), loadSales(from - EDGE_MS, to + EDGE_MS, storeId)]);
+  const [{ counts, syncedAt }, { sales, labels }] = await Promise.all([loadCounts(from, to, branchKey), loadSales(from - EDGE_MS, to + EDGE_MS, storeId)]);
   return { ...computeStockLoss(counts, sales, labels, from, to), from, to, syncedAt };
 }

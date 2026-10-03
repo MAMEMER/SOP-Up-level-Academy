@@ -7,7 +7,12 @@ import { fetchEmployeeNames, fetchTimesheets, hasStoreHubCreds, toBangkok } from
 import { branchFor, resolveEmployeeCode } from "../../../../lib/employee-directory.ts";
 import { onePerStaffDay } from "../../../../lib/planner-kpi.ts";
 import { ensureStaffLoaded } from "../../../../lib/staff-store.ts";
-import { restListCollection, restUpsertDoc } from "../../../../lib/firestore-rest.ts";
+import { restDeleteDoc, restListCollection, restUpsertDoc } from "../../../../lib/firestore-rest.ts";
+import { allBranchKeys, branchForStoreHubStore } from "../../../../lib/store-config.ts";
+
+// ฟิลด์ที่ sync นี้เขียนเอง — doc ใน schedule_actual ที่มีแค่ฟิลด์พวกนี้ = มาจาก StoreHub ล้วน ลบทิ้งได้
+// ถ้ามีฟิลด์อื่น (ลา / สลับกะ / แก้มือ) ห้ามแตะ
+const SYNC_ONLY_FIELDS = new Set(["branch", "month", "workDate", "staffCode", "clockIn", "clockInSource", "updatedAt", "updatedBy"]);
 
 // Pulls StoreHub timesheets for a month and writes the earliest clock-in per staff-day
 // into Firestore `schedule_actual` (merged, so leave records are preserved). The planner
@@ -55,7 +60,7 @@ export async function GET(request: Request) {
 
     // earliest clock-in per staff-day; store-account (Uplevel Academy) sessions go to a
     // separate open/close audit (store open = earliest clock-in, close = latest clock-out).
-    const earliest = new Map<string, { workDate: string; staffCode: string; time: string }>();
+    const earliest = new Map<string, { workDate: string; staffCode: string; time: string; storeBranch?: string }>();
     const audit = new Map<string, { branch: string; workDate: string; open?: string; close?: string }>();
     for (const ts of timesheets) {
       if (!ts.clockInTime) continue;
@@ -64,8 +69,8 @@ export async function GET(request: Request) {
       if (isStore) {
         const { workDate, time: open } = toBangkok(ts.clockInTime);
         const close = ts.clockOutTime ? toBangkok(ts.clockOutTime).time : undefined;
-        // บัญชีร้าน (Uplevel Academy) = บางแค; ถ้าวันหน้ามีบัญชีร้านเสนาเฟสต์ ชื่อจะมีคำว่า เสนา/sena
-        const storeBranch = /sena|เสนา/i.test(name) ? "senafest" : "bangkae";
+        // บัญชีร้านตอกที่เครื่องสาขาไหน = สาขานั้น (storeId จาก StoreHub) — เดาจากชื่อเฉพาะตอนไม่มี storeId
+        const storeBranch = branchForStoreHubStore(ts.storeId) ?? (/sena|เสนา/i.test(name) ? "senafest" : "bangkae");
         const cur = audit.get(`${storeBranch}__${workDate}`) ?? { branch: storeBranch, workDate };
         if (!cur.open || open < cur.open) cur.open = open;
         if (close && (!cur.close || close > cur.close)) cur.close = close;
@@ -77,7 +82,7 @@ export async function GET(request: Request) {
       const { workDate, time } = toBangkok(ts.clockInTime);
       const key = `${workDate}__${staffCode}`;
       const existing = earliest.get(key);
-      if (!existing || time < existing.time) earliest.set(key, { workDate, staffCode, time });
+      if (!existing || time < existing.time) earliest.set(key, { workDate, staffCode, time, storeBranch: branchForStoreHubStore(ts.storeId) });
     }
 
     const plans = onePerStaffDay(
@@ -86,8 +91,9 @@ export async function GET(request: Request) {
       )).filter((plan) => plan.month === month)
     );
     const plannedBranch = new Map(plans.map((plan) => [`${plan.workDate}__${plan.staffCode}`, plan.branch || ""]));
+    // สาขาที่ตอกบัตรจริง (เครื่อง POS ของสาขาไหน) ชนะตารางกะ — ตารางใช้เฉพาะตอน StoreHub ไม่บอก storeId
     const branchOf = (workDate: string, staffCode: string) =>
-      plannedBranch.get(`${workDate}__${staffCode}`) || branchFor(staffCode);
+      earliest.get(`${workDate}__${staffCode}`)?.storeBranch || plannedBranch.get(`${workDate}__${staffCode}`) || branchFor(staffCode);
 
     const nowIso = new Date(Date.now()).toISOString();
     await Promise.all(
@@ -105,6 +111,23 @@ export async function GET(request: Request) {
       )
     );
 
+    // คนที่ย้ายสาขาหลัง sync รอบก่อน: เวลาตอกบัตรเก่าค้างอยู่อีกสาขา → ลบเฉพาะ doc ที่ sync เขียนล้วนๆ
+    const actuals = await restListCollection<Record<string, unknown> & { branch?: string; month?: string; workDate?: string; staffCode?: string }>(
+      "schedule_actual"
+    );
+    const stale = actuals.filter((doc) => {
+      if (doc.month !== month || !doc.workDate || !doc.staffCode || !doc.branch) return false;
+      if (!earliest.has(`${doc.workDate}__${doc.staffCode}`)) return false;
+      if (doc.branch === branchOf(doc.workDate, doc.staffCode)) return false;
+      return doc.clockInSource === "storehub" && Object.keys(doc).every((field) => SYNC_ONLY_FIELDS.has(field));
+    });
+    // ลบไม่สำเร็จบางใบก็ไม่ให้ทั้งรอบล้ม (store_audit ข้างล่างยังต้องเขียน) — รอบหน้าลบซ้ำเอง
+    await Promise.allSettled(
+      stale
+        .filter((doc) => allBranchKeys().includes(doc.branch!))
+        .map((doc) => restDeleteDoc("schedule_actual", `${doc.branch}__${doc.workDate}__${doc.staffCode}`))
+    );
+
     await Promise.all(
       [...audit.values()].map((a) =>
         restUpsertDoc("store_audit", `${a.branch}__${a.workDate}`, {
@@ -119,7 +142,7 @@ export async function GET(request: Request) {
       )
     );
 
-    return NextResponse.json({ ok: true, month, synced: earliest.size, audit: audit.size });
+    return NextResponse.json({ ok: true, month, synced: earliest.size, audit: audit.size, movedStale: stale.length });
   } catch (error) {
     return NextResponse.json({ error: "sync_failed", detail: String(error) }, { status: 500 });
   }

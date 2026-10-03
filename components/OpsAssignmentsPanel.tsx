@@ -17,10 +17,12 @@ function isImageUrl(url: string) {
 
 export function OpsAssignmentsPanel({
   workDate,
-  initialGroups
+  initialGroups,
+  branch = "bangkae"
 }: {
   workDate: string;
   initialGroups: AssignmentGroup[];
+  branch?: string;
 }) {
   const [groups, setGroups] = useState<AssignmentGroup[]>(initialGroups);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -28,13 +30,13 @@ export function OpsAssignmentsPanel({
   // Re-sync whenever the selected date changes (server passes new initialGroups).
   useEffect(() => {
     setGroups(initialGroups);
-  }, [initialGroups, workDate]);
+  }, [initialGroups, workDate, branch]);
 
   useEffect(() => {
     let cancelled = false;
     async function pull() {
       try {
-        const res = await fetch(`/api/admin/ops/assignments?date=${encodeURIComponent(workDate)}`, {
+        const res = await fetch(`/api/admin/ops/assignments?date=${encodeURIComponent(workDate)}&branch=${encodeURIComponent(branch)}`, {
           cache: "no-store"
         });
         if (!res.ok) return;
@@ -57,7 +59,7 @@ export function OpsAssignmentsPanel({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [workDate]);
+  }, [workDate, branch]);
 
   const total = groups.reduce((sum, group) => sum + group.memberCount, 0);
 

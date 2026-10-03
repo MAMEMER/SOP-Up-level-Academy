@@ -5,6 +5,9 @@ import { requireUser } from "../../../../lib/auth.ts";
 import { isOwner } from "../../../../lib/owner.ts";
 import { getOpsSummary } from "../../../../lib/ops-summary.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
+import { branchesForView, resolveAdminBranchView } from "../../../../lib/admin-branch.ts";
+import { branchColor, branchShortName } from "../../../../lib/store-config.ts";
+import { AdminBranchSwitch } from "../../../../components/AdminBranchSwitch.tsx";
 
 // Always render fresh: the ops board reads live assignment/checklist data (no-store) so
 // the owner sees the current state, not a cached snapshot. The assignments panel then
@@ -12,7 +15,7 @@ import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams?: Promise<{ date?: string }>;
+  searchParams?: Promise<{ date?: string; branch?: string }>;
 };
 
 function isDateValue(value: string | undefined) {
@@ -25,7 +28,9 @@ export default async function AdminOpsPage({ searchParams }: PageProps) {
 
   const params = searchParams ? await searchParams : {};
   const workDate = isDateValue(params.date) ? params.date! : formatWorkDate();
-  const summary = await getOpsSummary(workDate);
+  const view = await resolveAdminBranchView(params.branch);
+  const branches = branchesForView(view);
+  const summaries = await Promise.all(branches.map(async (branch) => ({ branch, summary: await getOpsSummary(workDate, branch) })));
 
   return (
     <main className="page">
@@ -41,11 +46,23 @@ export default async function AdminOpsPage({ searchParams }: PageProps) {
             วันที่
             <input type="date" name="date" defaultValue={workDate} />
           </label>
+          <input type="hidden" name="branch" value={view} />
           <button type="submit">ดู</button>
         </form>
       </section>
 
-      <OwnerOpsBoard summary={summary} isOwner={isOwner(user.email)} />
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={view} allowAll />
+      </div>
+
+      <div className={branches.length > 1 ? "admin-branch-cols" : undefined}>
+        {summaries.map(({ branch, summary }) => (
+          <section key={branch} className="admin-branch-col" style={{ ["--branch-color" as string]: branchColor(branch) }}>
+            <h3><i aria-hidden />{branchShortName(branch)}</h3>
+            <OwnerOpsBoard summary={summary} isOwner={isOwner(user.email)} branch={branch} />
+          </section>
+        ))}
+      </div>
     </main>
   );
 }

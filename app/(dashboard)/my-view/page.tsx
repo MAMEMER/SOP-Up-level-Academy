@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
 import {
-  branchFor,
   displayNameFor,
   employeeCodeForEmail,
   employeeCodes,
@@ -24,6 +23,8 @@ import { TaskFocusBoard } from "../../../components/TaskFocusBoard.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
 import { fetchPerformanceDailyStore } from "../../../lib/performance-daily-store.ts";
+import { teamRecordName } from "../../../lib/store-config.ts";
+import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 
 // KPI window follows the calendar: 1st of this month → today (Asia/Bangkok)
 const reviewPeriod = () => currentReviewPeriod();
@@ -62,8 +63,9 @@ export default async function MyViewPage({ searchParams }: PageProps) {
     );
   }
 
-  const branch = branchFor(selectedCode);
   const workDate = formatWorkDate();
+  // สาขาที่คนนี้เข้ากะวันนี้ (ไปช่วยอีกสาขาก็เห็นกะ/งานของสาขานั้น) — KPI อ่านรวมทุกสาขาอยู่แล้ว
+  const branch = await workBranchFor(selectedCode, workDate);
   const displayName = displayNameFor(selectedCode);
 
   const period = reviewPeriod();
@@ -81,7 +83,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   const row = rows.find((item) => item.employeeName === selectedCode);
 
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
-    (record) => record.employeeName === selectedCode || record.employeeName === "ทีม บางแค"
+    (record) => record.employeeName === selectedCode || record.employeeName === teamRecordName(branch)
   );
   // Always scope the feed to the selected staff — even for the owner, this page shows
   // exactly what that one employee would see (self-view), never the whole team.
