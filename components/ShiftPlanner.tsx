@@ -176,7 +176,8 @@ export function ShiftPlanner({
   const [rawPlans, setRawPlans] = useState<PlanCell[]>([]);
   // ช่องที่เพิ่งแก้ในจอนี้ (`${staff}__${date}`) — กะสาขาอื่นของช่องนั้นถูกลบไปแล้วจริง
   const [movedKeys, setMovedKeys] = useState<Set<string>>(new Set());
-  const [events, setEvents] = useState<Record<string, { title: string; activities: DayActivity[] }>>({});
+  // กิจกรรมรายวันแยกตามสาขา — โหมด "ทุกสาขา" แสดง/แก้ของสาขาที่เลือกใน "ลงให้สาขา"
+  const [eventsByBranch, setEventsByBranch] = useState<Record<string, Record<string, { title: string; activities: DayActivity[] }>>>({});
   const [actuals, setActuals] = useState<Record<string, ActualDoc>>({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -201,6 +202,13 @@ export function ShiftPlanner({
 
   // สาขาที่ใช้เขียนข้อมูลระดับวัน (กิจกรรม/preset/clock-in): โหมดสาขาเดียวใช้สาขานั้นตรงๆ
   const branch = view === "all" ? targetBranch : view;
+  const events = eventsByBranch[branch] ?? {};
+  type DayMap = Record<string, { title: string; activities: DayActivity[] }>;
+  const setEvents = (update: DayMap | ((prev: DayMap) => DayMap)) =>
+    setEventsByBranch((prev) => ({
+      ...prev,
+      [branch]: typeof update === "function" ? update(prev[branch] ?? {}) : update
+    }));
   const dates = useMemo(() => monthDates(month), [month]);
   const viewBranches = useMemo(
     () => (view === "all" ? branches : branches.filter((entry) => entry.key === view)),
@@ -240,25 +248,48 @@ export function ShiftPlanner({
             branch: plan.branch
           }))
         );
+        const planStamp: Record<string, string> = {};
         for (const plan of data.plans as PlanDoc[]) {
           const key = cellKey(plan.workDate, plan.staffCode);
-          // กันข้อมูลเก่าที่คนเดียวถูกลงไว้สองสาขา: เก็บกะที่ทำงานจริงไว้ก่อน OFF
+          // กันข้อมูลเก่าที่คนเดียวถูกลงไว้สองสาขา: กะทำงานชนะ OFF, ถ้าทำงานทั้งคู่เชื่อช่องที่แก้ล่าสุด
+          // (เดิมเอาแถวสุดท้ายที่อ่านได้ = สาขาที่เรียงทีหลังชนะเสมอ → ช่องเด้งข้ามสาขา)
           const existing = planMap[key];
-          if (existing && existing.assignment !== "off" && plan.assignment === "off") continue;
+          const working = plan.assignment === "s1" || plan.assignment === "s2";
+          if (existing) {
+            const existingWorking = existing.assignment === "s1" || existing.assignment === "s2";
+            if (existingWorking && !working) continue;
+            if (existingWorking === working && (plan.updatedAt ?? "") <= (planStamp[key] ?? "")) continue;
+          }
           planMap[key] = { assignment: plan.assignment, startTime: plan.startTime, branch: plan.branch };
+          planStamp[key] = plan.updatedAt ?? "";
         }
-        const eventMap: Record<string, { title: string; activities: DayActivity[] }> = {};
+        const eventMap: Record<string, Record<string, { title: string; activities: DayActivity[] }>> = {};
         const gameLabels = new Set(gamePresets.map((g) => g.label));
         for (const ev of data.events as EventDoc[]) {
           const activities = ev.activities ?? (ev.game ? [{ game: ev.game, time: ev.time ?? "" }] : []);
           // Drop a stale auto-title that just repeats a game name (it now shows as a chip).
           const title = gameLabels.has(ev.title) ? "" : ev.title;
-          eventMap[ev.workDate] = { title, activities };
+          (eventMap[ev.branch] ??= {})[ev.workDate] = { title, activities };
         }
         const actualMap: Record<string, ActualDoc> = {};
-        for (const actual of data.actuals) actualMap[cellKey(actual.workDate, actual.staffCode)] = actual;
+        for (const actual of data.actuals) {
+          // โหมดรวม: แถว ACTUAL เดียวต่อคน-วัน — รวมของทุกสาขา (ตอกบัตรเช้าสุด, ลา/ขาด/สลับจากแถวไหนก็ได้)
+          const key = cellKey(actual.workDate, actual.staffCode);
+          const current = actualMap[key];
+          if (!current) {
+            actualMap[key] = actual;
+            continue;
+          }
+          actualMap[key] = {
+            ...current,
+            ...(actual.clockIn && (!current.clockIn || actual.clockIn < current.clockIn) ? { clockIn: actual.clockIn } : {}),
+            leaveType: current.leaveType ?? actual.leaveType,
+            absent: current.absent ?? actual.absent,
+            swappedTo: current.swappedTo ?? actual.swappedTo
+          };
+        }
         setPlans(planMap);
-        setEvents(eventMap);
+        setEventsByBranch(eventMap);
         setActuals(actualMap);
       })
       .catch(() => alive && setError("โหลดตารางไม่สำเร็จ — เช็คสิทธิ์ Firestore"))
@@ -338,6 +369,11 @@ export function ShiftPlanner({
   const conflictKeys = new Set(
     issues.filter((i) => i.kind === "branch_overlap" || i.kind === "branch_hop").map((i) => i.ref)
   );
+
+  /** สาขาของช่องคน-วัน (ตามกะที่ลงไว้) — ACTUAL/ลา/สลับกะ ต้องลงสาขาเดียวกับกะ ไม่ใช่สาขาที่จอเปิดอยู่ */
+  function branchOfCell(workDate: string, staffCode: string): string {
+    return plans[cellKey(workDate, staffCode)]?.branch || branch;
+  }
 
   async function onCellChange(workDate: string, staffCode: string, rawValue: string) {
     const key = cellKey(workDate, staffCode);
@@ -463,15 +499,16 @@ export function ShiftPlanner({
   // ACTUAL status (leave/absent) — a real event on the day, recorded in the ACTUAL row.
   async function onActualChange(workDate: string, staffCode: string, status: "normal" | "leave_personal" | "leave_sick" | "absent") {
     const key = cellKey(workDate, staffCode);
+    const cellBranchKey = branchOfCell(workDate, staffCode);
     setActuals((prev) => {
-      const base = prev[key] ?? ({ branch, month: workDate.slice(0, 7), workDate, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
+      const base = prev[key] ?? ({ branch: cellBranchKey, month: workDate.slice(0, 7), workDate, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
       const next: ActualDoc = { ...base };
       next.leaveType = status === "leave_personal" ? "personal" : status === "leave_sick" ? "sick" : undefined;
       next.absent = status === "absent" ? true : undefined;
       return { ...prev, [key]: next };
     });
     try {
-      await setActualStatus({ branch, workDate, staffCode, status, updatedBy: plannedBy });
+      await setActualStatus({ branch: cellBranchKey, workDate, staffCode, status, updatedBy: plannedBy });
     } catch {
       setError("บันทึกสถานะจริงไม่สำเร็จ");
     }
@@ -486,16 +523,19 @@ export function ShiftPlanner({
       const jobs: Promise<unknown>[] = [];
       for (const [key, cell] of Object.entries(plans)) {
         const [workDate, staffCode] = key.split("__");
-        jobs.push(savePlanCell({ branch, workDate, staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy }));
+        // แต่ละช่องบันทึกลงสาขาของช่องนั้นเอง — เดิมใช้สาขาที่จอเปิดอยู่ = ทุกคนถูกก๊อปไปอีกสาขา
+        jobs.push(savePlanCell({ branch: cell.branch || branch, workDate, staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy }));
       }
-      for (const [workDate, day] of Object.entries(events)) {
-        if (day.title || day.activities.length) jobs.push(saveDayEvent({ branch, workDate, title: day.title, activities: day.activities, updatedBy: plannedBy }));
+      for (const [eventBranch, days] of Object.entries(eventsByBranch)) {
+        for (const [workDate, day] of Object.entries(days)) {
+          if (day.title || day.activities.length) jobs.push(saveDayEvent({ branch: eventBranch, workDate, title: day.title, activities: day.activities, updatedBy: plannedBy }));
+        }
       }
       for (const [key, actual] of Object.entries(actuals)) {
         const status = actual.leaveType === "personal" ? "leave_personal" : actual.leaveType === "sick" ? "leave_sick" : actual.absent ? "absent" : null;
         if (status) {
           const [workDate, staffCode] = key.split("__");
-          jobs.push(setActualStatus({ branch, workDate, staffCode, status, updatedBy: plannedBy }));
+          jobs.push(setActualStatus({ branch: branchOfCell(workDate, staffCode), workDate, staffCode, status, updatedBy: plannedBy }));
         }
       }
       await Promise.all(jobs);
@@ -509,8 +549,9 @@ export function ShiftPlanner({
     if (!swapCell || !swapTarget) return;
     const { date, staffCode } = swapCell;
     const key = cellKey(date, staffCode);
+    const cellBranchKey = branchOfCell(date, staffCode);
     setActuals((prev) => {
-      const base = prev[key] ?? ({ branch, month: date.slice(0, 7), workDate: date, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
+      const base = prev[key] ?? ({ branch: cellBranchKey, month: date.slice(0, 7), workDate: date, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
       return { ...prev, [key]: { ...base, swappedTo: swapTarget, swapNote: swapNote || undefined, leaveType: undefined, absent: undefined } };
     });
     setSwapCell(null);
@@ -518,7 +559,7 @@ export function ShiftPlanner({
     const note = swapNote;
     setSwapNote("");
     try {
-      await setSwap({ branch, workDate: date, staffCode, swappedTo: swapTarget, note, updatedBy: plannedBy });
+      await setSwap({ branch: cellBranchKey, workDate: date, staffCode, swappedTo: swapTarget, note, updatedBy: plannedBy });
     } catch {
       setError("บันทึกการสลับไม่สำเร็จ");
     }
@@ -567,9 +608,10 @@ export function ShiftPlanner({
       });
       // optimistic local update
       const nextPlans: Record<string, CellValue> = {};
-      for (const cell of cells) nextPlans[cellKey(cell.workDate, cell.staffCode)] = { assignment: cell.assignment, startTime: cell.startTime };
+      for (const cell of cells) nextPlans[cellKey(cell.workDate, cell.staffCode)] = { assignment: cell.assignment, startTime: cell.startTime, branch };
       setPlans(nextPlans);
       // persist all cells
+      // จัดอัตโนมัติ = ทั้งเดือนลงสาขานี้ (savePlanCell ลบกะค้างของสาขาอื่นวันเดียวกันให้เอง)
       await Promise.all(
         cells.map((cell) =>
           savePlanCell({ branch, workDate: cell.workDate, staffCode: cell.staffCode, assignment: cell.assignment, startTime: cell.startTime, updatedBy: plannedBy })

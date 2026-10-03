@@ -7,18 +7,68 @@ import { restListCollection } from "./firestore-rest.ts";
 // supplies StoreHub clock-in + any actual leave the owner logged. The employee code
 // in the planner (ICE/Boom/Leo) is exactly the KPI employeeName, so no mapping needed.
 
-type ShiftDoc = { branch?: string; workDate?: string; staffCode?: string; assignment?: string; startTime?: string };
+type ShiftDoc = { branch?: string; workDate?: string; staffCode?: string; assignment?: string; startTime?: string; updatedAt?: string };
 type ActualDoc = { branch?: string; workDate?: string; staffCode?: string; clockIn?: string; leaveType?: string; swappedTo?: string };
+
+const isWorking = (assignment?: string) => assignment === "s1" || assignment === "s2";
+
+/** 1 กะต่อคน-วัน: กะทำงานชนะ OFF/ลา, ถ้าทำงานทั้งคู่เชื่อช่องที่แก้ล่าสุด */
+export function onePerStaffDay(shifts: ShiftDoc[]): ShiftDoc[] {
+  const byKey = new Map<string, ShiftDoc>();
+  for (const shift of shifts) {
+    if (!shift.workDate || !shift.staffCode) continue;
+    const key = `${shift.workDate}__${shift.staffCode}`;
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, shift);
+      continue;
+    }
+    const nextWorks = isWorking(shift.assignment);
+    const currentWorks = isWorking(current.assignment);
+    if (nextWorks !== currentWorks) {
+      if (nextWorks) byKey.set(key, shift);
+      continue;
+    }
+    if ((shift.updatedAt ?? "") > (current.updatedAt ?? "")) byKey.set(key, shift);
+  }
+  return [...byKey.values()];
+}
+
+/** รวม schedule_actual ของทุกสาขาเป็น 1 แถวต่อคน-วัน (ตอกบัตรเช้าสุด, ลา/สลับกะจากแถวไหนก็ได้) */
+export function mergeActuals(actuals: ActualDoc[]): ActualDoc[] {
+  const byKey = new Map<string, ActualDoc>();
+  for (const actual of actuals) {
+    if (!actual.workDate || !actual.staffCode) continue;
+    const key = `${actual.workDate}__${actual.staffCode}`;
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, { ...actual });
+      continue;
+    }
+    if (actual.clockIn && (!current.clockIn || actual.clockIn < current.clockIn)) current.clockIn = actual.clockIn;
+    if (!current.leaveType && actual.leaveType) current.leaveType = actual.leaveType;
+    if (!current.swappedTo && actual.swappedTo) current.swappedTo = actual.swappedTo;
+  }
+  return [...byKey.values()];
+}
 
 function addHoursIso(startIso: string, hours: number): string {
   return new Date(Date.parse(startIso) + hours * 3600 * 1000).toISOString();
 }
 
-export async function fetchAttendanceSource(branch: string): Promise<AttendanceSource> {
-  const [shifts, actuals] = await Promise.all([
+/**
+ * KPI เป็นของ "คน" ไม่ใช่ของสาขา — คนที่ไปเข้ากะเสนาเฟสต์ต้องถูกนับเหมือนเข้ากะบางแค.
+ * จึงอ่านทุกสาขารวมกัน แล้วยุบให้เหลือ 1 กะต่อคนต่อวัน (ข้อมูลเก่าที่ถูกบันทึกซ้ำสองสาขา
+ * เชื่อช่องที่แก้ล่าสุด) และตอกบัตรเอาเวลาเข้าที่เช้าสุดของวันนั้น.
+ * `_branch` คงไว้ให้ผู้เรียกเดิมไม่ต้องแก้ — ไม่ได้ใช้กรองแล้ว.
+ */
+export async function fetchAttendanceSource(_branch?: string): Promise<AttendanceSource> {
+  const [allShifts, allActuals] = await Promise.all([
     restListCollection<ShiftDoc>("schedule_shifts"),
     restListCollection<ActualDoc>("schedule_actual")
   ]);
+  const shifts = onePerStaffDay(allShifts);
+  const actuals = mergeActuals(allActuals);
 
   const schedules: ShiftSchedule[] = [];
   const clockEvents: ClockEvent[] = [];
@@ -30,11 +80,11 @@ export async function fetchAttendanceSource(branch: string): Promise<AttendanceS
   // Swapped shifts: the original isn't expected to work (someone else covers), so drop
   // their scheduled shift that day = no missing-clock-in penalty.
   const swapped = new Set(
-    actuals.filter((a) => a.branch === branch && a.swappedTo && a.workDate && a.staffCode).map((a) => `${a.workDate}__${a.staffCode}`)
+    actuals.filter((a) => a.swappedTo && a.workDate && a.staffCode).map((a) => `${a.workDate}__${a.staffCode}`)
   );
 
   for (const s of shifts) {
-    if (s.branch !== branch || !s.workDate || !s.staffCode) continue;
+    if (!s.workDate || !s.staffCode) continue;
     if (swapped.has(`${s.workDate}__${s.staffCode}`)) continue;
     if (s.assignment === "s1" || s.assignment === "s2") {
       const start = s.startTime || (s.assignment === "s1" ? "09:00" : "11:30");
@@ -57,7 +107,7 @@ export async function fetchAttendanceSource(branch: string): Promise<AttendanceS
   }
 
   for (const a of actuals) {
-    if (a.branch !== branch || !a.workDate || !a.staffCode) continue;
+    if (!a.workDate || !a.staffCode) continue;
     if (a.clockIn) {
       clockEvents.push({
         employeeName: a.staffCode,

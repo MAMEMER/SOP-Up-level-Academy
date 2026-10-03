@@ -2,6 +2,7 @@ import "server-only";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { isWorkingAssignment, type ShiftAssignment, type ShiftCode } from "./shift-schedule.ts";
 import { allBranchKeys } from "./store-config.ts";
+import { branchFor } from "./employee-directory.ts";
 import {
   addWorkDays,
   bangkokWorkDate,
@@ -140,7 +141,10 @@ export async function fetchShiftForStaff(branch: string, workDate: string, staff
   return (await fetchShiftPlacement(branch, workDate, staffCode))?.shift ?? null;
 }
 
-/** กะ + สาขาที่เข้าวันนั้น (ใช้ตอนต้องบอกพนักงานว่าวันนี้อยู่สาขาไหน) */
+/**
+ * กะ + สาขาที่เข้าวันนั้น (ใช้ตอนต้องบอกพนักงานว่าวันนี้อยู่สาขาไหน).
+ * ถ้ามีกะค้างอยู่หลายสาขา (ข้อมูลเก่าที่ถูกบันทึกซ้ำ) เชื่อช่องที่แก้ล่าสุด — ไม่ใช่สาขาบ้าน.
+ */
 export async function fetchShiftPlacement(
   branch: string,
   workDate: string,
@@ -151,12 +155,30 @@ export async function fetchShiftPlacement(
   const snapshots = await Promise.all(
     order.map((key) => adminDb().collection(SHIFTS).doc(`${key}__${workDate}__${staffCode}`).get())
   );
+  let best: { shift: ShiftCode; branch: string; updatedAt: string } | null = null;
   for (let index = 0; index < snapshots.length; index += 1) {
     if (!snapshots[index].exists) continue;
-    const assignment = (snapshots[index].data() as { assignment?: ShiftAssignment }).assignment;
-    if (assignment && isWorkingAssignment(assignment)) return { shift: assignment, branch: order[index] };
+    const data = snapshots[index].data() as { assignment?: ShiftAssignment; updatedAt?: string };
+    if (!data.assignment || !isWorkingAssignment(data.assignment)) continue;
+    const updatedAt = data.updatedAt ?? "";
+    if (!best || updatedAt > best.updatedAt) best = { shift: data.assignment, branch: order[index], updatedAt };
   }
-  return null;
+  return best ? { shift: best.shift, branch: best.branch } : null;
+}
+
+/**
+ * สาขาที่พนักงานคนนี้ "ทำงานจริง" วันนั้น = สาขาที่ลงกะไว้ในตาราง; วันที่ไม่มีกะใช้สาขาบ้าน.
+ * ทุกหน้าของพนักงาน (หน้าแรก / checklist / งาน / ส่งต่อกะ) ต้องใช้ตัวนี้ ไม่ใช่ branchFor() —
+ * ไม่งั้นคนที่ลงกะเสนาเฟสต์จะเห็นและติ๊ก checklist ของบางแค.
+ */
+export async function workBranchFor(staffCode: string | null | undefined, workDate: string): Promise<string> {
+  if (!staffCode) return "bangkae";
+  const home = branchFor(staffCode);
+  try {
+    return (await fetchShiftPlacement(home, workDate, staffCode))?.branch ?? home;
+  } catch {
+    return home;
+  }
 }
 
 function taskId(orderId: string): string {

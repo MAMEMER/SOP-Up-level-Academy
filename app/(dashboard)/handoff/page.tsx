@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { HandoffBoard } from "../../../components/HandoffBoard.tsx";
 import { requireUser } from "../../../lib/auth.ts";
-import { branchFor, employeeDirectory, resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
+import { employeeDirectory, resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
+import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 
 export default async function HandoffPage() {
   const user = await requireUser();
   const staffCode = resolveEmployeeByEmail(user.email) ?? null;
-  const branch = staffCode ? branchFor(staffCode) : "bangkae";
+  const branch = await workBranchFor(staffCode, formatWorkDate());
   const workDate = formatWorkDate();
   const staffOptions = employeeDirectory
     .filter((entry) => entry.branch === branch)

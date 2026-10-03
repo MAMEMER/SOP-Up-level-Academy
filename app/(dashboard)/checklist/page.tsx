@@ -2,13 +2,14 @@ import Link from "next/link";
 import { ChecklistView } from "../../../components/ChecklistView.tsx";
 import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { requireUser } from "../../../lib/auth.ts";
-import { branchFor, resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
+import { resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
+import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 
 export default async function ChecklistPage() {
   const user = await requireUser();
   const staffCode = resolveEmployeeByEmail(user.email) ?? null;
-  const branch = staffCode ? branchFor(staffCode) : "bangkae";
+  const branch = await workBranchFor(staffCode, formatWorkDate());
   const workDate = formatWorkDate();
 
   return (

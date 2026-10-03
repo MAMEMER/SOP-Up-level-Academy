@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { StockRunWorkspace } from "../../../components/StockRunWorkspace.tsx";
 import { requireUser } from "../../../lib/auth.ts";
-import { branchFor, employeeCodeForEmail } from "../../../lib/employee-directory.ts";
+import { employeeCodeForEmail } from "../../../lib/employee-directory.ts";
+import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
+import { formatWorkDate } from "../../../lib/workflow-records.ts";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChecklistWeeklyPage() {
   const user = await requireUser();
   const staffCode = employeeCodeForEmail(user.email) || null;
-  const branch = staffCode ? branchFor(staffCode) : "bangkae";
+  const branch = await workBranchFor(staffCode, formatWorkDate());
 
   return (
     <main className="page">

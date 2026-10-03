@@ -127,6 +127,7 @@ export async function POST(request: Request) {
         const staffCode = str(body.staffCode);
         const assignment = str(body.assignment) as ShiftAssignment;
         if (!branch || !workDate || !staffCode || !assignment) return badRequest("missing_params");
+        if (!allBranchKeys().includes(branch)) return badRequest("unknown_branch");
         const record: Record<string, unknown> = {
           branch,
           month: monthOf(workDate),
@@ -137,7 +138,16 @@ export async function POST(request: Request) {
           updatedAt: nowIso,
           updatedBy
         };
-        await db().collection(SHIFTS).doc(shiftDocId(branch, workDate, staffCode)).set(record);
+        // คนหนึ่งอยู่ได้สาขาเดียวต่อวัน: ลงกะทำงาน/ลาที่สาขานี้ = ลบช่องของสาขาอื่นวันเดียวกันทิ้งในคำสั่งเดียว
+        // (ไม่พึ่งให้หน้าจอเรียก clearOtherBranchCells ตามมา — ทางที่ลืมเรียกคือที่มาของกะซ้อนสองสาขา)
+        const batch = db().batch();
+        batch.set(db().collection(SHIFTS).doc(shiftDocId(branch, workDate, staffCode)), record);
+        if (assignment !== "off") {
+          for (const key of allBranchKeys().filter((key) => key !== branch)) {
+            batch.delete(db().collection(SHIFTS).doc(shiftDocId(key, workDate, staffCode)));
+          }
+        }
+        await batch.commit();
         return NextResponse.json({ ok: true });
       }
       // เจ้าของตั้งเวลาเข้างานของแต่ละกะเอง (ช่วงเปิดสาขาใหม่เวลายังไม่นิ่ง)
