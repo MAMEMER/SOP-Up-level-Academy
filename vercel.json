@@ -1,9 +1,31 @@
 {
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "crons": [
-    { "path": "/api/storehub/sync-clockin", "schedule": "0 4 * * *" },
-    { "path": "/api/storehub/sync-clockin", "schedule": "0 16 * * *" },
-    { "path": "/api/storehub/sync-shop", "schedule": "0 3 * * *" },
-    { "path": "/api/storehub/sync-shop", "schedule": "0 16 * * *" }
+    {
+      "path": "/api/storehub/sync-clockin",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/storehub/sync-clockin",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/storehub/sync-shop",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/storehub/sync-shop",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/parcel-orders/alerts",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/parcel-orders/alerts",
+      "schedule": "0 11 * * *"
+    }
   ]
 }

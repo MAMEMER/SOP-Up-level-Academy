@@ -10,6 +10,8 @@ import { projectNoProgressAdjustments } from "./assigned-work-auto-kpi.ts";
 import { bangkokToday } from "./performance-score-data.ts";
 import { defaultKpiRules } from "./kpi-rules.ts";
 import { fetchAttendanceSource } from "./planner-kpi.ts";
+import { fetchWorkedAtBranch, listAllParcelOrders } from "./parcel-orders-server.ts";
+import { parcelLateAdjustments, type ParcelOrder } from "./parcel-orders.ts";
 
 /**
  * Every manual KPI input in one object.
@@ -20,14 +22,16 @@ import { fetchAttendanceSource } from "./planner-kpi.ts";
  * stay free of "server-only" and keep its record helpers unit-testable.
  */
 export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStore> {
-  const [manual, stockCheckRecords, checklistAuditRecords, scoreAdjustments, kpiRules, projects, workedDays] = await Promise.all([
+  const [manual, stockCheckRecords, checklistAuditRecords, scoreAdjustments, kpiRules, projects, workedDays, parcels, workedAtBranch] = await Promise.all([
     fetchManualRecords(),
     fetchStockCheckRecords(),
     fetchChecklistAuditRecords(),
     fetchScoreAdjustments(),
     fetchKpiRules(),
     fetchAllWorkProjects(),
-    fetchWorkedDays()
+    fetchWorkedDays(),
+    listAllParcelOrders().catch(() => [] as ParcelOrder[]),
+    fetchWorkedAtBranch()
   ]);
   // ผลตรวจงานที่มอบหมายรายคน (หน้า /admin/projects) เข้า KPI ผ่าน channel เดียวกับ
   // owner corrections — พนักงานจึงโดนหัก/ได้คืนคะแนนจริงในหน้าคะแนนพนักงานโดยไม่ต้องแก้ engine.
@@ -41,11 +45,18 @@ export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStor
     ratePerDay: kpiRules?.assignedWork?.noProgressPerDay ?? defaultKpiRules.assignedWork.noProgressPerDay,
     workedDays
   });
+  // พัสดุการ์ด: ของถึงร้านแล้วแต่แอดมินยังแกะ-เช็ค-ลงไม่จบหลังกำหนด → หักทุกคนที่เข้ากะสาขานั้นจริง
+  // วันที่เลย (lib/parcel-orders.ts) — derived เหมือน no-progress ไม่เก็บลง Firestore
+  const parcelAdjustments = parcelLateAdjustments(parcels, {
+    today: bangkokToday(),
+    ratePerDay: kpiRules?.assignedWork?.parcelLatePerDay ?? defaultKpiRules.assignedWork.parcelLatePerDay,
+    workedAtBranch
+  });
   return {
     ...manual,
     stockCheckRecords,
     checklistAuditRecords,
-    scoreAdjustments: [...(scoreAdjustments || []), ...projectReviewAdjustments, ...noProgressAdjustments],
+    scoreAdjustments: [...(scoreAdjustments || []), ...projectReviewAdjustments, ...noProgressAdjustments, ...parcelAdjustments],
     kpiRules
   };
 }

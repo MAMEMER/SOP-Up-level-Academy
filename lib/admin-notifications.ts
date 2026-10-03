@@ -83,6 +83,8 @@ export type NotificationInput = {
   handoffs: { open: number };
   /** checklist ของวันนี้ */
   checklist: { latePhases: number; notStartedStaff: string[] };
+  /** พัสดุการ์ดที่สั่งจากพ่อค้า (sop_parcel_orders) — ไม่ส่ง = ไม่มีข้อมูล */
+  parcels?: { overdue: number; late: number; problem: number; arrived: number };
   /** แจ้งบัค / ข้อเสนอแนะที่ยังไม่ได้อ่าน */
   bugReports: { open: number };
   /**
@@ -160,6 +162,51 @@ export function buildAdminNotifications(input: NotificationInput): AdminNotifica
       detail: input.deliveries.unclaimed ? `ยังไม่มีคนรับงาน ${input.deliveries.unclaimed} ใบ` : undefined,
       href: "/#delivery-orders",
       count: input.deliveries.unshipped
+    });
+  }
+
+  // ── พัสดุการ์ด: เกิน 5 วันยังไม่ถึง = เจ้าของร้านต้องตามพ่อค้า ────────────────
+  const parcels = input.parcels;
+  if (parcels?.overdue) {
+    items.push({
+      id: "parcel-overdue",
+      level: "urgent",
+      source: "พัสดุการ์ด",
+      title: `สั่งเกิน 5 วันยังไม่ถึงร้าน ${parcels.overdue} กล่อง`,
+      detail: "ตามพ่อค้า",
+      href: "/parcels",
+      count: parcels.overdue
+    });
+  }
+  if (parcels?.late) {
+    items.push({
+      id: "parcel-late",
+      level: "urgent",
+      source: "พัสดุการ์ด",
+      title: `ของถึงแล้ว แอดมินยังไม่ลง เลยกำหนด ${parcels.late} กล่อง`,
+      detail: "หักคะแนนคนที่เข้ากะทุกวันที่เลย",
+      href: "/parcels",
+      count: parcels.late
+    });
+  }
+  if (parcels?.problem) {
+    items.push({
+      id: "parcel-problem",
+      level: "warning",
+      source: "พัสดุการ์ด",
+      title: `ของไม่ตรง/ขาด รอจัดการ ${parcels.problem} กล่อง`,
+      href: "/parcels",
+      count: parcels.problem
+    });
+  }
+  if (parcels?.arrived) {
+    items.push({
+      id: "parcel-arrived",
+      level: "info",
+      source: "พัสดุการ์ด",
+      title: `ของถึงแล้ว แอดมินกำลังเช็ค/ลง ${parcels.arrived} กล่อง`,
+      href: "/parcels",
+      count: parcels.arrived
     });
   }
 
