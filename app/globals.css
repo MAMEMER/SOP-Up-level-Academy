@@ -7704,7 +7704,7 @@ main .page > section, main > section { margin-top: 16px !important; }
 /* ปุ่มสลับสาขาบนหน้าแอดมิน */
 .admin-branch-switch {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   padding: 4px;
   border-radius: 999px;
@@ -7715,11 +7715,15 @@ main .page > section, main > section { margin-top: 16px !important; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 1 1 auto;
+  justify-content: center;
+  white-space: nowrap;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
   background: transparent;
+  box-shadow: none;
   color: var(--color-ink-soft);
   font: inherit;
   font-size: 15px;
@@ -7745,6 +7749,12 @@ main .page > section, main > section { margin-top: 16px !important; }
   margin: 0 0 16px;
 }
 .admin-branch-bar small { color: var(--color-ink-soft); }
+@media (max-width: 480px) {
+  .admin-branch-switch { display: flex; width: 100%; }
+  .admin-branch-switch button { padding: 0 10px; font-size: 14px; }
+}
+/* สถิติในคอลัมน์สาขา: 2×2 บนมือถือ ไม่ให้ยืดเป็นแถวละช่องจนต้องเลื่อนยาว */
+.admin-branch-col .admin-hub__pulse { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .admin-branch-cols {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
@@ -7767,3 +7777,5 @@ main .page > section, main > section { margin-top: 16px !important; }
   border-radius: 50%;
   background: var(--branch-color);
 }
+.admin-branch-switch button:not(.is-active),
+.admin-branch-switch button:not(.is-active):hover { background: transparent; box-shadow: none; transform: none; }
