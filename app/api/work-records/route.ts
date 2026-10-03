@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "../../../lib/auth.ts";
-import { employeeCodeForEmail, employeeDirectory } from "../../../lib/employee-directory.ts";
+import { employeeCodeForEmail } from "../../../lib/employee-directory.ts";
+import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 import { listRecordsForScopeKey, listRecordsInRange, readRecord, storageMode, upsertRecord } from "../../../lib/work-records-store.ts";
-import { preserveFirstSubmission, type WorkflowDailyRecord } from "../../../lib/workflow-records.ts";
+import { formatWorkDate, preserveFirstSubmission, type WorkflowDailyRecord } from "../../../lib/workflow-records.ts";
 import {
   MAX_WORK_RECORD_BYTES,
   employeeKeyFromEmail,
@@ -13,9 +14,18 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function branchForEmail(email: string) {
-  const code = employeeCodeForEmail(email);
-  return employeeDirectory.find((entry) => entry.code === code)?.branch || "bangkae";
+/**
+ * สาขาที่คนนี้ทำงานในวันนั้น = สาขาที่ลงกะไว้ (ไม่มีกะ = สาขาบ้าน). เช็คลิสต์ที่ติ๊กตอนไปเข้ากะ
+ * อีกสาขาต้องไปอยู่สาขานั้น — เดิมใช้สาขาบ้านเสมอ ของเลยไปโผล่ผิดสาขา.
+ */
+async function branchForEmail(email: string, workDate = formatWorkDate()) {
+  return workBranchFor(employeeCodeForEmail(email), workDate);
+}
+
+/** `d-2026-10-03` → `2026-10-03`; scope อื่น (weekly/monthly) ใช้วันนี้ */
+function workDateOfScopeKey(scopeKey: string): string {
+  const match = /^d-(\d{4}-\d{2}-\d{2})$/.exec(scopeKey);
+  return match ? match[1] : formatWorkDate();
 }
 
 function keyForEmail(email: string) {
@@ -23,8 +33,8 @@ function keyForEmail(email: string) {
 }
 
 /** "team" records are shared per branch; anything else is the person's own record. */
-function ownerKeyFor(email: string, owner: string | null) {
-  return owner === "team" ? teamKeyForBranch(branchForEmail(email)) : keyForEmail(email);
+async function ownerKeyFor(email: string, owner: string | null) {
+  return owner === "team" ? teamKeyForBranch(await branchForEmail(email)) : keyForEmail(email);
 }
 
 /**
@@ -58,7 +68,7 @@ export async function GET(request: Request) {
     const to = params.get("to");
     if (!from || !to) return NextResponse.json({ error: "missing_range" }, { status: 400 });
 
-    const records = await listRecordsInRange(ownerKeyFor(employeeEmail, params.get("owner")), from, to);
+    const records = await listRecordsInRange(await ownerKeyFor(employeeEmail, params.get("owner")), from, to);
     return NextResponse.json({ records, storageReady: true });
   } catch (error) {
     return NextResponse.json({ error: "read_failed", detail: String(error) }, { status: 500 });
@@ -86,7 +96,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
   }
 
-  const employeeKey = ownerKeyFor(user.email, body.owner ?? null);
+  const employeeKey = await ownerKeyFor(user.email, body.owner ?? null);
   let data = body.data;
 
   // กดส่งซ้ำต้องไม่เลื่อนเวลาส่งให้ช้าลง — ตัดสินจากเอกสารที่เก็บอยู่จริง ไม่ใช่จากสิ่งที่
@@ -103,7 +113,7 @@ export async function PUT(request: Request) {
     employeeKey,
     employeeEmail: user.email,
     employeeName: user.name,
-    branch: branchForEmail(user.email),
+    branch: await branchForEmail(user.email, workDateOfScopeKey(body.scopeKey)),
     scope: body.scope,
     scopeKey: body.scopeKey,
     data,
