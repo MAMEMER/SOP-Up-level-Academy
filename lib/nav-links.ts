@@ -30,6 +30,7 @@ export const staffGroups: NavGroup[] = [
     label: "เช็คลิสต์และตาราง",
     links: [
       { href: "/checklist", label: "เช็คลิสต์" },
+      { href: "/closing", label: "ปิดยอด" },
       { href: "/supplies", label: "ของที่ต้องสั่ง" },
       { href: "/schedule", label: "ตารางกะ" },
       { href: "/training", label: "คู่มืองาน" }
@@ -38,7 +39,10 @@ export const staffGroups: NavGroup[] = [
 ];
 
 /** ลิงก์เดี่ยวของแอดมิน — หน้ารวมงานจัดการเป็นทางเข้าหลัก ไม่ต้องซ่อนในกลุ่ม */
-export const adminQuickLinks: NavLink[] = [{ href: "/admin", label: "หน้ารวมงานจัดการ", exact: true }];
+export const adminQuickLinks: NavLink[] = [
+  { href: "/admin", label: "หน้ารวมงานจัดการ", exact: true },
+  { href: "/admin/closing", label: "ปิดยอด 2 สาขา" }
+];
 
 export const adminGroups: NavGroup[] = [
   {

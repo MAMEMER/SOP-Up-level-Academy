@@ -7779,3 +7779,54 @@ main .page > section, main > section { margin-top: 16px !important; }
 }
 .admin-branch-switch button:not(.is-active),
 .admin-branch-switch button:not(.is-active):hover { background: transparent; box-shadow: none; transform: none; }
+
+/* ปิดยอดประจำวัน */
+.close-form { display: grid; gap: 16px; margin-top: 12px; }
+.close-card { background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(45, 49, 66, 0.08); border-radius: 18px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.close-card h3 { margin: 0; font-size: 18px; }
+.close-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.close-card__head .soft-button, .close-form .soft-button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.close-lines { margin: 0; display: grid; gap: 6px; }
+.close-lines > div { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.close-lines dt { color: var(--color-ink-soft); min-width: 0; }
+.close-lines dd { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.close-lines__total { border-top: 1px solid rgba(45, 49, 66, 0.12); padding-top: 6px; font-weight: 600; }
+.close-lines__total dt { color: var(--color-ink); }
+.close-lines .is-ok dd, .close-lines .is-ok dt { color: #15803d; }
+.close-lines .is-bad dd, .close-lines .is-bad dt { color: #b91c1c; }
+.close-lines--sub { font-size: 14px; opacity: 0.9; }
+.close-field { display: grid; gap: 6px; }
+.close-field span { font-size: 14px; color: var(--color-ink-soft); }
+.close-field input, .close-field textarea, .close-denoms input, .close-paidouts input { font: inherit; font-size: 16px; padding: 10px 12px; min-height: 44px; border-radius: 12px; border: 1px solid rgba(45, 49, 66, 0.18); background: #fff; width: 100%; box-sizing: border-box; }
+.close-denoms { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 8px 20px; }
+.close-denoms label { display: grid; grid-template-columns: 88px minmax(0, 1fr) 96px; align-items: center; gap: 10px; }
+.close-denoms span { font-size: 15px; color: var(--color-ink-soft); }
+.close-denoms small { font-size: 14px; color: var(--color-ink); text-align: right; font-variant-numeric: tabular-nums; }
+.close-paidouts { display: grid; gap: 8px; }
+.close-paidouts > span { font-size: 14px; color: var(--color-ink-soft); }
+.close-paidouts__row { display: grid; grid-template-columns: minmax(80px, 110px) minmax(0, 1fr) 44px; gap: 8px; }
+.close-icon-button { min-width: 44px; min-height: 44px; border-radius: 12px; border: 1px solid rgba(45, 49, 66, 0.14); background: #fff; display: grid; place-items: center; color: var(--color-ink-soft); cursor: pointer; }
+.close-handover { margin: 0; font-size: 16px; }
+.close-handover strong { font-size: 20px; }
+.close-alert { display: flex; gap: 8px; align-items: flex-start; padding: 12px; border-radius: 14px; background: #fff4e5; color: #8a4b08; font-size: 14px; margin: 0; }
+.close-alert ul, .close-list { margin: 6px 0 0; padding-left: 18px; }
+.close-alert svg { flex: none; margin-top: 2px; }
+.close-problems { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; color: #b91c1c; font-size: 14px; }
+.close-problems li { display: flex; gap: 6px; align-items: center; }
+.close-message { display: flex; gap: 6px; align-items: center; margin: 0; font-size: 15px; }
+.close-message.is-ok { color: #15803d; }
+.close-message.is-bad { color: #b91c1c; }
+.close-submit { min-height: 52px; width: 100%; font-size: 17px; }
+.close-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.close-meta { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+.close-verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; margin: 0 0 16px; }
+.close-verdict > div { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; font-weight: 600; background: rgba(45, 49, 66, 0.06); }
+.close-verdict .is-ok { background: #e7f6ec; color: #15803d; }
+.close-verdict .is-bad { background: #fde8e8; color: #b91c1c; }
+.close-verdict .is-wait { background: #fff4e5; color: #8a4b08; }
+.admin-branch-col { display: grid; gap: 12px; align-content: start; }
+.close-kshop { margin-top: 16px; }
+.close-bank { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.close-bank .primary-action { min-height: 44px; }
+@media (max-width: 480px) { .close-bank { grid-template-columns: 1fr; } }
+.close-details summary { cursor: pointer; font-size: 14px; color: var(--color-ink-soft); }
