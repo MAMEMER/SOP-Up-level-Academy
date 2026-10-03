@@ -9,14 +9,15 @@ import { AdminNotificationCenter } from "../../../components/AdminNotificationCe
 import { DeliveryOrdersBoard } from "../../../components/DeliveryOrdersBoard.tsx";
 import { WorkflowReviewRecords } from "../../../components/WorkflowReviewRecords.tsx";
 import { syncDeliveryTasks } from "../../../lib/delivery-tasks-server.ts";
-import { deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-tasks.ts";
+import { DELIVERY_BRANCH, deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-tasks.ts";
+import { branchesForView, resolveAdminBranchView } from "../../../lib/admin-branch.ts";
+import { branchColor, branchShortName } from "../../../lib/store-config.ts";
+import { AdminBranchSwitch } from "../../../components/AdminBranchSwitch.tsx";
 import type { DeliveryTask } from "../../../lib/delivery-tasks.ts";
 import { getShopSyncStatus } from "../../../lib/shop-sync-status.ts";
 import { ShopStockSyncPanel } from "../../../components/ShopStockSyncPanel.tsx";
 import { docIdFor, eligibleStaff, listDocRecords } from "../../../lib/staff-documents-server.ts";
 import { docsStatus } from "../../../lib/staff-documents.ts";
-
-const ADMIN_BRANCH = "bangkae";
 
 // The owner's home. Signed in as an admin, "/" is still the staff dashboard — a personal
 // checklist nobody in charge fills in — so running the day meant hunting through ten nav
@@ -37,15 +38,19 @@ type Tool = {
 // ตัวเลขบนหน้านี้ต้องสดเสมอ — เจ้าของร้านใช้ตัดสินใจว่าจะไปตามเรื่องไหนก่อน
 export const dynamic = "force-dynamic";
 
-export default async function AdminHubPage() {
+export default async function AdminHubPage({ searchParams }: { searchParams?: Promise<{ branch?: string }> }) {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
   const workDate = formatWorkDate();
-  const summary = await getOpsSummary(workDate);
-  // งานส่งของ: sync ครั้งเดียวตรงนี้ แล้วส่งต่อให้ทั้งบอร์ดและศูนย์แจ้งเตือน —
-  // ไม่ให้หน้าเดียวยิง syncDeliveryTasks ซ้ำสองรอบ. admin เห็นทุกใบ (visibleTo คืน true).
-  const deliveryAll = await syncDeliveryTasks(ADMIN_BRANCH).catch(() => [] as DeliveryTask[]);
+  // ดูสองสาขาคู่กัน (ค่าเริ่มต้น) หรือทีละสาขา — ตัวเลขทุกตัวบนหน้านี้คิดแยกต่อสาขา
+  const view = await resolveAdminBranchView((searchParams ? await searchParams : {}).branch);
+  const branches = branchesForView(view);
+  const summaries = await Promise.all(branches.map(async (branch) => ({ branch, summary: await getOpsSummary(workDate, branch) })));
+  const showsDelivery = branches.includes(DELIVERY_BRANCH);
+  // งานส่งของ (ออเดอร์ออนไลน์ = สาขา DELIVERY_BRANCH): sync ครั้งเดียวตรงนี้ แล้วส่งต่อให้ทั้งบอร์ดและ
+  // ศูนย์แจ้งเตือน — ไม่ยิงซ้ำสองรอบ. admin เห็นทุกใบ (visibleTo คืน true).
+  const deliveryAll = showsDelivery ? await syncDeliveryTasks().catch(() => [] as DeliveryTask[]) : [];
   const deliveryTasks = sortDeliveryTasks(
     deliveryAll.filter((task) =>
       deliveryTaskVisibleTo(task, { isAdmin: true, staffCode: null, shiftToday: null, today: workDate })
@@ -53,7 +58,7 @@ export default async function AdminHubPage() {
     workDate
   );
   // ทุกเรื่องค้างจากทุกหน้า รวมมาไว้บนสุดของ hub — ไม่ต้องไล่เปิดทีละหน้าถึงจะรู้
-  const notifications = await getAdminNotifications(summary, workDate, ADMIN_BRANCH, deliveryTasks);
+  const notifications = await getAdminNotifications(summaries, workDate, deliveryTasks);
   // สถานะ sync สต็อกร้านออนไลน์ล่าสุด (StoreHub → shop-products) — โชว์ให้เจ้าของกด sync เองได้
   const shopSyncStatus = await getShopSyncStatus();
   const owner = isOwner(user.email);
@@ -66,9 +71,20 @@ export default async function AdminHubPage() {
     .then(([people, records]) => people.filter((person) => docsStatus(records.get(docIdFor(person))) === "not_submitted").length)
     .catch(() => 0);
 
-  const waitingReview = summary.assignments.filter((item) => item.status === "submitted").length;
-  const openWork = summary.assignments.filter((item) => item.status === "open").length;
-  const checklistPercent = summary.daily.total > 0 ? Math.round((summary.daily.completed / summary.daily.total) * 100) : 0;
+  const pulses = summaries.map(({ branch, summary }) => ({
+    branch,
+    summary,
+    waitingReview: summary.assignments.filter((item) => item.status === "submitted").length,
+    openWork: summary.assignments.filter((item) => item.status === "open").length,
+    checklistPercent: summary.daily.total > 0 ? Math.round((summary.daily.completed / summary.daily.total) * 100) : 0
+  }));
+  const sumOf = (pick: (summary: (typeof summaries)[number]["summary"]) => number) =>
+    summaries.reduce((total, entry) => total + pick(entry.summary), 0);
+  const openWork = pulses.reduce((total, entry) => total + entry.openWork, 0);
+  const latePhases = sumOf((summary) => summary.daily.latePhases);
+  const submittedPhases = sumOf((summary) => summary.daily.submittedPhases);
+  // คนที่เข้ากะวันนี้ในสาขาที่กำลังดู (เริ่ม checklist แล้ว + ยังไม่เริ่ม)
+  const staffCount = sumOf((summary) => summary.staff.length + summary.noRecordStaff.length);
 
   const groups: Array<{ title: string; hint: string; tools: Tool[] }> = [
     {
@@ -79,13 +95,13 @@ export default async function AdminHubPage() {
           href: "/admin/ops",
           title: "รายละเอียดรายคน",
           detail: "เจาะดูรายคน — ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม (ตัวเลขสรุปรวมอยู่บนหน้านี้แล้ว)",
-          badge: summary.daily.latePhases ? { count: summary.daily.latePhases, label: "เกินกำหนด" } : undefined
+          badge: latePhases ? { count: latePhases, label: "เกินกำหนด" } : undefined
         },
         {
           href: "/manager-review",
           title: "ตรวจงาน",
           detail: "งานที่พนักงานกดส่งตรวจ พร้อมหลักฐานที่แนบมา",
-          badge: summary.daily.submittedPhases ? { count: summary.daily.submittedPhases, label: "ส่งมาแล้ว" } : undefined
+          badge: submittedPhases ? { count: submittedPhases, label: "ส่งมาแล้ว" } : undefined
         },
         {
           href: "/admin/staff-view",
@@ -166,7 +182,7 @@ export default async function AdminHubPage() {
           title: "จัดการพนักงาน",
           detail: "เพิ่ม / แก้ / ปิดบัญชี · อีเมลที่ login ได้ · รหัสพนักงาน · ชื่อใน StoreHub",
           staffAdminOnly: true,
-          badge: { count: summary.staff.length + summary.noRecordStaff.length, label: "คน" }
+          badge: { count: staffCount, label: "คนเข้ากะวันนี้" }
         },
         {
           href: "/admin/staff-documents",
@@ -194,39 +210,52 @@ export default async function AdminHubPage() {
         </div>
       </section>
 
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={view} allowAll />
+      </div>
+
       <AdminNotificationCenter items={notifications} />
 
-      <section className="admin-hub__pulse">
-        <Link href="/manager-review" className="board-stat">
-          <span>Checklist วันนี้</span>
-          <strong>{checklistPercent}%</strong>
-          <small>{summary.daily.completed}/{summary.daily.total} ข้อ · {summary.staff.length} คนเริ่มแล้ว</small>
-        </Link>
-        <Link href="/manager-review" className="board-stat">
-          <span>รอตรวจ</span>
-          <strong className={waitingReview ? "is-alert" : undefined}>{waitingReview}</strong>
-          <small>งานที่พนักงานส่งมา</small>
-        </Link>
-        <Link href="/admin/assign" className="board-stat">
-          <span>งานค้าง</span>
-          <strong className={openWork ? "is-alert" : undefined}>{openWork}</strong>
-          <small>มอบหมายแล้วยังไม่ส่ง</small>
-        </Link>
-        <Link href="/handoff" className="board-stat">
-          <span>งานส่งต่อ</span>
-          <strong className={summary.handoffs.length ? "is-alert" : undefined}>{summary.handoffs.length}</strong>
-          <small>ค้างข้ามกะ</small>
-        </Link>
-      </section>
+      <div className={pulses.length > 1 ? "admin-branch-cols" : undefined}>
+        {pulses.map(({ branch, summary, waitingReview, openWork: open, checklistPercent }) => (
+          <section key={branch} className="admin-branch-col" style={{ ["--branch-color" as string]: branchColor(branch) }}>
+            <h3><i aria-hidden />{branchShortName(branch)}</h3>
+            <div className="admin-hub__pulse">
+              <Link href={`/admin/ops?branch=${branch}`} className="board-stat">
+                <span>Checklist วันนี้</span>
+                <strong>{checklistPercent}%</strong>
+                <small>{summary.daily.completed}/{summary.daily.total} ข้อ · {summary.staff.length} คนเริ่มแล้ว</small>
+              </Link>
+              <Link href="/manager-review" className="board-stat">
+                <span>รอตรวจ</span>
+                <strong className={waitingReview ? "is-alert" : undefined}>{waitingReview}</strong>
+                <small>งานที่พนักงานส่งมา</small>
+              </Link>
+              <Link href={`/admin/assign?branch=${branch}`} className="board-stat">
+                <span>งานค้าง</span>
+                <strong className={open ? "is-alert" : undefined}>{open}</strong>
+                <small>มอบหมายแล้วยังไม่ส่ง</small>
+              </Link>
+              <Link href={`/admin/ops?branch=${branch}`} className="board-stat">
+                <span>งานส่งต่อ</span>
+                <strong className={summary.handoffs.length ? "is-alert" : undefined}>{summary.handoffs.length}</strong>
+                <small>ค้างข้ามกะ</small>
+              </Link>
+            </div>
+          </section>
+        ))}
+      </div>
 
-      {/* งานส่งของ — ยกออเดอร์เว็บกิลด์มาไว้บน hub เพื่อไม่ต้องออกไปหน้าพนักงาน */}
-      <DeliveryOrdersBoard
-        branch={ADMIN_BRANCH}
-        initialTasks={deliveryTasks}
-        initialToday={workDate}
-        initialShift={null}
-        canAct={!user.isImpersonating}
-      />
+      {/* งานส่งของ — ออเดอร์ออนไลน์ทั้งหมดเป็นงานของสาขา DELIVERY_BRANCH */}
+      {showsDelivery ? (
+        <DeliveryOrdersBoard
+          branch={DELIVERY_BRANCH}
+          initialTasks={deliveryTasks}
+          initialToday={workDate}
+          initialShift={null}
+          canAct={!user.isImpersonating}
+        />
+      ) : null}
 
       {/* คิวตรวจงาน — ยกจาก /manager-review มาไว้บน hub ตรงนี้ด้วย */}
       <WorkflowReviewRecords />

@@ -4,12 +4,12 @@ import { fetchSupplyNeeds, hasSupplyNeedsSource } from "../lib/storehub-supply-n
 // แถบ "ของที่ต้องสั่ง" บนหน้าหลักของพนักงาน — อยู่บนสุดเพื่อไม่ให้ลืมสั่งของ.
 // ดึงจาก StoreHub (แคชไว้แล้วใน lib) ถ้าดึงไม่ได้หรือไม่มีของต้องสั่ง = ไม่ขึ้นอะไรเลย
 // จะได้ไม่กลายเป็นแถบว่างที่ทุกคนเรียนรู้ที่จะมองข้าม.
-export async function SupplyNeedsBanner() {
+export async function SupplyNeedsBanner({ branch }: { branch: string }) {
   if (!hasSupplyNeedsSource()) return null;
 
   let result: Awaited<ReturnType<typeof fetchSupplyNeeds>>;
   try {
-    result = await fetchSupplyNeeds();
+    result = await fetchSupplyNeeds(undefined, branch);
   } catch {
     return null;
   }

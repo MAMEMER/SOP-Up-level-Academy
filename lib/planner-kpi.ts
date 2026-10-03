@@ -1,6 +1,7 @@
 import type { ClockEvent, LeaveRecord, ShiftSchedule } from "./performance-score.ts";
 import type { AttendanceSource } from "./performance-score-data.ts";
 import { restListCollection } from "./firestore-rest.ts";
+import { defaultShiftStart } from "./shift-schedule.ts";
 
 // Builds the KPI attendance source from the LIVE Firestore planner: the shift plan
 // (schedule_shifts) supplies scheduled shifts + planned leave, and schedule_actual
@@ -87,7 +88,8 @@ export async function fetchAttendanceSource(_branch?: string): Promise<Attendanc
     if (!s.workDate || !s.staffCode) continue;
     if (swapped.has(`${s.workDate}__${s.staffCode}`)) continue;
     if (s.assignment === "s1" || s.assignment === "s2") {
-      const start = s.startTime || (s.assignment === "s1" ? "09:00" : "11:30");
+      // ไม่ได้ใส่เวลาเข้า = เวลาแรกของกะนั้นในสาขาที่ลงกะ (เสนาฯ ก2 ≠ 11:30 ของบางแค — ไม่งั้นโดนนับสายผิด)
+      const start = s.startTime || defaultShiftStart(s.assignment, s.branch);
       const scheduledStart = `${s.workDate}T${start}:00+07:00`;
       schedules.push({
         employeeName: s.staffCode,

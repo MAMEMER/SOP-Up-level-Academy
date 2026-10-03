@@ -4,7 +4,7 @@ import { SelfReviewBoard } from "../../../components/SelfReviewBoard.tsx";
 import { FlowerGarden } from "../../../components/FlowerGarden.tsx";
 import { StaffFeedbackPanel } from "../../../components/StaffFeedbackPanel.tsx";
 import { requireUser } from "../../../lib/auth.ts";
-import { branchFor, displayNameFor, employeeCodeForEmail, employeeCodes, employeeDirectory } from "../../../lib/employee-directory.ts";
+import { displayNameFor, employeeCodeForEmail, employeeCodes, employeeDirectory } from "../../../lib/employee-directory.ts";
 import { currentReviewPeriod, getPerformanceScoreRows } from "../../../lib/performance-score-data.ts";
 import { fetchChecklistKpiInput } from "../../../lib/checklist-kpi.ts";
 import { fetchAttendanceSource } from "../../../lib/planner-kpi.ts";
@@ -15,6 +15,7 @@ import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { phaseScheduleForWorkDate, formatWorkDate } from "../../../lib/workflow-records.ts";
 import { resolveStaffViewSelection } from "../../../lib/staff-view.ts";
 import { buildSelfReview, topLateChecklistPhase } from "../../../lib/self-review.ts";
+import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 
 // ประเมินผลงานตัวเอง — พนักงานเปิดดูของตัวเองได้ตลอด, หัวหน้าสลับดูของแต่ละคนได้
 // (กติกาการมองเห็นใช้ resolveStaffViewSelection ตัวเดียวกับหน้า "งานของฉัน").
@@ -50,8 +51,8 @@ export default async function MyReviewPage({ searchParams }: PageProps) {
     );
   }
 
-  const branch = branchFor(selectedCode);
   const workDate = formatWorkDate();
+  const branch = await workBranchFor(selectedCode, workDate);
   const period = currentReviewPeriod();
 
   const [dailyStore, attendance, checklistKpi, windows, shifts] = await Promise.all([

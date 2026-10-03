@@ -4,6 +4,7 @@ import { isWorkingAssignment, type ShiftAssignment, type ShiftCode } from "./shi
 import { allBranchKeys } from "./store-config.ts";
 import { branchFor } from "./employee-directory.ts";
 import {
+  DELIVERY_BRANCH,
   addWorkDays,
   bangkokWorkDate,
   buildShiftWindows,
@@ -127,8 +128,8 @@ export async function fetchShiftWindows(branch: string, workDate: string): Promi
     fetchShiftCells(branch, nextDate)
   ]);
   return {
-    today: buildShiftWindows(workDate, todayCells),
-    tomorrow: buildShiftWindows(nextDate, tomorrowCells)
+    today: buildShiftWindows(workDate, todayCells, branch),
+    tomorrow: buildShiftWindows(nextDate, tomorrowCells, branch)
   };
 }
 
@@ -194,14 +195,20 @@ export async function fetchDeliveryTasks(branch: string, now = new Date()): Prom
 }
 
 /**
- * ดึงออเดอร์ที่จ่ายแล้วจากเว็บกิลด์ แล้วสร้างใบงานส่งของสำหรับใบที่ยังไม่มี.
- * คืนใบงานทั้งหมดของสาขาช่วงล่าสุด (ของเดิม + ที่เพิ่งสร้าง).
+ * ดึงออเดอร์ที่จ่ายแล้วจากเว็บกิลด์ แล้วสร้างใบงานส่งของสำหรับใบที่ยังไม่มี — ใต้ DELIVERY_BRANCH เสมอ
+ * ไม่ว่าใครเป็นคนเปิดหน้า. คืนใบงานทั้งหมดของสาขาส่งของช่วงล่าสุด (ของเดิม + ที่เพิ่งสร้าง).
  */
-export async function syncDeliveryTasks(branch: string, now = new Date()): Promise<DeliveryTask[]> {
-  const existing = await fetchDeliveryTasks(branch, now);
-  if (!hasAdminCredentials()) return existing;
-
-  const known = new Set(existing.map((task) => task.orderId));
+export async function syncDeliveryTasks(now = new Date()): Promise<DeliveryTask[]> {
+  const branch = DELIVERY_BRANCH;
+  if (!hasAdminCredentials()) return [];
+  const since0 = addWorkDays(bangkokWorkDate(now), -LOOKBACK_DAYS);
+  const recent = (await adminDb().collection(TASKS).where("paidWorkDate", ">=", since0).get()).docs.map(
+    (doc) => doc.data() as DeliveryTask
+  );
+  // ใบที่ยังไม่ส่ง ไม่ว่าสร้างไว้ใต้สาขาไหน (ก่อน 3 ต.ค. สร้างใต้บางแค) ต้องยังอยู่บนบอร์ดจนปิดงาน
+  const existing = recent.filter((task) => task.branch === branch || task.status !== "shipped");
+  // ออเดอร์ที่มีใบงานแล้ว (สาขาไหนก็ตาม) ห้ามสร้างซ้ำ
+  const known = new Set(recent.map((task) => task.orderId));
   const since = new Date(now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
   let orders;

@@ -15,11 +15,12 @@ import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assi
 import { weeklyEventsActiveOn } from "../../lib/weekly-event-tasks.ts";
 import { DeliveryOrdersBoard } from "../../components/DeliveryOrdersBoard.tsx";
 import { fetchShiftForStaff, syncDeliveryTasks, workBranchFor } from "../../lib/delivery-tasks-server.ts";
-import { deliveryTaskState, deliveryTaskVisibleTo, sortDeliveryTasks } from "../../lib/delivery-tasks.ts";
+import { DELIVERY_BRANCH, deliveryTaskState, deliveryTaskVisibleTo, sortDeliveryTasks, type DeliveryTask } from "../../lib/delivery-tasks.ts";
 import { TodaySummary } from "../../components/TodaySummary.tsx";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
 import { resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../../lib/performance-daily-store.ts";
+import { teamRecordName } from "../../lib/store-config.ts";
 
 // หน้าแรก = "งานที่มอบหมายให้ฉัน" เป็นหลัก แยกเป็น 3 ประเภทให้ชัด (รายวัน · งานประจำ/เป็นรอบ ·
 // งานโปรเจกต์) แล้วต่อด้วยออเดอร์ที่ต้องส่ง. รายการรวมยาวๆ ของทั้งร้านย้ายไปอยู่หน้าของมันเอง
@@ -34,7 +35,7 @@ export default async function HomePage() {
   // หน้าแรกเป็นของ "คนที่เข้าระบบอยู่" เท่านั้น — แอดมินก็เห็นแค่งานของตัวเอง
   // (ภาพรวมทั้งร้านอยู่ที่ /admin/ops) ไม่งั้นงานของตัวเองจมอยู่ในลิสต์ของทุกคน
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
-    (record) => Boolean(employeeCode && (record.employeeName === employeeCode || record.employeeName === "ทีม บางแค"))
+    (record) => Boolean(employeeCode && (record.employeeName === employeeCode || record.employeeName === teamRecordName(branch)))
   );
   // งานที่มอบหมายจาก 2 ส่วน: เจ้าของร้านมอบหมาย (work_assignments) + ส่งต่อจากกะปิดร้าน (work_handoffs)
   const assignedWorkFeed = assignedWorkFeedForViewer(await fetchAssignedWorkFeed(branch, workDate), {
@@ -49,8 +50,10 @@ export default async function HomePage() {
 
   // งานส่งของ: ออเดอร์ที่จ่ายเงินแล้วบนเว็บกิลด์ เด้งเข้ากะที่รับผิดชอบเอง
   // (ก่อน 15:00 = กะปัจจุบัน · ตั้งแต่ 15:00 = กะปัจจุบัน + กะถัดไป)
+  // ออเดอร์ออนไลน์เป็นงานของสาขาส่งของสาขาเดียว (DELIVERY_BRANCH) — คนที่เข้ากะสาขาอื่นวันนี้ไม่เห็นบอร์ดนี้
+  const handlesDelivery = branch === DELIVERY_BRANCH;
   const [deliveryAll, shiftToday] = await Promise.all([
-    syncDeliveryTasks(branch),
+    handlesDelivery ? syncDeliveryTasks().catch(() => [] as DeliveryTask[]) : Promise.resolve([] as DeliveryTask[]),
     staffCode ? fetchShiftForStaff(branch, workDate, staffCode) : Promise.resolve(null)
   ]);
   const deliveryTasks = sortDeliveryTasks(
@@ -86,7 +89,7 @@ export default async function HomePage() {
       {/* ของที่ต้องสั่ง — บนสุดของหน้า เพราะลืมสั่งแล้วของขาดหน้าร้านทันที
           Suspense กันไม่ให้การเรียก StoreHub หน่วงงานของตัวเองที่เหลือทั้งหน้า */}
       <Suspense fallback={null}>
-        <SupplyNeedsBanner />
+        <SupplyNeedsBanner branch={branch} />
       </Suspense>
 
       {/* เหลืออะไรบ้างวันนี้ แบบนับเป็นตัวเลข ไม่ใช่ลิสต์ยาว */}
@@ -165,14 +168,18 @@ export default async function HomePage() {
         </p>
       )}
 
-      <div id="delivery" />
-      <DeliveryOrdersBoard
-        branch={branch}
-        initialTasks={deliveryTasks}
-        initialToday={workDate}
-        initialShift={shiftToday}
-        canAct={!user.isImpersonating}
-      />
+      {handlesDelivery ? (
+        <>
+          <div id="delivery" />
+          <DeliveryOrdersBoard
+            branch={branch}
+            initialTasks={deliveryTasks}
+            initialToday={workDate}
+            initialShift={shiftToday}
+            canAct={!user.isImpersonating}
+          />
+        </>
+      ) : null}
     </main>
   );
 }

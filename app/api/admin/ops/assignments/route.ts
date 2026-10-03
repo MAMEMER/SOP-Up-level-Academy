@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "../../../../../lib/auth.ts";
 import { fetchAssignmentsForDateServer } from "../../../../../lib/work-assignments-server.ts";
 import { groupAssignmentsByTask } from "../../../../../lib/assigned-work-teams.ts";
+import { isBranchKey } from "../../../../../lib/admin-branch.ts";
 import { formatWorkDate } from "../../../../../lib/workflow-records.ts";
 
 // Near-real-time feed for the owner ops board's "งานที่มอบหมาย" panel. The panel polls
@@ -22,10 +23,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const dateParam = new URL(request.url).searchParams.get("date");
+  const params = new URL(request.url).searchParams;
+  const dateParam = params.get("date");
+  const branch = isBranchKey(params.get("branch")) ? params.get("branch")! : "bangkae";
   const workDate = isDateValue(dateParam) ? dateParam : formatWorkDate();
 
-  const assignments = await fetchAssignmentsForDateServer("bangkae", workDate);
+  const assignments = await fetchAssignmentsForDateServer(branch, workDate);
   const groups = groupAssignmentsByTask(assignments);
 
   return NextResponse.json(

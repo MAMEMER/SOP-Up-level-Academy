@@ -419,7 +419,8 @@ export function buildOrderPlan(tracked: SupplyNeedItem[], minOrderValue: number)
 const PRODUCTS_TTL_MS = 15 * 60 * 1000;
 const INVENTORY_TTL_MS = 3 * 60 * 1000;
 let productsCache: { at: number; rows: StoreHubProductRow[] } | null = null;
-let inventoryCache: { at: number; storeId: string; rows: StoreHubInventoryRow[] } | null = null;
+// แคชแยกต่อสโตร์ — สองสาขาเปิดหน้าสลับกันต้องไม่ล้างแคชกันเอง (StoreHub จำกัด 3 ครั้ง/วินาที)
+const inventoryCache = new Map<string, { at: number; rows: StoreHubInventoryRow[] }>();
 
 async function cachedProducts(): Promise<StoreHubProductRow[]> {
   const now = Date.now();
@@ -439,12 +440,11 @@ async function cachedProducts(): Promise<StoreHubProductRow[]> {
 
 async function cachedInventory(storeId: string): Promise<StoreHubInventoryRow[]> {
   const now = Date.now();
-  if (inventoryCache && inventoryCache.storeId === storeId && now - inventoryCache.at < INVENTORY_TTL_MS) {
-    return inventoryCache.rows;
-  }
+  const hit = inventoryCache.get(storeId);
+  if (hit && now - hit.at < INVENTORY_TTL_MS) return hit.rows;
   const raw = await storeHubGet<StoreHubInventoryRow[]>(`/inventory/${storeId}`);
   const rows = Array.isArray(raw) ? raw : [];
-  inventoryCache = { at: now, storeId, rows };
+  inventoryCache.set(storeId, { at: now, rows });
   return rows;
 }
 
@@ -471,18 +471,19 @@ export function tallySoldQuantities(transactions: StoreHubTransaction[]): Record
 
 const SALES_TTL_MS = 60 * 60 * 1000;
 const SALES_WINDOW_DAYS = 30;
-let salesCache: { at: number; storeId: string; sold: Record<string, number> } | null = null;
+const salesCache = new Map<string, { at: number; sold: Record<string, number> }>();
 
 async function cachedSales(storeId: string): Promise<Record<string, number>> {
   const now = Date.now();
-  if (salesCache && salesCache.storeId === storeId && now - salesCache.at < SALES_TTL_MS) return salesCache.sold;
+  const hit = salesCache.get(storeId);
+  if (hit && now - hit.at < SALES_TTL_MS) return hit.sold;
   const to = new Date(now).toISOString();
   const from = new Date(now - SALES_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const raw = await storeHubGet<StoreHubTransaction[]>(
     `/transactions?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
   );
   const sold = tallySoldQuantities((Array.isArray(raw) ? raw : []).filter((t) => !t.storeId || t.storeId === storeId));
-  salesCache = { at: now, storeId, sold };
+  salesCache.set(storeId, { at: now, sold });
   return sold;
 }
 
@@ -519,8 +520,8 @@ export async function fetchSupplyNeedsFromApi(branchKey = "bangkae"): Promise<Su
  * ดึงรายการของที่ต้องสั่ง — ใช้ StoreHub Open API ก่อน (สดเสมอ ไม่ต้องดูแล cookie)
  * ถ้าไม่มี creds ค่อยถอยไปใช้ลิงก์ export สำรอง.
  */
-export async function fetchSupplyNeeds(threshold = DEFAULT_THRESHOLD): Promise<SupplyNeedsResult> {
-  if (hasStoreHubCreds()) return fetchSupplyNeedsFromApi();
+export async function fetchSupplyNeeds(threshold = DEFAULT_THRESHOLD, branchKey = "bangkae"): Promise<SupplyNeedsResult> {
+  if (hasStoreHubCreds()) return fetchSupplyNeedsFromApi(branchKey);
   return fetchSupplyNeedsFromFeed(threshold);
 }
 

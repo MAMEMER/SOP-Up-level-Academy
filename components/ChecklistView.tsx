@@ -52,7 +52,7 @@ export function ChecklistView({
         setShift(assignment);
         // Shift-1 checklist window is counted from the real clock-in time + 4h; fall back to
         // the shift's default entry time when the planner left it blank.
-        setShiftStart(assignment ? plan?.startTime ?? defaultShiftStart(assignment) : null);
+        setShiftStart(assignment ? plan?.startTime ?? defaultShiftStart(assignment, branch) : null);
       })
       .catch(() => {
         if (!alive) return;

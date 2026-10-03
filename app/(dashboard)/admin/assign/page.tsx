@@ -4,14 +4,17 @@ import { AssignWork } from "../../../../components/AssignWork.tsx";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { buildTeamOptions } from "../../../../lib/team-options.ts";
+import { resolveAdminBranch } from "../../../../lib/admin-branch.ts";
+import { AdminBranchSwitch } from "../../../../components/AdminBranchSwitch.tsx";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 
-export default async function AdminAssignPage() {
+export default async function AdminAssignPage({ searchParams }: { searchParams?: Promise<{ branch?: string }> }) {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 
+  const branch = await resolveAdminBranch((searchParams ? await searchParams : {}).branch);
+
   const staff = employeeDirectory
-    .filter((entry) => entry.branch === "bangkae")
     .map((entry) => ({ code: entry.code, displayName: entry.displayName, employmentType: entry.employmentType }));
 
   // Team quick-select shortcuts for the ผู้รับผิดชอบ picker (ticket AvYge3vV6w39OUfEHwIE).
@@ -28,7 +31,11 @@ export default async function AdminAssignPage() {
           <p>สั่งงานให้ staff รายคน — งานจะขึ้นบนหน้า &quot;วันนี้ของฉัน&quot; ของเขาทันทีที่ login</p>
         </div>
       </section>
-      <AssignWork branch="bangkae" assignedBy={user.email ?? user.name} staff={staff} teams={teams} defaultDate={formatWorkDate()} />
+      <div className="admin-branch-bar">
+        <AdminBranchSwitch value={branch} />
+        <small>ข้อมูลในหน้านี้เป็นของสาขาที่เลือก</small>
+      </div>
+      <AssignWork key={branch} branch={branch} assignedBy={user.email ?? user.name} staff={staff} teams={teams} defaultDate={formatWorkDate()} />
     </main>
   );
 }

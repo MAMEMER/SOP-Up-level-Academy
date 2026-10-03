@@ -14,7 +14,7 @@ import {
 describe("เวลากะของแต่ละสาขา", () => {
   it("ค่าเริ่มต้นมาจากคอนฟิกสาขา — เสนาเฟสต์เข้า 09:30, บางแค 09:00", () => {
     assert.deepEqual(defaultBranchShiftConfig("senafest").starts.s1, ["09:30", "10:00"]);
-    assert.deepEqual(defaultBranchShiftConfig("bangkae").starts.s1, ["09:00", "11:00"]);
+    assert.deepEqual(defaultBranchShiftConfig("bangkae").starts.s1, ["09:00", "09:30", "11:00"]);
     assert.equal(defaultBranchShiftConfig("senafest").closeTime, "22:00");
     assert.equal(defaultBranchShiftConfig("senafest").workHours, 9);
   });

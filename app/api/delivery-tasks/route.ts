@@ -7,7 +7,7 @@ import {
   shipDeliveryTask,
   syncDeliveryTasks
 } from "../../../lib/delivery-tasks-server.ts";
-import { bangkokWorkDate, deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-tasks.ts";
+import { DELIVERY_BRANCH, bangkokWorkDate, deliveryTaskVisibleTo, sortDeliveryTasks } from "../../../lib/delivery-tasks.ts";
 
 // งานส่งของจากออเดอร์เว็บกิลด์. GET จะ sync ออเดอร์ที่จ่ายแล้วเป็นใบงานก่อนเสมอ แล้วคืน
 // เฉพาะใบที่คนดูควรเห็น (กะตัวเองวันนี้ / งานที่ตัวเองรับไว้ / เจ้าของร้านเห็นหมด).
@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { user, staffCode } = await actor();
   const params = new URL(request.url).searchParams;
-  const branch = params.get("branch") || "bangkae";
+  // ออเดอร์ออนไลน์อยู่สาขาเดียวเสมอ (DELIVERY_BRANCH) — ไม่ฟัง ?branch= ของคนที่เปิดหน้า
+  const branch = DELIVERY_BRANCH;
   // ปกติคืนเฉพาะใบที่ยังต้องทำ (deliveryTaskVisibleTo ตัดใบที่ส่งแล้วทิ้ง) — ตัวกรอง
   // "ทั้งหมด / ปิดแล้ว" บนหน้าจอส่ง includeClosed มาเพื่อขอใบที่ปิดไปแล้วในช่วงล่าสุดด้วย
   const includeClosed = params.get("includeClosed") === "1";
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
 
   try {
     const [tasks, shiftToday] = await Promise.all([
-      syncDeliveryTasks(branch, now),
+      syncDeliveryTasks(now),
       staffCode ? fetchShiftForStaff(branch, today, staffCode) : Promise.resolve(null)
     ]);
     const viewer = { isAdmin: isAdmin(user), staffCode: staffCode || null, shiftToday, today };
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
       case "handoffDelivery": {
-        const branch = str(body.branch) || "bangkae";
+        const branch = DELIVERY_BRANCH;
         const result = await handoffDeliveryTask(id, branch, acting);
         return NextResponse.json({ ok: true, targets: result.targets });
       }

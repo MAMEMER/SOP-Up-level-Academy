@@ -47,7 +47,10 @@ export default async function AdminSchedulePage() {
         </div>
       </section>
       <ShiftPlanner staff={staff} plannedBy={user.email ?? user.name} branches={branches} />
-      <StoreAuditPanel branch="bangkae" />
+      {/* เวลาเปิด–ปิดร้านจริงจาก StoreHub — แยกกล่องต่อสาขา */}
+      {branchConfigs.map((branch) => (
+        <StoreAuditPanel key={branch.key} branch={branch.key} />
+      ))}
     </main>
   );
 }

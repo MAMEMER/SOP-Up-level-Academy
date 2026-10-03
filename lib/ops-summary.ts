@@ -11,7 +11,7 @@ import { groupAssignmentsByTask, type AssignmentGroup } from "./assigned-work-te
 import { customerServiceRecordsForDate, type CustomerServiceRecord } from "./performance-service-records.ts";
 import { monthlyTasks } from "./monthly-event-tasks.ts";
 import { weeklyEventsActiveOn } from "./weekly-event-tasks.ts";
-import { employeeDirectory, employeeCodeForEmail } from "./employee-directory.ts";
+import { branchFor, employeeDirectory, employeeCodeForEmail } from "./employee-directory.ts";
 import { fetchPerformanceDailyStore } from "./performance-daily-store.ts";
 import { fetchShiftAssignmentsForDate } from "./shift-plan-server.ts";
 import { isPhaseInShift } from "./card-store-workflow.ts";
@@ -101,7 +101,9 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
     safe(() => fetchShiftAssignmentsForDate(branch, workDate), null as Map<string, ShiftCode> | null)
   ]);
 
+  // checklist ของวันนี้บันทึกลงสาขาที่เข้ากะ (#95) — นับเฉพาะของสาขานี้ ไม่ให้คนสาขาอื่นมาปนตัวเลข
   const staff: StaffDaySummary[] = dayDocs
+    .filter((doc) => (doc.branch || branchFor(employeeCodeForEmail(doc.employeeEmail) || "")) === branch)
     .map((doc) => {
       const records = dayPayloads([doc]).filter((record) => record.workDate === workDate);
       const code = employeeCodeForEmail(doc.employeeEmail);
@@ -133,9 +135,10 @@ export async function getOpsSummary(workDate: string, branch = "bangkae"): Promi
   // staff codes with a working shift (s1/s2) per the schedule; off/leave/unrostered are
   // excluded. When there is no plan for the day at all (workingCodes === null) we fall back
   // to the whole branch roster so a forgotten plan doesn't silently mute every reminder.
+  // มีตารางกะ = ตามคนที่ลงกะสาขานี้วันนี้ (รวมคนที่มาช่วยจากอีกสาขา) · ไม่มีตาราง = ตามคนประจำสาขา
   const noRecordStaff = employeeDirectory
-    .filter((entry) => entry.branch === branch && !seen.has((entry.email || "").toLowerCase()))
-    .filter((entry) => (workingCodes ? workingCodes.has(entry.code) : true))
+    .filter((entry) => !seen.has((entry.email || "").toLowerCase()))
+    .filter((entry) => (workingCodes ? workingCodes.has(entry.code) : entry.branch === branch))
     .map((entry) => entry.displayName);
 
   const stockDoc = weekDocs.find((doc) => doc.scopeKey === weeklyScopeKey(periodKey));

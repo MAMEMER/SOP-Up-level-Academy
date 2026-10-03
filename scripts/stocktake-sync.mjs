@@ -87,7 +87,9 @@ function pageScript(from, to, supplier) {
     const list = await fetch("/stocks/ajaxStockTakesWithCount?" + q).then((r) => r.json());
     const out = [];
     for (const row of list.aaData || []) {
-      const entry = { id: row.DT_RowId, start: row[0], completed: row[1], supplier: row[4], status: row[5], items: [] };
+      // ชื่อสโตร์อยู่ในคอลัมน์ใดคอลัมน์หนึ่งของแถว — เก็บคอลัมน์ที่มีชื่อสาขาไว้แยกผลนับเสนาฯ/บางแค
+      const storeName = row.slice(0, 6).map(String).find((cell) => /bang ?khae|bangkae|sena/i.test(cell)) || "";
+      const entry = { id: row.DT_RowId, start: row[0], completed: row[1], supplier: row[4], status: row[5], storeName, items: [] };
       if (entry.supplier === ${JSON.stringify(supplier)} && /complete/i.test(entry.status)) {
         const body = new URLSearchParams({ sEcho: 1, iColumns: 7, iDisplayStart: 0, iDisplayLength: 5000, id: entry.id });
         const res = await fetch("/stocks/stocktakes/ajaxCountedItemsWithCount", {
@@ -132,6 +134,7 @@ async function main() {
       completedAt: parseBkk(row.completed) ?? null,
       status,
       supplier: row.supplier,
+      storeName: row.storeName || "",
       items: JSON.stringify(row.items)
     });
     written += 1;

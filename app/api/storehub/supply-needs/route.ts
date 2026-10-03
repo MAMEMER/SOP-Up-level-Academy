@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { verifySession } from "../../../../lib/session-jwt.ts";
 import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
 import { fetchSupplyNeeds, hasSupplyNeedsSource } from "../../../../lib/storehub-supply-needs.ts";
+import { allBranchKeys } from "../../../../lib/store-config.ts";
 
 // ดึงรายการสินค้าใกล้หมดจาก StoreHub Supply Needs feed แล้วส่งให้ SOP แสดงเป็นแจ้งเตือน
 // พนักงานเห็นรายการที่ต้องสั่งได้เลย โดยไม่ต้อง copy CSV มาวางเอง.
@@ -25,7 +26,9 @@ export async function GET(request: Request) {
   const threshold = Number.isFinite(thresholdParam) && thresholdParam > 0 ? thresholdParam : undefined;
 
   try {
-    const result = await fetchSupplyNeeds(threshold);
+    const branchParam = url.searchParams.get("branch") || "bangkae";
+    const branch = allBranchKeys().includes(branchParam) ? branchParam : "bangkae";
+    const result = await fetchSupplyNeeds(threshold, branch);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     return NextResponse.json({ error: "fetch_failed", detail: String(error) }, { status: 502 });

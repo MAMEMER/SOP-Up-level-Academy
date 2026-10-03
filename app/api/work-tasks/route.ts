@@ -29,10 +29,10 @@ export async function GET(request: Request) {
       case "myAssignments": {
         const workDate = p.get("workDate") || "";
         const staffCode = p.get("staffCode") || "";
-        if (!branch || !workDate || !staffCode) return badRequest("missing_params");
+        if (!workDate || !staffCode) return badRequest("missing_params");
+        // งานที่สั่งรายคนเป็นของ "คนนั้น" ไม่ใช่ของสาขา — คนที่ไปช่วยอีกสาขาวันนั้นต้องยังเห็นงานตัวเอง
         const snap = await db()
           .collection(ASSIGNMENTS)
-          .where("branch", "==", branch)
           .where("workDate", "==", workDate)
           .where("staffCode", "==", staffCode)
           .get();
@@ -46,8 +46,8 @@ export async function GET(request: Request) {
       }
       case "assignmentsForStaff": {
         const staffCode = p.get("staffCode") || "";
-        if (!branch || !staffCode) return badRequest("missing_params");
-        const snap = await db().collection(ASSIGNMENTS).where("branch", "==", branch).where("staffCode", "==", staffCode).get();
+        if (!staffCode) return badRequest("missing_params");
+        const snap = await db().collection(ASSIGNMENTS).where("staffCode", "==", staffCode).get();
         return NextResponse.json({ assignments: snap.docs.map((d) => d.data()) });
       }
       case "assignmentById": {

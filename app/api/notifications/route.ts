@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { actor, badRequest, canWriteNow, db, readOnly } from "../../../lib/api-firestore.ts";
 import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
-import { branchFor } from "../../../lib/employee-directory.ts";
+import { DELIVERY_BRANCH } from "../../../lib/delivery-tasks.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
-import { fetchDeliveryTasks } from "../../../lib/delivery-tasks-server.ts";
+import { fetchDeliveryTasks, workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 import { NOTIFICATION_READS_COLLECTION, buildStaffNotifications } from "../../../lib/staff-notifications.ts";
 import { WORK_PROJECTS_COLLECTION } from "../../../lib/work-projects.ts";
 import { COACHING_NOTES_COLLECTION } from "../../../lib/coaching-notes.ts";
@@ -21,7 +21,8 @@ export async function GET() {
   const { staffCode } = await actor();
   if (!staffCode || !hasAdminCredentials()) return NextResponse.json({ notifications: [], staffCode: staffCode || null });
 
-  const branch = branchFor(staffCode) || "bangkae";
+  // ออเดอร์ออนไลน์แจ้งเฉพาะคนที่เข้ากะสาขาส่งของวันนี้ — ตรงกับบอร์ดบนหน้าแรก
+  const handlesDelivery = (await workBranchFor(staffCode, formatWorkDate())) === DELIVERY_BRANCH;
   try {
     const [assignmentSnap, projectSnap, coachingSnap, feedbackSnap, readSnap, deliveries] = await Promise.all([
       db().collection(ASSIGNMENTS).where("staffCode", "==", staffCode).get(),
@@ -29,7 +30,7 @@ export async function GET() {
       db().collection(COACHING_NOTES_COLLECTION).where("staffCode", "==", staffCode).get(),
       db().collection(STAFF_FEEDBACK_COLLECTION).where("staffCode", "==", staffCode).get(),
       db().collection(NOTIFICATION_READS_COLLECTION).doc(staffCode).get(),
-      fetchDeliveryTasks(branch).catch(() => [])
+      handlesDelivery ? fetchDeliveryTasks(DELIVERY_BRANCH).catch(() => []) : Promise.resolve([])
     ]);
 
     const lastSeenAt = readSnap.exists ? String((readSnap.data() as { lastSeenAt?: string }).lastSeenAt || "") : "";
