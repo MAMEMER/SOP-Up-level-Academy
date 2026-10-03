@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { TodayTaskList } from "../../../components/TodayTaskList.tsx";
 import { requireUser } from "../../../lib/auth.ts";
-import { branchFor, employeeCodeForEmail } from "../../../lib/employee-directory.ts";
-import { fetchShiftForStaff } from "../../../lib/delivery-tasks-server.ts";
+import { employeeCodeForEmail } from "../../../lib/employee-directory.ts";
+import { fetchShiftForStaff, workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function TasksPage() {
   const user = await requireUser();
   const staffCode = employeeCodeForEmail(user.email) || null;
-  const branch = staffCode ? branchFor(staffCode) : "bangkae";
+  const branch = await workBranchFor(staffCode, formatWorkDate());
   const workDate = formatWorkDate();
   // กะของวันนี้ตัดสินว่างานไหนเป็นของคุณ — ไม่ได้ลงกะก็ยังเห็นทั้งหมดไว้อ้างอิง
   const shift = staffCode ? await fetchShiftForStaff(branch, workDate, staffCode) : null;

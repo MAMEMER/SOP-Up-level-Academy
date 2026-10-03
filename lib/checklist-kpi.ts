@@ -24,13 +24,14 @@ export type ChecklistKpiInput = {
  * off the record itself (submittedAt vs the dueAt stored when it was submitted), so a
  * later change to a phase's deadline never re-scores a day that already closed.
  */
-export async function fetchChecklistKpiInput(branch: string, startDate: string, endDate: string): Promise<ChecklistKpiInput> {
+export async function fetchChecklistKpiInput(_branch: string, startDate: string, endDate: string): Promise<ChecklistKpiInput> {
   const docs = await listAllRecordsInScopeRange(dailyScopeKey(startDate), dailyScopeKey(endDate));
   const submittedDays: ChecklistDay[] = [];
   const lateSubmissions: ChecklistLateSubmission[] = [];
 
   for (const doc of docs) {
-    if (doc.scope !== "daily" || doc.branch !== branch) continue;
+    // นับทุกสาขา: checklist เป็นของคน — ติ๊กที่เสนาเฟสต์ก็ต้องนับเป็นวันที่ทำแล้ว
+    if (doc.scope !== "daily") continue;
     const employeeName = employeeCodeForEmail(doc.employeeEmail);
     if (!employeeName) continue;
 

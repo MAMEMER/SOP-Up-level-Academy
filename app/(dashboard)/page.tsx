@@ -14,11 +14,11 @@ import { assignedWorkRecordsForDate } from "../../lib/performance-service-record
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assigned-work-feed.ts";
 import { weeklyEventsActiveOn } from "../../lib/weekly-event-tasks.ts";
 import { DeliveryOrdersBoard } from "../../components/DeliveryOrdersBoard.tsx";
-import { fetchShiftForStaff, syncDeliveryTasks } from "../../lib/delivery-tasks-server.ts";
+import { fetchShiftForStaff, syncDeliveryTasks, workBranchFor } from "../../lib/delivery-tasks-server.ts";
 import { deliveryTaskState, deliveryTaskVisibleTo, sortDeliveryTasks } from "../../lib/delivery-tasks.ts";
 import { TodaySummary } from "../../components/TodaySummary.tsx";
 import { formatWorkDate } from "../../lib/workflow-records.ts";
-import { branchFor, resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
+import { resolveEmployeeByEmail } from "../../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../../lib/performance-daily-store.ts";
 
 // หน้าแรก = "งานที่มอบหมายให้ฉัน" เป็นหลัก แยกเป็น 3 ประเภทให้ชัด (รายวัน · งานประจำ/เป็นรอบ ·
@@ -30,7 +30,7 @@ export default async function HomePage() {
   const dailyStore = await fetchPerformanceDailyStore();
   const employeeCode = employeeCodeForEmail(user.email);
   const staffCode = resolveEmployeeByEmail(user.email);
-  const branch = staffCode ? branchFor(staffCode) : "bangkae";
+  const branch = await workBranchFor(staffCode, workDate);
   // หน้าแรกเป็นของ "คนที่เข้าระบบอยู่" เท่านั้น — แอดมินก็เห็นแค่งานของตัวเอง
   // (ภาพรวมทั้งร้านอยู่ที่ /admin/ops) ไม่งั้นงานของตัวเองจมอยู่ในลิสต์ของทุกคน
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
@@ -100,7 +100,7 @@ export default async function HomePage() {
         deliveryRemaining={deliveryTasks.filter((task) => deliveryTaskState(task, workDate) !== "done").length}
       />
 
-      {staffCode ? <MyShiftToday staffCode={staffCode} branch={branchFor(staffCode)} workDate={workDate} /> : null}
+      {staffCode ? <MyShiftToday staffCode={staffCode} branch={branch} workDate={workDate} /> : null}
 
       <section className="section-heading" id="assigned-work">
         <p className="eyebrow">งานที่มอบหมายให้ฉัน</p>
