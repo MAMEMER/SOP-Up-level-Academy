@@ -5,8 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown } from "lucide-react";
 import {
-  adminGroups,
-  adminQuickLinks,
+  adminNav,
   groupOfPath,
   isActivePath,
   quickLinks,
@@ -17,10 +16,11 @@ import {
 
 // เมนูแบบกลุ่ม: มือถือ = ปุ่ม "เมนู" เปิดแผงเดียวจบ (ไม่ใช่ปุ่ม 25 ปุ่มเรียงเต็มจอ)
 // เดสก์ท็อป = แถบเดียว แต่ละกลุ่มกดแล้วดรอปลงมา.
-export function NavMenu({ isAdmin }: { isAdmin: boolean }) {
+export function NavMenu({ isAdmin, owner = false, staffAdmin = false }: { isAdmin: boolean; owner?: boolean; staffAdmin?: boolean }) {
   const pathname = usePathname();
-  const groups: NavGroup[] = isAdmin ? [...staffGroups, ...adminGroups] : staffGroups;
-  const tops: NavLink[] = isAdmin ? [...quickLinks, ...adminQuickLinks] : quickLinks;
+  const admin = isAdmin ? adminNav({ owner, staffAdmin }) : null;
+  const groups: NavGroup[] = admin ? admin.groups : staffGroups;
+  const tops: NavLink[] = admin ? admin.tops : quickLinks;
 
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -88,7 +88,7 @@ export function NavMenu({ isAdmin }: { isAdmin: boolean }) {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={isActivePath(link.href, pathname) ? "is-active" : undefined}
+                      className={isActivePath(link.href, pathname, link.exact) ? "is-active" : undefined}
                     >
                       {link.label}
                     </Link>

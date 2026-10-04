@@ -8067,3 +8067,38 @@ p.ab-help{padding-left:0}
   .ab-person small{display:none}
   .ab-save{margin-left:0;width:100%}
 }
+
+/* ===== สารบัญทุกเมนูบนหน้าหลักเจ้าของ (components/AdminDirectory.tsx) ===== */
+.admin-dir { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.admin-dir__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.admin-dir__search {
+  display: flex; align-items: center; gap: 8px; flex: 0 1 360px; min-width: 0;
+  min-height: 44px; padding: 0 12px; border: 1px solid rgba(255, 199, 142, 0.8); border-radius: 12px; background: #fff;
+  color: var(--color-ink-soft);
+}
+.admin-dir__search:focus-within { border-color: var(--color-orange-deep); }
+.admin-dir__search input { flex: 1; min-width: 0; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-height: 0 !important; outline: 0; background: transparent; font: inherit; font-size: 16px; color: var(--color-ink); }
+.admin-dir__search button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-height: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; border-radius: 8px; background: transparent !important; color: inherit; cursor: pointer; }
+.admin-dir__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.admin-dir__section { background: #fff; border: 1px solid rgba(255, 199, 142, 0.5); border-radius: 16px; padding: 14px 8px 8px; min-width: 0; }
+.admin-dir__section h4 {
+  margin: 0 10px 6px; font-family: var(--guild-font); font-weight: 500; font-size: 16px; color: var(--color-orange-deep);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.admin-dir__section h4 small { font-family: inherit; font-weight: 400; font-size: 12px; color: var(--color-ink-soft); }
+.admin-dir__section ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.admin-dir__link { display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; border-radius: 10px; text-decoration: none; color: inherit; min-height: 44px; justify-content: center; }
+.admin-dir__link:hover, .admin-dir__link:focus-visible { background: rgba(255, 140, 66, 0.1); }
+.admin-dir__label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 15px; color: var(--color-ink); }
+.admin-dir__label em {
+  flex: 0 0 auto; font-style: normal; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+  background: rgba(255, 140, 66, 0.14); color: var(--color-orange-deep);
+}
+.admin-dir__link small { font-size: 12.5px; line-height: 1.45; color: var(--color-ink-soft); }
+.admin-dir__empty { color: var(--color-ink-soft); }
+@media (max-width: 1100px) { .admin-dir__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .admin-dir__grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-dir__search { flex-basis: 100%; }
+  .admin-dir__link small { display: none; }
+}

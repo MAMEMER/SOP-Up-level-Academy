@@ -1,3 +1,5 @@
+import { ADMIN_HOME, adminSectionsFor, staffPagesSection, type SiteSection, type SiteViewer } from "./admin-sitemap.ts";
+
 // เมนูของเว็บ — จัดเป็นกลุ่มแทนการวางปุ่มทุกปุ่มเรียงกัน เพราะบนมือถือ ~25 ปุ่มกลายเป็น
 // กำแพงปุ่มที่หาอะไรไม่เจอ. หน้าที่ใช้ทุกวัน (หน้าหลัก) อยู่นอกกลุ่ม กดถึงได้ตลอด.
 
@@ -39,68 +41,26 @@ export const staffGroups: NavGroup[] = [
   }
 ];
 
-/** ลิงก์เดี่ยวของแอดมิน — หน้ารวมงานจัดการเป็นทางเข้าหลัก ไม่ต้องซ่อนในกลุ่ม */
-export const adminQuickLinks: NavLink[] = [
-  { href: "/admin", label: "หน้ารวมงานจัดการ", exact: true },
-  { href: "/admin/closing", label: "ปิดยอด 2 สาขา" }
-];
-
-export const adminGroups: NavGroup[] = [
-  {
-    key: "assign",
-    label: "ตารางและการมอบหมายงาน",
-    links: [
-      { href: "/admin/schedule", label: "ตารางกะ" },
-      { href: "/admin/assign", label: "มอบหมายงานรายวัน (แบบเดิม)" },
-      { href: "/admin/projects", label: "มอบหมายงานเดี่ยว/กลุ่ม" },
-      { href: "/admin/tasks", label: "สั่งงานประจำ" },
-      { href: "/admin/calendar", label: "ปฏิทินสั่งงาน" }
-    ]
-  },
-  {
-    key: "staff",
-    label: "พนักงาน",
-    links: [
-      { href: "/admin/staff-view", label: "มุมมองพนักงาน" },
-      { href: "/admin/staff", label: "จัดการพนักงาน" },
-      { href: "/admin/staff-documents", label: "เอกสารพนักงาน" }
-    ]
-  },
-  {
-    key: "config",
-    label: "ตั้งค่างาน",
-    links: [
-      { href: "/admin/checklist-config", label: "ปรับ Checklist" },
-      { href: "/admin/manual-config", label: "แก้คู่มืองาน" }
-    ]
-  },
-  {
-    key: "kpi",
-    label: "Stock / KPI",
-    links: [
-      { href: "/admin/stock-check", label: "ลงคะแนน Stock" },
-      { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist" },
-      { href: "/admin/performance-score", label: "คะแนนพนักงาน" },
-      { href: "/admin/kpi-rules", label: "เกณฑ์ให้คะแนน" }
-    ]
-  },
-  {
-    key: "review",
-    label: "ตรวจและสรุป",
-    links: [
-      { href: "/manager-review", label: "ตรวจงาน" },
-      { href: "/admin/ops", label: "สรุปทั้งร้าน รายคน" },
-      { href: "/monthly-summary", label: "สรุปรายเดือน" }
-    ]
-  }
-];
+/** เมนูของแอดมิน — อ่านจากสารบัญเดียว (lib/admin-sitemap.ts) ชุดเดียวกับหน้ารวม /admin.
+ * แอดมินไม่เห็นเมนูพนักงานปนอยู่ด้านบน: หน้าพนักงานรวมอยู่หมวด "หน้าพนักงาน" หมวดเดียว */
+export function adminNav(viewer: SiteViewer): { tops: NavLink[]; groups: NavGroup[] } {
+  const toGroup = (section: SiteSection): NavGroup => ({
+    key: section.key,
+    label: section.label,
+    links: section.links.map((link) => ({ href: link.href, label: link.label, exact: link.href === "/" }))
+  });
+  return {
+    tops: [{ href: ADMIN_HOME.href, label: ADMIN_HOME.label, exact: true }],
+    groups: [...adminSectionsFor(viewer).map(toGroup), toGroup(staffPagesSection)]
+  };
+}
 
 /** กลุ่มไหนคือกลุ่มของหน้าที่เปิดอยู่ — ใช้เปิดกลุ่มนั้นค้างไว้ให้รู้ว่าตัวเองอยู่ตรงไหน */
 export function groupOfPath(groups: NavGroup[], pathname: string): string | null {
   let best: { key: string; length: number } | null = null;
   for (const group of groups) {
     for (const link of group.links) {
-      if (pathname === link.href || pathname.startsWith(`${link.href}/`)) {
+      if (isActivePath(link.href, pathname, link.exact)) {
         if (!best || link.href.length > best.length) best = { key: group.key, length: link.href.length };
       }
     }
