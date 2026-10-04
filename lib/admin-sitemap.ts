@@ -35,6 +35,7 @@ export const adminSections: SiteSection[] = [
     hint: "เปิดดูทุกวัน",
     links: [
       { href: "/admin/ops", label: "ดูงานรายคน", detail: "ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม แยกสาขา", keywords: "สรุปทั้งร้าน ops" },
+      { href: "/admin/task-review", label: "ตรวจงานที่มอบหมาย", detail: "แยกสาขา · ทีม · พนักงาน → แฟ้มรายเดือน · คอมเมนต์ + ให้คะแนน", keywords: "แฟ้มงาน ตรวจ คะแนน" },
       { href: "/manager-review", label: "ตรวจงานที่ส่งมา", detail: "งานที่พนักงานกดส่งตรวจ พร้อมรูป/หลักฐาน", keywords: "รีวิว review" },
       { href: "/admin/closing", label: "ปิดยอด 2 สาขา", detail: "เงินสดแต่ละสาขา · K SHOP รวมเทียบยอดธนาคาร", keywords: "เงิน ยอดขาย kshop" }
     ]
@@ -114,7 +115,8 @@ export const staffPagesSection: SiteSection = {
     { href: "/parcels", label: "พัสดุการ์ด", detail: "รับพัสดุ + วิดีโอแกะกล่อง" },
     { href: "/supplies", label: "ของที่ต้องสั่ง", detail: "รายการของใกล้หมดจาก StoreHub" },
     { href: "/schedule", label: "ตารางกะ (พนักงาน)", detail: "ตารางกะแบบที่พนักงานเห็น" },
-    { href: "/projects", label: "งานที่มอบหมาย", detail: "งานเดี่ยว/กลุ่มฝั่งพนักงาน" },
+    { href: "/my-tasks", label: "แจ้งเตือนงาน", detail: "งานที่มอบหมายที่น้องยังไม่ได้ส่ง" },
+    { href: "/my-tasks/file", label: "แฟ้มงาน", detail: "งานของน้องแยกเดือน เขียว/แดง" },
     { href: "/training", label: "คู่มืองาน", detail: "คู่มือที่พนักงานอ่าน" },
     { href: "/flowers", label: "ดอกไม้", detail: "สวนดอกไม้ของทีม" }
   ]

@@ -7,6 +7,8 @@ import { ProjectMeter } from "./ProjectMeter.tsx";
 import { ProjectProgressList } from "./ProjectProgressList.tsx";
 import { ProjectReviewPanel } from "./ProjectReviewPanel.tsx";
 import { ProjectAssignForm, type StaffOption } from "./ProjectAssignForm.tsx";
+import { ProgressLine, StateBadge, thaiDate } from "./TaskInboxParts.tsx";
+import { TRACK_MODE_LABEL, childrenOf, dueFor, trackModeOf } from "../lib/task-inbox.ts";
 import { ASSIGNEE_STATUS_CLASS, ASSIGNEE_STATUS_LABEL, assigneeStatus } from "../lib/project-review.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { type TeamOption } from "../lib/team-options.ts";
@@ -182,10 +184,14 @@ export function ProjectBoard({
           <p className="assign-work__empty">ยังไม่มีงานที่มอบหมายในเดือน{thaiMonthLabel(month)}</p>
         ) : (
           <div className="project-list">
-            {inMonth.map((project) => (
+            {/* งานย่อยแสดงอยู่ใต้งานใหญ่ ไม่ซ้ำเป็นแถวของตัวเอง */}
+            {inMonth.filter((project) => !project.parentId || !rows.some((row) => row.id === project.parentId)).map((project) => (
               <ProjectRow
                 key={project.id}
                 project={project}
+                subtasks={childrenOf(rows, project.id)}
+                branch={branch}
+                teams={teams}
                 today={today}
                 staff={staff}
                 open={openId === project.id}
@@ -216,6 +222,9 @@ export function ProjectBoard({
 
 function ProjectRow({
   project,
+  subtasks,
+  branch,
+  teams,
   today,
   staff,
   open,
@@ -223,6 +232,9 @@ function ProjectRow({
   onChanged
 }: {
   project: WorkProject;
+  subtasks: WorkProject[];
+  branch: string;
+  teams: TeamOption[];
   today: string;
   staff: StaffOption[];
   open: boolean;
@@ -234,6 +246,9 @@ function ProjectRow({
   const [assignees, setAssignees] = useState<string[]>(project.assignees);
   const [busy, setBusy] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+  const [workDays, setWorkDays] = useState(project.workDays || 1);
+  const workdaysMode = trackModeOf(project) === "workdays";
   const [error, setError] = useState<string | null>(null);
   const needsToday = teamNeedsProgressToday(project, today);
   const todayCount = progressCount(project, today);
@@ -256,7 +271,8 @@ function ProjectRow({
     setAssignees((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
   }
 
-  const datesChanged = startDate !== project.startDate || endDate !== project.endDate;
+  const datesChanged =
+    startDate !== project.startDate || (workdaysMode ? workDays !== (project.workDays || 1) : endDate !== project.endDate);
   const assigneesChanged =
     assignees.length !== project.assignees.length || assignees.some((code) => !project.assignees.includes(code));
 
@@ -279,7 +295,47 @@ function ProjectRow({
       {project.detail ? <p className="project-card__detail">{project.detail}</p> : null}
       {project.expectedResult ? <p className="project-card__detail">งานเสร็จคือ: {project.expectedResult}</p> : null}
 
-      <ProjectMeter project={project} today={today} />
+      {trackModeOf(project) === "percent" ? <ProjectMeter project={project} today={today} /> : <ProgressLine project={project} today={today} />}
+
+      {/* งานใหญ่ → งานย่อยรายคน (เพิ่มทีหลังได้เรื่อยๆ) */}
+      {subtasks.length || subOpen ? (
+        <div className="ti-subtasks">
+          <p className="assign-work__label">งานย่อย {subtasks.length ? `(${subtasks.length})` : ""}</p>
+          {subtasks.map((sub) => (
+            <div key={sub.id} className="ti-subtask">
+              <span className="ti-subtask__main">
+                <strong>{sub.title}</strong>
+                <small>
+                  {sub.assignees.map(displayNameFor).join(", ")} · กำหนด {thaiDate(dueFor(sub, sub.assignees[0]))} · {TRACK_MODE_LABEL[trackModeOf(sub)]}
+                </small>
+              </span>
+              {sub.assignees.map((code) => (
+                <StateBadge key={code} project={sub} assignee={code} today={today} />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {subOpen ? (
+        <ProjectAssignForm
+          branch={branch}
+          staff={staff}
+          teams={teams}
+          parentId={project.id}
+          defaultStartDate={today < project.startDate ? project.startDate : today}
+          defaultEndDate={project.endDate}
+          contextNote={`งานย่อยของ: ${project.title}`}
+          onCreated={async () => {
+            setSubOpen(false);
+            await onChanged();
+          }}
+        />
+      ) : null}
+      {project.parentId ? null : (
+        <button type="button" className="project-card__toggle" onClick={() => setSubOpen((v) => !v)}>
+          {subOpen ? "ยกเลิกเพิ่มงานย่อย" : "+ เพิ่มงานย่อย (สั่งรายคน)"}
+        </button>
+      )}
 
       {/* สถานะคะแนนรายคน — เห็นได้ทันทีว่าใครผ่าน/ต้องแก้/ล่าช้า */}
       <div className="project-card__statuses">
@@ -322,11 +378,20 @@ function ProjectRow({
             ตั้งแต่วันที่
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </label>
-          <label>
-            ถึงวันที่
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </label>
-          <span className="project-form__days">รวม {totalDays(startDate, endDate)} วัน</span>
+          {workdaysMode ? (
+            <label>
+              ให้เวลากี่วันทำงาน
+              <input type="number" min={1} max={60} value={workDays} onChange={(e) => setWorkDays(Number(e.target.value))} />
+            </label>
+          ) : (
+            <label>
+              ถึงวันที่
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </label>
+          )}
+          <span className="project-form__days">
+            {workdaysMode ? `ส่งภายใน ${thaiDate(project.endDate)} (วันทำงานที่ ${project.workDays || 1})` : `รวม ${totalDays(startDate, endDate)} วัน`}
+          </span>
         </div>
         <div className="project-card__quick">
           <span>ปรับเวลาเร็วๆ</span>
@@ -338,7 +403,7 @@ function ProjectRow({
               type="button"
               className="primary-action"
               disabled={busy}
-              onClick={() => run(() => updateProjectDates(project.id, startDate, endDate))}
+              onClick={() => run(() => updateProjectDates(project.id, startDate, endDate, workdaysMode ? workDays : undefined))}
             >
               บันทึกช่วงเวลาใหม่
             </button>

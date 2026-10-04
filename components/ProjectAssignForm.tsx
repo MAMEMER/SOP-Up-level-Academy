@@ -4,7 +4,8 @@ import { useState } from "react";
 import { isTeamSelected, toggleTeamSelection, type TeamOption } from "../lib/team-options.ts";
 import { ANSWER_KINDS, ANSWER_KIND_LABEL, type AnswerKind } from "../lib/checklist-overrides.ts";
 import { createProject } from "../lib/work-projects-store.ts";
-import { MODE_LABEL, addDays, totalDays, validateProjectDraft } from "../lib/work-projects.ts";
+import { MODE_LABEL, addDays, totalDays, validateProjectDraft, type TrackMode } from "../lib/work-projects.ts";
+import { TRACK_MODES, TRACK_MODE_HINT, TRACK_MODE_LABEL, validateTrack } from "../lib/task-inbox.ts";
 
 export type StaffOption = { code: string; displayName: string; employmentType: "full_time" | "part_time" };
 
@@ -17,6 +18,7 @@ export function ProjectAssignForm({
   defaultStartDate,
   defaultEndDate,
   contextNote,
+  parentId,
   onCreated
 }: {
   branch: string;
@@ -27,6 +29,8 @@ export function ProjectAssignForm({
   defaultEndDate?: string;
   /** บริบทของวัน/กิจกรรมที่เลือกมา — โชว์ไว้บนฟอร์มให้เห็นว่าสั่งงานของวันไหน */
   contextNote?: string;
+  /** สั่งเป็นงานย่อยของงานใหญ่นี้ */
+  parentId?: string;
   onCreated?: () => void | Promise<void>;
 }) {
   const [title, setTitle] = useState("");
@@ -39,6 +43,12 @@ export function ProjectAssignForm({
   const [openTime, setOpenTime] = useState("");
   const [dueTime, setDueTime] = useState("");
   const [answerKind, setAnswerKind] = useState<AnswerKind>("tick");
+  const [trackMode, setTrackMode] = useState<TrackMode>("done");
+  const [workDays, setWorkDays] = useState(5);
+  const [targetAmount, setTargetAmount] = useState("");
+  const [unit, setUnit] = useState("");
+  // หลายคน + งานเดี่ยว → แยกเป็นงานของแต่ละคน (ส่ง/ตรวจ/ให้คะแนนแยกกัน)
+  const [perPerson, setPerPerson] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +58,9 @@ export function ProjectAssignForm({
 
   async function submit() {
     const draft = { title: title.trim(), startDate, endDate, assignees: selectedCodes };
-    const invalid = validateProjectDraft(draft);
+    const invalid =
+      validateProjectDraft(trackMode === "workdays" ? { ...draft, endDate: startDate } : draft) ||
+      validateTrack({ trackMode, workDays, targetAmount: Number(targetAmount) });
     if (invalid) {
       setError(invalid);
       return;
@@ -56,19 +68,29 @@ export function ProjectAssignForm({
     setError(null);
     setBusy(true);
     try {
-      await createProject({
+      const base = {
         branch,
         title: draft.title,
         detail: detail.trim() || undefined,
         expectedResult: expectedResult.trim() || undefined,
         startDate,
-        endDate,
-        assignees: selectedCodes,
+        // นับวันทำงาน: server คำนวณวันส่งจากตารางกะเอง
+        endDate: trackMode === "workdays" ? startDate : endDate,
         mode,
         openTime: openTime || undefined,
         dueTime: dueTime || undefined,
-        ...(answerKind === "tick" ? {} : { answer: { kind: answerKind } })
-      });
+        ...(answerKind === "tick" ? {} : { answer: { kind: answerKind } }),
+        trackMode,
+        ...(trackMode === "workdays" ? { workDays } : {}),
+        ...(trackMode === "amount" ? { targetAmount: Number(targetAmount), unit: unit.trim() || undefined } : {}),
+        ...(parentId ? { parentId } : {})
+      };
+      const split = mode === "single" && perPerson && selectedCodes.length > 1;
+      if (split) {
+        for (const code of selectedCodes) await createProject({ ...base, assignees: [code] });
+      } else {
+        await createProject({ ...base, assignees: selectedCodes });
+      }
       setTitle("");
       setDetail("");
       setExpectedResult("");
@@ -85,7 +107,7 @@ export function ProjectAssignForm({
 
   return (
     <section className="assign-work__form soft-card">
-      <p className="assign-work__label">มอบหมายงาน (เดี่ยว / กลุ่ม)</p>
+      <p className="assign-work__label">{parentId ? "เพิ่มงานย่อย" : "มอบหมายงาน (เดี่ยว / กลุ่ม)"}</p>
       {contextNote ? <p className="assign-work__context">{contextNote}</p> : null}
       <p className="assign-work__hint-lead">
         บอก <strong>ทำอะไร · ใครทำ · วันไหนถึงวันไหน · ส่งงานแบบไหน</strong> — วันเดียวก็ได้ หลายวันก็ส่ง progress ทุกวัน
@@ -151,7 +173,53 @@ export function ProjectAssignForm({
       </div>
 
       <div className="assign-work__field">
-        <span className="assign-work__field-label">4. ช่วงเวลา <span className="assign-work__req">*</span></span>
+        <span className="assign-work__field-label">4. นับความคืบหน้าแบบไหน</span>
+        <div className="assign-work__chips">
+          {TRACK_MODES.filter((value) => value !== "percent").map((value) => (
+            <button
+              type="button"
+              key={value}
+              className={trackMode === value ? "assign-work__chip is-on" : "assign-work__chip"}
+              onClick={() => {
+                setTrackMode(value);
+                if (value === "done") setEndDate(startDate);
+              }}
+            >
+              {TRACK_MODE_LABEL[value]}
+            </button>
+          ))}
+        </div>
+        <p className="assign-work__hint-lead">{TRACK_MODE_HINT[trackMode]}</p>
+        {trackMode === "workdays" ? (
+          <div className="assign-work__due-row">
+            <label>
+              เริ่มวันที่
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </label>
+            <label>
+              ให้เวลากี่วันทำงาน
+              <input type="number" inputMode="numeric" min={1} max={60} value={workDays} onChange={(e) => setWorkDays(Number(e.target.value))} />
+            </label>
+            <span className="project-form__days">วันส่ง = วันทำงานที่ {workDays} ตามตารางกะของน้อง (นับเฉพาะวันที่เข้า)</span>
+          </div>
+        ) : null}
+        {trackMode === "amount" ? (
+          <div className="assign-work__due-row">
+            <label>
+              เป้าหมาย
+              <input type="number" inputMode="numeric" min={1} value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="เช่น 3000" />
+            </label>
+            <label>
+              หน่วย
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="เช่น ใบ / กล่อง" />
+            </label>
+          </div>
+        ) : null}
+      </div>
+
+      {trackMode === "workdays" ? null : (
+      <div className="assign-work__field">
+        <span className="assign-work__field-label">5. ช่วงเวลา <span className="assign-work__req">*</span></span>
         <div className="assign-work__due-row">
           <label>
             ตั้งแต่วันที่
@@ -172,9 +240,10 @@ export function ProjectAssignForm({
           <button type="button" onClick={() => setEndDate(addDays(endDate, 1))}>+ 1 วัน</button>
         </div>
       </div>
+      )}
 
       <div className="assign-work__field">
-        <span className="assign-work__field-label">5. เดี่ยวหรือกลุ่ม · เวลา · วิธีส่งงาน</span>
+        <span className="assign-work__field-label">{trackMode === "workdays" ? 5 : 6}. เดี่ยวหรือกลุ่ม · เวลา · วิธีส่งงาน</span>
         <div className="assign-work__chips">
           {(["single", "group"] as const).map((value) => (
             <button
@@ -187,6 +256,12 @@ export function ProjectAssignForm({
             </button>
           ))}
         </div>
+        {mode === "single" && selectedCodes.length > 1 ? (
+          <label className="assign-work__split">
+            <input type="checkbox" checked={perPerson} onChange={(e) => setPerPerson(e.target.checked)} />
+            แยกเป็นงานของแต่ละคน ({selectedCodes.length} งาน) — ส่งและตรวจแยกกัน
+          </label>
+        ) : null}
         <div className="assign-work__due-row">
           <label>
             เริ่มส่งได้ตั้งแต่
@@ -214,7 +289,7 @@ export function ProjectAssignForm({
         onClick={submit}
         disabled={busy || !title.trim() || selectedCodes.length === 0}
       >
-        {busy ? "กำลังมอบหมาย…" : `มอบหมายงาน${selectedCodes.length > 1 ? ` (${selectedCodes.length} คน)` : ""}`}
+        {busy ? "กำลังมอบหมาย…" : `${parentId ? "เพิ่มงานย่อย" : "มอบหมายงาน"}${selectedCodes.length > 1 ? ` (${selectedCodes.length} คน)` : ""}`}
       </button>
     </section>
   );

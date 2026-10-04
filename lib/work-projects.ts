@@ -32,6 +32,29 @@ export type ProjectProgress = {
   note: string;
   images?: string[];
   link?: string;
+  /** งานนับเป็นเนื้องาน (trackMode "amount") — ทำเพิ่มไปเท่าไรในอัปเดตนี้ */
+  amount?: number;
+};
+
+/**
+ * นับความคืบหน้าแบบไหน — เจ้าของเลือกตอนสั่งงาน (ดู lib/task-inbox.ts):
+ *  - done     = มีแค่เสร็จ/ไม่เสร็จ (เช่น ติดลูกโป่ง 1 วัน) ไม่มีความคืบหน้าระหว่างทาง
+ *  - workdays = ให้เวลา N วันทำงาน นับเฉพาะวันที่เข้ากะ · ส่งงานรายวันแค่บอกว่าทำไปเท่าไร
+ *  - amount   = นับเป็นเนื้องาน มีเป้า (เช่น นับการ์ด 3,000 ใบ) ส่งรายวันว่าทำเพิ่มไปเท่าไร
+ *  - percent  = แบบเดิม ลงเป็น % (งานเก่าที่ไม่ได้ตั้งไว้)
+ */
+export type TrackMode = "done" | "workdays" | "amount" | "percent";
+
+/** ส่งงานว่า "เสร็จสมบูรณ์แล้ว" พร้อมหลักฐาน — ส่งแล้วงานหายจากหน้าแจ้งเตือน รอเจ้าของตรวจ */
+export type TaskSubmission = {
+  id: string;
+  by: string;
+  at: string;
+  /** วันทำงาน YYYY-MM-DD ที่ส่ง */
+  date: string;
+  note: string;
+  images: string[];
+  link?: string;
 };
 
 /** ประวัติการปรับของเจ้าของ (ยืด/ลดวัน เพิ่ม/ลดคน) — ให้ย้อนดูได้ว่าทำไมแผนเปลี่ยน */
@@ -65,6 +88,10 @@ export type ProjectReviewEntry = {
   /** คะแนนของรายการนี้ (signed) — + เพิ่ม/คืน · − หัก */
   points: number;
   note?: string;
+  /** รูปที่เจ้าของแนบตอนตรวจ — ให้น้องเห็นว่าตรงไหนยังไม่เรียบร้อย */
+  images?: string[];
+  /** เจ้าของปรับคะแนนเองจากค่าที่ระบบแนะนำ */
+  manual?: boolean;
   /** อีเมลผู้กดยืนยันผลตรวจ */
   confirmedBy: string;
   confirmedByName?: string;
@@ -110,6 +137,21 @@ export type WorkProject = {
   originalOwner?: string;
   /** ledger การส่งต่องาน (ต่อท้ายอย่างเดียว) — ดู lib/project-handover.ts */
   handovers?: ProjectHandover[];
+  /** นับความคืบหน้าแบบไหน — ไม่ได้ตั้ง = งานเก่า (วันเดียว = done, หลายวัน = percent) */
+  trackMode?: TrackMode;
+  /** trackMode "workdays": ให้เวลากี่วันทำงาน */
+  workDays?: number;
+  /** trackMode "workdays": วันทำงานที่นับ (คำนวณจากตารางกะ) — วันสุดท้าย = endDate */
+  workDayDates?: string[];
+  /** trackMode "amount": เป้าหมาย + หน่วย เช่น 3000 "ใบ" */
+  targetAmount?: number;
+  unit?: string;
+  /** งานย่อยของงานใหญ่ (id ของงานแม่) */
+  parentId?: string;
+  /** ชื่องานแม่ (เก็บไว้ตอนสร้าง — น้องที่ได้งานย่อยอาจไม่ได้อยู่ในงานแม่) */
+  parentTitle?: string;
+  /** ส่งงานสมบูรณ์ (ต่อท้ายอย่างเดียว) */
+  submissions?: TaskSubmission[];
 };
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {

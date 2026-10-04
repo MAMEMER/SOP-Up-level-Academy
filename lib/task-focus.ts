@@ -150,7 +150,7 @@ export function projectToFocusTask(project: WorkProject, now: number, today: str
     ...(project.timing?.dueTime ? { dueTime: project.timing.dueTime } : {}),
     ownerCode: owner,
     ownerLabel: displayNameFor(owner),
-    href: "/projects"
+    href: "/my-tasks"
   };
   if (project.status !== "active") {
     return { ...base, urgency: "done", ctaLabel: "ดูงาน", note: project.status === "done" ? "เสร็จแล้ว" : "ยกเลิกแล้ว" };
