@@ -18,7 +18,7 @@ import { StaffDocsBanner } from "../../../components/StaffDocsBanner.tsx";
 import { StaffScoreCard } from "../../../components/StaffScoreCard.tsx";
 import { MyShiftToday } from "../../../components/MyShiftToday.tsx";
 import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
-import { MyProjects } from "../../../components/MyProjects.tsx";
+import { TaskInbox } from "../../../components/TaskInbox.tsx";
 import { TaskFocusBoard } from "../../../components/TaskFocusBoard.tsx";
 import { DashboardChecklistStatus } from "../../../components/DashboardChecklistStatus.tsx";
 import { DashboardTaskSections } from "../../../components/DashboardTaskSections.tsx";
@@ -129,9 +129,9 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       {/* งานโปรเจกต์ (หลายวัน) — ขึ้นตรงนี้ด้วยเพื่อเตือนให้ลง progress ของวันนี้ก่อนกลับ */}
       <section className="section-heading">
         <p className="eyebrow">งานที่มอบหมาย</p>
-        <h3>งานที่มอบหมาย (เดี่ยว / กลุ่ม)</h3>
+        <h3>แจ้งเตือนงาน — ยังไม่ได้ส่ง</h3>
       </section>
-      <MyProjects branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} isAdmin={isOwner && !user.isImpersonating} />
+      <TaskInbox branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} />
 
       {/* คะแนน = ข้อมูลสรุป ไม่ใช่งานที่ต้องทำ — อยู่ล่างสุดตามใบงาน */}
       {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}

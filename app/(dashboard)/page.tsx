@@ -4,7 +4,7 @@ import { AssignedDailyList } from "../../components/AssignedDailyList.tsx";
 import { SupplyNeedsBanner } from "../../components/SupplyNeedsBanner.tsx";
 import { StaffDocsBanner } from "../../components/StaffDocsBanner.tsx";
 import { FlowerReminderBanner } from "../../components/FlowerReminderBanner.tsx";
-import { MyProjects } from "../../components/MyProjects.tsx";
+import { TaskInbox } from "../../components/TaskInbox.tsx";
 import { TodayTaskList } from "../../components/TodayTaskList.tsx";
 import { MyShiftToday } from "../../components/MyShiftToday.tsx";
 import { cardStoreWorkflow } from "../../lib/card-store-workflow.ts";
@@ -155,12 +155,12 @@ export default async function HomePage() {
             <article className="task-section">
               <div className="task-section-head">
                 <div>
-                  <p className="eyebrow">งานโปรเจกต์</p>
-                  <h3>งานเดี่ยว / กลุ่ม ที่ต้องส่งความคืบหน้า</h3>
+                  <p className="eyebrow">แจ้งเตือนงาน</p>
+                  <h3>งานที่มอบหมาย ที่ยังไม่ได้ส่ง</h3>
                 </div>
-                <Link className="status-pill" href="/projects">ดูทั้งหมด</Link>
+                <Link className="status-pill" href="/my-tasks/file">แฟ้มงาน</Link>
               </div>
-              <MyProjects branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} isAdmin={user.role === "admin" && !user.isImpersonating} />
+              <TaskInbox branch={branch} staffCode={staffCode} today={workDate} readOnly={user.isImpersonating} />
             </article>
           ) : null}
         </>

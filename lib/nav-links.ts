@@ -11,6 +11,7 @@ export type NavGroup = { key: string; label: string; links: NavLink[] };
 export const quickLinks: NavLink[] = [
   { href: "/", label: "หน้าหลัก" },
   { href: "/my-view", label: "งานของฉัน" },
+  { href: "/my-tasks", label: "แจ้งเตือนงาน" },
   { href: "/my-review", label: "ผลงานของฉัน" },
   { href: "/flowers", label: "ดอกไม้" }
 ];
@@ -23,7 +24,7 @@ export const staffGroups: NavGroup[] = [
       { href: "/tasks", label: "งานวันนี้" },
       // ส่งต่องานย้ายเข้ามาอยู่ในการ์ดของ "งานที่มอบหมาย" แล้ว (ใบงาน iDBqn3jE) — หน้า /handoff
       // เดิมยังเปิดได้จากลิงก์ตรงเพื่อดูงานที่ค้างอยู่ในระบบเก่า แต่ไม่ต้องมีเมนูซ้ำอีกช่อง
-      { href: "/projects", label: "งานที่มอบหมาย" },
+      { href: "/my-tasks/file", label: "แฟ้มงาน" },
       { href: "/parcels", label: "พัสดุการ์ด" },
       { href: "/my-documents", label: "เอกสารของฉัน" }
     ]

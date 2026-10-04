@@ -59,12 +59,19 @@ export async function createProject(input: {
   openTime?: string;
   dueTime?: string;
   answer?: { kind: string; options?: string[]; placeholder?: string };
+  /** นับความคืบหน้าแบบไหน (lib/task-inbox.ts) */
+  trackMode?: "done" | "workdays" | "amount" | "percent";
+  workDays?: number;
+  targetAmount?: number;
+  unit?: string;
+  /** งานย่อยของงานใหญ่ */
+  parentId?: string;
 }): Promise<void> {
   await post({ action: "createProject", ...input });
 }
 
-export async function updateProjectDates(id: string, startDate: string, endDate: string): Promise<void> {
-  await post({ action: "updateProjectDates", id, startDate, endDate });
+export async function updateProjectDates(id: string, startDate: string, endDate: string, workDays?: number): Promise<void> {
+  await post({ action: "updateProjectDates", id, startDate, endDate, ...(workDays ? { workDays } : {}) });
 }
 
 export async function updateProjectAssignees(id: string, assignees: string[]): Promise<void> {
@@ -99,8 +106,15 @@ export async function addProjectProgress(input: {
   note: string;
   images?: string[];
   link?: string;
+  /** งานนับเนื้องาน: วันนี้ทำเพิ่มไปเท่าไร */
+  amount?: number;
 }): Promise<void> {
   await post({ action: "addProgress", ...input });
+}
+
+/** ส่งงานสมบูรณ์ + หลักฐาน (ต้องมีรูป) — งานหายจากหน้าแจ้งเตือน รอเจ้าของตรวจ */
+export async function submitFinalWork(input: { id: string; date: string; note: string; images: string[]; link?: string }): Promise<void> {
+  await post({ action: "submitFinal", ...input });
 }
 
 export async function deleteProjectProgress(id: string, progressId: string): Promise<void> {
@@ -113,12 +127,27 @@ export async function setProjectPercent(id: string, percent: number): Promise<vo
 }
 
 /** แอดมิน "ยืนยันผ่าน" งานของคนคนหนึ่ง — server คิดคะแนน KPI ให้ (เร็ว/ตรงเวลา/แก้ทัน/ช้า) */
-export async function reviewApproveWork(input: { id: string; assignee: string; submittedDate: string; note?: string }): Promise<void> {
+export async function reviewApproveWork(input: {
+  id: string;
+  assignee: string;
+  submittedDate: string;
+  note?: string;
+  /** เจ้าของปรับคะแนนเอง (ไม่ส่ง = ใช้ค่าที่ระบบคิด) */
+  points?: number;
+  images?: string[];
+}): Promise<void> {
   await post({ action: "reviewApprove", ...input });
 }
 
 /** แอดมิน "ให้แก้ไข" งานของคนคนหนึ่ง — หัก −1 ทันที + ตั้งกำหนดส่งใหม่ */
-export async function reviewRequestFix(input: { id: string; assignee: string; revisedDue: string; note?: string }): Promise<void> {
+export async function reviewRequestFix(input: {
+  id: string;
+  assignee: string;
+  revisedDue: string;
+  note?: string;
+  points?: number;
+  images?: string[];
+}): Promise<void> {
   await post({ action: "reviewRequestFix", ...input });
 }
 

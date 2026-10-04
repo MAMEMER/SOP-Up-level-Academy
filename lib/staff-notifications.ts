@@ -126,7 +126,7 @@ export function buildStaffNotifications(input: Input): StaffNotification[] {
         kind: "assigned_work",
         title: `งานที่มอบหมาย: ${project.title}`,
         at: project.createdAt,
-        href: "/projects",
+        href: "/my-tasks",
         unread: isUnread(project.createdAt)
       });
     }
@@ -138,7 +138,7 @@ export function buildStaffNotifications(input: Input): StaffNotification[] {
         title: `รับงานต่อ: ${project.title}`,
         detail: handover.note ? clip(handover.note) : undefined,
         at: handover.at,
-        href: "/projects",
+        href: "/my-tasks",
         unread: isUnread(handover.at)
       });
     }

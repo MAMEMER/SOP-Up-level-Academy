@@ -27,7 +27,9 @@ import {
 } from "../../../lib/project-review.ts";
 import { applyHandover, currentOwnerOf, handoverSummary, validateHandover } from "../../../lib/project-handover.ts";
 import { fetchShiftAssignmentsForDate } from "../../../lib/shift-plan-server.ts";
-import type { ProjectReviewEntry } from "../../../lib/work-projects.ts";
+import type { ProjectReviewEntry, TaskSubmission, TrackMode } from "../../../lib/work-projects.ts";
+import { TRACK_MODES, amountDone, everyoneDone, lastSubmissionFor, trackModeOf, validateSubmission, validateTrack } from "../../../lib/task-inbox.ts";
+import { computeWorkDayDates } from "../../../lib/task-workdays-server.ts";
 
 // Server route for งานแบบโปรเจกต์ (หลายวัน + ส่ง progress รายวัน). Same shape as
 // /api/work-tasks: session-verified, blocked while impersonating, Admin SDK does the write,
@@ -66,6 +68,50 @@ function answerFromBody(body: Record<string, unknown>) {
 const strArr = (v: unknown) => (Array.isArray(v) ? Array.from(new Set(v.filter((x): x is string => typeof x === "string" && x.trim().length > 0))) : []);
 const safeUrls = (v: unknown) => strArr(v).filter((url) => isValidLinkUrl(url));
 
+/** คะแนนที่เจ้าของใส่เอง (−50…+20) — ไม่ส่งมา/ไม่ใช่ตัวเลข = ใช้ค่าที่ระบบคิดให้ */
+function reviewPointsOverride(v: unknown): number | null {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(-50, Math.min(20, n));
+}
+
+/** วิธีนับความคืบหน้าที่เจ้าของเลือก — ค่าเพี้ยนไม่รับ (คืน {} = งานแบบเดิม) */
+function trackFromBody(body: Record<string, unknown>): { trackMode?: TrackMode; workDays?: number; targetAmount?: number; unit?: string } {
+  const mode = TRACK_MODES.includes(body.trackMode as TrackMode) ? (body.trackMode as TrackMode) : undefined;
+  if (!mode) return {};
+  const workDays = Math.round(Number(body.workDays));
+  const targetAmount = Number(body.targetAmount);
+  const unit = str(body.unit).trim().slice(0, 20);
+  return {
+    trackMode: mode,
+    ...(mode === "workdays" ? { workDays } : {}),
+    ...(mode === "amount" ? { targetAmount, ...(unit ? { unit } : {}) } : {})
+  };
+}
+
+/**
+ * งานแบบนับวันทำงาน: วันส่ง = วันทำงานที่ N ตามตารางกะ. ตารางกะเปลี่ยน (เพิ่มกะ/ลา) → คำนวณใหม่
+ * ตอนโหลด แล้วเขียนกลับเฉพาะงานที่ยังทำอยู่และยังไม่มีใครส่ง (งานที่ส่ง/ตรวจแล้วกำหนดต้องนิ่ง).
+ */
+async function refreshWorkdays(projects: WorkProject[]): Promise<WorkProject[]> {
+  return Promise.all(
+    projects.map(async (project) => {
+      if (trackModeOf(project) !== "workdays" || project.status !== "active" || !project.workDays) return project;
+      if ((project.submissions || []).length || (project.reviews || []).length) return project;
+      try {
+        const dates = await computeWorkDayDates(project.assignees, project.startDate, project.workDays);
+        const endDate = dates[dates.length - 1] || project.endDate;
+        if (endDate === project.endDate && dates.join() === (project.workDayDates || []).join()) return project;
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(project.id).update({ endDate, workDayDates: dates });
+        return { ...project, endDate, workDayDates: dates };
+      } catch {
+        return project;
+      }
+    })
+  );
+}
+
 export async function GET(request: Request) {
   await actor();
   const p = new URL(request.url).searchParams;
@@ -82,7 +128,7 @@ export async function GET(request: Request) {
       case "projectsForBranch": {
         if (!branch) return badRequest("missing_branch");
         const snap = await db().collection(WORK_PROJECTS_COLLECTION).where("branch", "==", branch).get();
-        return NextResponse.json({ projects: snap.docs.map((d) => d.data() as WorkProject) });
+        return NextResponse.json({ projects: await refreshWorkdays(snap.docs.map((d) => d.data() as WorkProject)) });
       }
       case "projectsForStaff": {
         const staffCode = p.get("staffCode") || "";
@@ -96,7 +142,7 @@ export async function GET(request: Request) {
           .get();
         // ไม่กรองสาขาที่นี่: ถ้าเจ้าของมอบหมายชื่อคุณไว้ คุณต้องเห็น — สาขาในโปรไฟล์พนักงานกับสาขา
         // ที่ตอนสั่งงานไม่ตรงกัน ไม่ควรทำให้งานหายไปเงียบๆ
-        return NextResponse.json({ projects: snap.docs.map((d) => d.data() as WorkProject) });
+        return NextResponse.json({ projects: await refreshWorkdays(snap.docs.map((d) => d.data() as WorkProject)) });
       }
       case "projectById": {
         const id = (p.get("id") || "").trim();
@@ -156,7 +202,20 @@ export async function POST(request: Request) {
         };
         const invalid = validateProjectDraft(draft);
         if (invalid) return badRequest(invalid);
-        const id = newId(nowIso, draft.title);
+        const track = trackFromBody(body);
+        const invalidTrack = validateTrack(track);
+        if (invalidTrack) return badRequest(invalidTrack);
+        // ให้เวลา N วันทำงาน → วันส่ง = วันทำงานที่ N ตามตารางกะของคนที่ได้รับงาน
+        let workDayDates: string[] | undefined;
+        if (track.trackMode === "workdays" && track.workDays) {
+          workDayDates = await computeWorkDayDates(draft.assignees, draft.startDate, track.workDays);
+          draft.endDate = workDayDates[workDayDates.length - 1] || draft.startDate;
+        }
+        const parentId = docId(body.parentId);
+        const parentSnap = parentId ? await db().collection(WORK_PROJECTS_COLLECTION).doc(parentId).get() : null;
+        if (parentId && !parentSnap?.exists) return badRequest("ไม่พบงานใหญ่ที่จะเพิ่มงานย่อย");
+        const parentTitle = parentSnap?.exists ? String((parentSnap.data() as WorkProject).title || "") : "";
+        const id = newId(nowIso, `${draft.title}-${draft.assignees.join("-")}`);
         const project: WorkProject = {
           id,
           branch: str(body.branch) || "bangkae",
@@ -171,6 +230,9 @@ export async function POST(request: Request) {
           mode: body.mode === "group" ? "group" : "single",
           ...(timingFromBody(body) ? { timing: timingFromBody(body) } : {}),
           ...(answerFromBody(body) ? { answer: answerFromBody(body) } : {}),
+          ...track,
+          ...(workDayDates ? { workDayDates } : {}),
+          ...(parentId ? { parentId, parentTitle } : {}),
           // ผู้รับผิดชอบคนแรก = คนแรกในรายชื่อ (งานกลุ่มก็ยังต้องมีคนถือ ไว้ใช้ตอนส่งต่อ/คิด KPI)
           originalOwner: draft.assignees[0],
           currentOwner: draft.assignees[0],
@@ -193,15 +255,25 @@ export async function POST(request: Request) {
         if (!id || !isIsoDate(startDate) || !isIsoDate(endDate)) return badRequest("missing_params");
         const project = await load(id);
         if (project instanceof NextResponse) return project;
-        const invalid = validateProjectDraft({ ...project, startDate, endDate });
+        let finalEnd = endDate;
+        let workPatch: { workDays?: number; workDayDates?: string[] } = {};
+        if (trackModeOf(project) === "workdays") {
+          // งานนับวันทำงาน: เจ้าของปรับ "จำนวนวัน" แล้ววันส่งคำนวณจากตารางกะใหม่
+          const workDays = Math.max(1, Math.min(60, Math.round(Number(body.workDays)) || project.workDays || 1));
+          const dates = await computeWorkDayDates(project.assignees, startDate, workDays);
+          finalEnd = dates[dates.length - 1] || startDate;
+          workPatch = { workDays, workDayDates: dates };
+        }
+        const invalid = validateProjectDraft({ ...project, startDate, endDate: finalEnd });
         if (invalid) return badRequest(invalid);
         await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
           startDate,
-          endDate,
+          endDate: finalEnd,
+          ...workPatch,
           updatedAt: nowIso,
           history: stamp(project, {
             action: "dates",
-            detail: `${project.startDate} → ${project.endDate} เป็น ${startDate} → ${endDate}`
+            detail: `${project.startDate} → ${project.endDate} เป็น ${startDate} → ${finalEnd}`
           })
         });
         return NextResponse.json({ ok: true });
@@ -301,7 +373,16 @@ export async function POST(request: Request) {
         if (!isAdmin(user) && projectMode(project) === "single" && (project.handovers || []).length > 0 && currentOwnerOf(project) !== staffCode) {
           return badRequest("งานนี้ส่งต่อให้คนอื่นแล้ว — ผู้รับผิดชอบปัจจุบันเป็นคนส่งงาน");
         }
-        const percent = clampPercent(Number(body.percent));
+        const mode = trackModeOf(project);
+        const amount = mode === "amount" ? Number(body.amount) : NaN;
+        if (mode === "amount" && (!Number.isFinite(amount) || amount < 0)) return badRequest("ต้องใส่จำนวนที่ทำเพิ่มวันนี้เป็นตัวเลข");
+        // งานแบบใหม่ไม่ให้น้องเดา % — amount คิด % จากเป้าให้ · workdays/done ไม่มี %
+        const percent =
+          mode === "percent"
+            ? clampPercent(Number(body.percent))
+            : mode === "amount" && project.targetAmount
+              ? clampPercent(((amountDone(project) + amount) / project.targetAmount) * 100)
+              : 0;
         const note = str(body.note).trim();
         const invalid = validateProgressInput({ percent, note });
         if (invalid) return badRequest(invalid);
@@ -316,14 +397,50 @@ export async function POST(request: Request) {
           // รูป/ลิงก์ ถูกเรนเดอร์เป็น <a href> ให้คนอื่นกด — รับเฉพาะ https หรือ path ในเว็บนี้
           // (กัน javascript:/data: หลุดเข้าไปเป็นปุ่มให้คนกด) ใช้กติกาเดียวกับลิงก์ใน checklist
           ...(safeUrls(body.images).length ? { images: safeUrls(body.images) } : {}),
-          ...(isValidLinkUrl(str(body.link).trim()) ? { link: str(body.link).trim() } : {})
+          ...(isValidLinkUrl(str(body.link).trim()) ? { link: str(body.link).trim() } : {}),
+          ...(mode === "amount" ? { amount } : {})
         };
         const progress = [...(project.progress || []), entry].slice(-MAX_PROJECT_PROGRESS);
-        // 100% ที่คนทำรายงาน = งานเสร็จ แต่ยังให้เจ้าของเปลี่ยนสถานะเองได้ทีหลัง
+        // แบบเดิม (%): 100% = งานเสร็จ · แบบใหม่ต้องกด "ส่งงานสมบูรณ์" พร้อมหลักฐานเท่านั้น
         await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
           progress,
           updatedAt: nowIso,
-          ...(percent >= 100 && project.status === "active" ? { status: "done" as ProjectStatus } : {})
+          ...(mode === "percent" && percent >= 100 && project.status === "active" ? { status: "done" as ProjectStatus } : {})
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── ส่งงานสมบูรณ์ + หลักฐาน → หายจากหน้าแจ้งเตือน รอเจ้าของตรวจ ─────────────
+      case "submitFinal": {
+        const id = docId(body.id);
+        if (!id) return badRequest("missing_id");
+        const project = await load(id);
+        if (project instanceof NextResponse) return project;
+        if (!isAdmin(user) && !project.assignees.includes(staffCode)) return forbidden();
+        if (project.status === "cancelled") return badRequest("งานนี้ถูกยกเลิกแล้ว");
+        const by = staffCode || user.actualEmail;
+        const images = safeUrls(body.images);
+        const note = str(body.note).trim();
+        const invalid = validateSubmission({ note, images });
+        if (invalid) return badRequest(invalid);
+        // กดซ้ำ (เน็ตช้า กดสองที) ภายใน 1 นาที = ครั้งเดียว
+        const last = (project.submissions || []).filter((entry) => entry.by === by).slice(-1)[0];
+        if (last && Date.parse(nowIso) - Date.parse(last.at) < 60_000) return NextResponse.json({ ok: true, duplicate: true });
+        const submission: TaskSubmission = {
+          id: `sb__${nowIso}__${by}`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
+          by,
+          at: nowIso,
+          date: isIsoDate(body.date) ? (body.date as string) : nowIso.slice(0, 10),
+          note,
+          images,
+          ...(isValidLinkUrl(str(body.link).trim()) ? { link: str(body.link).trim() } : {})
+        };
+        const submissions = [...(project.submissions || []), submission].slice(-100);
+        await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
+          submissions,
+          ...(everyoneDone({ ...project, submissions }) ? { status: "done" as ProjectStatus } : {}),
+          updatedAt: nowIso,
+          history: stamp(project, { action: "status", detail: `ส่งงานสมบูรณ์ โดย ${by}` })
         });
         return NextResponse.json({ ok: true });
       }
@@ -418,13 +535,19 @@ export async function POST(request: Request) {
         const project = await load(id);
         if (project instanceof NextResponse) return project;
         if (!project.assignees.includes(assignee)) return badRequest("ไม่พบชื่อคนนี้ในงาน");
-        const submittedDate = isIsoDate(body.submittedDate) ? (body.submittedDate as string) : nowIso.slice(0, 10);
+        const submittedDate = isIsoDate(body.submittedDate)
+          ? (body.submittedDate as string)
+          : lastSubmissionFor(project, assignee)?.date || nowIso.slice(0, 10);
         const dueDate = effectiveDue(project, assignee);
         const hadRevision = hasOpenRevision(reviewEntriesFor(project, assignee));
         // งานที่เคยส่งต่อและส่งช้า → หักคนละส่วนตามวันที่แต่ละคนถือครองงานจริง
         // งานที่ไม่เคยส่งต่อ → ได้รายการเดียวเหมือนเดิม
-        const splits = splitReviewByOwner(project, { assignee, dueDate, submittedDate, hadRevision });
+        // เจ้าของปรับคะแนนเอง (points) → รายการเดียวของคนที่ตรวจ ตามเลขที่เจ้าของใส่
+        const override = reviewPointsOverride(body.points);
+        const auto = splitReviewByOwner(project, { assignee, dueDate, submittedDate, hadRevision });
+        const splits = override === null ? auto : [{ ...auto[0], assignee, points: override }];
         const note = str(body.note).trim();
+        const reviewImages = safeUrls(body.images);
         const entries: ProjectReviewEntry[] = splits.map((split, index) => ({
           id: `rv__${nowIso}__${split.assignee}__${index}`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
           assignee: split.assignee,
@@ -434,6 +557,8 @@ export async function POST(request: Request) {
           daysLate: split.daysLate,
           points: split.points,
           ...(note ? { note } : {}),
+          ...(reviewImages.length ? { images: reviewImages } : {}),
+          ...(override !== null ? { manual: true } : {}),
           confirmedBy: user.actualEmail,
           ...(user.actualName ? { confirmedByName: user.actualName } : {}),
           confirmedAt: nowIso
@@ -442,6 +567,8 @@ export async function POST(request: Request) {
         await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
           reviews: [...(project.reviews || []), ...entries],
           updatedAt: nowIso,
+          // ทุกคนผ่าน/ส่งแล้ว = ปิดงาน · ยังมีคนค้าง = งานยังเปิดให้คนนั้นได้รับการเตือนต่อ
+          ...(everyoneDone({ ...project, reviews: [...(project.reviews || []), ...entries] }) ? { status: "done" as ProjectStatus } : {}),
           history: stamp(project, {
             action: "review",
             detail: `ยืนยันผ่าน ${entries.map((entry) => `${entry.assignee}: ${entry.outcome} (${entry.points >= 0 ? "+" : ""}${entry.points})`).join(" · ")}`
@@ -463,6 +590,9 @@ export async function POST(request: Request) {
         if (!project.assignees.includes(assignee)) return badRequest("ไม่พบชื่อคนนี้ในงาน");
         const dueDate = effectiveDue(project, assignee);
         const comp = computeReviewPoints({ verdict: "request_fix", dueDate, hadRevision: false });
+        const fixOverride = reviewPointsOverride(body.points);
+        if (fixOverride !== null) comp.points = fixOverride;
+        const fixImages = safeUrls(body.images);
         const entry: ProjectReviewEntry = {
           id: `rv__${nowIso}__${assignee}`.replace(/[^a-zA-Z0-9_:\-.@]/g, "-").slice(0, 140),
           assignee,
@@ -472,14 +602,18 @@ export async function POST(request: Request) {
           daysLate: 0,
           points: comp.points,
           ...(str(body.note).trim() ? { note: str(body.note).trim() } : {}),
+          ...(fixImages.length ? { images: fixImages } : {}),
+          ...(fixOverride !== null ? { manual: true } : {}),
           confirmedBy: user.actualEmail,
           ...(user.actualName ? { confirmedByName: user.actualName } : {}),
           confirmedAt: nowIso
         };
         await db().collection(WORK_PROJECTS_COLLECTION).doc(id).update({
           reviews: [...(project.reviews || []), entry],
+          // สั่งแก้ = งานกลับมาเปิด → ขึ้นในหน้าแจ้งเตือนงานของน้องอีกครั้ง
+          status: "active" as ProjectStatus,
           updatedAt: nowIso,
-          history: stamp(project, { action: "review", detail: `ให้แก้ไข ${assignee}: −1 · กำหนดใหม่ ${revisedDue}` })
+          history: stamp(project, { action: "review", detail: `ให้แก้ไข ${assignee}: ${comp.points} · กำหนดใหม่ ${revisedDue}` })
         });
         return NextResponse.json({ ok: true, points: comp.points });
       }

@@ -61,3 +61,18 @@ export async function fetchShiftAssignmentsForDate(
   }
   return shifts;
 }
+
+/**
+ * พนักงานที่มีกะทำงานในสาขานี้ในเดือนนี้ (YYYY-MM) — ใช้ประกอบรายชื่อ "พนักงานในสาขา" เพราะ
+ * home branch ในรายชื่อพนักงานเป็นสาขาเดียว แต่คนข้ามไปเข้ากะอีกสาขาได้ (onSchedule ≠ onRoster)
+ */
+export async function fetchStaffCodesForBranchMonth(branch: string, month: string): Promise<Set<string>> {
+  if (!hasAdminCredentials()) return new Set();
+  const snapshot = await adminDb().collection(SHIFTS).where("branch", "==", branch).where("month", "==", month).get();
+  const codes = new Set<string>();
+  for (const doc of snapshot.docs) {
+    const data = doc.data() as { staffCode?: string; assignment?: ShiftAssignment };
+    if (data.staffCode && data.assignment && isWorkingAssignment(data.assignment)) codes.add(data.staffCode);
+  }
+  return codes;
+}
