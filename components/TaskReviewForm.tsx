@@ -31,7 +31,20 @@ export function TaskReviewForm({
   const suggestFix = computeReviewPoints({ verdict: "request_fix", dueDate: due, hadRevision });
 
   const [verdict, setVerdict] = useState<"approve" | "request_fix">("approve");
-  const [points, setPoints] = useState(suggestPass.points);
+  const [points, setPointsValue] = useState(suggestPass.points);
+  // ข้อความในช่องคะแนน แยกจากตัวเลขจริง — ระหว่างพิมพ์ "-" หรือลบจนว่าง ช่องต้องไม่เด้งกลับ
+  const [pointsText, setPointsText] = useState(String(suggestPass.points));
+  const clampPoints = (value: number) => Math.max(-50, Math.min(20, Math.round(value)));
+  function setPoints(next: number | ((prev: number) => number)) {
+    const value = clampPoints(typeof next === "function" ? next(points) : next);
+    setPointsValue(value);
+    setPointsText(String(value));
+  }
+  function typePoints(raw: string) {
+    setPointsText(raw);
+    const value = Number(raw);
+    if (raw.trim() !== "" && raw !== "-" && Number.isFinite(value)) setPointsValue(clampPoints(value));
+  }
   const [note, setNote, clearNote] = useDraft(`ti-review-${task.id}-${assignee}`);
   const [photos, setPhotos] = useState("");
   const [revisedDue, setRevisedDue] = useState(addDays(today, 1));
@@ -98,10 +111,19 @@ export function TaskReviewForm({
         <button type="button" aria-label="ลดคะแนน" onClick={() => setPoints((p) => p - 1)}>
           <Minus size={16} aria-hidden />
         </button>
-        <strong className={points < 0 ? "is-neg" : points > 0 ? "is-pos" : undefined}>
-          {points > 0 ? "+" : ""}
-          {points}
-        </strong>
+        {/* พิมพ์เลขเองได้เลย (ติดลบใส่ - นำหน้า) — ไม่ต้องกด +/− รัวๆ · ช่วงเดียวกับที่ server รับ −50…+20 */}
+        <input
+          type="number"
+          className={points < 0 ? "ti-points__input is-neg" : points > 0 ? "ti-points__input is-pos" : "ti-points__input"}
+          aria-label="คะแนน"
+          min={-50}
+          max={20}
+          step={1}
+          value={pointsText}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => typePoints(e.target.value)}
+          onBlur={() => setPointsText(String(points))}
+        />
         <button type="button" aria-label="เพิ่มคะแนน" onClick={() => setPoints((p) => p + 1)}>
           <Plus size={16} aria-hidden />
         </button>
