@@ -14,6 +14,7 @@ import { assignedWorkRecordsForDate } from "../../lib/performance-service-record
 import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assigned-work-feed.ts";
 import { weeklyEventsActiveOn } from "../../lib/weekly-event-tasks.ts";
 import { DeliveryOrdersBoard } from "../../components/DeliveryOrdersBoard.tsx";
+import { ParcelOrdersBoard } from "../../components/ParcelOrdersBoard.tsx";
 import { fetchShiftForStaff, syncDeliveryTasks, workBranchFor } from "../../lib/delivery-tasks-server.ts";
 import { DELIVERY_BRANCH, deliveryTaskState, deliveryTaskVisibleTo, sortDeliveryTasks, type DeliveryTask } from "../../lib/delivery-tasks.ts";
 import { TodaySummary } from "../../components/TodaySummary.tsx";
@@ -102,6 +103,9 @@ export default async function HomePage() {
         assignedRemaining={assignedWorkFeed.filter((item) => item.statusClass !== "workflow-status-green").length}
         deliveryRemaining={deliveryTasks.filter((task) => deliveryTaskState(task, workDate) !== "done").length}
       />
+
+      {/* พัสดุการ์ดที่ถึงร้านแล้วรอแกะ-เช็ค-ลง — ผูก KPI จึงอยู่บนสุดของงาน (ไม่มีกล่องค้าง = ไม่โชว์) */}
+      <ParcelOrdersBoard branch={branch} compact canAct={!user.isImpersonating} />
 
       {staffCode ? <MyShiftToday staffCode={staffCode} branch={branch} workDate={workDate} /> : null}
 

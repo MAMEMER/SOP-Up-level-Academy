@@ -3,6 +3,8 @@ import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { buildAdminNotifications, type AdminNotification, type NotificationInput } from "./admin-notifications.ts";
 import { deliveryTaskState, type DeliveryTask } from "./delivery-tasks.ts";
 import { syncDeliveryTasks } from "./delivery-tasks-server.ts";
+import { listParcelOrders } from "./parcel-orders-server.ts";
+import { parcelCounts, type ParcelOrder } from "./parcel-orders.ts";
 import { restListCollection } from "./firestore-rest.ts";
 import { branchShortName } from "./store-config.ts";
 import { dailyScopeKey } from "./work-records.ts";
@@ -141,7 +143,7 @@ export async function getAdminNotifications(
   deliveryTasks?: DeliveryTask[]
 ): Promise<AdminNotification[]> {
   const branches = summaries.map((entry) => entry.branch);
-  const [deliveries, lostPresses, tickets, assignments, guild] = await Promise.all([
+  const [deliveries, lostPresses, tickets, assignments, guild, parcels] = await Promise.all([
     deliveryTasks
       ? Promise.resolve(deliveryTasks)
       : safe(() => syncDeliveryTasks(), [] as DeliveryTask[]),
@@ -156,7 +158,8 @@ export async function getAdminNotifications(
       mergeRequests: 0,
       guildShopOrders: 0,
       pendingMembers: 0
-    })
+    }),
+    safe(() => listParcelOrders(), [] as ParcelOrder[])
   ]);
 
   // หลายสาขา: รวมตัวเลขของทุกสาขาที่กำลังดู · ชื่อคนที่ยังไม่เริ่มต่อท้ายด้วยสาขาให้รู้ว่าต้องตามที่ไหน
@@ -175,6 +178,7 @@ export async function getAdminNotifications(
       )
     },
     bugReports: { open: tickets },
+    parcels: parcelCounts(parcels.filter((order) => branches.includes(order.branch)), workDate),
     guild
   });
 }
