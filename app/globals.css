@@ -8270,9 +8270,16 @@ p.ab-help{padding-left:0}
 .ti-seg button.is-on.is-red { background: var(--ti-red-soft); border-color: var(--ti-red); color: var(--ti-red); }
 .ti-points { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .ti-points > button { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--ti-line); background: #fff; cursor: pointer; color: var(--ti-ink); }
-.ti-points strong { min-width: 3ch; text-align: center; font-size: 1.35rem; }
-.ti-points strong.is-neg { color: var(--ti-red); }
-.ti-points strong.is-pos { color: var(--ti-green); }
+.ti-points__input {
+  width: 4.5rem; min-height: 44px; padding: 0.3rem 0.4rem; box-sizing: border-box;
+  border: 1px solid var(--ti-line); border-radius: 12px; background: #fff;
+  font: inherit; font-size: 1.35rem; font-weight: 700; text-align: center; color: var(--ti-ink);
+  -moz-appearance: textfield;
+}
+.ti-points__input::-webkit-outer-spin-button, .ti-points__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.ti-points__input:focus-visible { outline: 3px solid var(--color-orange, #ff8c42); outline-offset: 1px; }
+.ti-points__input.is-neg { color: var(--ti-red); }
+.ti-points__input.is-pos { color: var(--ti-green); }
 .ti-points small { flex-basis: 100%; color: var(--ti-soft); }
 
 .ti-queue { display: grid; gap: 0; margin-bottom: 1.75rem; }
