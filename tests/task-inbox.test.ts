@@ -107,6 +107,11 @@ describe("taskState — ไม่หายจากหน้าแจ้งเ�
     assert.equal(everyoneDone(t), false);
     assert.equal(everyoneDone({ ...t, submissions: [...t.submissions!, sub("2026-10-04T11:00:00.000Z", "Leo")] }), true);
   });
+  it("งานเก่าปิด 100% ตรวจไปแล้วคนเดียว — คนที่เหลือยังรอตรวจ", () => {
+    const t = task({ assignees: ["Boom", "Leo"], mode: "group", status: "done", reviews: [review({})] });
+    assert.equal(taskState(t, "Boom"), "passed");
+    assert.equal(taskState(t, "Leo"), "submitted");
+  });
   it("เลยกำหนดและยังไม่ส่ง = แดง", () => {
     assert.equal(isLateFor(task(), "Boom", "2026-10-05"), true);
     assert.equal(rowTone(task(), ["Boom"], "2026-10-05"), "red");
