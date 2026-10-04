@@ -5,6 +5,8 @@ import { isOwner, canManageStaffAccounts } from "../../../lib/owner.ts";
 import { getOpsSummary } from "../../../lib/ops-summary.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
 import { getAdminNotifications } from "../../../lib/admin-notifications-server.ts";
+import { AdminDirectory, type DirectoryBadge } from "../../../components/AdminDirectory.tsx";
+import { adminSectionsFor } from "../../../lib/admin-sitemap.ts";
 import { AdminNotificationCenter } from "../../../components/AdminNotificationCenter.tsx";
 import { DeliveryOrdersBoard } from "../../../components/DeliveryOrdersBoard.tsx";
 import { WorkflowReviewRecords } from "../../../components/WorkflowReviewRecords.tsx";
@@ -22,18 +24,8 @@ import { docsStatus } from "../../../lib/staff-documents.ts";
 // The owner's home. Signed in as an admin, "/" is still the staff dashboard — a personal
 // checklist nobody in charge fills in — so running the day meant hunting through ten nav
 // links. This page is the one place to start from: what needs attention right now, then
-// every tool grouped by what you came to do.
-
-type Tool = {
-  href: string;
-  title: string;
-  detail: string;
-  /** live number worth acting on, shown as a badge */
-  badge?: { count: number; label: string };
-  ownerOnly?: boolean;
-  /** หน้าที่เปิด/ปิดสิทธิ์เข้าระบบให้คนอื่น — เห็นเฉพาะบัญชีที่ดูแลรายชื่อ */
-  staffAdminOnly?: boolean;
-};
+// every tool grouped by what you came to do. The menu itself comes from lib/admin-sitemap.ts
+// (same list as the top nav) so a page can never be in one and missing from the other.
 
 // ตัวเลขบนหน้านี้ต้องสดเสมอ — เจ้าของร้านใช้ตัดสินใจว่าจะไปตามเรื่องไหนก่อน
 export const dynamic = "force-dynamic";
@@ -62,8 +54,7 @@ export default async function AdminHubPage({ searchParams }: { searchParams?: Pr
   // สถานะ sync สต็อกร้านออนไลน์ล่าสุด (StoreHub → shop-products) — โชว์ให้เจ้าของกด sync เองได้
   const shopSyncStatus = await getShopSyncStatus();
   const owner = isOwner(user.email);
-  // หน้าจัดการพนักงานย้ายมาอยู่ที่ /admin/staff ตอน /admin กลายเป็น hub — เลยยกปุ่มลัด
-  // ขึ้นมาไว้บนสุดให้กดเข้าได้ทันที ไม่ต้องเลื่อนลงไปหาการ์ดเล็กๆ ท้ายหน้า (SOP bug: หน้าจัดการพนักงานหาย)
+  // หน้าจัดการพนักงาน (/admin/staff) เห็นเฉพาะคนที่ดูแลรายชื่อ — อยู่หมวด "พนักงาน" ทั้งในเมนูบนและสารบัญ
   const canManageStaff = canManageStaffAccounts(user.actualEmail);
 
   // เอกสารประกันสังคมที่พนักงานยังไม่ส่ง — อ่านพลาดก็แค่ไม่มีตัวเลข ไม่ทำให้ hub พัง
@@ -86,138 +77,23 @@ export default async function AdminHubPage({ searchParams }: { searchParams?: Pr
   // คนที่เข้ากะวันนี้ในสาขาที่กำลังดู (เริ่ม checklist แล้ว + ยังไม่เริ่ม)
   const staffCount = sumOf((summary) => summary.staff.length + summary.noRecordStaff.length);
 
-  const groups: Array<{ title: string; hint: string; tools: Tool[] }> = [
-    {
-      title: "ดูว่าวันนี้เป็นยังไง",
-      hint: "เริ่มจากตรงนี้ทุกเช้า",
-      tools: [
-        {
-          href: "/admin/ops",
-          title: "รายละเอียดรายคน",
-          detail: "เจาะดูรายคน — ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม (ตัวเลขสรุปรวมอยู่บนหน้านี้แล้ว)",
-          badge: latePhases ? { count: latePhases, label: "เกินกำหนด" } : undefined
-        },
-        {
-          href: "/admin/closing",
-          title: "ปิดยอด 2 สาขา",
-          detail: "เงินสดแต่ละสาขาตรงไหม · K SHOP สองเครื่องรวมกันตรงกับยอดธนาคารไหม"
-        },
-        {
-          href: "/manager-review",
-          title: "ตรวจงาน",
-          detail: "งานที่พนักงานกดส่งตรวจ พร้อมหลักฐานที่แนบมา",
-          badge: submittedPhases ? { count: submittedPhases, label: "ส่งมาแล้ว" } : undefined
-        },
-        {
-          href: "/admin/staff-view",
-          title: "มุมมองพนักงาน",
-          detail: "เข้าดูเว็บในมุมมองของพนักงานคนนั้น เช็คว่าเขาเห็นอะไร"
-        }
-      ]
-    },
-    {
-      title: "สั่งงาน / วางแผน",
-      hint: "งานที่ทำล่วงหน้า",
-      tools: [
-        {
-          href: "/admin/assign",
-          title: "มอบหมายงาน",
-          detail: "สั่งงานรายคน แนบไฟล์ได้ · ขึ้นบนหน้าของเขาทันทีที่ login",
-          badge: openWork ? { count: openWork, label: "ยังไม่ส่ง" } : undefined
-        },
-        {
-          href: "/admin/tasks",
-          title: "สั่งงานประจำ",
-          detail: "งานรายวัน/สัปดาห์/เดือน ที่เดียว — ลงวันไหน กะไหน เริ่มได้เมื่อไร จบไม่เกินเมื่อไร ส่งงานแบบไหน"
-        },
-        {
-          href: "/admin/calendar",
-          title: "ปฏิทินสั่งงาน",
-          detail: "เห็นทั้งเดือนว่าวันไหนมีงาน/กิจกรรมอะไร กดวันนั้นสั่งงานได้เลย หรือสั่งเป็นทุกวันที่มีกิจกรรมนั้น"
-        },
-        {
-          href: "/admin/activities",
-          title: "ตารางกิจกรรมสองสาขา",
-          detail: "บางแค × เสนาเฟสต์ วันไหนจัดอะไร และใครเข้ากะที่ไหน — ลากย้ายวัน/สาขาได้ เตือนเกมชนกันข้ามสาขา",
-          ownerOnly: true
-        },
-        {
-          href: "/admin/projects",
-          title: "มอบหมายงาน (เดี่ยว/กลุ่ม)",
-          detail: "งานวันเดียวหรือหลายวัน — ใครทำ เวลา ส่งงานแบบไหน · หลายวันดูความคืบหน้ารายวันเป็น %"
-        },
-        {
-          href: "/admin/stock-runs",
-          title: "ตรวจนับ Stock",
-          detail: "มอบหมาย + ตรวจรับงานตรวจนับ Stock อุปกรณ์/Sleeve (สัปดาห์) และ Single card (เดือน) เป็นรายครั้ง พร้อมประวัติ"
-        },
-        { href: "/admin/schedule", title: "ตารางกะ", detail: "วางกะรายเดือน · ดึงเวลาเข้างานจริงจาก StoreHub มาเทียบ" },
-        { href: "/admin/checklist-config", title: "ปรับ Checklist", detail: "แก้รายการ checklist ทั้ง Daily / Weekly / Monthly · เวลาส่ง ลำดับหัวข้อ และกะ" },
-        { href: "/admin/manual-config", title: "แก้คู่มืองาน", detail: "แก้ขั้นตอน วัตถุประสงค์ ข้อควรระวัง ที่พนักงานอ่าน" }
-      ]
-    },
-    {
-      title: "ให้คะแนน / สรุปผล",
-      hint: owner ? "มีตัวเลขการหักเงินอยู่ในนี้" : "ตัวเลขการหักเงินเห็นเฉพาะเจ้าของ",
-      tools: [
-        { href: "/admin/stock-check", title: "ลงคะแนน Stock", detail: "บันทึกผลนับ stock ของวันนั้น — ตรง / ไม่ตรง / ไม่ได้นับ" },
-        { href: "/admin/checklist-audit", title: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแล้วแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach" },
-        {
-          href: "/admin/performance-score",
-          title: "คะแนนพนักงาน",
-          detail: "KPI 5 หมวด · incentive · เหตุผลการหักคะแนนรายวัน",
-          ownerOnly: false
-        },
-        {
-          href: "/admin/flower-target",
-          title: "เป้าดอกไม้",
-          detail: "แต่ละคนต้องได้ดอกไม้กี่ % ของยอดขาย · รางวัลคนได้มากสุด · อันดับเดือนนี้",
-          ownerOnly: true
-        },
-        {
-          href: "/admin/stock-loss",
-          title: "ของหาย น้ำ/ขนม",
-          detail: "มูลค่าของที่หายรายรอบ · รายการที่หาย · จุดที่ควรตาม",
-          ownerOnly: true
-        },
-        { href: "/admin/kpi-rules", title: "กติกาให้คะแนน", detail: "ดู logic การบวก/หักคะแนนทั้งหมด · เจ้าของปรับเรตได้" },
-        { href: "/monthly-summary", title: "สรุปรายเดือน", detail: "งานที่ส่งตรวจทั้งเดือน และความครบถ้วนของ checklist" }
-      ]
-    },
-    {
-      title: "ตั้งค่า",
-      hint: "นานๆ แก้ที",
-      tools: [
-        {
-          href: "/admin/staff",
-          title: "จัดการพนักงาน",
-          detail: "เพิ่ม / แก้ / ปิดบัญชี · อีเมลที่ login ได้ · รหัสพนักงาน · ชื่อใน StoreHub",
-          staffAdminOnly: true,
-          badge: { count: staffCount, label: "คนเข้ากะวันนี้" }
-        },
-        {
-          href: "/admin/staff-documents",
-          title: "เอกสารพนักงาน",
-          detail: "ใครส่งเอกสารประกันสังคม + บัญชีเงินเดือนแล้วบ้าง · ลิงก์โฟลเดอร์ในไดรฟ์",
-          badge: docsMissing ? { count: docsMissing, label: "ยังไม่ส่ง" } : undefined
-        }
-      ]
-    }
-  ];
+  // ตัวเลขที่ควรรู้ก่อนกด — ผูกกับหน้าในสารบัญ (lib/admin-sitemap.ts)
+  const badges: Record<string, DirectoryBadge | undefined> = {
+    "/admin/ops": latePhases ? { count: latePhases, label: "เกินกำหนด" } : undefined,
+    "/manager-review": submittedPhases ? { count: submittedPhases, label: "ส่งมาแล้ว" } : undefined,
+    "/admin/assign": openWork ? { count: openWork, label: "ยังไม่ส่ง" } : undefined,
+    "/admin/staff": staffCount ? { count: staffCount, label: "คนเข้ากะวันนี้" } : undefined,
+    "/admin/staff-documents": docsMissing ? { count: docsMissing, label: "ยังไม่ส่ง" } : undefined
+  };
+  const sections = adminSectionsFor({ owner, staffAdmin: canManageStaff });
 
   return (
     <main className="page">
       <section className="board-hero">
         <div>
-          <p className="eyebrow">ศูนย์รวมงานจัดการ</p>
-          <h2>ศูนย์กลางงานจัดการ</h2>
-          <p>ทุกอย่างที่ต้องใช้จัดการทีม อยู่ในหน้านี้ที่เดียว · {workDate}</p>
-        </div>
-        <div className="hero-actions">
-          {canManageStaff ? (
-            <Link href="/admin/staff" className="primary-action">จัดการพนักงาน</Link>
-          ) : null}
-          <Link href="/" className="soft-button">ดูหน้าพนักงาน</Link>
+          <p className="eyebrow">{workDate}</p>
+          <h2>หน้าหลักเจ้าของ</h2>
+          <p>บนสุด = เรื่องที่ต้องตามวันนี้ · ถัดลงมา = ทุกเมนู ค้นหาได้ · ตัวเลขแต่ละสาขาอยู่ด้านล่าง</p>
         </div>
       </section>
 
@@ -226,6 +102,8 @@ export default async function AdminHubPage({ searchParams }: { searchParams?: Pr
       </div>
 
       <AdminNotificationCenter items={notifications} />
+
+      <AdminDirectory sections={sections} badges={badges} />
 
       <div className={pulses.length > 1 ? "admin-branch-cols" : undefined}>
         {pulses.map(({ branch, summary, waitingReview, openWork: open, checklistPercent }) => (
@@ -282,28 +160,6 @@ export default async function AdminHubPage({ searchParams }: { searchParams?: Pr
         </div>
       </section>
 
-      {groups.map((group) => (
-        <section key={group.title} className="admin-hub__group">
-          <div className="section-heading">
-            <p className="eyebrow">{group.hint}</p>
-            <h3>{group.title}</h3>
-          </div>
-          <div className="admin-hub__tools">
-            {group.tools
-              .filter((tool) => !tool.staffAdminOnly || canManageStaffAccounts(user.actualEmail))
-              .filter((tool) => !tool.ownerOnly || owner)
-              .map((tool) => (
-              <Link key={tool.href} href={tool.href} className="admin-hub__tool">
-                <div>
-                  <strong>{tool.title}</strong>
-                  {tool.badge ? <em>{tool.badge.count} {tool.badge.label}</em> : null}
-                </div>
-                <small>{tool.detail}</small>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
     </main>
   );
 }

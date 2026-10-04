@@ -5,7 +5,7 @@ import { DigitalClock } from "./DigitalClock.tsx";
 import { NotificationBell } from "./NotificationBell.tsx";
 import { NavMenu } from "./NavMenu.tsx";
 import type { CurrentUser } from "../lib/auth.ts";
-import { isOwner } from "../lib/owner.ts";
+import { canManageStaffAccounts, isOwner } from "../lib/owner.ts";
 import { SOP_SESSION_COOKIE } from "../lib/auth-session.ts";
 import { VIEW_AS_COOKIE } from "../lib/impersonation.ts";
 
@@ -35,14 +35,14 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
   return (
     <div className={user.isImpersonating ? "app-shell is-impersonating" : "app-shell"}>
       <aside className="sidebar">
-        <Link href="/" className="brand">
+        <Link href={user.role === "admin" ? "/admin" : "/"} className="brand">
           <img className="brand-logo-image" src="/up-level-academy-logo.png" alt="UP LEVEL Academy" />
           <div>
             <strong>SOP Up Level</strong>
             <small>คู่มืองาน + KPI พนักงาน</small>
           </div>
         </Link>
-        <NavMenu isAdmin={user.role === "admin"} />
+        <NavMenu isAdmin={user.role === "admin"} owner={isOwner(user.email)} staffAdmin={canManageStaffAccounts(user.actualEmail)} />
       </aside>
       <div className="workspace">
         {user.isImpersonating ? (
