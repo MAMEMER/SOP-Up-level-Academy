@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AssignedSubmissions, RoutineSubmissions } from "./ReviewNewSystems.tsx";
 import { fetchWorkRecordsForEveryone } from "../lib/work-records-client.ts";
 import { dailyScopeKey, monthlyScopeKey, weeklyScopeKey, type WorkRecordDoc } from "../lib/work-records.ts";
 import {
@@ -498,6 +499,13 @@ export function ManagerReviewBoard({ branch }: { branch: string }) {
         />
       ) : (
         <TeamList cards={teamCards} findVerdict={findVerdict} onVerdictSaved={onVerdictSaved} />
+      )}
+
+      {/* ระบบใหม่: งานประจำ (รายวัน/สัปดาห์/เดือน) + งานที่มอบหมาย — เดิมหน้านี้ไม่เห็นเลย */}
+      {tab === "assigned" ? (
+        <AssignedSubmissions branch={branch} workDate={workDate} />
+      ) : (
+        <RoutineSubmissions branch={branch} tab={tab} workDate={workDate} />
       )}
     </section>
   );

@@ -104,3 +104,16 @@ export async function submitStoreTask(input: {
   const data = await post({ action: "submitTask", ...input });
   return (data.done as Record<string, TaskRecord>) ?? {};
 }
+
+/** งานประจำที่ส่งในช่วงวันที่ (หน้าตรวจงาน) — คีย์ชั้นนอกคือวันที่ ชั้นในคือ taskId */
+export async function fetchStoreTaskRange(
+  branch: string,
+  from: string,
+  to: string
+): Promise<{ tasks: WorkSpec[]; recordsByDate: Record<string, Record<string, TaskRecord>> }> {
+  const qs = new URLSearchParams({ branch, from, to }).toString();
+  const res = await fetch(`/api/store-tasks?${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`store-tasks range failed: ${res.status}`);
+  const data = (await res.json()) as { tasks?: WorkSpec[]; recordsByDate?: Record<string, Record<string, TaskRecord>> };
+  return { tasks: data.tasks ?? [], recordsByDate: data.recordsByDate ?? {} };
+}

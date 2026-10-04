@@ -79,8 +79,26 @@ export function WorkflowReviewRecords() {
             <strong>กำลังโหลดข้อมูล…</strong>
           </div>
         ) : rows.length ? (
-          rows.flatMap((person) =>
-            person.records.map((record) => {
+          // ย่อไว้ทีละคน — เห็นแค่สรุป (ตรงเวลา/ช้า/ไม่ส่ง) กดขยายถึงจะเห็นทุกช่วง
+          rows.map((person) => {
+            const statuses = person.records.map((record) => workflowVisualStatus(person.records, workDate, record.phaseId));
+            const late = statuses.filter((status) => status === "orange").length;
+            const bad = statuses.filter((status) => status === "red" || status === "purple").length;
+            const ok = statuses.filter((status) => status === "green").length;
+            const tone = bad ? "red" : late ? "orange" : "green";
+            return (
+              <details key={person.employeeEmail} className={`review-person is-${tone}`}>
+                <summary className="review-person__head">
+                  <span className="review-person__dot" aria-hidden />
+                  <strong>{person.employeeName}</strong>
+                  <small>
+                    {person.records.length} ช่วง · ตรงเวลา {ok}
+                    {late ? ` · ช้า ${late}` : ""}
+                    {bad ? ` · แดง ${bad}` : ""}
+                  </small>
+                </summary>
+                <div className="review-person__body">
+            {person.records.map((record) => {
               const visualStatus = workflowVisualStatus(person.records, workDate, record.phaseId);
               const isMissed = record.status === "missed";
 
@@ -116,8 +134,11 @@ export function WorkflowReviewRecords() {
                   <em>{reviewLabel[visualStatus]}</em>
                 </div>
               );
-            })
-          )
+            })}
+                </div>
+              </details>
+            );
+          })
         ) : (
           <div className="empty-review">
             <strong>ยังไม่มีข้อมูลที่ส่งตรวจของวันนี้</strong>

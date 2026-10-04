@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { FieldPath } from "firebase-admin/firestore";
 import { actor, badRequest, canWriteNow, db, forbidden, isAdmin, readOnly } from "../../../lib/api-firestore.ts";
 import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
 import { isValidLinkUrl } from "../../../lib/checklist-links.ts";
@@ -49,6 +50,33 @@ export async function GET(request: Request) {
 
   if (!hasAdminCredentials())
     return NextResponse.json({ tasks: [], records: {}, progress: {}, updatedAt: null, updatedBy: null });
+
+  // ช่วงวันที่ (หน้าตรวจงาน แท็บรายสัปดาห์/รายเดือน): งานที่ส่งในช่วงนั้นทั้งหมด แยกตามวัน
+  // ใช้ช่วงของ document id (`${branch}__${date}`) — ไม่ต้องสร้าง composite index
+  const from = (p.get("from") || "").trim();
+  const to = (p.get("to") || "").trim();
+  if (isDate(from) && isDate(to)) {
+    try {
+      const [taskSnap, rangeSnap] = await Promise.all([
+        db().collection(TASKS).doc(branch).get(),
+        db()
+          .collection(RECORDS)
+          .where(FieldPath.documentId(), ">=", recordId(branch, from))
+          .where(FieldPath.documentId(), "<=", recordId(branch, to))
+          .get()
+      ]);
+      const data = taskSnap.exists ? (taskSnap.data() as Record<string, unknown>) : {};
+      const recordsByDate: Record<string, Record<string, TaskRecord>> = {};
+      for (const doc of rangeSnap.docs) {
+        const row = doc.data() as { date?: string; done?: Record<string, TaskRecord> };
+        const date = row.date || doc.id.split("__")[1] || "";
+        if (date) recordsByDate[date] = row.done ?? {};
+      }
+      return NextResponse.json({ tasks: normalizeWorkSpecs(data.tasks), recordsByDate });
+    } catch (error) {
+      return NextResponse.json({ error: "read_failed", detail: String(error) }, { status: 500 });
+    }
+  }
 
   try {
     const [taskSnap, recordSnap, progressSnap] = await Promise.all([

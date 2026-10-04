@@ -4,6 +4,8 @@ import Link from "next/link";
 import { DigitalClock } from "./DigitalClock.tsx";
 import { NotificationBell } from "./NotificationBell.tsx";
 import { NavMenu } from "./NavMenu.tsx";
+import { RosterHydrator } from "./RosterHydrator.tsx";
+import { employeeDirectory } from "../lib/employee-directory.ts";
 import type { CurrentUser } from "../lib/auth.ts";
 import { canManageStaffAccounts, isOwner } from "../lib/owner.ts";
 import { SOP_SESSION_COOKIE } from "../lib/auth-session.ts";
@@ -34,6 +36,8 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
 
   return (
     <div className={user.isImpersonating ? "app-shell is-impersonating" : "app-shell"}>
+      {/* รายชื่อจริงลง browser ก่อนทุกอย่าง — ให้ทุกหน้าแสดงชื่อพนักงาน ไม่ใช่รหัส UP-xxx */}
+      <RosterHydrator entries={employeeDirectory.map(({ email: _email, ...entry }) => entry)} />
       <aside className="sidebar">
         <Link href={user.role === "admin" ? "/admin" : "/"} className="brand">
           <img className="brand-logo-image" src="/up-level-academy-logo.png" alt="UP LEVEL Academy" />
