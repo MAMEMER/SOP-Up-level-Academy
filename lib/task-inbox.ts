@@ -134,7 +134,9 @@ export function taskState(project: WorkProject, assignee: string): TaskState {
   if (sub) return "submitted";
   // งานรุ่นเก่าที่ปิดด้วย 100% (ก่อนมีปุ่มส่งงาน) — ถือว่าส่งแล้ว รอตรวจ
   // (งานรุ่นใหม่ดูจาก submissions/reviews รายคนเท่านั้น ไม่งั้นคนแรกส่ง = งานของอีกคนหายไปด้วย)
-  if (project.status === "done" && !(project.submissions || []).length && !(project.reviews || []).length) return "submitted";
+  // รายคน: คนนี้ยังไม่ถูกตรวจ + งานยังไม่มีระบบส่งงานใหม่เลย = งานเก่าที่รอตรวจ (งานใหม่ status done
+  // ก็ต่อเมื่อทุกคนส่งแล้วเท่านั้น — ดู everyoneDone)
+  if (project.status === "done" && !(project.submissions || []).length) return "submitted";
   return "active";
 }
 
