@@ -98,6 +98,11 @@ export default async function AdminHubPage({ searchParams }: { searchParams?: Pr
           badge: latePhases ? { count: latePhases, label: "เกินกำหนด" } : undefined
         },
         {
+          href: "/admin/closing",
+          title: "ปิดยอด 2 สาขา",
+          detail: "เงินสดแต่ละสาขาตรงไหม · K SHOP สองเครื่องรวมกันตรงกับยอดธนาคารไหม"
+        },
+        {
           href: "/manager-review",
           title: "ตรวจงาน",
           detail: "งานที่พนักงานกดส่งตรวจ พร้อมหลักฐานที่แนบมา",
