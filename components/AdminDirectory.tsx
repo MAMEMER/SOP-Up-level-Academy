@@ -18,6 +18,8 @@ export function AdminDirectory({
   badges: Record<string, DirectoryBadge | undefined>;
 }) {
   const [query, setQuery] = useState("");
+  // ย่อไว้ก่อน — เมนูบนสุดมีครบอยู่แล้ว ที่นี่โชว์แค่ช่องค้นหา + หน้าที่มีเรื่องรอ กดถึงจะกางทั้งหมด
+  const [expanded, setExpanded] = useState(false);
   const q = query.trim().toLowerCase();
   const shown = useMemo(
     () =>
@@ -59,7 +61,21 @@ export function AdminDirectory({
         </label>
       </div>
 
-      {shown.length ? (
+      {!q && !expanded ? (
+        <div className="admin-dir__compact">
+          {sections
+            .flatMap((section) => section.links)
+            .filter((link) => badges[link.href])
+            .map((link) => (
+              <Link key={link.href} href={link.href} className="admin-dir__pill">
+                {link.label} <em>{badges[link.href]!.count} {badges[link.href]!.label}</em>
+              </Link>
+            ))}
+          <button type="button" className="admin-dir__more" onClick={() => setExpanded(true)}>
+            ดูทุกเมนู
+          </button>
+        </div>
+      ) : shown.length ? (
         <div className="admin-dir__grid">
           {shown.map((section) => (
             <div key={section.key} className="admin-dir__section">
@@ -85,6 +101,11 @@ export function AdminDirectory({
               </ul>
             </div>
           ))}
+          {!q ? (
+            <button type="button" className="admin-dir__more" onClick={() => setExpanded(false)}>
+              ย่อเมนู
+            </button>
+          ) : null}
         </div>
       ) : (
         <p className="admin-dir__empty">ไม่เจอหน้าที่ตรงกับ &quot;{query}&quot; ลองคำอื่น</p>
