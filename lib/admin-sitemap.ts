@@ -76,6 +76,7 @@ export const adminSections: SiteSection[] = [
       { href: "/admin/stock-check", label: "ลงผลนับ Stock", detail: "ผลนับของวันนั้น ตรง / ไม่ตรง / ไม่ได้นับ (มีผลกับคะแนน)", keywords: "สต็อก" },
       { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach", keywords: "audit" },
       { href: "/admin/stock-loss", label: "ของหาย น้ำ/ขนม", detail: "มูลค่าของที่หายรายรอบ · จุดที่ควรตาม", ownerOnly: true, keywords: "สต็อกหาย loss" },
+      { href: "/admin/line-bot", label: "ผู้ช่วยไลน์ (บอท)", detail: "บอทตอบอะไรไปบ้าง ตอบเร็วแค่ไหน · เตือนแล้วส่งทันไหม", ownerOnly: true, keywords: "line ไลน์ bot golden baby เตือน" },
       { href: "/admin/flower-target", label: "เป้าดอกไม้", detail: "เป้าดอกไม้แต่ละคน · รางวัล · อันดับเดือนนี้", ownerOnly: true, keywords: "ทิป flower" },
       { href: "/monthly-summary", label: "สรุปรายเดือน", detail: "งานที่ส่งตรวจทั้งเดือน + ความครบของ checklist", keywords: "monthly" },
       { href: "/admin/kpi-rules", label: "กติกาให้คะแนน", detail: "ดูวิธีบวก/หักคะแนนทั้งหมด · เจ้าของปรับเรตได้", keywords: "เกณฑ์ kpi" }
