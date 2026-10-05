@@ -84,7 +84,7 @@ export type NotificationInput = {
   /** checklist ของวันนี้ */
   checklist: { latePhases: number; notStartedStaff: string[] };
   /** พัสดุการ์ดที่สั่งจากพ่อค้า (sop_parcel_orders) — ไม่ส่ง = ไม่มีข้อมูล */
-  parcels?: { overdue: number; late: number; problem: number; arrived: number };
+  parcels?: { overdue: number; late: number; problem: number; arrived: number; unmatched?: number };
   /** แจ้งบัค / ข้อเสนอแนะที่ยังไม่ได้อ่าน */
   bugReports: { open: number };
   /**
@@ -167,6 +167,17 @@ export function buildAdminNotifications(input: NotificationInput): AdminNotifica
 
   // ── พัสดุการ์ด: เกิน 5 วันยังไม่ถึง = เจ้าของร้านต้องตามพ่อค้า ────────────────
   const parcels = input.parcels;
+  if (parcels?.unmatched) {
+    items.push({
+      id: "parcel-unmatched",
+      level: "urgent",
+      source: "พัสดุการ์ด",
+      title: `ของถึงร้านแล้วแต่ยังไม่มีออเดอร์ ${parcels.unmatched} กล่อง`,
+      detail: "จับคู่ออเดอร์ให้น้องเช็คของต่อ",
+      href: "/parcels",
+      count: parcels.unmatched
+    });
+  }
   if (parcels?.overdue) {
     items.push({
       id: "parcel-overdue",

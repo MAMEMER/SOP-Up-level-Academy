@@ -13,6 +13,7 @@ import {
   cleanParcelNumber,
   cleanParcelText,
   isIsoDate,
+  mergeParcelInto,
   normaliseItems,
   normalisePhotos,
   ownerAlertMessage,
@@ -41,6 +42,7 @@ function fromDoc(id: string, data: FirebaseFirestore.DocumentData): ParcelOrder 
     ...(data as Omit<ParcelOrder, "id">),
     id,
     sellerPhotos: Array.isArray(data.sellerPhotos) ? data.sellerPhotos : [],
+    arrivalPhotos: Array.isArray(data.arrivalPhotos) ? data.arrivalPhotos : [],
     items: Array.isArray(data.items) ? data.items : []
   };
 }
@@ -158,14 +160,82 @@ export async function updateParcelOrder(id: string, input: ParcelCreateInput): P
       sellerPhotos: input.sellerPhotos === undefined ? order.sellerPhotos : normalisePhotos(input.sellerPhotos),
       items: merged
     };
-    tx.set(ref, clean(withProcessed(next, new Date())));
+    // พัสดุที่แอดมินลงไว้ก่อน → เจ้าของร้านใส่รายการ = จับคู่แล้ว เดดไลน์แอดมินเริ่มนับวันนี้
+    if (order.unmatched) {
+      next.unmatched = undefined;
+      next.matchedDate = bangkokDate(new Date());
+    }
+    const { id: _ignored, ...data } = withProcessed(next, new Date());
+    tx.set(ref, clean(data));
+    return {};
+  });
+}
+
+export type UnmatchedParcelInput = {
+  branch?: unknown;
+  seller?: unknown;
+  trackingNumber?: unknown;
+  note?: unknown;
+  arrivalPhotos?: unknown;
+};
+
+/**
+ * แอดมินลงพัสดุที่ของมาถึงแล้วแต่ยังไม่มีออเดอร์ (เจ้าของร้านลืมลง) — ต้องมีรูปอย่างน้อย 1 รูป
+ * ให้เจ้าของร้านดูแล้วรู้ว่าเป็นของเจ้าไหน. ไม่มีรายการ → ไม่นับเดดไลน์/KPI จนกว่าจะจับคู่.
+ */
+export async function createUnmatchedParcel(input: UnmatchedParcelInput, by: string): Promise<{ id?: string; error?: string; order?: ParcelOrder }> {
+  const arrivalPhotos = normalisePhotos(input.arrivalPhotos);
+  if (!arrivalPhotos.length) return { error: "ถ่ายรูปหน้ากล่อง/ของในกล่องอย่างน้อย 1 รูป" };
+  const now = new Date();
+  const today = bangkokDate(now);
+  const ref = col().doc();
+  const order: ParcelOrder = {
+    id: ref.id,
+    branch: validBranch(input.branch),
+    seller: cleanParcelText(input.seller, 120) || "ไม่ทราบผู้ส่ง",
+    orderedDate: today,
+    dueDate: today,
+    trackingNumber: cleanParcelText(input.trackingNumber, 80) || undefined,
+    note: cleanParcelText(input.note, 1000) || undefined,
+    sellerPhotos: [],
+    arrivalPhotos,
+    items: [],
+    unmatched: true,
+    arrivedDate: today,
+    arrivedAt: now.toISOString(),
+    arrivedBy: by,
+    createdBy: by,
+    createdAt: now.toISOString()
+  };
+  const { id: _ignored, ...data } = order;
+  await ref.set(clean(data));
+  return { id: ref.id, order };
+}
+
+/** เจ้าของร้านจับคู่พัสดุ unmatched เข้าออเดอร์ที่ลงไว้ — ย้ายข้อมูลรับของไปที่ออเดอร์ แล้วลบตัวพัสดุ */
+export async function matchParcel(parcelId: string, targetId: string): Promise<{ error?: string }> {
+  if (!targetId || targetId.includes("/") || targetId === parcelId) return { error: "เลือกออเดอร์ที่จะจับคู่" };
+  const parcelRef = col().doc(parcelId);
+  const targetRef = col().doc(targetId);
+  return adminDb().runTransaction(async (tx) => {
+    const [parcelSnap, targetSnap] = await Promise.all([tx.get(parcelRef), tx.get(targetRef)]);
+    if (!parcelSnap.exists) return { error: "ไม่พบพัสดุนี้ (อาจจับคู่ไปแล้ว)" };
+    if (!targetSnap.exists) return { error: "ไม่พบออเดอร์" };
+    const parcel = fromDoc(parcelId, parcelSnap.data()!);
+    const target = fromDoc(targetId, targetSnap.data()!);
+    if (!parcel.unmatched) return { error: "พัสดุนี้จับคู่ไปแล้ว" };
+    if (target.cancelled || target.unmatched || target.arrivedDate) return { error: "ออเดอร์นี้รับของไปแล้ว หรือยกเลิกแล้ว" };
+    const now = new Date();
+    const { id: _ignored, ...data } = withProcessed(mergeParcelInto(target, parcel, bangkokDate(now)), now);
+    tx.set(targetRef, clean(data));
+    tx.delete(parcelRef);
     return {};
   });
 }
 
 /** ตั้ง/ล้าง processedDate ตามว่าทุกรายการถูกจัดการครบหรือยัง */
 function withProcessed(order: ParcelOrder, now: Date): ParcelOrder {
-  if (!order.arrivedDate) return { ...order, processedAt: undefined, processedDate: undefined };
+  if (!order.arrivedDate || order.unmatched) return { ...order, processedAt: undefined, processedDate: undefined };
   const done = allItemsHandled(order);
   if (done && !order.processedDate) {
     return { ...order, processedAt: now.toISOString(), processedDate: bangkokDate(now) };
@@ -261,6 +331,7 @@ export async function markArrivedByOwner(id: string, arrivedDate: string, by: st
 export async function checkItem(id: string, itemId: string, check: ParcelCheck | null, note: string, by: string) {
   return mutate(id, (order, now) => {
     if (!order.arrivedDate) return { error: "อัปวิดีโอแกะกล่องก่อน แล้วค่อยเช็คของ" };
+    if (order.unmatched) return { error: "รอเจ้าของร้านจับคู่ออเดอร์ก่อน แล้วค่อยเช็คของ" };
     const item = order.items.find((entry) => entry.id === itemId);
     if (!item) return { error: "ไม่พบรายการ" };
     if (check && check !== "ok" && !note.trim()) return { error: "บอกด้วยว่าไม่ตรงยังไง" };
@@ -352,6 +423,17 @@ export async function sendOwnerParcelAlerts(now = new Date()): Promise<{ sent: n
   for (const order of due) batch.update(col().doc(order.id), { ownerAlertedOn: today });
   await batch.commit();
   return { sent: due.length };
+}
+
+export function unmatchedAlertText(order: ParcelOrder): string {
+  return [
+    "พัสดุการ์ด - ของถึงร้านแล้ว แต่ยังไม่มีออเดอร์",
+    `ผู้ส่งบนกล่อง: ${order.seller}`.replace(/[[\]*_`]/g, " "),
+    order.note ? order.note.replace(/[[\]*_`]/g, " ") : "",
+    "จับคู่ออเดอร์ให้น้องที่ https://sop.uplevelguild.com/parcels"
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function problemAlertText(order: ParcelOrder, problem: ParcelProblem): string {

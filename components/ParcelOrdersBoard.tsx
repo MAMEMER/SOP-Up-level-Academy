@@ -5,13 +5,17 @@
 // ลงตามที่บอก (เก็บไว้ก่อน หรือ ลงแฟ้มขาย ราคา X) → กด "ลงแล้ว".
 // เดดไลน์และ KPI อยู่ที่ lib/parcel-orders.ts.
 //
+// ของมาก่อนออเดอร์ (เจ้าของร้านลืมลง): แอดมินกด "ของมาแต่ไม่มีในรายการ" ลงรูปไว้ก่อน →
+// เจ้าของร้านจับคู่เข้าออเดอร์ที่ลงไว้ หรือกด "ใส่รายการการ์ด" ลงในกล่องนั้นตรงๆ.
+//
 // compact = โหมดหน้าหลักพนักงาน: โชว์เฉพาะกล่องที่ถึงแล้วรอทำ + บรรทัดสรุปกล่องที่กำลังมา.
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Clapperboard, Plus, ExternalLink, PackageCheck, PackageOpen, PencilLine, Undo2, X } from "lucide-react";
+import { Check, Clapperboard, Plus, ExternalLink, Link2, PackageCheck, PackageOpen, PackagePlus, PencilLine, Undo2, X } from "lucide-react";
 import {
   itemDestination,
+  matchCandidates,
   parcelCounts,
   parcelState,
   parcelStatusText,
@@ -26,6 +30,7 @@ import {
   draftFromOrder,
   fetchParcelFeed,
   markArrivedByOwner,
+  matchParcel,
   reportParcelProblem,
   resolveParcelProblem,
   storeParcelItem,
@@ -40,6 +45,7 @@ function who(by?: string): string {
   return by.includes("@") ? "เจ้าของร้าน" : displayNameFor(by);
 }
 import { ParcelOrderForm } from "./ParcelOrderForm.tsx";
+import { ParcelReceiveForm } from "./ParcelReceiveForm.tsx";
 
 const REFRESH_MS = 60_000;
 
@@ -71,6 +77,7 @@ export function ParcelOrdersBoard({
   const [busy, setBusy] = useState("");
   const [filter, setFilter] = useState<Filter>("open");
   const [showForm, setShowForm] = useState(false);
+  const [showReceive, setShowReceive] = useState(false);
   const [editingId, setEditingId] = useState("");
 
   const reload = useCallback(async () => {
@@ -122,6 +129,8 @@ export function ParcelOrdersBoard({
     ? "กำลังโหลด…"
     : counts.late
       ? `เลยกำหนด ${counts.late} กล่อง`
+      : !compact && counts.unmatched
+        ? `รอจับคู่ ${counts.unmatched} กล่อง`
       : staffQueue.length
         ? `รอแกะ/ลง ${staffQueue.length} กล่อง`
         : compact
@@ -137,7 +146,7 @@ export function ParcelOrdersBoard({
           <p className="eyebrow">การ์ดที่สั่งเข้าร้าน</p>
           <h3>พัสดุการ์ด</h3>
         </div>
-        <span className={`status-pill ${counts.late || (!compact && counts.overdue) ? "is-late" : ""}`}>{headline}</span>
+        <span className={`status-pill ${counts.late || (!compact && (counts.overdue || counts.unmatched)) ? "is-late" : ""}`}>{headline}</span>
       </div>
 
       {compact ? (
@@ -149,11 +158,13 @@ export function ParcelOrdersBoard({
               {" "}· กำลังมา {counts.waiting + counts.overdue} กล่อง — <Link href="/parcels">ดูทั้งหมด / รับพัสดุ</Link>
             </>
           ) : null}
+          {" "}· ของมาแต่ไม่มีในรายการ? <Link href="/parcels">ลงพัสดุไว้ก่อน</Link>
         </p>
       ) : (
         <>
         <p className="parcel-board__hint">
           ของต้องถึงร้านภายใน 5 วันหลังสั่ง · ถึงแล้วถ่ายวิดีโอตอนแกะ เช็คกับรายการ แล้วลงตามที่บอก ให้จบภายในวันที่ของถึงหรือวันถัดไป
+          · ของมาแต่ไม่มีในรายการ ลงไว้ก่อนได้ เจ้าของร้านจับคู่ทีหลัง
         </p>
         <div className="parcel-board__toolbar">
           <div className="delivery-board__filters" role="tablist" aria-label="ตัวกรองพัสดุ">
@@ -171,6 +182,12 @@ export function ParcelOrdersBoard({
             ))}
           </div>
           <Link href="/parcels/guide" className="parcel-board__guide">วิธีใช้ (คู่มือ)</Link>
+          {canAct && !showReceive ? (
+            <button type="button" className="parcel-board__receive" onClick={() => setShowReceive(true)}>
+              <PackagePlus size={16} aria-hidden />
+              ของมาแต่ไม่มีในรายการ
+            </button>
+          ) : null}
           {isAdmin && canAct && !showForm ? (
             <button type="button" className="parcel-board__new" onClick={() => setShowForm(true)}>
               <Plus size={16} aria-hidden />
@@ -180,6 +197,17 @@ export function ParcelOrdersBoard({
         </div>
         </>
       )}
+
+      {showReceive && !compact ? (
+        <ParcelReceiveForm
+          branch={branch}
+          onSaved={() => {
+            setShowReceive(false);
+            void reload();
+          }}
+          onCancel={() => setShowReceive(false)}
+        />
+      ) : null}
 
       {showForm && !compact ? (
         <ParcelOrderForm
@@ -203,6 +231,11 @@ export function ParcelOrdersBoard({
         {shown.map((order) =>
           editingId === order.id ? (
             <li key={order.id} className="parcel-order">
+              {order.unmatched ? (
+                <p className="parcel-board__hint">
+                  ใส่ร้าน/รายการการ์ดของกล่องนี้ — บันทึกแล้วถือว่าจับคู่ น้องเช็คของต่อได้เลย
+                </p>
+              ) : null}
               <ParcelOrderForm
                 orderId={order.id}
                 initial={draftFromOrder(order)}
@@ -223,6 +256,7 @@ export function ParcelOrdersBoard({
               busy={busy}
               run={run}
               showBranch={!branch}
+              candidates={matchCandidates(orders)}
               onEdit={() => setEditingId(order.id)}
             />
           )
@@ -240,6 +274,7 @@ function ParcelOrderCard({
   busy,
   run,
   showBranch,
+  candidates,
   onEdit
 }: {
   order: ParcelOrder;
@@ -249,6 +284,7 @@ function ParcelOrderCard({
   busy: string;
   run: (key: string, action: () => Promise<unknown>) => Promise<void>;
   showBranch: boolean;
+  candidates: ParcelOrder[];
   onEdit: () => void;
 }) {
   const state = parcelState(order, today);
@@ -260,6 +296,8 @@ function ParcelOrderCard({
   const [resolution, setResolution] = useState<Record<number, string>>({});
   const [arrivedDate, setArrivedDate] = useState(today);
   const [ownerArriveOpen, setOwnerArriveOpen] = useState(false);
+  const [matchTo, setMatchTo] = useState("");
+  const unmatched = state === "unmatched";
   const fileRef = useRef<HTMLInputElement>(null);
   const arrived = Boolean(order.arrivedDate);
   const working = busy.startsWith(order.id);
@@ -279,12 +317,13 @@ function ParcelOrderCard({
       <div className="parcel-order__head">
         <div className="parcel-order__title">
           <p className="parcel-order__meta">
-            {showBranch ? `${branchShortName(order.branch)} · ` : ""}สั่ง {order.orderedDate}
+            {showBranch ? `${branchShortName(order.branch)} · ` : ""}
+            {unmatched ? `ถึง ${order.arrivedDate}${order.arrivedBy ? ` · ${who(order.arrivedBy)}รับ` : ""}` : `สั่ง ${order.orderedDate}`}
             {order.trackingNumber ? ` · ${order.trackingNumber}` : ""}
             {order.totalPaid ? ` · จ่าย ${order.totalPaid.toLocaleString("th-TH")} บาท` : ""}
           </p>
           <strong>
-            {order.seller}
+            {unmatched ? `ยังไม่มีออเดอร์ · ${order.seller}` : order.seller}
             {order.sellerLink ? (
               <a href={order.sellerLink} target="_blank" rel="noreferrer" aria-label="เปิดแชทพ่อค้า" className="parcel-order__link">
                 <ExternalLink size={14} aria-hidden />
@@ -309,8 +348,44 @@ function ParcelOrderCard({
         </div>
       ) : null}
 
+      {order.arrivalPhotos?.length ? (
+        <div className="parcel-order__photos">
+          {order.arrivalPhotos.map((url, index) => (
+            <a key={url} href={url} target="_blank" rel="noreferrer" aria-label={`รูปตอนรับของ ${index + 1}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" loading="lazy" />
+            </a>
+          ))}
+        </div>
+      ) : null}
+
+      {/* เจ้าของร้านจับคู่พัสดุที่น้องลงไว้ก่อน */}
+      {unmatched && isAdmin && canAct ? (
+        <div className="parcel-order__match">
+          <select value={matchTo} onChange={(e) => setMatchTo(e.target.value)} aria-label="เลือกออเดอร์ที่จะจับคู่">
+            <option value="">{candidates.length ? "เลือกออเดอร์ที่ลงไว้…" : "ยังไม่มีออเดอร์ที่รอของ"}</option>
+            {candidates.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.seller} · สั่ง {candidate.orderedDate} · {candidate.items.length} รายการ
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={!matchTo || working}
+            onClick={() => run(`${order.id}:match`, () => matchParcel(order.id, matchTo))}
+          >
+            <Link2 size={15} aria-hidden /> จับคู่
+          </button>
+          <button type="button" className="parcel-order__text-btn" onClick={onEdit}>
+            <PencilLine size={14} aria-hidden /> ยังไม่ได้ลงออเดอร์ — ใส่รายการการ์ดเลย
+          </button>
+        </div>
+      ) : null}
+      {unmatched && !isAdmin ? <p className="parcel-order__meta">ลงไว้แล้ว รอเจ้าของร้านบอกว่าเป็นออเดอร์ไหน แล้วค่อยเช็คของ</p> : null}
+
       {/* ขั้น 1: รับพัสดุ = อัปวิดีโอแกะกล่อง */}
-      {!arrived && canAct && state !== "cancelled" ? (
+      {(!arrived || (unmatched && !order.unboxVideoUrl)) && canAct && state !== "cancelled" ? (
         <div className="parcel-order__arrive">
           <label className={`parcel-order__video-btn ${working ? "is-busy" : ""}`}>
             <PackageOpen size={18} aria-hidden />
@@ -329,7 +404,7 @@ function ParcelOrderCard({
               <span style={{ width: `${Math.round(progress * 100)}%` }} />
             </div>
           ) : null}
-          {isAdmin && !ownerArriveOpen ? (
+          {isAdmin && !arrived && !ownerArriveOpen ? (
             <button type="button" className="parcel-order__text-btn" onClick={() => setOwnerArriveOpen(true)}>
               เจ้าของร้าน: บันทึกว่าถึงร้านแล้ว (ไม่มีวิดีโอ)
             </button>
@@ -354,7 +429,7 @@ function ParcelOrderCard({
           <Clapperboard size={16} aria-hidden /> วิดีโอแกะกล่อง
           {order.arrivedBy ? ` · ${who(order.arrivedBy)}` : ""} · ถึง {order.arrivedDate}
         </a>
-      ) : arrived ? (
+      ) : arrived && !unmatched ? (
         <p className="parcel-order__meta">ถึงร้าน {order.arrivedDate} (เจ้าของร้านบันทึก)</p>
       ) : null}
 
@@ -449,7 +524,7 @@ function ParcelOrderCard({
         })}
       </ul>
 
-      {arrived ? (
+      {arrived && !unmatched ? (
         <p className="parcel-order__meta">
           ทำแล้ว {handledCount}/{order.items.length} รายการ
         </p>
@@ -525,16 +600,18 @@ function ParcelOrderCard({
           ) : null}
           {isAdmin ? (
             <>
-              <button type="button" className="parcel-order__text-btn" onClick={onEdit}>
-                <PencilLine size={14} aria-hidden /> แก้ออเดอร์
-              </button>
+              {!unmatched ? (
+                <button type="button" className="parcel-order__text-btn" onClick={onEdit}>
+                  <PencilLine size={14} aria-hidden /> แก้ออเดอร์
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="parcel-order__text-btn is-danger"
                 disabled={working}
                 onClick={() => run(`${order.id}:cancel`, () => cancelParcel(order.id, true))}
               >
-                ยกเลิกออเดอร์
+                {unmatched ? "ไม่ใช่ของร้าน — ลบออก" : "ยกเลิกออเดอร์"}
               </button>
             </>
           ) : null}

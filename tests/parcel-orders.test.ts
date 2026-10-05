@@ -2,12 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   arrivalDueDate,
+  matchCandidates,
+  mergeParcelInto,
   normaliseItems,
   ownerAlertMessage,
   parcelLateAdjustments,
   parcelState,
   parcelsNeedingOwnerAlert,
   processDueDate,
+  processStartDate,
   type ParcelOrder
 } from "../lib/parcel-orders.ts";
 
@@ -116,4 +119,37 @@ test("รายการลงแฟ้มขายต้องมีราค�
   assert.equal(ok.error, undefined);
   assert.deepEqual(ok.items.map((i) => [i.name, i.plan, i.price]), [["A", "sell", 1200], ["B", "keep", undefined]]);
   assert.ok(normaliseItems([], id).error);
+});
+
+test("ของมาก่อนออเดอร์: unmatched ไม่หัก KPI และเตือนเจ้าของร้าน", () => {
+  const parcel = order({ unmatched: true, items: [], arrivedDate: "2026-10-06", seller: "ไม่ทราบผู้ส่ง" });
+  assert.equal(parcelState(parcel, "2026-10-20"), "unmatched");
+  assert.deepEqual(
+    parcelLateAdjustments([parcel], { today: "2026-10-20", ratePerDay: 2, workedAtBranch: new Set(["ICE:2026-10-10:bangkae"]) }),
+    []
+  );
+  assert.equal(parcelsNeedingOwnerAlert([parcel], "2026-10-07").length, 1);
+  assert.match(ownerAlertMessage([parcel], "2026-10-07"), /ยังไม่ได้ลงออเดอร์/);
+});
+
+test("จับคู่แล้ว: เดดไลน์แอดมินนับจากวันที่จับคู่ ไม่ใช่วันที่ของถึง", () => {
+  const parcel = order({ id: "p1", unmatched: true, items: [], arrivedDate: "2026-10-06", arrivedBy: "ICE", arrivalPhotos: ["https://firebasestorage.googleapis.com/x"], note: "การ์ด 1 ใบ" });
+  const target = order({ id: "o2", orderedDate: "2026-10-03", dueDate: arrivalDueDate("2026-10-03") });
+  assert.deepEqual(matchCandidates([parcel, target, order({ id: "o3", cancelled: true })]).map((o) => o.id), ["o2"]);
+  const merged = mergeParcelInto(target, parcel, "2026-10-09");
+  assert.equal(merged.arrivedDate, "2026-10-06");
+  assert.equal(merged.arrivedBy, "ICE");
+  assert.equal(merged.matchedDate, "2026-10-09");
+  assert.equal(merged.arrivalPhotos?.length, 1);
+  assert.match(merged.note || "", /การ์ด 1 ใบ/);
+  assert.equal(processStartDate(merged), "2026-10-09");
+  assert.equal(parcelState(merged, "2026-10-10"), "arrived");
+  assert.equal(parcelState(merged, "2026-10-11"), "late");
+  // วันที่ 7–10 ไม่หัก (ยังไม่ได้จับคู่ / อยู่ในกำหนด) · 11 หัก
+  const adj = parcelLateAdjustments([merged], {
+    today: "2026-10-12",
+    ratePerDay: 2,
+    workedAtBranch: new Set(["ICE:2026-10-08:bangkae", "ICE:2026-10-10:bangkae", "ICE:2026-10-11:bangkae"])
+  });
+  assert.deepEqual(adj.map((a) => a.workDate), ["2026-10-11"]);
 });
