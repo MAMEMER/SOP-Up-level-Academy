@@ -318,7 +318,7 @@ function ParcelOrderCard({
         <div className="parcel-order__title">
           <p className="parcel-order__meta">
             {showBranch ? `${branchShortName(order.branch)} · ` : ""}
-            {unmatched ? `ถึง ${order.arrivedDate}${order.arrivedBy ? ` · ${who(order.arrivedBy)}รับ` : ""}` : `สั่ง ${order.orderedDate}`}
+            {unmatched ? `ถึง ${order.arrivedDate}${order.arrivedBy ? ` · รับโดย ${who(order.arrivedBy)}` : ""}` : `สั่ง ${order.orderedDate}`}
             {order.trackingNumber ? ` · ${order.trackingNumber}` : ""}
             {order.totalPaid ? ` · จ่าย ${order.totalPaid.toLocaleString("th-TH")} บาท` : ""}
           </p>
