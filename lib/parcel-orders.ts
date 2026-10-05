@@ -7,6 +7,11 @@
 //   3. เทียบของกับออเดอร์ทีละรายการ: ตรง → เอาลงตามที่บอก แล้วกด "ลงแล้ว"
 //                                      ไม่ตรง/ขาด → แจ้งปัญหา เจ้าของร้านไปตามพ่อค้า
 //
+// ใครทำก่อนก็ได้: ถ้าของมาถึงก่อนที่เจ้าของร้านจะลงออเดอร์ (ลืมลง) แอดมินลง "พัสดุที่ยังไม่มี
+// ออเดอร์" ได้เลย — รูปหน้ากล่อง/ของข้างใน + วิดีโอแกะกล่อง (unmatched). เจ้าของร้านมาจับคู่
+// ทีหลัง: รวมเข้าออเดอร์ที่ลงไว้ หรือใส่รายการการ์ดลงไปตรงๆ. เดดไลน์ฝั่งแอดมินเริ่มนับจาก
+// วันที่จับคู่ (matchedDate) ไม่ใช่วันที่ของถึง — ไม่มีรายการให้เช็ค จะหักคะแนนแอดมินไม่ได้
+//
 // เดดไลน์สองฝั่ง (ห้ามหลุดเด็ดขาด):
 //   - ฝั่งเจ้าของร้าน: สั่งแล้ว PARCEL_ARRIVAL_DAYS (5) วันยังไม่ถึงร้าน → เตือนแชมป์ไปตามพ่อค้า
 //   - ฝั่งแอดมิน: ของถึงร้านแล้วต้องแกะ-เช็ค-ลงให้จบภายในวันที่ถึง + อีก PARCEL_PROCESS_GRACE_DAYS
@@ -97,12 +102,19 @@ export type ParcelOrder = {
   cancelled?: boolean;
   cancelledBy?: string;
   cancelledAt?: string;
+  /** แอดมินลงไว้ตอนของถึง ยังไม่รู้ว่าเป็นออเดอร์ไหน — รอเจ้าของร้านจับคู่ */
+  unmatched?: boolean;
+  /** รูปหน้ากล่อง/ของในกล่อง ที่แอดมินถ่ายตอนรับ */
+  arrivalPhotos?: string[];
+  /** วันที่เจ้าของร้านจับคู่กับออเดอร์ (YYYY-MM-DD) — เดดไลน์ฝั่งแอดมินนับจากวันนี้ถ้าช้ากว่าวันที่ถึง */
+  matchedDate?: string;
   /** วันล่าสุดที่ส่ง Telegram เตือนเจ้าของร้านเรื่องออเดอร์นี้ (กันเตือนซ้ำในวันเดียว) */
   ownerAlertedOn?: string;
 };
 
 /**
  * สถานะที่หน้าจอใช้:
+ *  unmatched = ของถึงแล้ว แต่ยังไม่มีออเดอร์ — รอเจ้าของร้านจับคู่
  *  waiting   = รอของมา (ยังไม่เลย 5 วัน)
  *  overdue   = เลย 5 วันแล้วยังไม่ถึง → เจ้าของร้านต้องตามพ่อค้า
  *  arrived   = ถึงแล้ว แอดมินกำลังเช็ค/ลง (ยังอยู่ในกำหนด)
@@ -111,9 +123,10 @@ export type ParcelOrder = {
  *  done      = จบ
  *  cancelled = ยกเลิก
  */
-export type ParcelState = "waiting" | "overdue" | "arrived" | "late" | "problem" | "done" | "cancelled";
+export type ParcelState = "unmatched" | "waiting" | "overdue" | "arrived" | "late" | "problem" | "done" | "cancelled";
 
 export const PARCEL_STATE_LABEL: Record<ParcelState, string> = {
+  unmatched: "ถึงแล้ว รอจับคู่ออเดอร์",
   waiting: "รอของมา",
   overdue: "เกิน 5 วัน ยังไม่ถึง",
   arrived: "ถึงแล้ว รอเช็ค/ลง",
@@ -159,6 +172,12 @@ export function processDueDate(arrivedDate: string): string {
   return addDays(arrivedDate, PARCEL_PROCESS_GRACE_DAYS);
 }
 
+/** วันที่เริ่มนับเดดไลน์ฝั่งแอดมิน = วันที่ถึง หรือวันที่เจ้าของร้านจับคู่ (ถ้าช้ากว่า) */
+export function processStartDate(order: Pick<ParcelOrder, "arrivedDate" | "matchedDate">): string {
+  const arrived = order.arrivedDate || "";
+  return order.matchedDate && order.matchedDate > arrived ? order.matchedDate : arrived;
+}
+
 // ── สถานะ ──────────────────────────────────────────────────────────────────
 
 /** รายการนี้แอดมินทำส่วนของตัวเองจบแล้ว: ตรงแล้วลงแล้ว หรือ ไม่ตรง/ขาดแล้วแจ้งไว้ */
@@ -178,8 +197,9 @@ export function allItemsHandled(order: Pick<ParcelOrder, "items">): boolean {
 
 export function parcelState(order: ParcelOrder, today: string): ParcelState {
   if (order.cancelled) return "cancelled";
+  if (order.unmatched) return "unmatched";
   if (!order.arrivedDate) return today > order.dueDate ? "overdue" : "waiting";
-  if (!order.processedDate) return today > processDueDate(order.arrivedDate) ? "late" : "arrived";
+  if (!order.processedDate) return today > processDueDate(processStartDate(order)) ? "late" : "arrived";
   return openProblems(order).length ? "problem" : "done";
 }
 
@@ -198,11 +218,12 @@ export function daysOverdue(order: ParcelOrder, today: string): number {
 const STATE_ORDER: Record<ParcelState, number> = {
   late: 0,
   arrived: 1,
-  overdue: 2,
-  problem: 3,
-  waiting: 4,
-  done: 5,
-  cancelled: 6
+  unmatched: 2,
+  overdue: 3,
+  problem: 4,
+  waiting: 5,
+  done: 6,
+  cancelled: 7
 };
 
 /** งานที่แอดมินต้องทำ (ของถึงแล้ว) ขึ้นก่อน แล้วค่อยเรื่องที่เจ้าของร้านต้องตาม */
@@ -223,17 +244,18 @@ export function itemDestination(item: Pick<ParcelItem, "plan" | "price">): strin
 
 export function parcelStatusText(order: ParcelOrder, today: string): string {
   const state = parcelState(order, today);
+  if (state === "unmatched") return `ถึงร้าน ${order.arrivedDate} — รอเจ้าของร้านบอกว่าเป็นออเดอร์ไหน`;
   if (state === "waiting") {
     const left = daysBetween(today, order.dueDate);
     return left <= 0 ? "ต้องถึงร้านวันนี้" : `ต้องถึงร้านภายใน ${left} วัน (${order.dueDate})`;
   }
   if (state === "overdue") return `เกินกำหนด ${daysOverdue(order, today)} วัน — ยังไม่ถึงร้าน`;
   if (state === "arrived" && order.arrivedDate) {
-    const due = processDueDate(order.arrivedDate);
+    const due = processDueDate(processStartDate(order));
     return due === today ? "ถึงแล้ว — ต้องลงให้จบวันนี้" : `ถึงแล้ว — ลงให้จบภายใน ${due}`;
   }
   if (state === "late" && order.arrivedDate) {
-    return `ถึงตั้งแต่ ${order.arrivedDate} ยังลงไม่จบ — เลยกำหนด ${daysBetween(processDueDate(order.arrivedDate), today)} วัน`;
+    return `ถึงตั้งแต่ ${order.arrivedDate} ยังลงไม่จบ — เลยกำหนด ${daysBetween(processDueDate(processStartDate(order)), today)} วัน`;
   }
   return PARCEL_STATE_LABEL[state];
 }
@@ -266,8 +288,8 @@ export function parcelLateAdjustments(orders: ParcelOrder[], opts: ParcelKpiOpti
   const out: ScoreAdjustment[] = [];
 
   for (const order of orders) {
-    if (order.cancelled || !order.arrivedDate) continue;
-    let first = addDays(processDueDate(order.arrivedDate), 1);
+    if (order.cancelled || order.unmatched || !order.arrivedDate) continue;
+    let first = addDays(processDueDate(processStartDate(order)), 1);
     if (first < startFrom) first = startFrom;
     let last = yesterday;
     if (order.processedDate) {
@@ -311,10 +333,12 @@ export type ParcelCounts = {
   /** ของไม่ตรง/ขาด รอเจ้าของร้าน */
   problem: number;
   waiting: number;
+  /** ถึงแล้วแต่ยังไม่มีออเดอร์ รอเจ้าของร้านจับคู่ */
+  unmatched: number;
 };
 
 export function parcelCounts(orders: ParcelOrder[], today: string): ParcelCounts {
-  const counts: ParcelCounts = { overdue: 0, late: 0, arrived: 0, problem: 0, waiting: 0 };
+  const counts: ParcelCounts = { overdue: 0, late: 0, arrived: 0, problem: 0, waiting: 0, unmatched: 0 };
   for (const order of orders) {
     const state = parcelState(order, today);
     if (state in counts) counts[state as keyof ParcelCounts] += 1;
@@ -327,7 +351,7 @@ export function parcelsNeedingOwnerAlert(orders: ParcelOrder[], today: string): 
   return orders.filter((order) => {
     if (order.ownerAlertedOn === today) return false;
     const state = parcelState(order, today);
-    return state === "overdue" || state === "late" || state === "problem";
+    return state === "overdue" || state === "late" || state === "problem" || state === "unmatched";
   });
 }
 
@@ -335,6 +359,7 @@ export function parcelsNeedingOwnerAlert(orders: ParcelOrder[], today: string): 
 export function ownerAlertMessage(orders: ParcelOrder[], today: string): string {
   const lines: string[] = ["พัสดุการ์ด - ต้องตาม"];
   const groups: Array<{ state: ParcelState; head: string }> = [
+    { state: "unmatched", head: "ของถึงร้านแล้ว แต่ยังไม่ได้ลงออเดอร์ (จับคู่ให้น้อง)" },
     { state: "overdue", head: "เกิน 5 วันยังไม่ถึงร้าน (ตามพ่อค้า)" },
     { state: "late", head: "ของถึงแล้ว แอดมินยังไม่ลง" },
     { state: "problem", head: "ของไม่ตรง/ขาด" }
@@ -347,7 +372,7 @@ export function ownerAlertMessage(orders: ParcelOrder[], today: string): string 
       const detail =
         group.state === "overdue"
           ? `สั่ง ${order.orderedDate} เกิน ${daysOverdue(order, today)} วัน`
-          : group.state === "late"
+          : group.state === "late" || group.state === "unmatched"
             ? `ถึง ${order.arrivedDate}`
             : openProblems(order).map((problem) => problem.note).join(" / ");
       lines.push(`- ${plain(order.seller || "ไม่ระบุร้าน")} · ${detail}`);
@@ -408,3 +433,29 @@ export function normalisePhotos(raw: unknown): string[] {
 }
 
 export { cleanText as cleanParcelText, cleanNumber as cleanParcelNumber };
+
+/** ออเดอร์ที่พัสดุ unmatched จับคู่เข้าได้: ยังไม่ถึงร้าน ไม่ยกเลิก (สาขาไหนก็ได้ — ส่งผิดสาขาก็จับได้) */
+export function matchCandidates(orders: ParcelOrder[]): ParcelOrder[] {
+  return orders.filter((order) => !order.cancelled && !order.unmatched && !order.arrivedDate);
+}
+
+/**
+ * รวมพัสดุ unmatched เข้าออเดอร์: ออเดอร์ได้วันที่ถึง/ผู้รับ/วิดีโอ/รูปหน้ากล่องจากพัสดุ และ
+ * matchedDate = วันนี้ (เดดไลน์แอดมินเริ่มนับใหม่). สาขาตามที่ของไปถึงจริง.
+ */
+export function mergeParcelInto(target: ParcelOrder, parcel: ParcelOrder, today: string): ParcelOrder {
+  const notes = [target.note, parcel.note ? `ตอนรับของ: ${parcel.note}` : ""].filter(Boolean);
+  return {
+    ...target,
+    branch: parcel.branch,
+    trackingNumber: target.trackingNumber || parcel.trackingNumber,
+    note: notes.join("\n") || undefined,
+    arrivedDate: parcel.arrivedDate,
+    arrivedAt: parcel.arrivedAt,
+    arrivedBy: parcel.arrivedBy,
+    unboxVideoUrl: target.unboxVideoUrl || parcel.unboxVideoUrl,
+    arrivalPhotos: [...(target.arrivalPhotos || []), ...(parcel.arrivalPhotos || [])].slice(0, MAX_PHOTOS),
+    problems: [...(target.problems || []), ...(parcel.problems || [])],
+    matchedDate: today
+  };
+}

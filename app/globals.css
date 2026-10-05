@@ -8338,3 +8338,11 @@ p.ab-help{padding-left:0}
 .mrev-new .ti-thumbs { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .mrev-new .ti-thumbs a { display: block; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; border: 1px solid var(--ti-line); }
 .mrev-new .ti-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* พัสดุที่ของมาก่อนออเดอร์ — แอดมินลงไว้ เจ้าของร้านจับคู่ */
+.parcel-board__receive { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; border: 1px solid rgba(45,49,66,0.14); border-radius: 999px; padding: 10px 16px; font-size: 15px; font-weight: 600; font-family: inherit; color: var(--color-ink); background: rgba(255,255,255,0.7); cursor: pointer; }
+.parcel-order__pill--unmatched { background: rgba(255,214,102,0.35); color: #8a5a00; }
+.parcel-order--unmatched .parcel-order__status { color: #8a5a00; font-weight: 600; }
+.parcel-order__match { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.parcel-order__match select { flex: 1 1 220px; min-width: 0; min-height: 44px; font-size: 16px; font-family: inherit; border: 1px solid rgba(45,49,66,0.16); border-radius: 12px; padding: 8px 10px; background: #fff; text-overflow: ellipsis; }
+.parcel-order__match > button:not(.parcel-order__text-btn) { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; border: none; border-radius: 999px; padding: 8px 16px; font-size: 15px; font-weight: 600; font-family: inherit; color: #fff; background: linear-gradient(135deg, var(--color-cta-1), var(--color-cta-2)); cursor: pointer; }
+.parcel-order__match > button:disabled { opacity: 0.45; cursor: default; }

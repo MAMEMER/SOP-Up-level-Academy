@@ -51,21 +51,23 @@ export type ParcelDraft = {
 export function draftFromOrder(order: ParcelOrder): ParcelDraft {
   return {
     branch: order.branch,
-    seller: order.seller,
+    seller: order.unmatched && order.seller === "ไม่ทราบผู้ส่ง" ? "" : order.seller,
     sellerLink: order.sellerLink || "",
-    orderedDate: order.orderedDate,
+    orderedDate: order.unmatched ? order.arrivedDate || order.orderedDate : order.orderedDate,
     totalPaid: order.totalPaid ? String(order.totalPaid) : "",
     trackingNumber: order.trackingNumber || "",
     note: order.note || "",
     sellerPhotos: order.sellerPhotos,
-    items: order.items.map((item: ParcelItem) => ({
-      id: item.id,
-      name: item.name,
-      qty: item.qty,
-      plan: item.plan,
-      price: item.price ? String(item.price) : "",
-      note: item.note || ""
-    }))
+    items: order.items.length
+      ? order.items.map((item: ParcelItem) => ({
+          id: item.id,
+          name: item.name,
+          qty: item.qty,
+          plan: item.plan,
+          price: item.price ? String(item.price) : "",
+          note: item.note || ""
+        }))
+      : [{ name: "", qty: 1, plan: "sell", price: "", note: "" }]
   };
 }
 
@@ -73,6 +75,15 @@ export async function saveParcelOrder(draft: ParcelDraft, id?: string): Promise<
   const result = await post<{ ok: true; id?: string }>({ action: id ? "update" : "create", id, ...draft });
   return result.id || id || "";
 }
+
+export type UnmatchedDraft = { branch: string; seller: string; trackingNumber: string; note: string; arrivalPhotos: string[] };
+
+/** ของมาถึงแต่ยังไม่มีออเดอร์ — แอดมินลงไว้ก่อน เจ้าของร้านจับคู่ทีหลัง */
+export async function receiveUnmatchedParcel(draft: UnmatchedDraft): Promise<string> {
+  const result = await post<{ ok: true; id?: string }>({ action: "receiveUnmatched", ...draft });
+  return result.id || "";
+}
+export const matchParcel = (id: string, targetId: string) => post({ action: "match", id, targetId });
 
 export const cancelParcel = (id: string, cancelled = true) => post({ action: "cancel", id, cancelled });
 export const markArrivedByOwner = (id: string, arrivedDate: string) => post({ action: "arrivedByOwner", id, arrivedDate });
