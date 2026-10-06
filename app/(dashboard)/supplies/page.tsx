@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { SuppliesCopyButton } from "../../../components/SuppliesCopyButton.tsx";
+import { SupplyOrdersBoard } from "../../../components/SupplyOrdersBoard.tsx";
+import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
+import { listSupplyOrders } from "../../../lib/supply-orders-server.ts";
+import { findPending, pendingSupplies, type PendingSupply } from "../../../lib/supply-orders.ts";
 import { requireUser } from "../../../lib/auth.ts";
 import { resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
 import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
@@ -32,6 +36,29 @@ function orderLine(item: SupplyNeedItem): string {
   const qty = item.orderQty ?? 0;
   const money = item.estimatedCost ? ` ≈ ฿${baht(item.estimatedCost)}` : "";
   return `${item.name} × ${qty}${money}`;
+}
+
+function thaiDate(iso: string): string {
+  const date = new Date(`${iso}T12:00:00+07:00`);
+  return Number.isNaN(date.getTime())
+    ? iso
+    : date.toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: "Asia/Bangkok" });
+}
+
+function OrderedRow({ item, pending }: { item: SupplyNeedItem; pending: PendingSupply }) {
+  return (
+    <li className="supply-row is-ordered">
+      <div className="supply-row-main">
+        <span className="supply-alert-name">{item.name}</span>
+        <small>
+          เหลือ {item.remaining} · สั่ง {pending.supplier} {thaiDate(pending.orderedDate)} จำนวน {pending.qty}
+        </small>
+      </div>
+      <div className="supply-row-order">
+        <span className="supply-ordered-badge">สั่งแล้ว รอส่ง</span>
+      </div>
+    </li>
+  );
 }
 
 function SupplyRow({ item, showNote }: { item: SupplyNeedItem; showNote?: boolean }) {
@@ -79,14 +106,31 @@ export default async function SuppliesPage() {
     }
   }
 
+  // ของที่ลงออเดอร์ไว้แล้วแต่ยังไม่ได้รับ = "สั่งแล้ว รอส่ง" — ตัดออกจากบิลรอบนี้ กันสั่งซ้ำ
+  let pending: PendingSupply[] = [];
+  if (hasAdminCredentials()) {
+    try {
+      pending = pendingSupplies(await listSupplyOrders({ branch }));
+    } catch {
+      pending = [];
+    }
+  }
+
   const plan = result?.plan ?? null;
-  const must = plan?.must ?? result?.items ?? [];
-  const suggested = plan?.suggested ?? [];
+  const allMust = plan?.must ?? result?.items ?? [];
+  const allSuggested = plan?.suggested ?? [];
+  const ordered = [...allMust, ...allSuggested]
+    .map((item) => ({ item, pending: findPending(item, pending) }))
+    .filter((entry): entry is { item: SupplyNeedItem; pending: PendingSupply } => Boolean(entry.pending));
+  const orderedSet = new Set(ordered.map((entry) => entry.item));
+  const must = allMust.filter((item) => !orderedSet.has(item));
+  const suggested = allSuggested.filter((item) => !orderedSet.has(item));
+  const sumCost = (items: SupplyNeedItem[]) => items.reduce((total, item) => total + (item.estimatedCost ?? 0), 0);
   const minimum = plan?.minOrderValue ?? config.supplyMinOrderValue ?? 0;
-  const mustTotal = plan?.mustTotal ?? result?.estimatedTotal ?? 0;
-  const grandTotal = plan?.grandTotal ?? mustTotal;
-  const short = plan?.shortOfMinimum ?? Math.max(minimum - grandTotal, 0);
-  const reached = plan?.reachedMinimum ?? grandTotal >= minimum;
+  const mustTotal = ordered.length ? sumCost(must) : plan?.mustTotal ?? result?.estimatedTotal ?? 0;
+  const grandTotal = ordered.length ? mustTotal + sumCost(suggested) : plan?.grandTotal ?? mustTotal;
+  const short = Math.max(minimum - grandTotal, 0);
+  const reached = grandTotal >= minimum;
 
   const copyText = [...must, ...suggested].map(orderLine).join("\n");
   const guessedPriceCount = [...must, ...suggested].filter((item) => item.costSource === "price").length;
@@ -119,7 +163,25 @@ export default async function SuppliesPage() {
 
       {result && must.length === 0 ? (
         <section className="supply-panel">
-          <p className="detail-hint">ตอนนี้ไม่มีของที่ถึงจุดสั่งซื้อ — ยังไม่ต้องสั่งอะไร</p>
+          <p className="detail-hint">
+            {ordered.length
+              ? "ของที่ถึงจุดสั่งซื้อ สั่งไปแล้วทั้งหมด — รอของมาส่ง ไม่ต้องสั่งซ้ำ"
+              : "ตอนนี้ไม่มีของที่ถึงจุดสั่งซื้อ — ยังไม่ต้องสั่งอะไร"}
+          </p>
+        </section>
+      ) : null}
+
+      {ordered.length > 0 ? (
+        <section className="supply-panel">
+          <div className="supply-alert-head ordered">
+            <strong>สั่งแล้ว รอของมาส่ง {ordered.length} รายการ</strong>
+            <small>ไม่ต้องสั่งซ้ำ — ไม่นับในบิลรอบนี้</small>
+          </div>
+          <ul className="supply-alert-list">
+            {ordered.map((entry) => (
+              <OrderedRow key={`ordered-${entry.item.productId ?? entry.item.name}`} item={entry.item} pending={entry.pending} />
+            ))}
+          </ul>
         </section>
       ) : null}
 
@@ -139,7 +201,7 @@ export default async function SuppliesPage() {
             ) : null}
             <p className="detail-hint">
               ต้องสั่งจริง ≈ {baht(mustTotal)} บาท
-              {suggested.length > 0 ? ` · เสนอให้หยิบเพิ่ม ≈ ${baht(plan?.suggestedTotal ?? 0)} บาท` : ""}
+              {suggested.length > 0 ? ` · เสนอให้หยิบเพิ่ม ≈ ${baht(sumCost(suggested))} บาท` : ""}
               {result?.missingCostCount
                 ? ` · มี ${result.missingCostCount} รายการที่ยังไม่ได้ใส่ต้นทุนใน StoreHub ยอดจริงจะสูงกว่านี้`
                 : ""}
@@ -181,6 +243,10 @@ export default async function SuppliesPage() {
           </div>
         </section>
       ) : null}
+
+      <section className="supply-panel">
+        <SupplyOrdersBoard branch={branch} canAct={!user.isImpersonating} />
+      </section>
 
       {result?.trackedCount ? (
         <p className="detail-hint">
