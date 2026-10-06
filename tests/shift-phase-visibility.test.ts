@@ -54,11 +54,11 @@ describe("resolveShiftPhaseView", () => {
     assert.equal(view.offLabel, "วันหยุด");
   });
 
-  it("an unrostered day is an off day labelled ไม่มีกะวันนี้", () => {
+  it("an unrostered day is an off day labelled วันหยุด", () => {
     const view = resolveShiftPhaseView(cardStoreWorkflow, "unrostered");
     assert.deepEqual(ids(view.phases), ids(cardStoreWorkflow));
     assert.equal(view.offDay, true);
-    assert.equal(view.offLabel, "ไม่มีกะวันนี้");
+    assert.equal(view.offLabel, "วันหยุด");
   });
 
   it("off-day view contains phases a working shift would have hidden (admins keep them all)", () => {

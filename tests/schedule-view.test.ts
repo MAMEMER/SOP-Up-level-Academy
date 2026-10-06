@@ -6,6 +6,7 @@ import {
   monthDays,
   dayActivityChips,
   monthLabel,
+  plannedOffDays,
   scheduleCell,
   shiftMonth,
   summaryLine,
@@ -193,5 +194,19 @@ describe("staff schedule — day activities", () => {
     const other = weeks.flat().find((item) => item.day?.workDate === "2026-08-07");
     assert.deepEqual(other?.activities, []);
     assert.equal(other?.note, null);
+  });
+});
+
+describe("plannedOffDays", () => {
+  it("fills a blank day as off only when the day is planned for someone", () => {
+    const plans = [
+      { staffCode: "UP-005", workDate: "2026-10-05", assignment: "s2" as const, branch: "bangkae" },
+      { staffCode: "UP-003", workDate: "2026-10-06", assignment: "s2" as const, branch: "bangkae" }
+    ];
+    const filled = plannedOffDays(plans, ["UP-003", "UP-005"]);
+    assert.deepEqual(
+      filled.map((cell) => `${cell.staffCode}__${cell.workDate}__${cell.assignment}`).sort(),
+      ["UP-003__2026-10-05__off", "UP-005__2026-10-06__off"]
+    );
   });
 });
