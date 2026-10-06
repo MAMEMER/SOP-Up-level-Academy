@@ -43,8 +43,9 @@ test("monthGrid — ต.ค. 2026 เริ่มจันทร์ 28 ก.ย. 
   assert.equal(grid.filter((d) => d.inMonth).length, 31);
   const go = grid.find((d) => d.date === "2026-10-17")!;
   assert.equal(go.specials[0].title, "Grand Opening");
-  assert.ok(go.events.every((e) => e.branch !== "senafest"));
-  assert.ok(go.events.some((e) => e.branch === "bangkae"));
+  // 17 ต.ค. บางแคปิด ทุกอย่างไปรวมที่ Grand Opening — ไม่มีกิจกรรมประจำทั้งสองสาขา
+  assert.equal(go.events.length, 0);
+  assert.ok(go.specials.some((s) => s.branch === "bangkae" && s.closed));
   // เสนาเฟสต์ยังไม่เปิดก่อน 2 ต.ค.
   assert.ok(eventsOnDate(DEFAULT_BOARD, "2026-10-01").every((e) => e.branch === "bangkae"));
 });

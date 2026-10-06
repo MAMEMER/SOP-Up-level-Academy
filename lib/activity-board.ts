@@ -248,6 +248,8 @@ export type SpecialDay = {
   time: string;
   detail?: string;
   replacesWeekly?: boolean;
+  /** สาขาปิดทั้งวัน (ไม่ใช่งาน) — หน้าเว็บแสดงเป็นป้ายปิด */
+  closed?: boolean;
   href?: string;
 };
 
@@ -267,6 +269,17 @@ export const SPECIAL_DAYS: SpecialDay[] = [
     time: "11:00–20:00",
     detail: "แข่ง PKM · Lorcana · Riftbound เกมละ 64 ที่ · Pre-release Hyperia City · Lucky Draw",
     replacesWeekly: true,
+    href: "https://uplevelguild.com/grand-opening"
+  },
+  {
+    // แชมป์ 6 ต.ค.: วันนี้บางแคปิด ทุกกิจกรรมไปรวมที่ Grand Opening
+    date: "2026-10-17",
+    branch: "bangkae",
+    title: "บางแคปิด 1 วัน",
+    time: "ทั้งวัน",
+    detail: "ทุกกิจกรรมย้ายไปรวมที่ Grand Opening สาขาเสนาเฟสต์",
+    replacesWeekly: true,
+    closed: true,
     href: "https://uplevelguild.com/grand-opening"
   }
 ];
