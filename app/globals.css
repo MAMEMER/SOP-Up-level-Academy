@@ -8437,3 +8437,6 @@ p.ab-help{padding-left:0}
   .am-hero{padding:14px 16px;gap:14px}
   .am-hero-date b{font-size:30px}
 }
+.am-top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.am-publish{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.am-publish small{font-size:12px;color:var(--ab-faint)}
