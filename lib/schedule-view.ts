@@ -102,6 +102,23 @@ export function scheduleCell(workDate: string, plan: PlanCell | undefined): Sche
   return { workDate, assignment: null, startTime: null, timeRange: null, label: "—", tone: "blank", branch: null };
 }
 
+/**
+ * หน้าจัดตารางของแอดมินแสดงช่องว่างเป็น "OFF" — แอดมินจึงไม่เคยกดบันทึก OFF จริง (ช่องขึ้น OFF อยู่แล้ว).
+ * ฝั่งพนักงานต้องอ่านแบบเดียวกัน: วันที่จัดตารางแล้ว (มีใครสักคนลงไว้) แต่คนนี้ไม่มีช่อง = วันหยุด.
+ * วันที่ยังไม่มีใครลงเลยยังเป็น "—" (ยังไม่จัดตาราง) ไม่ใช่วันหยุด.
+ */
+export function plannedOffDays(plans: PlanCell[], staffCodes: string[]): PlanCell[] {
+  const plannedDates = new Set(plans.map((plan) => plan.workDate));
+  const taken = new Set(plans.map((plan) => `${plan.staffCode}__${plan.workDate}`));
+  const filled: PlanCell[] = [];
+  for (const workDate of plannedDates) {
+    for (const staffCode of staffCodes) {
+      if (!taken.has(`${staffCode}__${workDate}`)) filled.push({ staffCode, workDate, assignment: "off" });
+    }
+  }
+  return filled;
+}
+
 export type ScheduleRow = {
   staffCode: string;
   displayName: string;

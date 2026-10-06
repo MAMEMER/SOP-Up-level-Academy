@@ -16,6 +16,7 @@ import {
   calendarWeeks,
   monthDays,
   monthLabel,
+  plannedOffDays,
   shiftMonth,
   summaryLine,
   workingOn,
@@ -81,10 +82,14 @@ export function MyScheduleView({
   const days = monthDays(month);
   const branchByKey = Object.fromEntries(branches.map((entry) => [entry.key, entry]));
   // กรองตามสาขาที่เลือกดู — กะของสาขาอื่นถูกซ่อน แต่ "ฉัน" ยังเห็นกะตัวเองเสมอ
-  const visiblePlans =
-    view === "all"
+  // ช่องว่างในวันที่จัดตารางแล้ว = วันหยุด (ตรงกับที่แอดมินเห็นเป็น OFF) — เติมก่อนกรองสาขา
+  const offDays = plannedOffDays(plans, staff.map((entry) => entry.code));
+  const visiblePlans = [
+    ...(view === "all"
       ? plans
-      : plans.filter((plan) => (plan.branch || branches[0]?.key) === view || plan.staffCode === myStaffCode);
+      : plans.filter((plan) => (plan.branch || branches[0]?.key) === view || plan.staffCode === myStaffCode)),
+    ...offDays
+  ];
   const rows = buildScheduleRows(staff, visiblePlans, days, myStaffCode);
   const weeks = calendarWeeks(rows, days, events);
   const myRow = rows.find((row) => row.isMe);

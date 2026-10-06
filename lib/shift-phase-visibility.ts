@@ -29,7 +29,8 @@ export type ShiftPhaseView = {
 
 const OFF_LABELS: Record<"off" | "unrostered", string> = {
   off: "วันหยุด",
-  unrostered: "ไม่มีกะวันนี้"
+  // หน้าจัดตารางของแอดมินแสดงช่องว่างเป็น OFF — พนักงานต้องเห็นเป็นวันหยุดเหมือนกัน
+  unrostered: "วันหยุด"
 };
 
 /**
