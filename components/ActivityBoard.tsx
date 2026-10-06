@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Copy, GripVertical, HelpCircle, Plus, RotateCcw, Undo2, UsersRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Globe, GripVertical, HelpCircle, Plus, RotateCcw, Undo2, UsersRound } from "lucide-react";
 import { Modal } from "./Modal.tsx";
 import { ActivityMonth } from "./ActivityMonth.tsx";
 import {
@@ -69,8 +69,10 @@ export function ActivityBoard({ today, canEdit }: { today: string; canEdit: bool
   const [staffByDate, setStaffByDate] = useState<StaffByDate>({});
   const [staffLoading, setStaffLoading] = useState(true);
   const [editing, setEditing] = useState<{ event: BoardEvent; isNew: boolean } | null>(null);
-  const [dialog, setDialog] = useState<"help" | "reset" | null>(null);
+  const [dialog, setDialog] = useState<"help" | "reset" | "publish" | null>(null);
   const [toast, setToast] = useState("");
+  const [published, setPublished] = useState<{ publishedAt: string; matches: boolean } | null>(null);
+  const [publishing, setPublishing] = useState(false);
   const [view, setViewState] = useState<"week" | "month">("week");
   useEffect(() => {
     try {
@@ -114,6 +116,7 @@ export function ActivityBoard({ today, canEdit }: { today: string; canEdit: bool
         }
         if (!res.ok) throw new Error(data.error || String(res.status));
         baseRef.current = data.updatedAt || "";
+        setPublished((p) => (p ? { ...p, matches: false } : p));
         writeDraft(null);
         setSave("saved");
       } catch {
@@ -152,6 +155,7 @@ export function ActivityBoard({ today, canEdit }: { today: string; canEdit: bool
       .then((data) => {
         if (cancelled) return;
         setStaffByDate(data.staffByDate || {});
+        if (!loaded.current) setPublished(data.published || null);
         setStaffLoading(false);
         if (loaded.current) return;
         loaded.current = true;
@@ -280,18 +284,77 @@ export function ActivityBoard({ today, canEdit }: { today: string; canEdit: bool
     }))
     .filter((x) => x.bk || x.sf);
 
+  async function publish() {
+    setDialog(null);
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/activity-board", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || String(res.status));
+      setPublished({ publishedAt: data.publishedAt, matches: true });
+      say("อัพเดทเว็บแล้ว · หน้าเว็บเปลี่ยนภายใน 5 นาที");
+    } catch {
+      say("อัพเดทเว็บไม่สำเร็จ ลองกดใหม่อีกครั้ง");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  const publishLabel = publishing
+    ? "กำลังอัพเดท…"
+    : published?.matches
+      ? "เว็บตรงกับตารางแล้ว"
+      : "อัพเดทเว็บ";
   const viewToggle = (
-    <div className="am-seg am-view" role="group" aria-label="มุมมอง">
-      <button type="button" aria-pressed={view === "week"} onClick={() => setView("week")}>รายสัปดาห์</button>
-      <button type="button" aria-pressed={view === "month"} onClick={() => setView("month")}>ปฏิทินเดือน</button>
+    <div className="am-top">
+      <div className="am-seg am-view" role="group" aria-label="มุมมอง">
+        <button type="button" aria-pressed={view === "week"} onClick={() => setView("week")}>รายสัปดาห์</button>
+        <button type="button" aria-pressed={view === "month"} onClick={() => setView("month")}>ปฏิทินเดือน</button>
+      </div>
+      {canEdit ? (
+        <div className="am-publish">
+          <button
+            type="button"
+            className={`ab-btn${published?.matches ? "" : " ab-primary"}`}
+            disabled={publishing || save !== "saved"}
+            onClick={() => setDialog("publish")}
+          >
+            <Globe /> {publishLabel}
+          </button>
+          <small>
+            {published?.publishedAt
+              ? `ขึ้นเว็บล่าสุด ${new Date(published.publishedAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}${published.matches ? "" : " · มีที่แก้ยังไม่ขึ้นเว็บ"}`
+              : "ยังไม่เคยอัพเดทเว็บ · ปฏิทินบนเว็บยังใช้ตารางเก่า"}
+          </small>
+        </div>
+      ) : null}
     </div>
   );
+  const publishDialog =
+    dialog === "publish" ? (
+      <Modal title="อัพเดทปฏิทินบนเว็บ?" onClose={() => setDialog(null)}>
+        <ul className="ab-help">
+          <li>ปฏิทินกิจกรรมบน uplevelguild.com จะเปลี่ยนเป็นตารางนี้ ({events.length} รายการต่อสัปดาห์ ทั้งสองสาขา) พร้อมงานพิเศษ เช่น Grand Opening</li>
+          <li>ลูกค้าเห็นภายในประมาณ 5 นาที</li>
+          <li>หน้าสมัครแต่ละเกมยังไม่เปลี่ยนตาม — เปลี่ยนเฉพาะปฏิทิน</li>
+        </ul>
+        <div className="ab-actions">
+          <span className="ab-spacer" />
+          <button type="button" className="ab-btn" onClick={() => setDialog(null)}>ยกเลิก</button>
+          <button type="button" className="ab-btn ab-primary" onClick={() => void publish()}>
+            <Globe /> อัพเดทเว็บ
+          </button>
+        </div>
+      </Modal>
+    ) : null;
 
   if (view === "month") {
     return (
       <section className="ab">
         {viewToggle}
         <ActivityMonth events={events} today={today} />
+        {publishDialog}
+        {toast ? <div className="ab-toast" role="status">{toast}</div> : null}
       </section>
     );
   }
@@ -472,6 +535,7 @@ export function ActivityBoard({ today, canEdit }: { today: string; canEdit: bool
         </Modal>
       ) : null}
 
+      {publishDialog}
       {toast ? <div className="ab-toast" role="status">{toast}</div> : null}
     </section>
   );

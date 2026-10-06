@@ -5,7 +5,9 @@ import { listStaff } from "../../../lib/staff-store.ts";
 import { defaultShiftStart, isWorkingAssignment, shiftEndTime, type ShiftAssignment } from "../../../lib/shift-schedule.ts";
 import {
   BOARD_BRANCHES,
+  BRANCH_START,
   DEFAULT_BOARD,
+  SPECIAL_DAYS,
   isIsoDate,
   mondayOf,
   sanitizeBoard,
@@ -23,6 +25,19 @@ export const dynamic = "force-dynamic";
 const BOARD_COLLECTION = "sop_activity_board";
 const BOARD_DOC = "weekly";
 const SHIFTS = "schedule_shifts";
+// ตารางที่เผยแพร่แล้ว — uplevelguild.com (/api/events-calendar) อ่าน doc นี้ไปทำปฏิทินหน้าเว็บ.
+// แยกจากแม่แบบที่แก้อยู่ เพื่อให้เจ้าของจัดตารางเล่นๆ ได้โดยไม่ขึ้นเว็บจนกว่าจะกด "อัพเดทเว็บ".
+const PUBLIC_COLLECTION = "public_weekly_schedule";
+const PUBLIC_DOC = "current";
+
+type PublishedInfo = { publishedAt: string; publishedBy: string; sourceUpdatedAt: string };
+
+async function readPublished(): Promise<PublishedInfo | null> {
+  const snap = await db().collection(PUBLIC_COLLECTION).doc(PUBLIC_DOC).get();
+  if (!snap.exists) return null;
+  const d = snap.data() as Partial<PublishedInfo>;
+  return { publishedAt: d.publishedAt || "", publishedBy: d.publishedBy || "", sourceUpdatedAt: d.sourceUpdatedAt || "" };
+}
 
 type BoardDoc = { events: BoardEvent[]; updatedAt: string; updatedBy: string };
 
@@ -69,11 +84,12 @@ export async function GET(request: Request) {
   const week = new URL(request.url).searchParams.get("week") || "";
   if (week && !isIsoDate(week)) return badRequest("bad_week");
   try {
-    const board = await readBoard();
-    if (!week) return NextResponse.json(board);
+    const [board, pub] = await Promise.all([readBoard(), readPublished().catch(() => null)]);
+    const published = pub ? { publishedAt: pub.publishedAt, matches: pub.sourceUpdatedAt === board.updatedAt } : null;
+    if (!week) return NextResponse.json({ ...board, published });
     const monday = mondayOf(week);
     const staffByDate = await readWeekStaff(weekDates(monday));
-    return NextResponse.json({ ...board, monday, staffByDate });
+    return NextResponse.json({ ...board, monday, staffByDate, published });
   } catch (error) {
     return NextResponse.json({ error: "read_failed", detail: String(error) }, { status: 500 });
   }
@@ -101,5 +117,28 @@ export async function PUT(request: Request) {
     return NextResponse.json(result.doc);
   } catch (error) {
     return NextResponse.json({ error: "write_failed", detail: String(error) }, { status: 500 });
+  }
+}
+
+// กด "อัพเดทเว็บ" — คัดลอกตารางที่บันทึกแล้ว + งานพิเศษ ไปเป็นตารางสาธารณะ
+export async function POST() {
+  const { user } = await actor();
+  if (!canWriteNow(user)) return readOnly();
+  if (!isOwner(user.email)) return forbidden();
+  try {
+    const board = await readBoard();
+    if (!board.updatedAt) return badRequest("board_not_saved");
+    const publishedAt = new Date().toISOString();
+    await db().collection(PUBLIC_COLLECTION).doc(PUBLIC_DOC).set({
+      events: board.events,
+      specials: SPECIAL_DAYS,
+      branchStart: BRANCH_START,
+      sourceUpdatedAt: board.updatedAt,
+      publishedAt,
+      publishedBy: user.actualEmail
+    });
+    return NextResponse.json({ publishedAt, matches: true });
+  } catch (error) {
+    return NextResponse.json({ error: "publish_failed", detail: String(error) }, { status: 500 });
   }
 }
