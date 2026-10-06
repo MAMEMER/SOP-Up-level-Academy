@@ -6,6 +6,7 @@ import {
   isForShift,
   isForStaff,
   lastDayOfMonth,
+  needsWorkReport,
   monthDayOf,
   normalizeWorkSpec,
   ownerModeLabel,
@@ -198,5 +199,15 @@ describe("work spec — งานของวันนี้", () => {
   it("จัดกลุ่มตามหมวดหมู่ โดยงานที่ไม่ได้ตั้งหมวด อยู่กลุ่ม 'ทั่วไป'", () => {
     const groups = groupByCategory(specsDueFor(specs, { date: "2026-08-01", shift: null, staffCode: "LEO" }));
     assert.deepEqual(groups.map((group) => group.category), ["เปิดร้าน", "Stock", "ทั่วไป"]);
+  });
+});
+
+describe("needsWorkReport", () => {
+  it("asks for what was done + photos only on weekly / biweekly / monthly work", () => {
+    assert.equal(needsWorkReport({ frequency: "weekly" }), true);
+    assert.equal(needsWorkReport({ frequency: "biweekly" }), true);
+    assert.equal(needsWorkReport({ frequency: "monthly" }), true);
+    assert.equal(needsWorkReport({ frequency: "daily" }), false);
+    assert.equal(needsWorkReport({ frequency: "event" }), false);
   });
 });

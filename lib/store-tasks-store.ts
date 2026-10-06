@@ -6,7 +6,7 @@
 import type { WorkSpec } from "./work-spec.ts";
 import type { TaskProgressAction, TaskProgressEntry } from "./task-progress.ts";
 
-export type TaskRecord = { by: string; at: string; value?: string; photos?: string[] };
+export type TaskRecord = { by: string; at: string; value?: string; note?: string; photos?: string[] };
 
 export type StoreTasksPayload = {
   tasks: WorkSpec[];

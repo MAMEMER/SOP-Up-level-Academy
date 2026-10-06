@@ -14,7 +14,7 @@ import {
   type TaskProgressAction,
   type TaskProgressEntry
 } from "../lib/task-progress.ts";
-import { groupByCategory, scheduleLabel, specsDueFor, timingLabel, timingStateAt, type WorkSpec } from "../lib/work-spec.ts";
+import { groupByCategory, needsWorkReport, scheduleLabel, specsDueFor, timingLabel, timingStateAt, type WorkSpec } from "../lib/work-spec.ts";
 import type { ShiftCode } from "../lib/shift-schedule.ts";
 
 // งานของพนักงานในวันนี้ — รายวัน / รายสัปดาห์ / รายเดือน ปนกันในลิสต์เดียว เพราะคนทำงานไม่ได้
@@ -199,7 +199,9 @@ function TaskRow({
           doneAt={record?.at}
           doneValue={record?.value}
           donePhotos={record?.photos}
+          doneNote={record?.note}
           answer={task.answer}
+          requireReport={needsWorkReport(task.schedule)}
           disabled={readOnly || tooEarly}
           busy={busy}
           onAction={onAction}
