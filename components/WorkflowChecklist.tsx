@@ -29,6 +29,7 @@ import { useWorkRecordWindow } from "../lib/work-records-client.ts";
 import { SaveIndicator } from "./SaveIndicator.tsx";
 import { logSubmitPress } from "../lib/submit-log-client.ts";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
+import { SupplyOrdersBoard } from "./SupplyOrdersBoard.tsx";
 import { dailyScopeKey, shiftWorkDate } from "../lib/work-records.ts";
 
 function itemKey(phaseId: string, index: number) {
@@ -724,10 +725,15 @@ function StockTaskDetails({
   details,
   updateDetail,
   note,
-  updateNote
+  updateNote,
+  branch,
+  readOnly = false
 }: {
   index: number;
   canEdit: boolean;
+  /** สาขาที่เข้ากะ — ใช้กรองออเดอร์ของเติมสต็อกที่รอรับ */
+  branch?: string;
+  readOnly?: boolean;
   workDate: string;
   details: Record<string, string>;
   updateDetail: (key: string, value: string) => void;
@@ -920,6 +926,11 @@ function StockTaskDetails({
     );
   }
 
+  // รับของเติมสต็อก (น้ำ ขนม accessory) — ออเดอร์ที่ลงไว้ในหน้า "ของที่ต้องสั่ง" ขึ้นที่นี่ให้เช็คทีละรายการ
+  if (index === 5) {
+    return <SupplyOrdersBoard branch={branch} mode="receive" canAct={!readOnly} />;
+  }
+
   return null;
 }
 
@@ -931,9 +942,12 @@ export function WorkflowChecklist({
   windows,
   evidence,
   guides,
+  branch,
   readOnly = false
 }: {
   phases: WorkflowPhase[];
+  /** สาขาที่เข้ากะวันนี้ (ใช้กับแผงรับของเติมสต็อก) */
+  branch?: string;
   userEmail: string;
   userRole: "employee" | "leader" | "admin";
   /** Today's shift for this staffer — only used for labelling now, not for the window. */
@@ -1449,6 +1463,8 @@ export function WorkflowChecklist({
                               updateDetail={updateDetail}
                               note={notes[noteKey(workDate, phase.id)] || ""}
                               updateNote={(value) => updateNote(phase.id, value)}
+                              branch={branch}
+                              readOnly={readOnly}
                             />
                           ) : null}
                           {phase.id === "daytime-work" ? (

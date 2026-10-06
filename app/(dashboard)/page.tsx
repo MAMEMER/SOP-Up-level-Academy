@@ -15,6 +15,7 @@ import { assignedWorkFeedForViewer, fetchAssignedWorkFeed } from "../../lib/assi
 import { weeklyEventsActiveOn } from "../../lib/weekly-event-tasks.ts";
 import { DeliveryOrdersBoard } from "../../components/DeliveryOrdersBoard.tsx";
 import { ParcelOrdersBoard } from "../../components/ParcelOrdersBoard.tsx";
+import { SupplyOrdersBoard } from "../../components/SupplyOrdersBoard.tsx";
 import { fetchShiftForStaff, syncDeliveryTasks, workBranchFor } from "../../lib/delivery-tasks-server.ts";
 import { DELIVERY_BRANCH, deliveryTaskState, deliveryTaskVisibleTo, sortDeliveryTasks, type DeliveryTask } from "../../lib/delivery-tasks.ts";
 import { TodaySummary } from "../../components/TodaySummary.tsx";
@@ -91,6 +92,7 @@ export default async function HomePage() {
           Suspense กันไม่ให้การเรียก StoreHub หน่วงงานของตัวเองที่เหลือทั้งหน้า */}
       <Suspense fallback={null}>
         <SupplyNeedsBanner branch={branch} />
+        <SupplyOrdersBoard branch={branch} mode="compact" />
       </Suspense>
 
       {/* เหลืออะไรบ้างวันนี้ แบบนับเป็นตัวเลข ไม่ใช่ลิสต์ยาว */}
