@@ -31,6 +31,14 @@ export const FREQUENCY_LABEL: Record<WorkFrequency, string> = {
   range: "ช่วงวันที่"
 };
 
+/**
+ * งานรอบยาว (สัปดาห์/เดือน) ส่งแค่ "เสร็จ" ไม่พอ — ต้องบอกว่าทำอะไรไปบ้าง + แนบรูปหลักฐาน
+ * ทั้งหน้าพนักงานและ API ใช้ตัวนี้ตัดสินเหมือนกัน.
+ */
+export function needsWorkReport(schedule: Pick<WorkSchedule, "frequency">): boolean {
+  return schedule.frequency === "weekly" || schedule.frequency === "biweekly" || schedule.frequency === "monthly";
+}
+
 /** 0 = อาทิตย์ … 6 = เสาร์ (ตรงกับ Date.getDay ของเวลาไทย) */
 export const WEEKDAY_LABEL = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 

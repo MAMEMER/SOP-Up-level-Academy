@@ -3,7 +3,7 @@ import { FieldPath } from "firebase-admin/firestore";
 import { actor, badRequest, canWriteNow, db, forbidden, isAdmin, readOnly } from "../../../lib/api-firestore.ts";
 import { hasAdminCredentials } from "../../../lib/firebase-admin.ts";
 import { isValidLinkUrl } from "../../../lib/checklist-links.ts";
-import { normalizeWorkSpecs, type WorkSpec } from "../../../lib/work-spec.ts";
+import { needsWorkReport, normalizeWorkSpecs, type WorkSpec } from "../../../lib/work-spec.ts";
 import { normalizeScopeConfig, type ChecklistScopeConfig } from "../../../lib/checklist-overrides.ts";
 import { scopeForPeriod, type PeriodicPeriod } from "../../../lib/periodic-tasks.ts";
 import { mergeImportedSpecs, specsFromPeriod } from "../../../lib/task-import.ts";
@@ -36,7 +36,7 @@ const RECORDS = "sop_task_records";
 const PROGRESS = "sop_task_progress";
 const CHECKLIST_OVERRIDES = "sop_checklist_overrides";
 
-type TaskRecord = { by: string; at: string; value?: string; photos?: string[] };
+type TaskRecord = { by: string; at: string; value?: string; note?: string; photos?: string[] };
 
 const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 const recordId = (branch: string, date: string) => `${branch}__${date}`;
@@ -156,6 +156,12 @@ export async function POST(request: Request) {
         if (body.done === false) {
           delete done[taskId];
         } else {
+          // งานรายสัปดาห์/เดือนต้องส่งผ่าน progressTask (มีสิ่งที่ทำ + รูป) — ติ๊กเฉยๆ ทางนี้ไม่ได้
+          const taskSnap = await db().collection(TASKS).doc(branch).get();
+          const spec = normalizeWorkSpecs(taskSnap.exists ? (taskSnap.data() as { tasks?: unknown }).tasks : []).find(
+            (item) => item.id === taskId
+          );
+          if (spec && needsWorkReport(spec.schedule)) return badRequest("report_required");
           // คำตอบถูกเรนเดอร์ให้คนอื่นอ่าน/กด — ตัดความยาว และรับเฉพาะ URL ที่ปลอดภัย
           const value = typeof body.value === "string" ? body.value.trim().slice(0, 500) : "";
           const photos = Array.isArray(body.photos)
@@ -193,6 +199,10 @@ export async function POST(request: Request) {
           ? body.photos.filter((url): url is string => typeof url === "string" && isValidLinkUrl(url)).slice(0, 3)
           : [];
         const by = staffCode || user.actualEmail;
+        const note = typeof body.note === "string" ? body.note.trim().slice(0, 400) : "";
+        // งานรายสัปดาห์/เดือน: ส่งเสร็จต้องมีสิ่งที่ทำ + รูปหลักฐาน (หน้าจอกันไว้แล้ว — กันซ้ำฝั่ง server)
+        const reportRequired = Boolean(spec && needsWorkReport(spec.schedule));
+        if (action === "finish" && reportRequired && (!note || photos.length === 0)) return badRequest("report_required");
 
         const progressRef = db().collection(PROGRESS).doc(branch);
         const progressSnap = await progressRef.get();
@@ -226,6 +236,7 @@ export async function POST(request: Request) {
             by,
             at: nowIso,
             ...(value ? { value } : {}),
+            ...(reportRequired && note ? { note } : {}),
             ...(photos.length ? { photos } : {})
           };
         } else if (action === "reopen" || action === "clear") {

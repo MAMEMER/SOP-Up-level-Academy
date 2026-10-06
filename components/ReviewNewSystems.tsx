@@ -94,6 +94,7 @@ export function RoutineSubmissions({ branch, tab, workDate }: { branch: string; 
                     {thaiDate(row.date)} · ส่ง {thaiDateTime(row.record.at)}
                   </small>
                   {row.record.value ? <p>{row.record.value}</p> : null}
+                  {row.record.note ? <p>สิ่งที่ทำ: {row.record.note}</p> : null}
                   <Thumbs urls={row.record.photos} />
                 </div>
               ))}

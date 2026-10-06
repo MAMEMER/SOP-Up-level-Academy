@@ -22,7 +22,9 @@ export function TaskProgressPanel({
   doneAt,
   doneValue,
   donePhotos,
+  doneNote,
   answer,
+  requireReport = false,
   disabled = false,
   busy = false,
   onAction
@@ -34,8 +36,12 @@ export function TaskProgressPanel({
   doneAt?: string;
   doneValue?: string;
   donePhotos?: string[];
+  /** สิ่งที่ทำ ที่ส่งมาตอนกดเสร็จ (งานรายสัปดาห์/เดือน) */
+  doneNote?: string;
   /** ส่งงานแบบไหนตอนกดเสร็จ (ไม่ตั้ง = กดเสร็จได้เลย) */
   answer?: ItemAnswer;
+  /** งานรายสัปดาห์/เดือน: กดเสร็จต้องเขียนว่าทำอะไรไปบ้าง + แนบรูปหลักฐาน */
+  requireReport?: boolean;
   disabled?: boolean;
   busy?: boolean;
   onAction: (action: TaskProgressAction, payload?: ProgressPayload) => void;
@@ -48,7 +54,10 @@ export function TaskProgressPanel({
 
   const finished = done || entry?.status === "done";
   const stuck = entry?.status === "stuck";
-  const needsInput = answerNeedsInput(answer);
+  const needsInput = answerNeedsInput(answer) || requireReport;
+  // ช่องคำตอบที่เจ้าของตั้งไว้ (ตัวเลข/ข้อความ/ตัวเลือก) — รูปแยกไปช่องหลักฐาน
+  const needsValue = answerNeedsInput(answer) && answer?.kind !== "photo";
+  const needsPhotos = answer?.kind === "photo" || requireReport;
   const photoUrls = photos.split("\n").map((url) => url.trim()).filter(Boolean);
   const shownPercent = finished ? 100 : entry?.percent ?? 0;
 
@@ -74,7 +83,8 @@ export function TaskProgressPanel({
     if (mode === "finish") {
       send("finish", {
         ...(note.trim() ? { note: note.trim() } : {}),
-        ...(answer?.kind === "photo" ? { photos: photoUrls } : value.trim() ? { value: value.trim() } : {})
+        ...(needsPhotos ? { photos: photoUrls } : {}),
+        ...(needsValue && value.trim() ? { value: value.trim() } : {})
       });
       return;
     }
@@ -97,7 +107,10 @@ export function TaskProgressPanel({
 
   const formBlocked =
     (mode === "stuck" && note.trim().length === 0) ||
-    (mode === "finish" && needsInput && (answer?.kind === "photo" ? photoUrls.length === 0 : value.trim().length === 0));
+    (mode === "finish" &&
+      ((needsPhotos && photoUrls.length === 0) ||
+        (needsValue && value.trim().length === 0) ||
+        (requireReport && note.trim().length === 0)));
 
   return (
     <div className={`task-progress${finished ? " task-progress--done" : stuck ? " task-progress--stuck" : ""}`}>
@@ -189,10 +202,8 @@ export function TaskProgressPanel({
           ) : null}
 
           {/* งานที่เจ้าของสั่งให้กรอกอะไรตอนส่ง — ขอตอนกดเสร็จเท่านั้น */}
-          {mode === "finish" && needsInput ? (
-            answer?.kind === "photo" ? (
-              <EvidencePhotosInput value={photos} onChange={setPhotos} disabled={busy} label={answer.placeholder || "แนบรูป"} />
-            ) : answer?.kind === "choice" ? (
+          {mode === "finish" && needsValue ? (
+            answer?.kind === "choice" ? (
               <select value={value} onChange={(event) => setValue(event.target.value)} disabled={busy} aria-label="เลือกคำตอบ">
                 <option value="">{answer.placeholder || "เลือก…"}</option>
                 {(answer.options || []).map((option) => (
@@ -221,13 +232,26 @@ export function TaskProgressPanel({
             maxLength={400}
             disabled={busy}
             placeholder={
-              mode === "stuck" ? "ติดอะไรอยู่ (ต้องกรอก)" : mode === "finish" ? "อยากบอกอะไรเพิ่ม (ไม่บังคับ)" : "ทำอะไรไปแล้วบ้าง (ไม่บังคับ)"
+              mode === "stuck"
+                ? "ติดอะไรอยู่ (ต้องกรอก)"
+                : mode === "finish"
+                  ? requireReport
+                    ? "ทำอะไรไปบ้าง (ต้องกรอก)"
+                    : "อยากบอกอะไรเพิ่ม (ไม่บังคับ)"
+                  : "ทำอะไรไปแล้วบ้าง (ไม่บังคับ)"
             }
             aria-label="โน้ต"
           />
 
           {mode !== "finish" ? (
             <EvidencePhotosInput value={photos} onChange={setPhotos} disabled={busy} label="แนบรูป (ไม่บังคับ)" />
+          ) : needsPhotos ? (
+            <EvidencePhotosInput
+              value={photos}
+              onChange={setPhotos}
+              disabled={busy}
+              label={answer?.kind === "photo" && answer.placeholder ? answer.placeholder : "แนบรูปหลักฐาน (ต้องมีอย่างน้อย 1 รูป)"}
+            />
           ) : null}
 
           <div className="task-progress__form-actions">
@@ -239,11 +263,14 @@ export function TaskProgressPanel({
             </button>
           </div>
           {formBlocked && mode === "stuck" ? <small className="task-progress__hint">เขียนสั้นๆ ว่าติดอะไร เพื่อให้หัวหน้าช่วยได้</small> : null}
-          {formBlocked && mode === "finish" ? <small className="task-progress__hint">กรอกก่อนถึงจะส่งได้</small> : null}
+          {formBlocked && mode === "finish" ? (
+            <small className="task-progress__hint">{requireReport ? "เขียนสิ่งที่ทำ + แนบรูปหลักฐาน ก่อนถึงจะส่งได้" : "กรอกก่อนถึงจะส่งได้"}</small>
+          ) : null}
         </div>
       ) : null}
 
       {doneValue ? <p className="task-progress__answer">{doneValue}</p> : null}
+      {doneNote ? <p className="task-progress__answer">สิ่งที่ทำ: {doneNote}</p> : null}
       {donePhotos?.length ? (
         <p className="task-progress__photos">
           {donePhotos.map((url, index) => (
