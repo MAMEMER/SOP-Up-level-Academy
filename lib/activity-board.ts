@@ -229,3 +229,100 @@ export function weekDates(monday: string): string[] {
 export function isIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 }
+
+// ---------- มุมมองปฏิทินรายเดือน ----------
+
+/** โลโก้เกมจริง (public/games) — เกมที่ไม่มีโลโก้ใช้จุดสีแทน */
+export const GAME_LOGOS: Partial<Record<GameKey, string>> = {
+  pkm: "/games/pokemon.png",
+  lor: "/games/lorcana.png",
+  rb: "/games/riftbound.png",
+  eid: "/games/eidolon.png"
+};
+
+/** งานพิเศษรายวัน (ไม่ซ้ำทุกสัปดาห์). replacesWeekly = วันนั้นสาขานั้นงดกิจกรรมประจำสัปดาห์ */
+export type SpecialDay = {
+  date: string;
+  branch: BoardBranch;
+  title: string;
+  time: string;
+  detail?: string;
+  replacesWeekly?: boolean;
+  href?: string;
+};
+
+export const SPECIAL_DAYS: SpecialDay[] = [
+  {
+    date: "2026-10-02",
+    branch: "senafest",
+    title: "Soft Opening เสนาเฟสต์",
+    time: "19:00",
+    detail: "Gym Battle + Riftbound",
+    replacesWeekly: true
+  },
+  {
+    date: "2026-10-17",
+    branch: "senafest",
+    title: "Grand Opening",
+    time: "11:00–20:00",
+    detail: "แข่ง PKM · Lorcana · Riftbound เกมละ 64 ที่ · Pre-release Hyperia City · Lucky Draw",
+    replacesWeekly: true,
+    href: "https://uplevelguild.com/grand-opening"
+  }
+];
+
+/** สาขาเสนาเฟสต์เริ่มมีกิจกรรมประจำสัปดาห์วันนี้ (เปิดสาขา 2 ต.ค. 2026) */
+export const BRANCH_START: Partial<Record<BoardBranch, string>> = { senafest: "2026-10-02" };
+
+export type MonthDay = {
+  date: string;
+  day: number; // 0 = จันทร์
+  inMonth: boolean;
+  events: BoardEvent[];
+  specials: SpecialDay[];
+};
+
+/** 0 = จันทร์ … 6 = อาทิตย์ */
+export function boardDayOf(date: string): number {
+  return (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+/** "YYYY-MM" เลื่อนไป n เดือน */
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+/** กิจกรรมของวันหนึ่ง = แม่แบบรายสัปดาห์ของวันนั้น − สาขาที่ยังไม่เปิด − สาขาที่มีงานพิเศษแทน */
+export function eventsOnDate(events: BoardEvent[], date: string, specials: SpecialDay[] = SPECIAL_DAYS): BoardEvent[] {
+  const day = boardDayOf(date);
+  const replaced = new Set(specials.filter((s) => s.date === date && s.replacesWeekly).map((s) => s.branch));
+  return sortEvents(
+    events.filter((e) => {
+      if (e.day !== day || replaced.has(e.branch)) return false;
+      const start = BRANCH_START[e.branch];
+      return !start || date >= start;
+    })
+  );
+}
+
+/** ช่องปฏิทินทั้งเดือน เริ่มวันจันทร์ เติมวันของเดือนก่อน/หลังให้ครบสัปดาห์ */
+export function monthGrid(events: BoardEvent[], month: string, specials: SpecialDay[] = SPECIAL_DAYS): MonthDay[] {
+  const first = `${month}-01`;
+  const start = mondayOf(first);
+  const lastDate = addDays(`${addMonths(month, 1)}-01`, -1);
+  const end = addDays(mondayOf(lastDate), 6);
+  const out: MonthDay[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const inMonth = d.startsWith(month);
+    out.push({
+      date: d,
+      day: boardDayOf(d),
+      inMonth,
+      events: inMonth ? eventsOnDate(events, d, specials) : [],
+      specials: inMonth ? specials.filter((s) => s.date === d) : []
+    });
+  }
+  return out;
+}
