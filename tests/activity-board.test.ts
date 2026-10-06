@@ -34,3 +34,17 @@ test("sanitizeBoard ตัดแถวพัง เก็บแถวดี", ()
   assert.equal(out?.length, DEFAULT_BOARD.length);
   assert.equal(sanitizeBoard("nope"), null);
 });
+
+test("monthGrid — ต.ค. 2026 เริ่มจันทร์ 28 ก.ย. ครบสัปดาห์ และงานพิเศษแทนกิจกรรมประจำ", async () => {
+  const { monthGrid, eventsOnDate } = await import("../lib/activity-board.ts");
+  const grid = monthGrid(DEFAULT_BOARD, "2026-10");
+  assert.equal(grid[0].date, "2026-09-28");
+  assert.equal(grid.length % 7, 0);
+  assert.equal(grid.filter((d) => d.inMonth).length, 31);
+  const go = grid.find((d) => d.date === "2026-10-17")!;
+  assert.equal(go.specials[0].title, "Grand Opening");
+  assert.ok(go.events.every((e) => e.branch !== "senafest"));
+  assert.ok(go.events.some((e) => e.branch === "bangkae"));
+  // เสนาเฟสต์ยังไม่เปิดก่อน 2 ต.ค.
+  assert.ok(eventsOnDate(DEFAULT_BOARD, "2026-10-01").every((e) => e.branch === "bangkae"));
+});

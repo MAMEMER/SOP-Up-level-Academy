@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Copy, GripVertical, HelpCircle, Plus, RotateCcw, Undo2, UsersRound } from "lucide-react";
 import { Modal } from "./Modal.tsx";
+import { ActivityMonth } from "./ActivityMonth.tsx";
 import {
   BOARD_BRANCHES,
   BOARD_DAYS,
@@ -70,6 +71,18 @@ export function ActivityBoard({ today, canEdit }: { today: string; canEdit: bool
   const [editing, setEditing] = useState<{ event: BoardEvent; isNew: boolean } | null>(null);
   const [dialog, setDialog] = useState<"help" | "reset" | null>(null);
   const [toast, setToast] = useState("");
+  const [view, setViewState] = useState<"week" | "month">("week");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("sop-activity-view") === "month") setViewState("month");
+    } catch {}
+  }, []);
+  function setView(v: "week" | "month") {
+    setViewState(v);
+    try {
+      localStorage.setItem("sop-activity-view", v);
+    } catch {}
+  }
   const baseRef = useRef("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -267,8 +280,25 @@ export function ActivityBoard({ today, canEdit }: { today: string; canEdit: bool
     }))
     .filter((x) => x.bk || x.sf);
 
+  const viewToggle = (
+    <div className="am-seg am-view" role="group" aria-label="มุมมอง">
+      <button type="button" aria-pressed={view === "week"} onClick={() => setView("week")}>รายสัปดาห์</button>
+      <button type="button" aria-pressed={view === "month"} onClick={() => setView("month")}>ปฏิทินเดือน</button>
+    </div>
+  );
+
+  if (view === "month") {
+    return (
+      <section className="ab">
+        {viewToggle}
+        <ActivityMonth events={events} today={today} />
+      </section>
+    );
+  }
+
   return (
     <section className="ab">
+      {viewToggle}
       <div className="ab-toolbar" role="toolbar" aria-label="เครื่องมือตาราง">
         <div className="ab-week">
           <button type="button" className="ab-btn ab-icon" aria-label="สัปดาห์ก่อน" onClick={() => setMonday(addDays(monday, -7))}>
