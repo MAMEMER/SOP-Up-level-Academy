@@ -19,6 +19,7 @@ import {
   weeklyEventPeriodKey,
   type WeeklyEventPayload
 } from "../lib/weekly-event-store.ts";
+import { SubmitStatus } from "./SubmitStatus.tsx";
 import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./ChecklistCompleteRedirect.tsx";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import { applyEventChecklistOverride, applyEventMetaOverride, makeCustomEventItem } from "../lib/checklist-overrides.ts";
@@ -44,6 +45,8 @@ export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
   const [data, setData] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
   const [savedAt, setSavedAt] = useState<Record<string, string>>({});
+  // กำลังส่ง / ส่งไม่ถึงระบบ ต่อกิจกรรม — "ส่งแล้ว" ขึ้นเมื่อ server ตอบรับเท่านั้น
+  const [sendState, setSendState] = useState<Record<string, "sending" | "failed">>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -96,11 +99,32 @@ export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
     setSavedAt((current) => ({ ...current, [event.id]: new Date().toLocaleTimeString("th-TH") }));
   }
 
-  function submit(event: WeeklyEvent) {
+  async function submit(event: WeeklyEvent) {
     if (!periodKey || !loaded || !canSubmitWeeklyEvent(event, eventTicked(event))) return;
+    if (sendState[event.id] === "sending") return;
     const next = { ...submitted, [submitKey(periodKey, event.id)]: true };
+    setSendState((current) => ({ ...current, [event.id]: "sending" }));
+    // เดิมยิงแล้วเด้งกลับ Dashboard ทันทีโดยไม่รอผล — ส่งพลาดก็ไม่มีใครเห็น ("กดส่งแล้วแต่ไม่มา").
+    // ตอนนี้รอ server ตอบก่อน ลองซ้ำเมื่อเน็ตสะดุด แล้วค่อยขึ้น "ส่งแล้ว"
+    let ok = false;
+    for (let attempt = 0; attempt < 3 && !ok; attempt += 1) {
+      try {
+        await saveWeeklyEventPayload(periodKey, { ticks, data, submitted: next });
+        ok = true;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+      }
+    }
+    if (!ok) {
+      setSendState((current) => ({ ...current, [event.id]: "failed" }));
+      return;
+    }
     setSubmitted(next);
-    persist({ submitted: next });
+    setSendState((current) => {
+      const rest = { ...current };
+      delete rest[event.id];
+      return rest;
+    });
     // checklist ของกิจกรรมนี้ครบ 100% แล้ว (ส่งได้เมื่อทำครบทุกข้อ) → กลับหน้า Dashboard
     goToDashboard();
   }
@@ -126,10 +150,11 @@ export function WeeklyEventChecklist({ eventId }: { eventId?: string } = {}) {
             data={data}
             submitted={Boolean(submitted[submitKey(periodKey, event.id)])}
             savedLabel={savedAt[event.id]}
+            sendState={sendState[event.id]}
             onToggle={(itemId) => toggle(event, itemId)}
             onField={(itemId, field, value) => updateField(event, itemId, field, value)}
             onSave={() => saveDraft(event)}
-            onSubmit={() => submit(event)}
+            onSubmit={() => void submit(event)}
           />
         ))}
       </div>
@@ -144,6 +169,7 @@ function WeeklyEventCard({
   data,
   submitted,
   savedLabel,
+  sendState,
   onToggle,
   onField,
   onSave,
@@ -155,6 +181,7 @@ function WeeklyEventCard({
   data: Record<string, string>;
   submitted: boolean;
   savedLabel?: string;
+  sendState?: "sending" | "failed";
   onToggle: (itemId: string) => void;
   onField: (itemId: string, field: string, value: string) => void;
   onSave: () => void;
@@ -197,6 +224,7 @@ function WeeklyEventCard({
           </div>
         ) : null}
       </div>
+      <SubmitStatus state={submitted ? "sent" : sendState ?? "not_sent"} />
       <div className="runner-progress" aria-label={`ความคืบหน้า ${progress}%`}>
         <span style={{ width: `${progress}%` }} />
       </div>
@@ -228,15 +256,16 @@ function WeeklyEventCard({
 
       <div className="workflow-record-actions">
         <button type="button" className="soft-button" onClick={onSave}>
-          บันทึก (draft)
+          บันทึกไว้ก่อน (ยังไม่ส่ง)
         </button>
-        <button type="button" className="green-button" onClick={onSubmit} disabled={!canSubmit || submitted}>
-          {submitted ? "ส่งงานแล้ว" : "ส่งงาน"}
+        <button type="button" className="green-button" onClick={onSubmit} disabled={!canSubmit || submitted || sendState === "sending"}>
+          {submitted ? "ส่งงานแล้ว" : sendState === "sending" ? "กำลังส่ง…" : sendState === "failed" ? "ส่งอีกครั้ง" : "ส่งงาน"}
         </button>
-        <strong className={submitted ? "record-status submitted" : "record-status"}>
-          {submitted ? "ส่งงานวันนี้แล้ว" : savedLabel ? `บันทึก draft แล้ว ${savedLabel}` : "ยังไม่ส่ง"}
-        </strong>
       </div>
+      <SubmitStatus
+        state={submitted ? "sent" : sendState ?? "not_sent"}
+        hint={!submitted && savedLabel ? `บันทึก draft ไว้ ${savedLabel} แต่ยังไม่ได้กด "ส่งงาน"` : undefined}
+      />
     </section>
   );
 }

@@ -8440,3 +8440,30 @@ p.ab-help{padding-left:0}
 .am-top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
 .am-publish{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .am-publish small{font-size:12px;color:var(--ab-faint)}
+
+/* ป้ายสถานะการส่งงาน (components/SubmitStatus.tsx) — เด่นกว่าทุกอย่างในการ์ด */
+.submit-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.submit-status strong { display: block; font-weight: 800; }
+.submit-status small { display: block; margin-top: 2px; font-size: 13px; font-weight: 500; }
+.submit-status__icon { flex: none; }
+.submit-status--compact { padding: 8px 12px; font-size: 15px; margin: 6px 0; }
+.submit-status--not_sent { background: #fff1e6; border-color: #f0a46a; color: #9a3f0b; }
+.submit-status--sending { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
+.submit-status--sending .submit-status__icon { animation: submit-status-spin 1s linear infinite; }
+.submit-status--sent { background: #15803d; border-color: #15803d; color: #fff; }
+.submit-status--sent small { color: #dcfce7; }
+.submit-status--failed { background: #ffe9e5; border-color: #c0392b; color: #a12312; }
+@keyframes submit-status-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .submit-status--sending .submit-status__icon { animation: none; }
+}

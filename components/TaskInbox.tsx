@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitStatus } from "./SubmitStatus.tsx";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, FolderOpen, Send } from "lucide-react";
@@ -28,6 +29,8 @@ export function TaskInbox({
   const [tasks, setTasks] = useState<WorkProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // ส่งงานสมบูรณ์แล้วการ์ดหายจากหน้านี้ — ต้องมีป้ายยืนยันค้างไว้ ไม่งั้นน้องไม่แน่ใจว่าส่งถึงไหม
+  const [lastSent, setLastSent] = useState<{ title: string; at: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!staffCode) {
@@ -54,6 +57,9 @@ export function TaskInbox({
 
   return (
     <div className="ti-inbox">
+      {lastSent ? (
+        <SubmitStatus state="sent" sentAt={lastSent.at} hint={`"${lastSent.title}" ไปรอเจ้าของตรวจในแฟ้มงานแล้ว`} />
+      ) : null}
       {tasks.length === 0 ? (
         <div className="ti-clear">
           <p className="ti-clear__title">ไม่มีงานค้าง</p>
@@ -63,7 +69,7 @@ export function TaskInbox({
           </Link>
         </div>
       ) : (
-        tasks.map((task) => <InboxCard key={task.id} task={task} branch={branch} staffCode={staffCode} today={today} readOnly={readOnly} onChanged={load} />)
+        tasks.map((task) => <InboxCard key={task.id} task={task} branch={branch} staffCode={staffCode} today={today} readOnly={readOnly} onChanged={load} onSent={(at) => setLastSent({ title: task.title, at })} />)
       )}
     </div>
   );
@@ -75,7 +81,8 @@ function InboxCard({
   staffCode,
   today,
   readOnly,
-  onChanged
+  onChanged,
+  onSent
 }: {
   task: WorkProject;
   branch: string;
@@ -83,6 +90,7 @@ function InboxCard({
   today: string;
   readOnly: boolean;
   onChanged: () => Promise<void>;
+  onSent: (at: string) => void;
 }) {
   const staffOptions = employeeDirectory
     .filter((entry) => entry.branch === branch)
@@ -116,11 +124,17 @@ function InboxCard({
 
       {!readOnly && daily && !fix ? (
         <>
-          {!updatedToday && task.startDate <= today ? <p className="ti-nudge">วันนี้ยังไม่ได้ส่งอัปเดต</p> : null}
+          {task.startDate <= today ? (
+            <SubmitStatus
+              compact
+              state={updatedToday ? "sent" : "not_sent"}
+              hint={updatedToday ? "อัปเดตของวันนี้ถึงเจ้าของแล้ว" : "วันนี้ยังไม่ได้ส่งอัปเดต"}
+            />
+          ) : null}
           <UpdateForm task={task} today={today} onSaved={onChanged} />
         </>
       ) : null}
-      {!readOnly ? <SubmitForm task={task} today={today} fix={fix} onSaved={onChanged} /> : null}
+      {!readOnly ? <SubmitForm task={task} today={today} fix={fix} onSaved={onChanged} onSent={onSent} /> : null}
       {/* ส่งต่องานให้คนกะถัดไป (ระบบเดิม ใบงาน iDBqn3jE) */}
       {!readOnly ? (
         <ProjectHandoverPanel project={task} branch={branch} today={today} staffCode={staffCode} isAdmin={false} staffOptions={staffOptions} onDone={onChanged} />
@@ -201,7 +215,19 @@ function UpdateForm({ task, today, onSaved }: { task: WorkProject; today: string
 }
 
 /** ส่งงานสมบูรณ์ — ต้องมีรูปหลักฐานก่อน ปุ่มถึงจะกดได้ */
-function SubmitForm({ task, today, fix, onSaved }: { task: WorkProject; today: string; fix: boolean; onSaved: () => Promise<void> }) {
+function SubmitForm({
+  task,
+  today,
+  fix,
+  onSaved,
+  onSent
+}: {
+  task: WorkProject;
+  today: string;
+  fix: boolean;
+  onSaved: () => Promise<void>;
+  onSent: (at: string) => void;
+}) {
   const [open, setOpen] = useState(!hasDailyUpdates(task) || fix);
   const [note, setNote, clearNote] = useDraft(`ti-submit-${task.id}`);
   const [photos, setPhotos, clearPhotos] = useDraft(`ti-submit-photos-${task.id}`);
@@ -215,6 +241,7 @@ function SubmitForm({ task, today, fix, onSaved }: { task: WorkProject; today: s
     setError(null);
     try {
       await submitFinalWork({ id: task.id, date: today, note: note.trim(), images });
+      onSent(new Date().toISOString());
       clearNote();
       clearPhotos();
       await onSaved();
