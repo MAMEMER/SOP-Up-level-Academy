@@ -24,7 +24,10 @@ function thaiDateTime(iso?: string): string {
 
 export default async function CardPricesPage() {
   const user = await requireUser();
-  const staffCode = employeeCodeForEmail(user.email) || "";
+  const roster = await listStaff();
+  // เจ้าของไม่อยู่ใน employee directory — หาโค้ดจากรายชื่อเข้าระบบแทน (UP-001 = แชมป์)
+  const staffCode =
+    employeeCodeForEmail(user.email) || roster.find((s) => s.email === user.email.trim().toLowerCase())?.code || "";
   let data: CardPricesData | null = null;
   let error = "";
   try {
@@ -33,7 +36,7 @@ export default async function CardPricesPage() {
     error = err instanceof Error ? err.message : "โหลดข้อมูลไม่ได้";
   }
   const staff = user.role === "admin"
-    ? (await listStaff()).filter((s) => s.active && s.code).map((s) => ({ code: s.code, name: s.name }))
+    ? roster.filter((s) => s.active && s.code).map((s) => ({ code: s.code, name: s.name }))
     : [];
 
   return (
