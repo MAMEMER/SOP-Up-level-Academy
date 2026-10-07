@@ -395,7 +395,7 @@ function FeedbackForm({ row, onChange }: { row: RefRow; onChange: () => void }) 
       ) : null}
       {error ? <p className="cp-error">{error}</p> : null}
       <div className="cp-actions">
-        <button type="submit" className="btn-cute" disabled={!verdict || state === "sending"}>
+        <button type="submit" className="primary-action" disabled={!verdict || state === "sending"}>
           ส่งความเห็น
         </button>
         <SubmitStatus state={state} sentAt={sentAt} compact />
@@ -434,7 +434,7 @@ function OverrideForm({ row, current, onChange }: { row: RefRow; current?: numbe
       </div>
       {error ? <p className="cp-error">{error}</p> : null}
       <div className="cp-actions">
-        <button type="submit" className="btn-soft" disabled={!price || state === "sending"}>
+        <button type="submit" className="soft-button" disabled={!price || state === "sending"}>
           ใช้ราคานี้
         </button>
         {current ? (
@@ -498,7 +498,7 @@ function WatchForm({ row, me, staff, onChange }: { row: RefRow; me: Me; staff: S
         </label>
       </div>
       <div className="cp-actions">
-        <button type="submit" className="btn-soft" disabled={state === "sending"}>
+        <button type="submit" className="soft-button" disabled={state === "sending"}>
           เริ่มจับตา
         </button>
         <SubmitStatus state={state} compact />
@@ -604,7 +604,7 @@ function ScoutPanel({ watches, me, staff, onChange }: { watches: CardWatch[]; me
           </div>
           {error ? <p className="cp-error">{error}</p> : null}
           <div className="cp-actions">
-            <button type="submit" className="btn-cute" disabled={state === "sending"}>
+            <button type="submit" className="primary-action" disabled={state === "sending"}>
               เพิ่มการ์ดที่จับตา
             </button>
             <SubmitStatus state={state} compact />
