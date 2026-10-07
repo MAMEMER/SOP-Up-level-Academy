@@ -115,6 +115,7 @@ export const staffPagesSection: SiteSection = {
     { href: "/closing", label: "ปิดยอด (พนักงาน)", detail: "หน้าที่พนักงานกรอกยอดปิดร้าน" },
     { href: "/parcels", label: "พัสดุการ์ด", detail: "รับพัสดุ + วิดีโอแกะกล่อง" },
     { href: "/supplies", label: "ของที่ต้องสั่ง", detail: "รายการของใกล้หมดจาก StoreHub" },
+    { href: "/card-prices", label: "ราคากลางการ์ด + สเกาต์", detail: "ราคาจากกลุ่มซื้อขาย FB · ทักท้วง · ตั้งจับตาการ์ด", keywords: "ราคา การ์ด scout สเกาต์ fb pokemon lorcana riftbound" },
     { href: "/schedule", label: "ตารางกะ (พนักงาน)", detail: "ตารางกะแบบที่พนักงานเห็น" },
     { href: "/my-tasks", label: "แจ้งเตือนงาน", detail: "งานที่มอบหมายที่น้องยังไม่ได้ส่ง" },
     { href: "/my-tasks/file", label: "แฟ้มงาน", detail: "งานของน้องแยกเดือน เขียว/แดง" },
