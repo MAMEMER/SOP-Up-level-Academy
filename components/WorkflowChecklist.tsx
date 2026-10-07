@@ -28,6 +28,7 @@ import { ChecklistCompleteOverlay, useChecklistCompleteRedirect } from "./Checkl
 import { useWorkRecordWindow } from "../lib/work-records-client.ts";
 import { SaveIndicator } from "./SaveIndicator.tsx";
 import { logSubmitPress } from "../lib/submit-log-client.ts";
+import { SubmitStatus, type SubmitState } from "./SubmitStatus.tsx";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import { dailyScopeKey, shiftWorkDate } from "../lib/work-records.ts";
 
@@ -1358,6 +1359,19 @@ export function WorkflowChecklist({
             missingEvidence.length === 0;
           const canAdminUnlock = isAdmin && unlocked && canAdminUnlockWorkflowRecord(record, phase.id, workDate, now, scheduleContext) && !adminUnlocked && !locked;
           const schedule = phaseScheduleForWorkDate(phase.id, workDate, scheduleContext);
+          // "ส่งแล้ว" เฉพาะเมื่อ server ยืนยัน — ระหว่างกำลังส่งหรือส่งพลาด ห้ามขึ้นเขียว
+          const submitState: SubmitState =
+            submitting === phase.id ? "sending" : failedSubmit[phase.id] ? "failed" : isSubmitted ? "sent" : "not_sent";
+          const submitHint =
+            submitState === "not_sent"
+              ? record?.status === "missed"
+                ? "หมดเวลาส่งแล้ว"
+                : record
+                  ? `บันทึกไว้แล้ว ${record.completed}/${record.total} แต่ยังไม่ได้กด "ส่งงาน" — เจ้าของยังไม่เห็น`
+                  : undefined
+              : submitState === "sent"
+                ? `${record?.completed ?? 0}/${record?.total ?? phase.checklist.length} ข้อ`
+                : undefined;
           return (
             <section key={phase.id} id={phase.id} className={`training-card phase-${phase.category}`}>
               <div className="workflow-card-head">
@@ -1373,6 +1387,7 @@ export function WorkflowChecklist({
                   <em>{done}/{phase.checklist.length}</em>
                 </div>
               </div>
+              {readOnly && !record ? null : <SubmitStatus state={submitState} sentAt={record?.submittedAt} hint={submitHint} />}
               {previousHandoff ? (
                 <div className="handoff-inbox">
                   <p className="eyebrow">งานส่งต่อจากกะปิดร้านเมื่อวาน</p>
@@ -1524,7 +1539,7 @@ export function WorkflowChecklist({
               ) : null}
               <div className="workflow-record-actions">
                 <button type="button" className="soft-button" onClick={() => recordPhase(phase, "saved")} disabled={!canEdit}>
-                  บันทึก
+                  บันทึกไว้ก่อน (ยังไม่ส่ง)
                 </button>
                 {canAdminUnlock ? (
                   <button type="button" className="soft-button warning" onClick={() => unlockPhaseForAdmin(phase)}>
@@ -1539,12 +1554,8 @@ export function WorkflowChecklist({
                 >
                   {submitting === phase.id ? "กำลังส่ง…" : failedSubmit[phase.id] ? "ส่งอีกครั้ง" : "ส่งงาน"}
                 </button>
-                {record ? (
-                  <strong className={isSubmitted ? "record-status submitted" : "record-status"}>
-                    {isSubmitted ? "ส่งตรวจแล้ว" : record.status === "missed" ? "หมดเวลาแล้ว" : "บันทึกแล้ว"} · {record.completed}/{record.total}
-                  </strong>
-                ) : null}
               </div>
+              <SubmitStatus state={submitState} sentAt={record?.submittedAt} compact />
               {failedSubmit[phase.id] ? (
                 <p className="phase-submit-failed">
                   ยังส่งไม่ถึงระบบ — งานนี้ยังไม่ถูกบันทึก เช็คอินเทอร์เน็ตแล้วกด “ส่งอีกครั้ง” อย่าเพิ่งปิดหน้านี้

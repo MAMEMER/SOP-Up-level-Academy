@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitStatus } from "./SubmitStatus.tsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { uploadEvidenceImage } from "../lib/evidence-upload.ts";
@@ -90,8 +91,17 @@ export function StockRunWorkspace({
     void load();
   }, [load]);
 
+  const [submitFailed, setSubmitFailed] = useState(false);
   const activeRun = useMemo(() => runs.find((run) => run.id === activeId) || null, [runs, activeId]);
   const history = useMemo(() => runs.filter((run) => !isStockRunActionable(run.status)), [runs]);
+  // ส่งแล้วงานหลุดจากฟอร์ม หน้ากลับไปขึ้น "ยังไม่ได้เริ่ม" — ต้องบอกให้ชัดว่ารอบล่าสุดส่งถึงแล้ว
+  const lastSent = useMemo(
+    () =>
+      history
+        .filter((run) => run.submittedAt)
+        .sort((a, b) => (b.submittedAt ?? "").localeCompare(a.submittedAt ?? ""))[0] ?? null,
+    [history]
+  );
 
   const persist = useCallback(
     async (next: StockRunDraft) => {
@@ -186,11 +196,13 @@ export function StockRunWorkspace({
     }
     setBusy(true);
     setError(null);
+    setSubmitFailed(false);
     try {
       if (timer.current) window.clearTimeout(timer.current);
       await submitRun(activeId, draft);
       await load();
     } catch (err) {
+      setSubmitFailed(true);
       setError(err instanceof Error ? err.message : "ส่งงานไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setBusy(false);
@@ -231,6 +243,7 @@ export function StockRunWorkspace({
           draft={draft}
           readOnly={readOnly}
           busy={busy}
+          submitFailed={submitFailed}
           uploading={uploading}
           saveState={saveState}
           error={error}
@@ -248,6 +261,13 @@ export function StockRunWorkspace({
         />
       ) : (
         <div className="stock-run-start">
+          {lastSent ? (
+            <SubmitStatus
+              state="sent"
+              sentAt={lastSent.submittedAt}
+              hint={`รอบ ${lastSent.periodLabel} · ${stockRunStatusLabel[lastSent.status]}`}
+            />
+          ) : null}
           <div className="runner-status">
             <div>
               <span>งานตรวจนับรอบนี้</span>
@@ -274,6 +294,7 @@ function ActiveRunForm({
   draft,
   readOnly,
   busy,
+  submitFailed,
   uploading,
   saveState,
   error,
@@ -291,6 +312,7 @@ function ActiveRunForm({
   draft: StockRunDraft;
   readOnly: boolean;
   busy: boolean;
+  submitFailed: boolean;
   uploading: boolean;
   saveState: "idle" | "saving" | "saved" | "error";
   error: string | null;
@@ -514,6 +536,10 @@ function ActiveRunForm({
       {error ? <p className="input-status warning">{error}</p> : null}
       {!canSubmit && !error ? <span className="evidence-input__hint">{blockReason}</span> : null}
 
+      <SubmitStatus
+        state={busy ? "sending" : submitFailed ? "failed" : "not_sent"}
+        hint={busy || submitFailed ? undefined : "ระบบบันทึกที่กรอกไว้ให้อัตโนมัติ แต่หัวหน้าจะเห็นเมื่อกด \"ส่งงานตรวจนับ\" แล้วเท่านั้น"}
+      />
       <div className="workflow-record-actions">
         <button type="button" className="green-button" onClick={onSubmit} disabled={readOnly || busy || uploading || !canSubmit}>
           {run.status === "needs_revision" ? "ส่งงานที่แก้แล้ว" : "ส่งงานตรวจนับ"}

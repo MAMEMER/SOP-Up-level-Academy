@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
+import { SubmitStatus } from "./SubmitStatus.tsx";
 import { answerNeedsInput, type ItemAnswer } from "../lib/checklist-overrides.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { PROGRESS_STEPS, statusLabel, type TaskProgressAction, type TaskProgressEntry } from "../lib/task-progress.ts";
@@ -114,6 +115,12 @@ export function TaskProgressPanel({
 
   return (
     <div className={`task-progress${finished ? " task-progress--done" : stuck ? " task-progress--stuck" : ""}`}>
+      <SubmitStatus
+        compact
+        state={busy ? "sending" : finished ? "sent" : "not_sent"}
+        sentAt={entry?.doneAt || doneAt}
+        hint={!finished && entry ? `ทำไว้ ${entry.percent}% — กด "เสร็จแล้ว" แล้วส่งงาน เจ้าของถึงจะเห็นว่าเสร็จ` : undefined}
+      />
       <div className="task-progress__status">
         {/* แถบมีตัวเลขกำกับอยู่แล้ว ป้ายเลยบอกแค่สถานะ ไม่พูด % ซ้ำ */}
         <span className="task-progress__pill">{finished ? "เสร็จแล้ว" : stuck ? "ติดปัญหา" : entry ? "กำลังทำ" : "ยังไม่เริ่ม"}</span>
