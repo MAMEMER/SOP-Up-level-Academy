@@ -266,7 +266,7 @@ export const SPECIAL_DAYS: SpecialDay[] = [
     date: "2026-10-17",
     branch: "senafest",
     title: "Grand Opening",
-    time: "11:00–20:00",
+    time: "10:00–22:00",
     detail: "แข่ง PKM · Lorcana · Riftbound เกมละ 64 ที่ · Pre-release Hyperia City · Lucky Draw",
     replacesWeekly: true,
     href: "https://uplevelguild.com/grand-opening"
