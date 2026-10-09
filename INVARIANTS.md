@@ -30,7 +30,7 @@
 - **พังถ้าละเมิด:** เสียค่าคำนวณจริง, audit ไม่ได้, refresh แล้วผลไม่เท่ากัน.
 
 ## 4. Admin auth / ใครเห็น-แก้เงินเดือน — `lib/owner.ts`, `lib/sop-users.ts`, `lib/auth.ts`
-- `OWNER_EMAILS` = **แค่ 2 คน** (champ + namenrw), hardcode. เงินเดือน **owner-only** ซ่อนจาก admin อื่น (`isOwner()` gate).
+- `OWNER_EMAILS` = **4 คน** (champ + namenrw + เคน + มุก; มุกเพิ่ม 2026-10-09 ตามแชมป์สั่ง), hardcode. เงินเดือน **owner-only** ซ่อนจาก admin อื่น (`isOwner()` gate).
 - Allow-list `sopUsers` = **code-based** (git ไม่ใช่ DB). Session = **HS256 JWT** ต้องมี `SESSION_SECRET`. `requireUser()` (auth.ts L21-48): ไม่มีใน allow-list → `redirect("/login?denied=1")`.
 - **ห้ามหลวม:** ปลด `isOwner` (admin อื่นเห็นเงินเดือน) / ปลด `sopUserForEmail` (ใครมี Google ก็เข้า) / cache role ใน localStorage / PIN แค่ UI ไม่ enforce server / เชื่อ DB role โดยไม่ verify ต่อ request.
 - **พังถ้าละเมิด:** เงินเดือนรั่ว, คนนอก login เข้า, forge role.
