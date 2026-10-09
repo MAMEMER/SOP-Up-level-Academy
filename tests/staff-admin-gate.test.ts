@@ -25,11 +25,12 @@ describe("canManageStaffAccounts", () => {
     assert.equal(canManageStaffAccounts("  Champ.Championest@Gmail.com "), true);
   });
 
-  it("เจ้าของ = หุ้นส่วนสามคน (แชมป์ · เนม · เคน)", () => {
+  it("เจ้าของ = แชมป์ · เนม · เคน · มุก", () => {
     assert.deepEqual(OWNER_EMAILS, [
       "champ.championest@gmail.com",
       "namenrw@gmail.com",
       "kittibhonlim@gmail.com",
+      "sin.sirisa@gmail.com",
     ]);
   });
 });
