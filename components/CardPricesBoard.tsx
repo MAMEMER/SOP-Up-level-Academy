@@ -86,7 +86,7 @@ export function CardPricesBoard({ data, me, staff }: { data: CardPricesData; me:
 
   return (
     <>
-      <ScoutPanel watches={data.watches} me={me} staff={staff} onChange={() => router.refresh()} />
+      <ScoutPanel rows={data.rows} watches={data.watches} me={me} staff={staff} onChange={() => router.refresh()} />
 
       <section className="cp-tools" aria-label="ค้นหาราคา">
         <label className="cp-search">
@@ -507,8 +507,23 @@ function WatchForm({ row, me, staff, onChange }: { row: RefRow; me: Me; staff: S
   );
 }
 
-function ScoutPanel({ watches, me, staff, onChange }: { watches: CardWatch[]; me: Me; staff: StaffOption[]; onChange: () => void }) {
+function ScoutPanel({
+  rows,
+  watches,
+  me,
+  staff,
+  onChange
+}: {
+  rows: RefRow[];
+  watches: CardWatch[];
+  me: Me;
+  staff: StaffOption[];
+  onChange: () => void;
+}) {
   const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<RefRow | null>(null);
+  const [listClosed, setListClosed] = useState(false);
+  const [active, setActive] = useState(0);
   const [game, setGame] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [who, setWho] = useState(me.code || staff[0]?.code || "");
@@ -570,32 +585,82 @@ function ScoutPanel({ watches, me, staff, onChange }: { watches: CardWatch[]; me
           className="cp-form"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!query.trim()) return setError("พิมพ์ชื่อการ์ดก่อน");
+            if (!picked && !query.trim()) return setError("พิมพ์ชื่อการ์ดก่อน");
             setError("");
             setState("sending");
-            const res = await post({ action: "watch", query, name: query, game, maxPrice, staffCode: who });
+            const body = picked
+              ? { action: "watch", key: picked.key, name: picked.name, game: picked.game, maxPrice, staffCode: who }
+              : { action: "watch", query, name: query, game, maxPrice, staffCode: who };
+            const res = await post(body);
             setState(res.ok ? "sent" : "failed");
             if (!res.ok) return setError(res.error || "");
             setQuery("");
+            setPicked(null);
+            setListClosed(false);
             setMaxPrice("");
             onChange();
           }}
         >
           <div className="cp-fields">
-            <label>
-              การ์ดที่จะจับตา (ชื่ออังกฤษ)
-              <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="เช่น Charizard ex" />
-            </label>
-            <label>
-              เกม
-              <select value={game} onChange={(e) => setGame(e.target.value)}>
-                {GAMES.map((g) => (
-                  <option key={g.key} value={g.key}>
-                    {g.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="cp-pick-wrap">
+              {picked ? (
+                <div className="cp-pick">
+                  การ์ดที่จะจับตา
+                  <div className="cp-picked">
+                    <span className="cp-name">
+                      <strong>{picked.name}</strong>
+                      <small>
+                        {tagLine(picked)}
+                        {picked.median ? ` · ตลาด ${baht(picked.median)}` : ""}
+                      </small>
+                    </span>
+                    <button
+                      type="button"
+                      className="cp-icon-btn"
+                      aria-label="เปลี่ยนการ์ด"
+                      onClick={() => {
+                        setPicked(null);
+                        setListClosed(false);
+                      }}
+                    >
+                      <X size={18} aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <CardPicker
+                  rows={rows}
+                  query={query}
+                  onQuery={(q) => {
+                    setQuery(q);
+                    setListClosed(false);
+                    setActive(0);
+                  }}
+                  open={!listClosed}
+                  active={active}
+                  onActive={setActive}
+                  onPick={(row) => {
+                    setPicked(row);
+                    setQuery(row.name);
+                    setError("");
+                  }}
+                  onFreeText={() => setListClosed(true)}
+                  onClose={() => setListClosed(true)}
+                />
+              )}
+            </div>
+            {picked ? null : (
+              <label>
+                เกม
+                <select value={game} onChange={(e) => setGame(e.target.value)}>
+                  {GAMES.map((g) => (
+                    <option key={g.key} value={g.key}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label>
               บอกเมื่อขายไม่เกิน (บาท)
               <input type="number" inputMode="numeric" min={1} value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="เว้นว่าง = ทุกราคา" />
@@ -604,14 +669,122 @@ function ScoutPanel({ watches, me, staff, onChange }: { watches: CardWatch[]; me
           </div>
           {error ? <p className="cp-error">{error}</p> : null}
           <div className="cp-actions">
-            <button type="submit" className="cp-primary" disabled={state === "sending"}>
+            <button type="submit" className="cp-primary" disabled={state === "sending" || (!picked && !query.trim())}>
               เพิ่มการ์ดที่จับตา
             </button>
             <SubmitStatus state={state} compact />
           </div>
-          <p className="cp-sub">หรือค้นการ์ดด้านล่าง กดที่การ์ด แล้วกด "เริ่มจับตา" — จะได้ใบที่ตรงเป๊ะ</p>
+          <p className="cp-sub">พิมพ์ชื่อแล้วเลือกใบจากรายการ จะได้ใบที่ตรงเป๊ะ · ใบที่ยังไม่มีราคา พิมพ์ชื่อแล้วกดเพิ่มได้เลย บอทจับตาตามชื่อ</p>
         </form>
       )}
     </section>
+  );
+}
+
+const SUGGEST = 8;
+
+/** ค้นการ์ดที่มีราคาแล้ว (ข้อมูลที่โหลดมาในหน้าอยู่แล้ว) — รายการอยู่ในโฟลว์ปกติ ไม่ลอยทับช่องอื่นบนมือถือ */
+function CardPicker({
+  rows,
+  query,
+  onQuery,
+  open,
+  active,
+  onActive,
+  onPick,
+  onFreeText,
+  onClose
+}: {
+  rows: RefRow[];
+  query: string;
+  onQuery: (q: string) => void;
+  open: boolean;
+  active: number;
+  onActive: (i: number) => void;
+  onPick: (row: RefRow) => void;
+  onFreeText: () => void;
+  onClose: () => void;
+}) {
+  const q = query.trim();
+  const matches = useMemo(
+    () => (q.length >= 2 ? [...searchRows(rows, q)].sort((a, b) => b.n - a.n || (b.median ?? 0) - (a.median ?? 0)).slice(0, SUGGEST) : []),
+    [rows, q]
+  );
+  const show = open && q.length >= 2;
+  const options = matches.length + 1; // + ตัวเลือก "จับตาตามชื่อที่พิมพ์"
+  const current = Math.min(active, options - 1);
+  const choose = (i: number) => (i < matches.length ? onPick(matches[i]) : onFreeText());
+
+  return (
+    <div className="cp-pick">
+      <label htmlFor="cp-scout-q">การ์ดที่จะจับตา — พิมพ์ชื่อหรือเลขการ์ด</label>
+      <input
+        id="cp-scout-q"
+        type="text"
+        role="combobox"
+        aria-expanded={show}
+        aria-controls="cp-scout-list"
+        aria-autocomplete="list"
+        aria-activedescendant={show ? `cp-scout-opt-${current}` : undefined}
+        autoComplete="off"
+        value={query}
+        placeholder="เช่น Charizard ex หรือ 201/165"
+        onChange={(e) => onQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (!show) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            onActive((current + 1) % options);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            onActive((current - 1 + options) % options);
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            choose(current);
+          } else if (e.key === "Escape") {
+            onClose();
+          }
+        }}
+      />
+      {show ? (
+        <ul className="cp-suggest" id="cp-scout-list" role="listbox" aria-label="การ์ดที่ตรงกับคำค้น">
+          {matches.map((row, i) => (
+            <li key={row.id}>
+              <button
+                type="button"
+                id={`cp-scout-opt-${i}`}
+                role="option"
+                aria-selected={i === current}
+                className={i === current ? "is-active" : undefined}
+                onMouseEnter={() => onActive(i)}
+                onClick={() => choose(i)}
+              >
+                <span className="cp-name">
+                  <strong>{row.name}</strong>
+                  <small>{tagLine(row)}</small>
+                </span>
+                <span className="cp-sugg-price">{row.median ? baht(row.median) : "–"}</span>
+              </button>
+            </li>
+          ))}
+          <li className="cp-free">
+            <button
+              type="button"
+              id={`cp-scout-opt-${matches.length}`}
+              role="option"
+              aria-selected={current === matches.length}
+              className={current === matches.length ? "is-active" : undefined}
+              onMouseEnter={() => onActive(matches.length)}
+              onClick={() => choose(matches.length)}
+            >
+              <span className="cp-name">
+                <strong>{matches.length ? "ไม่มีในรายการ" : "ยังไม่มีราคาใบนี้"} — จับตาตามชื่อที่พิมพ์</strong>
+                <small>“{q}”</small>
+              </span>
+            </button>
+          </li>
+        </ul>
+      ) : null}
+    </div>
   );
 }

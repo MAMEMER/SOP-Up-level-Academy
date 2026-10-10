@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CalendarDays } from "lucide-react";
 import { requireUser } from "../../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../../lib/employee-directory.ts";
 import { isOwner } from "../../../lib/owner.ts";
@@ -52,6 +53,13 @@ export default async function CardPricesPage() {
             {data?.meta?.updatedAt ? ` · อัปเดต ${thaiDateTime(data.meta.updatedAt)}` : ""}
           </p>
           <p>เห็นราคาไหนไม่น่าใช่ กดที่การ์ดแล้วทักท้วงได้เลย · อยากให้จับตาใบไหน ตั้งสเกาต์ไว้ บอทเจอแล้วทักไลน์บอก</p>
+          {user.role === "admin" ? (
+            <p className="cp-hero-links">
+              <Link href="/card-prices/events" className="cp-secondary">
+                <CalendarDays size={18} aria-hidden /> งานแข่งร้านอื่น
+              </Link>
+            </p>
+          ) : null}
         </div>
       </section>
       {error || !data ? (
