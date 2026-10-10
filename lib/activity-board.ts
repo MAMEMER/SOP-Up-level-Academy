@@ -251,6 +251,8 @@ export type SpecialDay = {
   /** สาขาปิดทั้งวัน (ไม่ใช่งาน) — หน้าเว็บแสดงเป็นป้ายปิด */
   closed?: boolean;
   href?: string;
+  /** เกมที่จัดในงานนี้ — หน้า "งานแข่งร้านอื่น" ใช้เช็คว่าวันเดียวกันชนกันเกมเดียวกันไหม */
+  games?: GameKey[];
 };
 
 export const SPECIAL_DAYS: SpecialDay[] = [
@@ -260,7 +262,8 @@ export const SPECIAL_DAYS: SpecialDay[] = [
     title: "Soft Opening เสนาเฟสต์",
     time: "19:00",
     detail: "Gym Battle + Riftbound",
-    replacesWeekly: true
+    replacesWeekly: true,
+    games: ["pkm", "rb"]
   },
   {
     date: "2026-10-17",
@@ -269,7 +272,8 @@ export const SPECIAL_DAYS: SpecialDay[] = [
     time: "10:00–22:00",
     detail: "แข่ง PKM · Lorcana · Riftbound เกมละ 64 ที่ · Pre-release Hyperia City · Lucky Draw",
     replacesWeekly: true,
-    href: "https://uplevelguild.com/grand-opening"
+    href: "https://uplevelguild.com/grand-opening",
+    games: ["pkm", "lor", "rb"]
   },
   {
     // แชมป์ 6 ต.ค.: วันนี้บางแคปิด ทุกกิจกรรมไปรวมที่ Grand Opening

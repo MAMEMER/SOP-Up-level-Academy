@@ -1,5 +1,6 @@
 import "server-only";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
+import { devFixturesOn } from "./dev-fixtures.ts";
 import type { CardWatch, PriceFeedback, PriceOverride, RefMeta, RefRow } from "./card-prices.ts";
 
 export const PRICES = "card_ref_prices";
@@ -16,6 +17,7 @@ export type CardPricesData = {
 };
 
 export async function loadCardPrices(): Promise<CardPricesData> {
+  if (devFixturesOn()) return (await import("./dev-fixtures.ts")).fixtureCardPrices();
   if (!hasAdminCredentials()) return { meta: null, rows: [], feedback: [], overrides: [], watches: [] };
   const db = adminDb();
   const [prices, feedback, overrides, watches] = await Promise.all([

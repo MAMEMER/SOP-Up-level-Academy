@@ -53,7 +53,13 @@ export const adminSections: SiteSection[] = [
         ownerOnly: true,
         keywords: "event weekly ทัวร์ pokemon lorcana"
       },
-      { href: "/admin/calendar", label: "ปฏิทินสั่งงาน", detail: "ทั้งเดือน วันไหนมีงาน/กิจกรรมอะไร กดวันแล้วสั่งงานได้", keywords: "calendar" }
+      { href: "/admin/calendar", label: "ปฏิทินสั่งงาน", detail: "ทั้งเดือน วันไหนมีงาน/กิจกรรมอะไร กดวันแล้วสั่งงานได้", keywords: "calendar" },
+      {
+        href: "/card-prices/events",
+        label: "งานแข่งร้านอื่น",
+        detail: "งานที่ร้านอื่นประกาศในกลุ่ม FB · ค่าสมัคร ที่นั่ง รางวัล · วันไหนชนกับงานเรา",
+        keywords: "คู่แข่ง competitor ทัวร์ event pokemon lorcana riftbound fb"
+      }
     ]
   },
   {
