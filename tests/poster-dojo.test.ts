@@ -11,11 +11,12 @@ test('Dojo queues pending and revise first, newest first, without archived poste
   assert.equal(reviewable('reworking'), false);
 });
 
-test('Rework task preserves the standalone console instructions exactly without annotations', () => {
+test('Rework task re-renders the poster the way it was made and rebuilds the ref side-by-side', () => {
   const source = readFileSync(new URL('../lib/poster-dojo.ts', import.meta.url), 'utf8');
   assert.ok(source.includes('status <name> pending'));
   const task = reworkTask('weekly', 2, 'เพิ่มขนาดชื่อ');
-  assert.equal(task.split('\n').length, 5);
+  assert.equal(task.split('\n').length, 7);
+  assert.ok(task.includes('printfx.sh') && task.includes('compare.py'));
   assert.ok(task.includes('practice/weekly.html'));
   assert.ok(task.includes('รอบแก้ที่ 2'));
   assert.ok(task.includes('คอมเมนต์ Champ (สิ่งที่ต้องแก้): "เพิ่มขนาดชื่อ"'));
