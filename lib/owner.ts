@@ -11,8 +11,14 @@ export function isOwner(email?: string | null): boolean {
 // ใครแก้ "ใครเข้าระบบได้บ้าง" ได้ — แคบกว่า owner อีกชั้น.
 // การเพิ่ม/ลบอีเมลคือการเปิดหรือปิดประตูเข้าระบบทั้งใบ จึงไม่เปิดให้พนักงานหรือ
 // ระดับ admin ทั่วไปแตะ. เดิมเหลือบัญชีแชมป์คนเดียว (10 ส.ค. 2026) — เปิดให้เคน
-// (หุ้นส่วน) ด้วยตามที่ Champ สั่ง 15 ส.ค. 2026. เนมยังไม่อยู่ในชั้นนี้.
-export const STAFF_ADMIN_EMAILS = ["champ.championest@gmail.com", "kittibhonlim@gmail.com"];
+// (หุ้นส่วน) ด้วยตามที่ Champ สั่ง 15 ส.ค. 2026. เพิ่มเนมกับมุก (ดูแล HR) ตามที่
+// Champ สั่ง 10 ต.ค. 2026.
+export const STAFF_ADMIN_EMAILS = [
+  "champ.championest@gmail.com",
+  "kittibhonlim@gmail.com",
+  "namenrw@gmail.com",
+  "sin.sirisa@gmail.com",
+];
 
 export function canManageStaffAccounts(email?: string | null): boolean {
   return !!email && STAFF_ADMIN_EMAILS.includes(email.trim().toLowerCase());

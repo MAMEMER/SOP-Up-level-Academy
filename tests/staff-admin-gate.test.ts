@@ -4,15 +4,17 @@ import { canManageStaffAccounts, isOwner, OWNER_EMAILS, STAFF_ADMIN_EMAILS } fro
 
 // การเพิ่ม/ลบอีเมล = เปิดหรือปิดประตูเข้าระบบทั้งใบ จึงแคบกว่า owner อีกชั้น
 describe("canManageStaffAccounts", () => {
-  it("แก้รายชื่อได้เฉพาะแชมป์กับเคน", () => {
-    assert.deepEqual(STAFF_ADMIN_EMAILS, ["champ.championest@gmail.com", "kittibhonlim@gmail.com"]);
-    assert.equal(canManageStaffAccounts("champ.championest@gmail.com"), true);
-    assert.equal(canManageStaffAccounts("kittibhonlim@gmail.com"), true);
-  });
-
-  it("เป็นเจ้าของอย่างเดียวยังไม่พอ — เนมแก้รายชื่อไม่ได้", () => {
-    assert.equal(isOwner("namenrw@gmail.com"), true);
-    assert.equal(canManageStaffAccounts("namenrw@gmail.com"), false);
+  it("แก้รายชื่อได้เฉพาะแชมป์ · เคน · เนม · มุก", () => {
+    assert.deepEqual(STAFF_ADMIN_EMAILS, [
+      "champ.championest@gmail.com",
+      "kittibhonlim@gmail.com",
+      "namenrw@gmail.com",
+      "sin.sirisa@gmail.com",
+    ]);
+    for (const email of STAFF_ADMIN_EMAILS) {
+      assert.equal(canManageStaffAccounts(email), true, email);
+      assert.equal(isOwner(email), true, email);
+    }
   });
 
   it("พนักงานแก้ไม่ได้ และค่าว่างไม่ผ่าน", () => {
