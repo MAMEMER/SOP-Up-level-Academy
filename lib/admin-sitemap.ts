@@ -67,6 +67,7 @@ export const adminSections: SiteSection[] = [
     label: "สั่งงาน",
     hint: "ให้พนักงานทำ",
     links: [
+      { href: "/admin/dojo", label: "รีวิวโปสเตอร์", detail: "เทียบภาพอ้างอิง · ผ่าน / ให้แก้ / ไม่เอา", staffAdminOnly: true, keywords: "dojo โปสเตอร์ poster รีวิว" },
       { href: "/admin/tasks", label: "งานประจำ", detail: "งานรายวัน/สัปดาห์/เดือน ลงวันไหน กะไหน ส่งแบบไหน", keywords: "daily weekly monthly routine" },
       { href: "/admin/projects", label: "มอบหมายงานเดี่ยว/กลุ่ม", detail: "งานวันเดียวหรือหลายวัน ใครทำ ดูความคืบหน้าเป็น %", keywords: "โปรเจกต์ project" },
       { href: "/admin/stock-runs", label: "สั่งตรวจนับ Stock", detail: "มอบหมาย + ตรวจรับการนับ อุปกรณ์/Sleeve และ Single card", keywords: "นับของ สต็อก" },

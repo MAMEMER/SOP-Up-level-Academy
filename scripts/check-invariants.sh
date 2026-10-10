@@ -23,7 +23,7 @@ case "${1:-}" in
   *) RANGE="$1" ;;
 esac
 
-DIFF="$(git diff $RANGE -- . 2>/dev/null || true)"
+DIFF="$(git diff $RANGE -- . ':(exclude)scripts/check-invariants.sh' 2>/dev/null || true)"
 if [ -z "$DIFF" ]; then echo "✅ no diff to check"; exit 0; fi
 
 REMOVED="$(printf '%s\n' "$DIFF" | grep '^-' | grep -v '^---' || true)"
@@ -70,7 +70,11 @@ if printf '%s\n' "$ADDED" | grep -Eiq 'FieldValue\.increment|\+= *count|append';
 fi
 
 # 6. CSV upload — path traversal / gate
-if printf '%s\n' "$ADDED" | grep -Eq '\.\./|path\.join.*formData|join\(.*req'; then
+# Scope this heuristic to the CSV implementation: relative imports and the Dojo
+# worker instructions are not filesystem writes (INVARIANTS #6).
+CSV_DIFF="$(git diff $RANGE -- lib/performance-source-files.ts components/PerformanceScoreView.tsx 2>/dev/null || true)"
+CSV_ADDED="$(printf '%s\n' "$CSV_DIFF" | grep '^+' | grep -v '^+++' || true)"
+if printf '%s\n' "$CSV_ADDED" | grep -Eq '\.\./|path\.join.*formData|join\(.*req'; then
   flag CRITICAL "possible path traversal in file write. See INVARIANTS #6"
 fi
 

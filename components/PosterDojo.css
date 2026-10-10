@@ -1,0 +1,26 @@
+.dojo { max-width: 960px; margin-inline: auto; }
+.dojo-toolbar, .dojo-rule { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.dojo button { font: inherit; border-radius: 999px; border: 1px solid var(--color-orange-soft); padding: 8px 14px; background: var(--color-paper, white); color: inherit; }
+.dojo button.btn { background: var(--color-orange); color: white; }
+.dojo button, .dojo-reference { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.dojo-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
+.dojo-filters [aria-pressed="true"] { border-color: var(--color-orange); color: var(--color-orange-deep); background: var(--color-orange-soft); }
+.dojo-poster { padding-block: 24px; border-top: 1px solid var(--color-rule, #ddd); min-width: 0; }
+.dojo-poster h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
+.dojo-poster p, .dojo-poster li { overflow-wrap: anywhere; }
+.dojo-image { display: block; min-width: 0; }
+.dojo-image img { display: block; width: 100%; height: auto; }
+.dojo-comparison { display: grid; gap: 12px; }
+.dojo-form { border: 0; padding: 0; margin-top: 20px; display: grid; gap: 12px; min-width: 0; }
+.dojo-form textarea, .dojo-form select { font: inherit; font-size: 16px; padding: 12px; width: 100%; min-height: 44px; box-sizing: border-box; border: 1px solid var(--color-rule, #ddd); border-radius: 12px; background: var(--color-paper, white); color: inherit; }
+.dojo-form textarea { resize: vertical; }
+.dojo-rule label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.dojo-rule select { width: auto; }
+.dojo-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.dojo-actions button { padding-inline: 8px; font-size: 16px; white-space: nowrap; }
+.dojo-reset { justify-self: start; }
+.dojo button:focus-visible, .dojo a:focus-visible { outline: 2px solid var(--color-orange); outline-offset: 3px; }
+.dojo button:disabled { opacity: .6; cursor: wait; }
+.dojo-stamp { color: var(--color-ink-soft); font-size: 14px; }
+.dojo-empty { padding-block: 24px; }
+@media (min-width: 700px) { .dojo-comparison:has(> :nth-child(2)) { grid-template-columns: 1fr 1fr; } }
