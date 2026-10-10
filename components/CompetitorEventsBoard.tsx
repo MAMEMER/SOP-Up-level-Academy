@@ -110,7 +110,7 @@ function EventRow({ e, ours }: { e: CompetitorEvent; ours?: OurDay }) {
       <p className="ce-tags">
         <span className="ce-game">{COMP_GAME_LABEL[e.game]}</span>
         {type ? <span>{type}</span> : null}
-        {!e.bkk ? <span>ต่างจังหวัด/ปริมณฑล</span> : null}
+        {e.bkk === false ? <span>ต่างจังหวัด</span> : null}
       </p>
       <ul className="ce-facts">
         {fee ? (

@@ -15,7 +15,8 @@ export type CompetitorEvent = {
   title: string;
   shop: string;
   location: string;
-  bkk: boolean;
+  /** true = Bangkok/vicinity, false = upcountry, null = post didn't say */
+  bkk: boolean | null;
   eventType: CompEventType;
   dates: string[];
   times: string;
@@ -92,7 +93,7 @@ export function sanitizeEvent(id: string, raw: unknown): CompetitorEvent | null 
     title: str(r.title, 200),
     shop: str(r.shop, 120),
     location: str(r.location, 200),
-    bkk: r.bkk === true,
+    bkk: r.bkk === true ? true : r.bkk === false ? false : null,
     eventType,
     dates,
     times: str(r.times, 120),
@@ -179,7 +180,7 @@ export function clashOn(game: CompGame, ours: OurDay | undefined): Clash {
 
 export function matchesFilter(e: CompetitorEvent, game: GameFilter, bkkOnly: boolean): boolean {
   if (e.ours) return false;
-  if (bkkOnly && !e.bkk) return false;
+  if (bkkOnly && e.bkk === false) return false;
   if (!game) return true;
   if (game === "other") return e.game === "other" || e.game === "onepiece";
   return e.game === game;
