@@ -266,20 +266,41 @@ export const SPECIAL_DAYS: SpecialDay[] = [
     games: ["pkm", "rb"]
   },
   {
+    // แชมป์ 12 ต.ค.: Grand Opening เป็น 2 วัน — เสาร์ 17 Lorcana · อาทิตย์ 18 PKM + Riftbound
     date: "2026-10-17",
     branch: "senafest",
-    title: "Grand Opening",
+    title: "Grand Opening วันที่ 1",
     time: "10:00–22:00",
-    detail: "แข่ง PKM · Lorcana · Riftbound เกมละ 64 ที่ · Pre-release Hyperia City · Lucky Draw",
+    detail: "แข่ง Lorcana Core 64 ที่ · Pre-release Hyperia City · Pack Rush · มินิเกม · Lucky Draw",
     replacesWeekly: true,
     href: "https://uplevelguild.com/grand-opening",
-    games: ["pkm", "lor", "rb"]
+    games: ["lor"]
   },
   {
-    // แชมป์ 6 ต.ค.: วันนี้บางแคปิด ทุกกิจกรรมไปรวมที่ Grand Opening
+    date: "2026-10-18",
+    branch: "senafest",
+    title: "Grand Opening วันที่ 2",
+    time: "10:00–22:00",
+    detail: "แข่ง Pokémon TCG · Riftbound เกมละ 64 ที่ · มินิเกม · Lucky Draw",
+    replacesWeekly: true,
+    href: "https://uplevelguild.com/grand-opening",
+    games: ["pkm", "rb"]
+  },
+  {
+    // แชมป์ 6 ต.ค. + 12 ต.ค.: บางแคปิดทั้ง 2 วัน ทุกกิจกรรมไปรวมที่ Grand Opening
     date: "2026-10-17",
     branch: "bangkae",
-    title: "บางแคปิด 1 วัน",
+    title: "บางแคปิด (Grand Opening)",
+    time: "ทั้งวัน",
+    detail: "ทุกกิจกรรมย้ายไปรวมที่ Grand Opening สาขาเสนาเฟสต์",
+    replacesWeekly: true,
+    closed: true,
+    href: "https://uplevelguild.com/grand-opening"
+  },
+  {
+    date: "2026-10-18",
+    branch: "bangkae",
+    title: "บางแคปิด (Grand Opening)",
     time: "ทั้งวัน",
     detail: "ทุกกิจกรรมย้ายไปรวมที่ Grand Opening สาขาเสนาเฟสต์",
     replacesWeekly: true,

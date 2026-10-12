@@ -59,13 +59,15 @@ test("จัดกลุ่มตามวัน: ตัดวันที่ผ
   assert.equal(groups.at(-1)?.label, "ยังไม่ระบุวัน");
 });
 
-test("ชนกัน: Grand Opening 17 ต.ค. เกมเดียวกัน = strong, เกมอื่น = soft, วันว่าง = ไม่มีป้าย", () => {
-  const ours = ourEventsByDate(DEFAULT_BOARD, ["2026-10-17", "2026-10-17"], SPECIAL_DAYS);
-  assert.deepEqual([...ours["2026-10-17"].games].sort(), ["lor", "pkm", "rb"]);
-  assert.ok(ours["2026-10-17"].titles.includes("Grand Opening"));
-  assert.ok(!ours["2026-10-17"].titles.includes("บางแคปิด 1 วัน"));
-  assert.equal(clashOn("pokemon", ours["2026-10-17"]), "strong");
-  assert.equal(clashOn("onepiece", ours["2026-10-17"]), "soft");
+test("ชนกัน: Grand Opening 17–18 ต.ค. เกมเดียวกัน = strong, เกมอื่น = soft, วันว่าง = ไม่มีป้าย", () => {
+  const ours = ourEventsByDate(DEFAULT_BOARD, ["2026-10-17", "2026-10-18"], SPECIAL_DAYS);
+  assert.deepEqual([...ours["2026-10-17"].games].sort(), ["lor"]);
+  assert.deepEqual([...ours["2026-10-18"].games].sort(), ["pkm", "rb"]);
+  assert.ok(ours["2026-10-17"].titles.includes("Grand Opening วันที่ 1"));
+  assert.ok(!ours["2026-10-17"].titles.includes("บางแคปิด (Grand Opening)"));
+  assert.equal(clashOn("pokemon", ours["2026-10-18"]), "strong");
+  assert.equal(clashOn("pokemon", ours["2026-10-17"]), "soft");
+  assert.equal(clashOn("onepiece", ours["2026-10-18"]), "soft");
   assert.equal(clashOn("pokemon", undefined), null);
 });
 
