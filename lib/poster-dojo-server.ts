@@ -6,7 +6,8 @@ const text = (v: unknown) => typeof v === 'string' ? v : '';
 const url = (v: unknown) => /^https?:\/\//.test(text(v)) ? text(v) : '';
 export async function listPosters(): Promise<Poster[]> {
   const snap = await adminDb().collection('poster-dojo').get();
-  return sortPosters(snap.docs.map(doc => {
+  // run-* docs belong to the pipeline page (/admin/posters), not this review queue
+  return sortPosters(snap.docs.filter(doc => doc.data().kind !== 'run').map(doc => {
     const p = doc.data();
     return { id: doc.id, name: text(p.name) || doc.id, status: text(p.status) || 'pending',
       imageUrl: url(p.imageUrl), refImage: url(p.refImage), refUrl: url(p.refUrl), sidebysideUrl: url(p.sidebysideUrl),
