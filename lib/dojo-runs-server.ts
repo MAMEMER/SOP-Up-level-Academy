@@ -23,12 +23,14 @@ function toRun(id: string, p: FirebaseFirestore.DocumentData, version: string): 
       const x = st[s.key] || {};
       return {
         key: s.key, label: s.label, status: text(x.status) || 'todo', summary: text(x.summary), at: ms(x.at),
+        progress: typeof x.progress === 'number' ? x.progress : null, progressNote: text(x.progress_note), progressAt: ms(x.progress_at),
         items: items(x.items), cands: items(x.cands), picked: x.picked != null ? Number(x.picked) : null,
         metrics: Array.isArray(x.metrics) ? x.metrics.map((m: any) => ({ label: text(m?.label), value: text(m?.value) })) : [],
         links: Array.isArray(x.links) ? x.links.map((l: any) => ({ url: url(l?.url), label: text(l?.label) })).filter((l: any) => l.url) : []
       };
     }),
     log: Array.isArray(p.log) ? p.log.map((l: any) => ({ stage: text(l?.stage), note: text(l?.note), by: text(l?.by), at: Number(l?.at) || 0, ...(l?.pick != null ? { pick: Number(l.pick) } : {}) })) : [],
+    live: p.live ? { state: text(p.live.state), at: ms(p.live.at), started: p.live.started ? ms(p.live.started) : null } : null,
     updatedAt: ms(p.updated_at) || ms(p.created_at), version
   };
 }

@@ -30,6 +30,8 @@ export const RUN_STATUS_TH: Record<string, string> = {
 export type RunItem = { img: string; caption: string };
 export type RunStage = {
   key: StageKey; label: string; status: string; summary: string; at: number;
+  /** % ที่ Claude รายงานระหว่างทำ (0–100) + กำลังทำอะไร */
+  progress: number | null; progressNote: string; progressAt: number;
   items: RunItem[]; cands: RunItem[]; picked: number | null;
   metrics: { label: string; value: string }[]; links: { url: string; label: string }[];
 };
@@ -39,7 +41,19 @@ export type Run = {
   brief: { job: string; query: string; note: string };
   redo: { from: string; note: string; pick?: number; by: string } | null;
   stages: RunStage[]; log: RunLog[]; updatedAt: number; version: string;
+  /** สัญญาณชีพจาก mini: state = pending (รอคิว) | running | idle, at = อัปเดตล่าสุด */
+  live: { state: string; at: number; started: number | null } | null;
 };
+
+/** สถานะ "ยังทำอยู่ไหม" สำหรับคนดู: เงียบเกิน 6 นาทีระหว่างทำ = อาจค้าง */
+export const STALL_MS = 6 * 60_000;
+export function liveState(run: Pick<Run, 'live' | 'status'>, now: number): 'idle' | 'queued' | 'working' | 'stalled' {
+  const busy = ['new', 'redo', 'queued', 'continue', 'running'].includes(run.status) ||
+    (run.status === 'approved' && run.live?.state !== 'idle' && !!run.live);
+  if (!busy) return 'idle';
+  if (!run.live || run.live.state === 'idle' || run.live.state === 'pending') return 'queued';
+  return now - run.live.at > STALL_MS ? 'stalled' : 'working';
+}
 
 /** งานที่ต้องให้คนดู (รอตรวจ) ขึ้นก่อน แล้วเรียงใหม่สุดก่อน */
 export function sortRuns(runs: Run[]) {
@@ -54,7 +68,12 @@ export function redoPatch(stage: StageKey, existing: StageKey[], note: string, b
     status: 'redo',
     redo: { from: stage, note, by, at, ...(pick != null ? { pick } : {}) }
   };
-  for (const k of STAGE_KEYS.slice(from)) if (existing.includes(k)) patch[`stages.${k}.status`] = k === stage ? 'redo' : 'stale';
+  // ขั้นที่สั่งแก้: เก็บรูปเดิมไว้ให้ดูระหว่างรอ · ขั้นหลังจากนั้นล้างทิ้งทั้งหมด (ผลเก่าใช้ไม่ได้แล้ว)
+  RUN_STAGES.forEach((s, i) => {
+    if (i < from || !existing.includes(s.key)) return;
+    if (s.key === stage) { patch[`stages.${s.key}.status`] = 'redo'; patch[`stages.${s.key}.progress`] = 0; patch[`stages.${s.key}.progress_note`] = ''; }
+    else patch[`stages.${s.key}`] = { order: i + 1, label: s.label, status: 'todo', items: [] };
+  });
   return patch;
 }
 
@@ -65,7 +84,7 @@ export function proceedStage(run: Pick<Run, 'status' | 'stages'>): StageKey | nu
   return s ? s.key : null;
 }
 export function proceedPatch(stage: StageKey) {
-  return { status: 'continue', [`stages.${stage}.status`]: 'done' };
+  return { status: 'continue', redo: null, [`stages.${stage}.status`]: 'done' };
 }
 
 export function canRedo(run: Pick<Run, 'status'>) { return run.status !== 'approved' && run.status !== 'done'; }

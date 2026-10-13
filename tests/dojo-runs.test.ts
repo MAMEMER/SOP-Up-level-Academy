@@ -8,15 +8,16 @@ test('Fixing a stage reruns it and marks only the later stages stale', () => {
   assert.equal(p.status, 'redo');
   assert.deepEqual(p.redo, { from: 'copy', note: 'แถบคือภาพเดียว', by: 'sin.sirisa@gmail.com', at: 5 });
   assert.equal(p['stages.copy.status'], 'redo');
-  assert.equal(p['stages.adapt.status'], 'stale');
-  assert.equal(p['stages.template.status'], 'stale');
+  assert.deepEqual(p['stages.adapt'], { order: 3, label: 'เปลี่ยนเป็น Up Level', status: 'todo', items: [] });
+  assert.equal((p['stages.template'] as { status: string }).status, 'todo');
   assert.equal(p['stages.ref.status'], undefined);
+  assert.equal(p['stages.ref'], undefined);
 });
 
 test('Picking another reference keeps the pick for the worker', () => {
   const p = redoPatch('ref', ['ref', 'copy'], '', 'champ', 1, 5) as { redo: { pick: number } };
   assert.equal(p.redo.pick, 5);
-  assert.equal((p as Record<string, unknown>)['stages.adapt.status'], undefined);
+  assert.equal((p as Record<string, unknown>)['stages.adapt'], undefined);
 });
 
 test('Approve needs a finished Up Level version and is one-shot', () => {
@@ -46,5 +47,15 @@ test('Copy waits for a person before the pipeline moves on', async () => {
   assert.equal(proceedStage({ status: 'waiting', stages: st('waiting') }), 'copy');
   assert.equal(proceedStage({ status: 'queued', stages: st('running') }), null);
   assert.equal(proceedStage({ status: 'waiting', stages: [{ key: 'review', status: 'waiting' }] as Run['stages'] }), null);
-  assert.deepEqual(proceedPatch('copy'), { status: 'continue', 'stages.copy.status': 'done' });
+  assert.deepEqual(proceedPatch('copy'), { status: 'continue', redo: null, 'stages.copy.status': 'done' });
+});
+
+test('The page can tell working from waiting in line and from stuck', async () => {
+  const { liveState } = await import('../lib/dojo-runs.ts');
+  const now = 10_000_000;
+  assert.equal(liveState({ status: 'waiting', live: null }, now), 'idle');
+  assert.equal(liveState({ status: 'redo', live: null }, now), 'queued');
+  assert.equal(liveState({ status: 'queued', live: { state: 'pending', at: now, started: null } }, now), 'queued');
+  assert.equal(liveState({ status: 'queued', live: { state: 'running', at: now - 30_000, started: now - 60_000 } }, now), 'working');
+  assert.equal(liveState({ status: 'queued', live: { state: 'running', at: now - 7 * 60_000, started: null } }, now), 'stalled');
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Check, Plus, RefreshCw, RotateCcw, Send, X, ExternalLink } from 'lucide-react';
-import { RUN_JOBS, RUN_STAGES, RUN_STATUS_TH, canApprove, canRedo, proceedStage, type Run, type RunStage } from '../lib/dojo-runs.ts';
+import { RUN_JOBS, RUN_STAGES, RUN_STATUS_TH, canApprove, canRedo, liveState, proceedStage, type Run, type RunStage } from '../lib/dojo-runs.ts';
 import './DojoRuns.css';
 
 const messages: Record<string, string> = {
@@ -13,6 +13,12 @@ const messages: Record<string, string> = {
 };
 const when = (t: number) => t ? new Date(t).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 const stageLabel = (k: string) => RUN_STAGES.find(s => s.key === k)?.label || k;
+const ago = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s} วินาที` : s < 3600 ? `${Math.floor(s / 60)} นาที` : `${Math.floor(s / 3600)} ชม.`; };
+function useNow(every = 5000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), every); return () => clearInterval(t); }, [every]);
+  return now;
+}
 
 function useDraft(key: string) {
   const [v, setV] = useState('');
@@ -52,8 +58,8 @@ export function DojoRuns({ reviewer, authenticated }: { reviewer: string; authen
   useEffect(() => {
     if (!authenticated) return;
     void load();
-    // งานบน mini อัปเดตเรื่อยๆ — ดึงใหม่ทุก 30 วิ เฉพาะตอนเปิดหน้านี้อยู่ (ไม่ทับข้อความที่พิมพ์ เพราะเก็บแยกใน draft)
-    timer.current = setInterval(() => { if (document.visibilityState === 'visible') void load(true); }, 30_000);
+    // งานบน mini อัปเดตเรื่อยๆ — ดึงใหม่ทุก 10 วิ เฉพาะตอนเปิดหน้านี้อยู่ (ไม่ทับข้อความที่พิมพ์ เพราะเก็บแยกใน draft)
+    timer.current = setInterval(() => { if (document.visibilityState === 'visible') void load(true); }, 10_000);
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [authenticated]);
   useEffect(() => {
@@ -103,6 +109,7 @@ function RunDetail({ run, reviewer, onZoom, onSaved }: { run: Run; reviewer: str
       {canApprove(run) && <button className="btn" onClick={approve} disabled={busy}><Check size={18} />ผ่าน ลงเทมเพลต</button>}
     </div>
     {error && <p role="alert" className="input-status warning">{error}</p>}
+    <LiveBar run={run} />
     {run.redo && (run.status === 'redo' || run.status === 'queued') && <p className="runs-note">
       <b>สั่งแก้แล้ว: {stageLabel(run.redo.from)}</b>{run.redo.pick != null && ` · ใช้ ref #${run.redo.pick}`}<br />{run.redo.note}<br />
       <small>{run.status === 'queued' ? 'ระบบรับงานแล้ว กำลังทำ' : 'รอระบบรับงาน (ภายใน 1–2 นาที)'}</small></p>}
@@ -113,6 +120,17 @@ function RunDetail({ run, reviewer, onZoom, onSaved }: { run: Run; reviewer: str
       {[...run.log].reverse().map((l, i) => <li key={i}><b>{stageLabel(l.stage)}</b> · {l.note}{l.pick != null && ` · ใช้ #${l.pick}`} — {l.by.split('@')[0]} {when(l.at)}</li>)}
     </ul></div>}
   </section>;
+}
+
+function LiveBar({ run }: { run: Run }) {
+  const now = useNow();
+  const st = liveState(run, now);
+  if (st === 'idle') return null;
+  const cur = run.stages.find(s => ['running', 'redo'].includes(s.status));
+  if (st === 'queued') return <p className="runs-live queued" role="status"><span className="runs-dot" />รอคิว — ระบบจะเริ่มทำภายในไม่กี่วินาที (ถ้ามีงานอื่นทำอยู่จะรอให้เสร็จก่อน)</p>;
+  if (st === 'stalled') return <p className="runs-live stalled" role="status"><span className="runs-dot" />ไม่มีความเคลื่อนไหว {ago(now - run.live!.at)} — อาจค้าง ถ้าเกิน 15 นาทีแจ้งแชมป์</p>;
+  return <p className="runs-live working" role="status"><span className="runs-dot" />
+    กำลังทำ{cur ? ` "${cur.label}"` : ''}{cur?.progress != null ? ` ${cur.progress}%` : ''} · อัปเดตล่าสุด {ago(now - run.live!.at)}ที่แล้ว{run.live?.started ? ` · ทำมาแล้ว ${ago(now - run.live.started)}` : ''}</p>;
 }
 
 function Stage({ n, run, s, reviewer, onZoom, onSaved }: { n: number; run: Run; s: RunStage; reviewer: string; onZoom: (u: string) => void; onSaved: (m: string) => void }) {
@@ -146,6 +164,11 @@ function Stage({ n, run, s, reviewer, onZoom, onSaved }: { n: number; run: Run; 
       {s.at > 0 && <small>{when(s.at)}</small>}
     </div>
     {!open && <p className="runs-hint">{hint}</p>}
+    {(s.status === 'running' || s.status === 'redo') && <div className="runs-progress">
+      <div className={s.progress == null ? 'runs-bar indeterminate' : 'runs-bar'} role="progressbar" aria-label={`ความคืบหน้า ${s.label}`}
+        aria-valuemin={0} aria-valuemax={100} aria-valuenow={s.progress ?? undefined}><span style={s.progress == null ? undefined : { width: `${s.progress}%` }} /></div>
+      <small>{s.progress == null ? (s.status === 'redo' ? 'รอเริ่มแก้' : 'กำลังเริ่ม') : `${s.progress}%`}{s.progressNote && ` · ${s.progressNote}`}</small>
+    </div>}
     {open && <div className="runs-stage-body">
       {s.summary && <p className="runs-summary">{s.summary}</p>}
       {s.metrics.length > 0 && <p className="runs-metrics">{s.metrics.map((m, i) => <span key={i}>{m.label} <b>{m.value}</b></span>)}</p>}
