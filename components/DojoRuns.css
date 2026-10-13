@@ -89,3 +89,18 @@
 .guide td:first-child { white-space: nowrap; font-weight: 500; }
 .runs-gate { margin-top: 14px; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 12px; padding: 12px; display: grid; gap: 10px; justify-items: start; }
 .runs-gate p { margin: 0; overflow-wrap: anywhere; }
+
+.runs-live { display: flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 12px; margin: 10px 0; overflow-wrap: anywhere; }
+.runs-live.working { background: #eff6ff; border: 1px solid #93c5fd; color: #1e3a8a; }
+.runs-live.queued { background: #f8fafc; border: 1px solid var(--color-rule, #ddd); }
+.runs-live.stalled { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+.runs-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: currentColor; animation: runs-pulse 1.4s ease-in-out infinite; }
+.runs-live.queued .runs-dot { animation: none; opacity: .5; }
+@keyframes runs-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
+.runs-progress { margin-top: 10px; display: grid; gap: 4px; }
+.runs-progress small { color: var(--color-ink-soft); font-size: 13px; overflow-wrap: anywhere; }
+.runs-bar { height: 8px; border-radius: 999px; background: var(--color-rule, #e5e5e5); overflow: hidden; position: relative; }
+.runs-bar span { display: block; height: 100%; background: var(--color-orange); border-radius: 999px; transition: width .6s ease; }
+.runs-bar.indeterminate span { position: absolute; width: 35%; animation: runs-slide 1.6s ease-in-out infinite; }
+@keyframes runs-slide { 0% { left: -35%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .runs-dot, .runs-bar.indeterminate span { animation: none; } .runs-bar.indeterminate span { left: 0; width: 100%; opacity: .4; } }
