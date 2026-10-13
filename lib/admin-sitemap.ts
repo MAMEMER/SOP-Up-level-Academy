@@ -121,6 +121,7 @@ export const staffPagesSection: SiteSection = {
     { href: "/checklist", label: "เช็คลิสต์", detail: "เช็คลิสต์เปิด-ปิดร้านรายวัน" },
     { href: "/closing", label: "ปิดยอด (พนักงาน)", detail: "หน้าที่พนักงานกรอกยอดปิดร้าน" },
     { href: "/parcels", label: "พัสดุการ์ด", detail: "รับพัสดุ + วิดีโอแกะกล่อง" },
+    { href: "/clip-brief", label: "บรีฟคลิป", detail: "บอก AI ก่อนตัดคลิปจากโฟลเดอร์ Footage ว่าเอาไปทำอะไร ฮุก ของเด็ด", keywords: "คลิป tiktok reel ตัดต่อ footage drive วิดีโอ" },
     { href: "/supplies", label: "ของที่ต้องสั่ง", detail: "รายการของใกล้หมดจาก StoreHub" },
     { href: "/card-prices", label: "ราคากลางการ์ด + สเกาต์", detail: "ราคาจากกลุ่มซื้อขาย FB · ทักท้วง · ตั้งจับตาการ์ด", keywords: "ราคา การ์ด scout สเกาต์ fb pokemon lorcana riftbound" },
     { href: "/schedule", label: "ตารางกะ (พนักงาน)", detail: "ตารางกะแบบที่พนักงานเห็น" },

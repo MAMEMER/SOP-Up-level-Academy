@@ -8606,3 +8606,58 @@ p.ab-help{padding-left:0}
 .cp-picked { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 8px 8px 12px; border: 1px solid var(--color-orange); border-radius: 12px; background: var(--color-cream-2); }
 .cp-picked .cp-name { flex: 1; }
 @media (min-width: 720px) { .cp-fields .cp-pick-wrap { grid-column: span 2; } }
+
+/* ── บรีฟคลิป /clip-brief ───────────────────────────────────────────────── */
+.clip-brief { max-width: 680px; display: flex; flex-direction: column; gap: 20px; }
+.clip-brief__head { display: flex; flex-direction: column; gap: 6px; }
+.clip-brief__head .eyebrow { margin: 0; }
+.clip-brief__head h2 { font-size: 28px; margin: 0; }
+.clip-brief__lead { margin: 0; color: var(--color-ink-soft); line-height: 1.7; }
+.clip-brief__form { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.clip-brief__field { display: flex; flex-direction: column; gap: 8px; border: none; margin: 0; padding: 0; min-width: 0; }
+.clip-brief__field legend, .clip-brief__label { padding: 0; margin-bottom: 2px; font-size: 16px; font-weight: 600; color: var(--color-ink); }
+.clip-brief__req { margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--color-orange-deep); }
+.clip-brief__hint { margin: 0; font-size: 13.5px; color: var(--color-ink-soft); line-height: 1.6; }
+.clip-brief__form input, .clip-brief__form select, .clip-brief__form textarea {
+  border: 1px solid rgba(255,199,142,0.6); border-radius: 10px; padding: 10px 12px; font-size: 16px; font-family: inherit;
+  background: #fff; color: var(--color-ink); min-height: 44px; width: 100%; min-width: 0; box-sizing: border-box; line-height: 1.6;
+}
+.clip-brief__form textarea { resize: vertical; }
+.clip-brief__pending-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13.5px; color: var(--color-ink-soft); }
+.clip-brief__icon-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--color-ink-soft); border-radius: 999px; cursor: pointer; }
+.clip-brief__folders { display: flex; flex-direction: column; gap: 6px; }
+.clip-brief__folder {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon name badge" "icon meta badge";
+  align-items: center; column-gap: 10px; row-gap: 0; text-align: left; min-height: 52px; padding: 8px 12px;
+  border: 1px solid rgba(45,49,66,0.12); border-radius: 12px; background: rgba(255,255,255,0.85); color: var(--color-ink);
+  font-family: inherit; font-size: 15px; cursor: pointer; min-width: 0;
+}
+.clip-brief__folder > svg { grid-area: icon; color: var(--color-ink-soft); }
+.clip-brief__folder-name { grid-area: name; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.clip-brief__folder-meta { grid-area: meta; font-size: 12.5px; color: var(--color-ink-soft); }
+.clip-brief__folder-meta:empty { display: none; }
+.clip-brief__folder.is-on { border-color: var(--color-orange); background: rgba(255,140,66,0.12); }
+.clip-brief__folder.is-on > svg { color: var(--color-orange-deep); }
+.clip-brief__badge { grid-area: badge; font-size: 12px; font-weight: 600; white-space: nowrap; padding: 3px 10px; border-radius: 999px; background: #fff1e6; color: #9a3f0b; }
+.clip-brief__badge--ok { background: rgba(184,230,193,0.5); color: #2e7d5b; }
+.clip-brief__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.clip-brief__chips button {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,199,142,0.7); background: #fff;
+  color: var(--color-ink); font-family: inherit; font-size: 15px; cursor: pointer;
+}
+.clip-brief__chips button.is-on { background: rgba(255,140,66,0.18); border-color: var(--color-orange); color: var(--color-orange-deep); font-weight: 600; }
+.clip-brief__error { margin: 0; color: #a12312; font-size: 14px; }
+.clip-brief__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.clip-brief__submit {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 24px; border: none; border-radius: 999px;
+  font-family: inherit; font-size: 16px; font-weight: 600; color: #fff; background: linear-gradient(135deg, var(--color-cta-1), var(--color-cta-2)); cursor: pointer;
+}
+.clip-brief__submit:disabled { opacity: 0.45; cursor: not-allowed; }
+.clip-brief__secondary {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 10px 16px; border: 1px solid rgba(45,49,66,0.18); border-radius: 999px;
+  background: #fff; color: var(--color-ink); font-family: inherit; font-size: 14px; cursor: pointer;
+}
+@media (max-width: 480px) {
+  .clip-brief__head h2 { font-size: 24px; }
+  .clip-brief__submit { flex: 1 1 100%; }
+}

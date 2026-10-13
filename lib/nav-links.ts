@@ -26,6 +26,7 @@ export const staffGroups: NavGroup[] = [
       // เดิมยังเปิดได้จากลิงก์ตรงเพื่อดูงานที่ค้างอยู่ในระบบเก่า แต่ไม่ต้องมีเมนูซ้ำอีกช่อง
       { href: "/my-tasks/file", label: "แฟ้มงาน" },
       { href: "/parcels", label: "พัสดุการ์ด" },
+      { href: "/clip-brief", label: "บรีฟคลิป" },
       { href: "/my-documents", label: "เอกสารของฉัน" }
     ]
   },
