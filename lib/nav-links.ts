@@ -23,6 +23,7 @@ export const staffGroups: NavGroup[] = [
     links: [
       { href: "/tasks", label: "งานวันนี้" },
       { href: "/influencers", label: "อินฟลูเอนเซอร์" },
+      { href: "/grand-opening-checklist", label: "เช็กลิสต์ Grand Opening" },
       // ส่งต่องานย้ายเข้ามาอยู่ในการ์ดของ "งานที่มอบหมาย" แล้ว (ใบงาน iDBqn3jE) — หน้า /handoff
       // เดิมยังเปิดได้จากลิงก์ตรงเพื่อดูงานที่ค้างอยู่ในระบบเก่า แต่ไม่ต้องมีเมนูซ้ำอีกช่อง
       { href: "/my-tasks/file", label: "แฟ้มงาน" },
