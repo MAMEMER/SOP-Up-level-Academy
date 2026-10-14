@@ -34,6 +34,7 @@ export const adminSections: SiteSection[] = [
     label: "วันนี้",
     hint: "เปิดดูทุกวัน",
     links: [
+      { href: "/admin/customer-handover", label: "ส่งมอบสินค้า", detail: "ค้นสินค้า บันทึกใบรับ และตรวจยอดตั้งต้น" },
       { href: "/admin/ops", label: "ดูงานรายคน", detail: "ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม แยกสาขา", keywords: "สรุปทั้งร้าน ops" },
       { href: "/admin/task-review", label: "ตรวจงานที่มอบหมาย", detail: "แยกสาขา · ทีม · พนักงาน → แฟ้มรายเดือน · คอมเมนต์ + ให้คะแนน", keywords: "แฟ้มงาน ตรวจ คะแนน" },
       { href: "/manager-review", label: "ตรวจงานที่ส่งมา", detail: "งานที่พนักงานกดส่งตรวจ พร้อมรูป/หลักฐาน", keywords: "รีวิว review" },

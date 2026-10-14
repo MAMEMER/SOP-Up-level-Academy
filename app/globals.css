@@ -8549,3 +8549,36 @@ p.ab-help{padding-left:0}
 .cp-primary { border: 0; color: #fff; background: linear-gradient(135deg, var(--color-cta-1, #ff8c42), var(--color-cta-2, #f97316)); }
 .cp-secondary { border: 1px solid var(--color-orange); color: var(--color-orange-deep); background: #fff; }
 .cp-primary:disabled, .cp-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Customer handover: editorial rows, existing Mitr and brand tokens. */
+.handover-page { max-width: 1120px; margin: 0 auto; padding: 24px 20px 110px; overflow-wrap: anywhere; }
+.handover-back,.handover-heading h1,.handover-notice,.handover-tools,.handover-select { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.handover-heading { margin:24px 0; }
+.handover-heading h1 { font-size:clamp(26px,4vw,36px); margin:8px 0; }
+.handover-page h2 { font-size:22px; margin:20px 0 12px; }
+.handover-page p { line-height:1.7; margin:8px 0; }
+.handover-notice { padding:14px 0; border-block:1px solid var(--color-border, #d2d8df); }
+.handover-page label { display:grid; gap:8px; min-width:0; }
+.handover-page input,.handover-page select,.handover-page textarea { font:inherit; font-size:16px; min-height:44px; max-width:100%; width:100%; padding:10px; border:1px solid var(--color-border,#aeb7c2); border-radius:8px; background:var(--color-paper,#fff); color:inherit; }
+.handover-page button,.handover-page summary,.handover-back { min-height:44px; touch-action:manipulation; }
+.handover-page button { font:inherit; padding:10px 14px; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
+.handover-page button:disabled { opacity:1; background:#e4e8ed; color:#4b5563; cursor:not-allowed; }
+.handover-page :focus-visible { outline:3px solid var(--color-orange,#2f80ed); outline-offset:3px; }
+.handover-search { display:grid; gap:16px; margin:20px 0; }
+.handover-tools { margin:16px 0; gap:8px; }
+.handover-line { border-bottom:1px solid var(--color-border,#d2d8df); padding:20px 0; min-width:0; }
+.handover-line summary { font-weight:500; cursor:pointer; max-width:100%; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+.handover-select label:first-child { display:flex; align-items:center; gap:10px; min-height:44px; }
+.handover-select input[type=checkbox] { width:24px; height:24px; min-height:24px; }
+.handover-select label:last-child { width:100px; }
+.handover-workspace { display:grid; gap:24px; }
+.handover-summary { min-width:0; }
+.handover-summary label { margin:14px 0; }
+.handover-action { display:grid; gap:8px; position:sticky; bottom:0; padding:12px 0 calc(12px + env(safe-area-inset-bottom)); background:var(--color-paper,#fff); }
+.handover-warning,.handover-error { color:#8a3411; }
+.handover-error { border-left:3px solid currentColor; padding:12px; }
+.handover-help { margin:24px 0; }
+.handover-receipt span { display:block; word-break:break-all; }
+@media (min-width:800px) { .handover-search { grid-template-columns:180px 1fr auto; align-items:end; } .handover-workspace { grid-template-columns:minmax(0,1fr) 320px; } .handover-summary { align-self:start; position:sticky; top:24px; } }
+
+@media (max-width:799px) { .handover-page { padding:16px 4px 100px; } .handover-heading { margin:12px 0; } .handover-notice { padding:8px 0; font-size:14px; } .handover-heading p { font-size:14px; } .handover-search { gap:10px; margin:14px 0; } .handover-search .button { position:sticky; bottom:12px; z-index:1; } }
