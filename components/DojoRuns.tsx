@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Check, Plus, RefreshCw, RotateCcw, Send, X, ExternalLink } from 'lucide-react';
-import { RUN_JOBS, RUN_STAGES, RUN_STATUS_TH, canApprove, canRedo, liveState, proceedStage, type Run, type RunStage } from '../lib/dojo-runs.ts';
+import { RUN_JOBS, RUN_STAGES, RUN_STATUS_TH, canApprove, canRedo, liveState, looksLikeApproval, proceedStage, type Run, type RunStage } from '../lib/dojo-runs.ts';
 import './DojoRuns.css';
 
 const messages: Record<string, string> = {
@@ -146,8 +146,17 @@ function Stage({ n, run, s, reviewer, onZoom, onSaved }: { n: number; run: Run; 
     catch (e) { setError(messages[e instanceof Error ? e.message : ''] || messages.write_failed); }
     finally { setBusy(false); }
   }
+  const gate = proceedStage(run) === s.key;
+  const working = s.status === 'running' || s.status === 'redo';
   async function redo(pick?: number) {
     if (pick == null && !note.trim()) { setError(messages.comment_required); return; }
+    if (pick == null && looksLikeApproval(note)) {
+      if (gate) { setNote(''); return proceed(); }
+      setError(working
+        ? 'ระบบยังทำขั้นนี้ไม่เสร็จ รอให้ขึ้นปุ่ม "เหมือนแล้ว ไปขั้นต่อไป" ก่อนแล้วค่อยกด — ช่องนี้ใช้สำหรับบอกว่าต้องแก้ตรงไหนเท่านั้น'
+        : 'ช่องนี้ใช้สั่งแก้ ถ้าขั้นนี้ผ่านแล้ว ไม่ต้องกดอะไร ระบบทำขั้นต่อไปเอง');
+      return;
+    }
     setBusy(true); setError('');
     try {
       await post({ action: 'redo', id: run.id, stage: s.key, note, ...(pick != null ? { pick } : {}) });
@@ -191,9 +200,11 @@ function Stage({ n, run, s, reviewer, onZoom, onSaved }: { n: number; run: Run; 
       </div>}
       {editable && <fieldset className="runs-fix" disabled={busy}>
         <label htmlFor={`fix-${run.id}-${s.key}`}>ขั้นนี้ผิดตรงไหน / ต้องเป็นแบบไหน</label>
+        {working && <p className="runs-hint">ระบบกำลังทำขั้นนี้อยู่ ถ้าส่งแก้ตอนนี้จะเริ่มทำขั้นนี้ใหม่</p>}
         <textarea id={`fix-${run.id}-${s.key}`} rows={3} maxLength={5000} value={note} onChange={e => setNote(e.target.value)} placeholder="เช่น ตัวหนังสือเล็กไป อ่านในมือถือไม่ออก" />
         <div className="runs-fix-actions">
-          <button className="btn" onClick={() => redo()}><RotateCcw size={18} />แก้ขั้นนี้ แล้วทำต่อ</button>
+          {gate && <button className="btn" onClick={proceed}><Check size={18} />เหมือนแล้ว ไปขั้นต่อไป</button>}
+          <button className={gate ? 'btn-soft' : 'btn'} onClick={() => redo()}><RotateCcw size={18} />แก้ขั้นนี้ แล้วทำต่อ</button>
           {note && <button className="btn-soft" onClick={() => setNote('')}><X size={18} />ล้างข้อความ</button>}
         </div>
         {error && <p role="alert" className="input-status warning">{error}</p>}
