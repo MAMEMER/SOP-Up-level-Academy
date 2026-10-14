@@ -10,7 +10,14 @@ export const openingSchema = z.object({
   assignee: z.string().trim().max(150), note: z.string().trim().max(5000)
 }).strict();
 export type OpeningFields = z.infer<typeof openingSchema>;
+export type OpeningImage = { id: string; path: string; thumbnailPath: string; name: string; mimeType: string; size: number; uploadedBy: string; uploadedAt: string };
+export const MAX_OPENING_IMAGES = 12;
+export const MAX_OPENING_IMAGE_BYTES = 4 * 1024 * 1024;
+export function validOpeningImage(type: string, size: number) {
+  return ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(type) && size > 0 && size <= MAX_OPENING_IMAGE_BYTES;
+}
 export type OpeningItem = OpeningFields & {
+  images?: OpeningImage[];
   id: string; revision: number; done: boolean; doneBy: string | null; doneAt: string | null;
   createdBy: string; createdAt: string | null; updatedBy: string; updatedAt: string | null; deleted: boolean;
 };

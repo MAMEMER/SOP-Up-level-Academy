@@ -8679,3 +8679,44 @@ p.ab-help{padding-left:0}
 @media (max-width: 600px) {
   .go-item details > .go-toolbar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 2; background: var(--color-cream); padding: 8px 0; }
 }
+
+/* Compact opening checklist: details only consume space when opened. */
+.go-checklist .go-filters { position: sticky; top: 0; z-index: 5; max-width: none; margin: 12px 0; padding: 8px 0; background: var(--color-cream); grid-template-columns: 1fr 1fr; gap: 8px; }
+.go-checklist .go-filters label { font-size: 14px; min-width: 0; }
+.go-checklist .go-show-done { flex-direction: row; align-items: center; gap: 8px; min-height: 44px; }
+.go-show-done input { width: 20px; min-width: 20px; margin: 0; }
+.go-checklist .go-category { margin-top: 12px; }
+.go-checklist .go-category h3 { margin: 0; }
+.go-checklist .go-category-toggle { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 0; border: 0; background: transparent; color: var(--color-ink); text-align: left; font-size: 17px; }
+.go-category-toggle > span { flex: 1; }
+.go-category-toggle small { font-size: 14px; font-variant-numeric: tabular-nums; }
+.go-checklist .go-item { padding: 0 !important; }
+.go-checklist .go-item-head { align-items: center; gap: 8px; }
+.go-checklist .go-tick { flex: 0 0 44px; gap: 0; }
+.go-checklist .go-tick input { width: 24px; min-width: 24px; height: 24px; margin: 10px; }
+.go-checklist .go-row-open { display: flex; align-items: center; gap: 8px; min-height: 44px; flex: 1; min-width: 0; padding: 8px 0; background: transparent; border: 0; color: var(--color-ink); text-align: left; }
+.go-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.go-row-open small { font-size: 12px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.go-row-open .go-row-person { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.go-row-images { display: flex; gap: 3px; align-items: center; }
+.go-row-open > svg { flex-shrink: 0; }
+.go-item-panel { padding: 8px 0 16px 8px; }
+.go-checklist .go-item-panel > details > summary { min-height: 44px; align-items: center; }
+.go-images { margin: 16px 0; }
+.go-upload { margin: 8px 0; }
+.go-image-list { display: flex; flex-wrap: wrap; gap: 16px; }
+.go-image-list figure { width: 144px; margin: 0; }
+.go-image-list figcaption { font-size: 12px; overflow-wrap: anywhere; margin: 4px 0; }
+.go-checklist .go-thumbnail { display: block; border: 0; padding: 0; background: transparent; }
+.go-thumbnail img { display: block; width: 112px; height: 84px; object-fit: cover; border-radius: 8px; }
+.go-lightbox { width: min(900px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 12px; border: 0; border-radius: 12px; background: var(--color-cream); color: var(--color-ink); }
+.go-lightbox::backdrop { background: rgb(20 28 40 / 75%); }
+.go-lightbox > img { display: block; width: 100%; max-height: calc(100dvh - 160px); object-fit: contain; margin-top: 8px; }
+.go-lightbox > p { font-size: 14px; overflow-wrap: anywhere; }
+.go-checklist :focus-visible, .go-lightbox :focus-visible { outline: 2px solid var(--color-orange-deep); outline-offset: 3px; }
+@media (min-width: 760px) { .go-checklist .go-filters { grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) auto auto; align-items: end; } .go-checklist .go-row-person { max-width: 140px; } }
+.go-checklist .go-tick input { min-height: 24px; padding: 0; }
+.go-checklist .go-tick { padding: 0; }
+.go-checklist .go-row-open { border-radius: 0; }
+@media (min-width: 760px) { .go-checklist .go-filters { top: 96px; } }
+.go-lightbox > img { height: auto; }
