@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { emptyOpening, filterOpeningItems, initialOpeningItems, mergeOpeningItems, newOpening, openingProgress, openingSchema, stampOpening } from "../lib/grand-opening-checklist.ts";
+import { emptyOpening, filterOpeningItems, initialOpeningItems, mergeOpeningItems, newOpening, openingProgress, openingSchema, stampOpening, validOpeningImage } from "../lib/grand-opening-checklist.ts";
 const fields = { ...emptyOpening, title: "โต๊ะ" };
 test("validation trims title; optional quantities remain null; rejects unsafe fields and numbers", () => {
   assert.equal(openingSchema.parse({ ...fields, title: " โต๊ะ " }).title, "โต๊ะ");
@@ -42,4 +42,9 @@ test("seeds are idempotent and retain edits, custom rows, and deletion tombstone
   assert.equal(initialOpeningItems[0].qtyNeeded, 43);
   assert.ok(initialOpeningItems.every(r => !r.assignee && !r.done));
   for (const row of initialOpeningItems) { assert.ok(openingSchema.safeParse({ title: row.title, category: row.category, day: row.day, qtyNeeded: row.qtyNeeded, qtyHave: row.qtyHave, assignee: row.assignee, note: row.note }).success); if (/Lorcana|Pre-release|Pack Rush/.test(row.title)) assert.equal(row.day, "17"); if (/PKM|Riftbound/.test(row.title)) assert.equal(row.day, "18"); }
+});
+
+test("only browser-displayable raster images within the upload limit are accepted", () => {
+  for (const type of ["image/jpeg", "image/png", "image/webp", "image/gif"]) assert.ok(validOpeningImage(type, 100));
+  for (const [type, size] of [["image/svg+xml", 100], ["application/pdf", 100], ["image/heic", 100], ["image/jpeg", 0], ["image/jpeg", 4194305]] as const) assert.equal(validOpeningImage(type, size), false);
 });
