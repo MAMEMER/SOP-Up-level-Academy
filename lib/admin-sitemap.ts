@@ -67,6 +67,7 @@ export const adminSections: SiteSection[] = [
     label: "สั่งงาน",
     hint: "ให้พนักงานทำ",
     links: [
+      { href: "/influencers", label: "อินฟลูเอนเซอร์", detail: "ติดตามช่อง · สถานะการทัก · เรท · ประวัติ", keywords: "influencer มุก GO พันธมิตร" },
       { href: "/admin/posters", label: "ทำโพสเตอร์", detail: "สั่งงานโพส · ดูทุกขั้น · สั่งแก้ · ผ่านแล้วเป็นเทมเพลต", staffAdminOnly: true, keywords: "poster โปสเตอร์ dojo สายพาน เทมเพลต template" },
       { href: "/admin/posters/guide", label: "คู่มือทำโพสเตอร์", detail: "อ่านก่อนใช้ครั้งแรก · วิธีสั่งงาน สั่งแก้ ใช้เทมเพลต", staffAdminOnly: true, keywords: "คู่มือ poster โปสเตอร์ วิธีใช้" },
       { href: "/admin/dojo", label: "รีวิวโปสเตอร์", detail: "เทียบภาพอ้างอิง · ผ่าน / ให้แก้ / ไม่เอา", staffAdminOnly: true, keywords: "dojo โปสเตอร์ poster รีวิว" },
