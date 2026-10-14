@@ -8641,3 +8641,41 @@ p.ab-help{padding-left:0}
   .it-row > div:last-of-type > button { grid-column: 1 / -1; }
   .it-row input[type="text"] { text-overflow: ellipsis; }
 }
+
+/* Grand Opening: shared, boxless editorial checklist. */
+.go-checklist { padding-bottom: 100px; }
+.go-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.go-progress { padding: 16px 0 20px; border-bottom: 1px solid var(--color-ink-soft); }
+.go-progress > strong { display: block; font-size: 22px; }
+.go-progress progress { width: 100%; height: 12px; accent-color: var(--color-orange-deep); margin: 12px 0; }
+.go-progress > div { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 14px; }
+.go-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0 8px; max-width: 600px; }
+.go-category { margin-top: 28px; }
+.go-category h3 { font-size: 20px; margin-bottom: 4px; }
+.go-item { padding: 16px 0; border-bottom: 1px solid var(--color-ink-soft); min-width: 0; }
+.go-item-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.go-item-head > span { font-size: 13px; flex-shrink: 0; }
+.go-checklist .go-tick { flex-direction: row; align-items: center; gap: 10px; min-width: 0; min-height: 44px; color: var(--color-ink); font-size: 17px; font-weight: 500; }
+.go-tick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.go-checklist .go-tick input { width: 44px; min-width: 44px; height: 44px; margin: 0; accent-color: var(--color-orange-deep); cursor: pointer; }
+.go-meta { font-size: 13px; color: var(--color-ink-soft); margin: 6px 0; overflow-wrap: anywhere; }
+.go-note { font-size: 14px; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.go-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.go-editor label:first-child, .go-editor label:nth-child(5) { grid-column: 1 / -1; }
+.go-quantity { display: flex; align-items: center; gap: 8px; }
+.go-checklist .go-quantity button { min-width: 44px; padding: 8px; background: transparent; color: var(--color-ink); border: 1px solid var(--color-ink-soft); }
+.go-checklist .go-history-button { background: transparent; border: 0; color: var(--color-ink); text-decoration: underline; padding-left: 0; }
+.go-history { overflow-wrap: anywhere; font-size: 14px; }
+.go-checklist summary { gap: 8px; }
+.go-checklist button { touch-action: manipulation; }
+@media (max-width: 600px) { .go-editor { grid-template-columns: minmax(0, 1fr); } .go-item-head { align-items: flex-start; } .go-item-head > span { padding-top: 12px; } .go-progress > div { gap: 8px 16px; } }
+.go-checklist .go-item { border: 0 !important; border-bottom: 1px solid var(--color-ink-soft) !important; border-radius: 0 !important; background: transparent !important; padding: 12px 0 !important; }
+.go-checklist .go-item p { margin: 4px 0 !important; }
+.go-checklist .go-item summary { padding: 0; }
+.go-checklist .go-help { margin-bottom: 8px; }
+.go-checklist button:hover:not(:disabled) { outline: 1px solid var(--color-ink); }
+.go-checklist .go-item, .go-checklist input, .go-checklist select, .go-checklist textarea { scroll-margin-top: 110px; }
+.go-progress { font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .go-item details > .go-toolbar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 2; background: var(--color-cream); padding: 8px 0; }
+}
