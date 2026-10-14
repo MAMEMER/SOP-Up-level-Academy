@@ -8710,7 +8710,7 @@ p.ab-help{padding-left:0}
 .go-checklist .go-thumbnail { display: block; border: 0; padding: 0; background: transparent; }
 .go-thumbnail img { display: block; width: 112px; height: 84px; object-fit: cover; border-radius: 8px; }
 .go-lightbox { width: min(900px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 12px; border: 0; border-radius: 12px; background: var(--color-cream); color: var(--color-ink); }
-.go-lightbox::backdrop { background: rgb(20 28 40 / 75%); }
+.go-lightbox::backdrop { background: var(--color-ink); }
 .go-lightbox > img { display: block; width: 100%; max-height: calc(100dvh - 160px); object-fit: contain; margin-top: 8px; }
 .go-lightbox > p { font-size: 14px; overflow-wrap: anywhere; }
 .go-checklist :focus-visible, .go-lightbox :focus-visible { outline: 2px solid var(--color-orange-deep); outline-offset: 3px; }
@@ -8720,3 +8720,15 @@ p.ab-help{padding-left:0}
 .go-checklist .go-row-open { border-radius: 0; }
 @media (min-width: 760px) { .go-checklist .go-filters { top: 96px; } }
 .go-lightbox > img { height: auto; }
+
+/* Shared staff announcement uses tracker buttons and the SOP palette. */
+.opening-announcement { position: sticky; top: 0; z-index: 12; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 20px; background: var(--color-cream); border-bottom: 1px solid var(--color-ink-soft); font-size: 14px; }
+.opening-announcement strong { flex: 1 1 100%; }
+.opening-announcement a { min-height: 44px; display: inline-flex; align-items: center; margin-left: auto; }
+.go-checklist .go-filters { top: 104px; }
+.go-checklist .go-item-panel { scroll-margin-top: 280px; }
+.go-category-toggle > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 760px) { .opening-announcement strong { flex: 1; } .go-checklist .go-filters { top: 72px; } .go-checklist .go-item-panel { scroll-margin-top: 200px; } }
+
+.app-shell > .opening-announcement { max-width: 1120px; margin: 0 auto; }
+.app-shell:has(.opening-announcement) > .sidebar { position: static; }
