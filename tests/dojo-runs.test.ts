@@ -59,3 +59,12 @@ test('The page can tell working from waiting in line and from stuck', async () =
   assert.equal(liveState({ status: 'queued', live: { state: 'running', at: now - 30_000, started: now - 60_000 } }, now), 'working');
   assert.equal(liveState({ status: 'queued', live: { state: 'running', at: now - 7 * 60_000, started: null } }, now), 'stalled');
 });
+
+test('looksLikeApproval: short go-ahead notes, never feedback', async () => {
+  const { looksLikeApproval } = await import('../lib/dojo-runs.ts');
+  assert.equal(looksLikeApproval('ก็อปเต็มใบ รอบ 2 แบบนี้เหมือนแล้ว ไปขั้นต่อไป'), true);
+  assert.equal(looksLikeApproval('ผ่าน'), true);
+  assert.equal(looksLikeApproval('ซ้อน 50% แบบนี้อ่านไม่ออก ไม่ผ่าน'), false);
+  assert.equal(looksLikeApproval('ยังไม่เหมือน ตัวหนังสือเล็กไป'), false);
+  assert.equal(looksLikeApproval('ตัวหนังสือเล็กไป อ่านในมือถือไม่ออก'), false);
+});

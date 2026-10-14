@@ -77,6 +77,13 @@ export function redoPatch(stage: StageKey, existing: StageKey[], note: string, b
   return patch;
 }
 
+/** ข้อความสั้นๆ ที่แปลว่า "ผ่าน ไปต่อ" (คนพิมพ์ลงช่องแก้แทนการกดปุ่มไปต่อ) — มีคำปฏิเสธเมื่อไรถือเป็นสั่งแก้ */
+export function looksLikeApproval(note: string) {
+  const t = note.trim();
+  if (!t || t.length > 80 || /ไม่|ยัง|แต่|แก้|เปลี่ยน/.test(t)) return false;
+  return /ผ่าน|ไปต่อ|ขั้นต่อไป|เหมือนแล้ว|ใช้แบบนี้|ใช้อันนี้|โอเค|ok|okay|ได้แล้ว|ดีแล้ว/i.test(t);
+}
+
 /** ด่านรอคน: ขั้นที่ status=waiting (เช่น copy) ต้องให้คนกด "ไปต่อ" ก่อนระบบจะทำขั้นถัดไป */
 export function proceedStage(run: Pick<Run, 'status' | 'stages'>): StageKey | null {
   if (run.status === 'approved' || run.status === 'done') return null;
