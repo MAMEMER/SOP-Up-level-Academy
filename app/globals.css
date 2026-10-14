@@ -8606,3 +8606,38 @@ p.ab-help{padding-left:0}
 .cp-picked { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 8px 8px 12px; border: 1px solid var(--color-orange); border-radius: 12px; background: var(--color-cream-2); }
 .cp-picked .cp-name { flex: 1; }
 @media (min-width: 720px) { .cp-fields .cp-pick-wrap { grid-column: span 2; } }
+
+/* Influencer outreach: editorial rows, stacked on phones. */
+.influencer-tracker { min-width: 0; padding-bottom: 80px; color: var(--color-ink); }
+.it-guide { border-block: 1px solid var(--color-ink-soft); padding: 16px 0; margin-bottom: 20px; }
+.it-guide h3 { margin: 0; }
+.it-guide blockquote { margin: 12px 0; padding-left: 16px; border-left: 3px solid var(--color-orange); line-height: 1.8; }
+.it-toolbar, .it-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.it-toolbar span { font-size: 14px; }
+.influencer-tracker button { min-height: 44px; padding: 8px 14px; font: inherit; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; justify-content: center; border-radius: 999px; box-shadow: none; }
+.influencer-tracker .it-primary { background: var(--color-ink); color: var(--color-cream); border: 1px solid var(--color-ink); }
+.influencer-tracker .it-secondary { background: transparent; color: var(--color-ink); border: 1px solid var(--color-ink-soft); }
+.influencer-tracker button:disabled { opacity: 1; background: var(--color-cream-2); color: var(--color-ink-soft); cursor: default; }
+.it-filters { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin: 16px 0; }
+.influencer-tracker label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; color: var(--color-ink-soft); }
+.influencer-tracker input, .influencer-tracker select, .influencer-tracker textarea { width: 100%; min-width: 0; min-height: 44px; padding: 8px; font: inherit; font-size: 16px; color: var(--color-ink); border: 1px solid var(--color-ink-soft); border-radius: 8px; background: var(--color-cream); box-sizing: border-box; }
+.influencer-tracker textarea { resize: vertical; }
+.it-notice { border-left: 3px solid var(--color-orange); padding-left: 12px; }
+.it-head, .it-row { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr); gap: 14px; }
+.it-head { padding: 12px 0; border-bottom: 2px solid var(--color-ink-soft); font-size: 14px; }
+.it-row { padding: 18px 0; border-bottom: 1px solid var(--color-ink-soft); }
+.it-row > div { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.influencer-tracker summary, .it-row a { min-height: 44px; display: flex; align-items: center; cursor: pointer; overflow-wrap: anywhere; color: var(--color-ink); }
+.it-history { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.it-history p { white-space: pre-wrap; }
+.influencer-tracker :focus-visible { outline: 3px solid var(--color-orange-deep); outline-offset: 3px; }
+@media (max-width: 1100px) { .it-head { display: none; } .it-row { grid-template-columns: 1fr 1fr; } .it-row > div:last-of-type { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .it-filters { grid-template-columns: 1fr 1fr; } .it-filters > label:first-child { grid-column: 1 / -1; } .it-row { grid-template-columns: 1fr; gap: 12px; } .it-row > div { grid-column: 1; } .it-row > div:first-child input { font-weight: 500; } }
+.influencer-tracker input, .influencer-tracker select, .influencer-tracker textarea, .it-row { scroll-margin-top: 130px; }
+.influencer-tracker button, .influencer-tracker summary, .influencer-tracker a { touch-action: manipulation; }
+@media (max-width: 600px) {
+  .it-row > div { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+  .it-row > div:first-child > details, .it-row > div:nth-child(4) > label:last-child, .it-row > div:last-of-type > label, .it-actions { grid-column: 1 / -1; }
+  .it-row > div:last-of-type > button { grid-column: 1 / -1; }
+  .it-row input[type="text"] { text-overflow: ellipsis; }
+}
