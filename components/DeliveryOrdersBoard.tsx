@@ -19,6 +19,9 @@ import type { ShiftCode } from "../lib/shift-schedule.ts";
 import { claimDelivery, fetchDeliveryFeed, handoffDelivery, shipDelivery } from "../lib/delivery-tasks-store.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 
+import { visibleRecords, isRemoved } from "../lib/removed-records.ts";
+import { RemovedToggle, RemovalNote } from "./RemovedRecords.tsx";
+
 const REFRESH_MS = 60_000;
 
 // หน้าแรกโชว์เฉพาะใบที่ยังต้องทำ — ใบที่ปิดแล้วยังเปิดดูย้อนหลังได้จากตัวกรองนี้
@@ -43,6 +46,7 @@ export function DeliveryOrdersBoard({
   initialToday?: string;
   initialShift?: ShiftCode | null;
 }) {
+  const [showRemoved, setShowRemoved] = useState(false);
   const [tasks, setTasks] = useState<DeliveryTask[]>(initialTasks);
   const [today, setToday] = useState(initialToday);
   const [shiftToday, setShiftToday] = useState<ShiftCode | null>(initialShift);
@@ -54,7 +58,7 @@ export function DeliveryOrdersBoard({
 
   const reload = useCallback(async () => {
     try {
-      const feed = await fetchDeliveryFeed(branch, filter !== "open");
+      const feed = await fetchDeliveryFeed(branch, filter !== "open", showRemoved);
       setTasks(feed.tasks);
       setToday(feed.today);
       setShiftToday(feed.shiftToday);
@@ -64,7 +68,7 @@ export function DeliveryOrdersBoard({
     } finally {
       setLoading(false);
     }
-  }, [branch, filter]);
+  }, [branch, filter, showRemoved]);
 
   // งานชุดแรกมาจาก server render แล้ว — รอบแรกจึงข้ามไป ไม่ต้อง sync ซ้ำทันทีที่โหลดหน้า
   // (แต่พอเปลี่ยนตัวกรอง reload เปลี่ยน identity → ยิงใหม่ทันทีเพื่อดึงใบที่ปิดแล้วมา)
@@ -91,10 +95,10 @@ export function DeliveryOrdersBoard({
 
   // งานของกะตัวเองขึ้นก่อน ที่เหลือเป็นงานของกะอื่นที่ยังค้าง — เห็นไว้เพื่อหยิบแทนกันได้
   const viewer = { isAdmin: false, staffCode: "self", shiftToday, today };
-  const ordered = [...tasks].sort(
+  const ordered = visibleRecords(tasks, showRemoved).sort(
     (left, right) => Number(isOwnShiftTask(right, viewer)) - Number(isOwnShiftTask(left, viewer))
   );
-  const remaining = tasks.filter((task) => task.status !== "shipped");
+  const remaining = visibleRecords(tasks).filter((task) => task.status !== "shipped");
   const overdue = remaining.filter((task) => deliveryTaskState(task, today) === "overdue");
   const shown = ordered.filter((task) => {
     if (filter === "open") return task.status !== "shipped";
@@ -132,6 +136,8 @@ export function DeliveryOrdersBoard({
         ))}
       </div>
 
+      <RemovedToggle checked={showRemoved} onChange={setShowRemoved} />
+
       {error ? <p className="delivery-board__error">{error}</p> : null}
 
       {shown.length === 0 && !loading ? (
@@ -148,13 +154,14 @@ export function DeliveryOrdersBoard({
           const busy = busyId === task.id;
           const mine = isOwnShiftTask(task, viewer);
           return (
-            <li key={task.id} className={`delivery-item delivery-item--${state}`}>
+            <li key={task.id} className={`delivery-item delivery-item--${state}${isRemoved(task) ? " is-removed" : ""}`}>
               <div className="delivery-item__main">
                 <p className="delivery-item__meta">
                   #{task.orderCode} · {deliveryTargetLabel(task)}
                   {task.handedOffBy ? ` · ส่งต่อโดย ${displayNameFor(task.handedOffBy)}` : ""}
                   {shiftToday && !mine ? <span className="delivery-item__other">ของกะอื่น</span> : null}
                 </p>
+                <RemovalNote record={task} />
                 <strong>{task.customerName || "ไม่ระบุชื่อผู้รับ"}</strong>
                 <p className="delivery-item__items">
                   {task.itemsSummary || "ไม่มีรายละเอียดสินค้า"}
@@ -174,7 +181,7 @@ export function DeliveryOrdersBoard({
                 </em>
               </div>
 
-              {canAct && task.status !== "shipped" ? (
+              {canAct && !isRemoved(task) && task.status !== "shipped" ? (
                 <div className="delivery-item__actions">
                   {task.status === "open" ? (
                     <button type="button" disabled={busy} onClick={() => run(task.id, () => claimDelivery(task.id))}>

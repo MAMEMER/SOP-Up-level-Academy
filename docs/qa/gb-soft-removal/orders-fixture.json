@@ -1,0 +1,48 @@
+{
+  "orders": [
+    {
+      "key": "shop__TEST-ACTIVE",
+      "source": "shop",
+      "ref": "TEST-ACTIVE",
+      "createdAt": "2026-10-15T03:00:00Z",
+      "name": "ข้อมูลทดสอบ · ลูกค้าปกติ",
+      "phone": "",
+      "items": "รายการทดสอบ ×1",
+      "total": 100,
+      "due": null,
+      "pay": "paid",
+      "payText": "จ่ายครบ",
+      "hand": "to_ship",
+      "handText": "รอจัดส่ง",
+      "method": "ship",
+      "address": "",
+      "note": "ข้อมูลจำลองสำหรับตรวจ PR เท่านั้น"
+    },
+    {
+      "key": "shop__TEST-REMOVED",
+      "source": "shop",
+      "ref": "TEST-REMOVED",
+      "createdAt": "2026-10-15T03:00:00Z",
+      "name": "ข้อมูลทดสอบ · เอาชื่อออก",
+      "phone": "",
+      "items": "รายการทดสอบ ×1",
+      "total": 100,
+      "due": null,
+      "pay": "paid",
+      "payText": "จ่ายครบ",
+      "hand": "to_ship",
+      "handText": "รอจัดส่ง",
+      "method": "ship",
+      "address": "",
+      "note": "ข้อมูลจำลองสำหรับตรวจ PR เท่านั้น",
+      "removed": true,
+      "removedBy": "UP-TEST",
+      "removedAt": "2026-10-15T08:00:00+07:00",
+      "removedReason": "รายการทดสอบซ้ำ ตรวจการซ่อนจากยอดงาน"
+    }
+  ],
+  "lots": {},
+  "errors": [],
+  "isAdmin": false,
+  "canAct": true
+}

@@ -1,3 +1,4 @@
+import type { RemovalFields } from "./removed-records.ts";
 // งานส่งของจากออเดอร์เว็บกิลด์ — routing rules.
 //
 // ลูกค้าสั่งของบน uplevelguild.com แล้วจ่ายเงิน → ออเดอร์ต้องถูกแพ็คและส่งภายใน 1 วัน.
@@ -44,7 +45,7 @@ export type ShiftWindows = {
 };
 
 /** หนึ่งใบงานส่งของ = หนึ่งออเดอร์ที่จ่ายเงินแล้ว (Firestore: delivery_tasks) */
-export type DeliveryTask = {
+export type DeliveryTask = RemovalFields & {
   id: string;
   branch: string;
   /** doc id ของ shop-orders บนเว็บกิลด์ */

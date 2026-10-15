@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const { user } = await actor();
   if (!hasAdminCredentials()) return NextResponse.json({ error: "storage_not_configured" }, { status: 503 });
   try {
-    return NextResponse.json({ ...(await fetchCustomerOrders()), isAdmin: isAdmin(user), canAct: canWriteNow(user) });
+    return NextResponse.json({ ...(await fetchCustomerOrders(new URL(request.url).searchParams.get("showRemoved") === "1")), isAdmin: isAdmin(user), canAct: canWriteNow(user) });
   } catch (error) {
     return NextResponse.json({ error: "read_failed", detail: String(error) }, { status: 500 });
   }

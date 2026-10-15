@@ -1,3 +1,4 @@
+import { visibleRecords, type RemovalFields } from "./removed-records.ts";
 // "ออเดอร์ลูกค้า" — ออเดอร์ทุกช่องทางในที่เดียว: ร้านออนไลน์, พรีออเดอร์ (Set 14, Bundle),
 // Pre-release และพรีออเดอร์ที่อยู่ในชีต (MA6, Lorcana 13, Mega Tactic).
 //
@@ -15,7 +16,7 @@ export type PayState = "paid" | "deposit" | "review" | "unpaid" | "refund" | "ca
 export type HandState = "not_needed" | "waiting_stock" | "to_hand" | "to_ship" | "picked_up" | "shipped";
 export type Method = "pickup" | "ship" | "event";
 
-export type CustomerOrder = {
+export type CustomerOrder = RemovalFields & {
   /** `${source}__${ref}` — doc id ของ sop_order_fulfillment */
   key: string;
   source: OrderSource;
@@ -399,7 +400,8 @@ export function matchesQuery(o: CustomerOrder, q: string): boolean {
   return [o.name, o.ref, o.items, SOURCE_LABEL[o.source]].some((v) => v.toLowerCase().includes(query));
 }
 
-export function orderCounts(orders: CustomerOrder[]): Record<Filter, number> {
+export function orderCounts(rows: CustomerOrder[]): Record<Filter, number> {
+  const orders = visibleRecords(rows);
   return {
     todo: orders.filter(isTodo).length,
     review: orders.filter((o) => o.pay === "review").length,
