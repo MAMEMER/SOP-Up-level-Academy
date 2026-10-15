@@ -123,6 +123,9 @@ test("category CRUD/reorder is audited, revision guarded, and quantity changes s
   assert.equal(currentRow()?.qtyHave, 1); assert.equal(currentBoard()?.activity[0].action, "quantity");
   assert.equal((await POST(request({ action: "quantity", id: "quantity-test", revision: 2, field: "qtyNeeded", delta: -1 }))).status, 200);
   assert.equal(currentRow()?.qtyNeeded, 0);
+  assert.equal((await POST(request({ action: "quantity", id: "quantity-test", revision: 3, field: "qtyHave", value: 250 }))).status, 200);
+  assert.equal(currentRow()?.qtyHave, 250);
+  assert.equal((await POST(request({ action: "quantity", id: "quantity-test", revision: 4, field: "qtyHave", value: -5 }))).status, 400);
   assert.equal((await POST(request({ action: "category-delete", id: "custom-cat", revision: 3 }))).status, 200);
   assert.equal(currentBoard()?.categories.find(row => row.id === "custom-cat")?.deleted, true);
   assert.equal(state.events.at(-1)?.action, "category-delete");
