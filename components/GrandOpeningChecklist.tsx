@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Plus, Minus, Download, RefreshCw, ImageIcon, ChevronDown, X, Trash2 } from "lucide-react";
+import { Plus, Minus, Check, Download, RefreshCw, ImageIcon, ChevronDown, X, Trash2 } from "lucide-react";
 import { initialOpeningBoard, changeOpeningCategory, activeOpeningRows, openingActivityText, openingRelativeTime, openingQuantity, type OpeningBoard, emptyOpening, filterOpeningItems, mergeOpeningItems, newOpening, openingDays, openingProgress, openingSchema, stampOpening, type OpeningFields, type OpeningHistory, MAX_OPENING_IMAGES, type OpeningImage, type OpeningItem } from "../lib/grand-opening-checklist.ts";
 
 import { prepareOpeningImage } from "../lib/grand-opening-images-client.ts";
@@ -41,16 +41,17 @@ export function GrandOpeningChecklist({ readOnly, userKey, userName }: { readOnl
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState("");
   const [invalid, setInvalid] = useState("");
+  const [qtyEdit, setQtyEdit] = useState<Record<string, string>>({});
   useEffect(() => {
-    try { const saved = JSON.parse(localStorage.getItem(key) || "null"); if (saved) { setBoard(saved.board || initialOpeningBoard); setQuick(saved.quick || {}); setCategoryDraft(saved.categoryDraft || ""); setCategoryNames(saved.categoryNames || {}); setDrafts(saved.drafts || {}); setLocalRows(saved.rows || []); setLocalHistory(saved.history || {}); setStatus(saved.status || ""); setDay(saved.day || ""); setShowDone(saved.showDone === true); setCategories(saved.categories || []); setExpanded(saved.expanded || []); } }
+    try { const saved = JSON.parse(localStorage.getItem(key) || "null"); if (saved) { setBoard(saved.board || initialOpeningBoard); setQuick(saved.quick || {}); setCategoryDraft(saved.categoryDraft || ""); setCategoryNames(saved.categoryNames || {}); setDrafts(saved.drafts || {}); setLocalRows(saved.rows || []); setLocalHistory(saved.history || {}); setStatus(saved.status || ""); setDay(saved.day || ""); setShowDone(saved.showDone === true); setCategories(saved.categories || []); setExpanded(saved.expanded || []); setQtyEdit(saved.qtyEdit || {}); } }
     catch { setError("อ่านร่างในเครื่องไม่ได้ กรุณาส่งออกก่อนรีเซ็ต"); }
     setReady(true);
   }, [key]);
   useEffect(() => {
     if (!ready) return;
-    try { localStorage.setItem(key, JSON.stringify({ board, quick, categoryDraft, categoryNames, drafts, rows: localRows, history: localHistory, status, day, showDone, categories, expanded })); }
+    try { localStorage.setItem(key, JSON.stringify({ board, quick, categoryDraft, categoryNames, drafts, rows: localRows, history: localHistory, status, day, showDone, categories, expanded, qtyEdit })); }
     catch { setError("เก็บร่างไม่ได้ อย่าปิดหน้านี้ก่อนบันทึกหรือส่งออก"); }
-  }, [ready, key, board, quick, categoryDraft, categoryNames, drafts, localRows, localHistory, status, day, showDone, categories, expanded]);
+  }, [ready, key, board, quick, categoryDraft, categoryNames, drafts, localRows, localHistory, status, day, showDone, categories, expanded, qtyEdit]);
   async function load() {
     try {
       const res = await fetch("/api/grand-opening-checklist", { cache: "no-store" });
@@ -92,7 +93,7 @@ export function GrandOpeningChecklist({ readOnly, userKey, userName }: { readOnl
     if (!window.confirm("รีเซ็ตร่างรายการนี้กลับเป็นข้อมูลล่าสุด?")) return;
     setDrafts(previous => { const next = { ...previous }; delete next[id]; return next; });
   }
-  async function mutate(row: OpeningItem, action: "save" | "tick" | "delete" | "quantity", extra?: { field: "qtyHave" | "qtyNeeded"; delta: number }) {
+  async function mutate(row: OpeningItem, action: "save" | "tick" | "delete" | "quantity", extra?: { field: "qtyHave" | "qtyNeeded"; delta?: number; value?: number }) {
     const draft = drafts[row.id];
     if (action === "save") {
       const parsed = openingSchema.safeParse(draft?.fields);
@@ -104,7 +105,7 @@ export function GrandOpeningChecklist({ readOnly, userKey, userName }: { readOnl
       let next: OpeningItem;
       if (mode === "preview") {
         const at = new Date().toISOString();
-        next = action === "save" ? { ...row, ...openingSchema.parse(draft.fields) } : action === "tick" ? stampOpening(row, !row.done, userName, at) : action === "quantity" && extra ? { ...row, [extra.field]: openingQuantity(row[extra.field], extra.delta) } : { ...row, deleted: true };
+        next = action === "save" ? { ...row, ...openingSchema.parse(draft.fields) } : action === "tick" ? stampOpening(row, !row.done, userName, at) : action === "quantity" && extra ? { ...row, [extra.field]: extra.value !== undefined ? openingQuantity(0, extra.value) : openingQuantity(row[extra.field], extra.delta ?? 0) } : { ...row, deleted: true };
         next = { ...next, revision: row.revision + 1, updatedBy: userName, updatedAt: at, createdAt: row.createdAt || at };
         setLocalRows(previous => [...previous.filter(item => item.id !== row.id), next]);
         setLocalHistory(previous => ({ ...previous, [row.id]: [{ id: crypto.randomUUID(), at, by: userName, action, before: savedRows.find(item => item.id === row.id) || null, after: next }, ...(previous[row.id] || [])] }));
@@ -113,6 +114,7 @@ export function GrandOpeningChecklist({ readOnly, userKey, userName }: { readOnl
         const data = await res.json(); if (!res.ok) { if (res.status === 409) await load(); throw new Error(data.detail || data.error || "บันทึกไม่สำเร็จ"); }
         next = data.row; setRows(previous => previous.some(item => item.id === row.id) ? previous.map(item => item.id === row.id ? next : item) : [...previous, next]);
       }
+      if (action === "quantity" && extra) setQtyEdit(previous => { const nextEdit = { ...previous }; delete nextEdit[`${row.id}:${extra.field}`]; return nextEdit; });
       if (action === "save" || action === "delete") setDrafts(previous => { const nextDrafts = { ...previous }; delete nextDrafts[row.id]; return nextDrafts; });
       if (mode === "preview") setBoard(previous => ({ ...previous, activity: [{ id: crypto.randomUUID(), at: next.updatedAt!, by: userName, action: action === "tick" && !next.done ? "untick" : action === "save" && !savedRows.some(item => item.id === row.id) ? "add" : action, title: next.title }, ...previous.activity].slice(0, 100) }));
       setOpenHistory(""); setMessage(mode === "preview" ? "บันทึกเฉพาะเครื่องนี้แล้ว" : "บันทึกให้ทีมแล้ว");
@@ -190,7 +192,22 @@ export function GrandOpeningChecklist({ readOnly, userKey, userName }: { readOnl
       return <article className="go-item" key={row.id}>
         <div className="go-item-head"><label className="go-tick"><input type="checkbox" checked={row.done} disabled={disabled || !saved || !!drafts[row.id]} onChange={() => void mutate(row, "tick")} aria-label={`เสร็จ: ${row.title}`} /></label><button className="go-row-open" aria-expanded={expanded.includes(row.id)} aria-controls={`${row.id}-panel`} onClick={() => setExpanded(previous => previous.includes(row.id) ? previous.filter(id => id !== row.id) : [...previous, row.id])}><span className="go-row-title" title={fields.title}>{fields.title || "รายการใหม่"}{drafts[row.id] ? " · ร่าง" : ""}</span>{row.qtyNeeded !== null || row.qtyHave !== null ? <small>{row.qtyHave ?? "?"}/{row.qtyNeeded ?? "?"}</small> : null}{row.doneBy && <small className="go-row-person" title={row.doneBy}>{row.doneBy}</small>}{!!row.images?.length && <small className="go-row-images"><ImageIcon size={14} aria-hidden="true" />{row.images.length}</small>}<ChevronDown size={16} aria-hidden="true" /></button></div>
         {expanded.includes(row.id) && <div className="go-item-panel" id={`${row.id}-panel`}>
-        <div className="it-actions">{(["qtyHave", "qtyNeeded"] as const).map(field => <div className="go-quantity" key={field}><span>{labels[field]} {row[field] ?? "ไม่ระบุ"}</span><button className="it-secondary" aria-label={`ลด${labels[field]}ทันที ${row.title}`} disabled={disabled || !!drafts[row.id] || !saved || !row[field]} onClick={() => void mutate(row, "quantity", { field, delta: -1 })}><Minus size={16} /></button><button className="it-secondary" aria-label={`เพิ่ม${labels[field]}ทันที ${row.title}`} disabled={disabled || !!drafts[row.id] || !saved || (row[field] ?? 0) >= 1000000} onClick={() => void mutate(row, "quantity", { field, delta: 1 })}><Plus size={16} /></button></div>)}</div>
+        <div className="it-actions">{(["qtyHave", "qtyNeeded"] as const).map(field => {
+          const editKey = `${row.id}:${field}`;
+          const locked = disabled || !!drafts[row.id] || !saved;
+          const typed = qtyEdit[editKey];
+          const typedValue = typed === undefined || typed.trim() === "" ? null : Number(typed);
+          const typedOk = typedValue !== null && Number.isInteger(typedValue) && typedValue >= 0 && typedValue <= 1000000;
+          const dirty = typed !== undefined && typedValue !== row[field];
+          const commit = () => { if (dirty && typedOk) void mutate(row, "quantity", { field, value: typedValue! }); };
+          return <div className="go-quantity" key={field}>
+            <label htmlFor={`${row.id}-quick-${field}`}>{labels[field]}</label>
+            <button className="it-secondary" aria-label={`ลด${labels[field]}ทันที ${row.title}`} disabled={locked || dirty || !row[field]} onClick={() => void mutate(row, "quantity", { field, delta: -1 })}><Minus size={16} /></button>
+            <input id={`${row.id}-quick-${field}`} className="go-quantity-input" type="number" inputMode="numeric" pattern="[0-9]*" min={0} max={1000000} step={1} placeholder="ไม่ระบุ" autoComplete="off" disabled={locked} aria-invalid={dirty && !typedOk} value={typed ?? (row[field] ?? "")} onFocus={e => e.currentTarget.select()} onChange={e => setQtyEdit(previous => ({ ...previous, [editKey]: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } if (e.key === "Escape") setQtyEdit(previous => { const nextEdit = { ...previous }; delete nextEdit[editKey]; return nextEdit; }); }} />
+            <button className="it-secondary" aria-label={`เพิ่ม${labels[field]}ทันที ${row.title}`} disabled={locked || dirty || (row[field] ?? 0) >= 1000000} onClick={() => void mutate(row, "quantity", { field, delta: 1 })}><Plus size={16} /></button>
+            {dirty && <button className="it-primary go-quantity-save" disabled={locked || !typedOk} onClick={commit}><Check size={16} />{saving === row.id ? "กำลังบันทึก" : "บันทึก"}</button>}
+          </div>;
+        })}</div>
         <p className="go-meta">{row.day ? `${row.day}${row.day === "ทั้งสองวัน" ? "" : " ต.ค."}` : "ไม่ระบุวัน"}</p>
         {row.done && <p className="go-meta">ติ๊กโดย {row.doneBy} · {time(row.doneAt)}</p>}
         <p className="go-meta">{row.assignee ? `ผู้รับผิดชอบ: ${row.assignee}` : "ยังไม่มอบหมาย"}{row.qtyNeeded !== null || row.qtyHave !== null ? ` · มี ${row.qtyHave ?? "ยังไม่ระบุ"} / ต้องใช้ ${row.qtyNeeded ?? "ยังไม่ระบุ"}` : ""}</p>

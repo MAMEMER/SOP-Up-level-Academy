@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 const categoryMutation = z.object({ action: z.enum(["category-add", "category-rename", "category-delete", "category-move"]), id: z.string().min(1).max(100), name: z.string().trim().max(100).optional(), direction: z.union([z.literal(-1), z.literal(1)]).optional(), revision: z.number().int().nonnegative() }).strict();
 const mutation = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save"), id: idSchema, revision: z.number().int().nonnegative(), fields: openingSchema }).strict(),
-  z.object({ action: z.literal("quantity"), id: idSchema, revision: z.number().int().nonnegative(), field: z.enum(["qtyHave", "qtyNeeded"]), delta: z.union([z.literal(-1), z.literal(1)]) }).strict(),
+  z.object({ action: z.literal("quantity"), id: idSchema, revision: z.number().int().nonnegative(), field: z.enum(["qtyHave", "qtyNeeded"]), delta: z.union([z.literal(-1), z.literal(1)]).optional(), value: z.number().int().min(0).max(1000000).optional() }).strict(),
   z.object({ action: z.literal("tick"), id: idSchema, revision: z.number().int().nonnegative(), done: z.boolean() }).strict(),
   z.object({ action: z.literal("image-delete"), id: idSchema, revision: z.number().int().nonnegative(), imageId: idSchema }).strict(),
   z.object({ action: z.literal("delete"), id: idSchema, revision: z.number().int().nonnegative() }).strict()
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
         next = { ...next, ...itemBody.fields };
       }
       if (!board.categories.some(category => category.id === next.category && !category.deleted)) throw Error("conflict");
-      if (itemBody.action === "quantity") next = { ...next, [itemBody.field]: openingQuantity(next[itemBody.field], itemBody.delta) };
+      if (itemBody.action === "quantity") next = { ...next, [itemBody.field]: itemBody.value !== undefined ? openingQuantity(0, itemBody.value) : openingQuantity(next[itemBody.field], itemBody.delta ?? 0) };
       if (itemBody.action === "tick") next = stampOpening(next, itemBody.done, by, at);
       if (itemBody.action === "delete") next = { ...next, deleted: true };
       if (itemBody.action === "image-add") {
