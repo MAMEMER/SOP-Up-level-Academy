@@ -1,4 +1,5 @@
 import "server-only";
+import { visibleRecords, removalFields, isRemoved } from "./removed-records.ts";
 import { JWT } from "google-auth-library";
 import { adminDb } from "./firebase-admin.ts";
 import {
@@ -73,8 +74,8 @@ export function invalidateOrders() {
   cache = null;
 }
 
-export async function fetchCustomerOrders(): Promise<OrdersFeed> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.feed;
+export async function fetchCustomerOrders(showRemoved = false): Promise<OrdersFeed> {
+  if (cache && Date.now() - cache.at < TTL_MS) return { ...cache.feed, orders: visibleRecords(cache.feed.orders, showRemoved) };
   const db = adminDb();
   const errors: string[] = [];
   const safe = async <T,>(label: string, run: () => Promise<T>, fallback: T): Promise<T> => {
@@ -87,8 +88,8 @@ export async function fetchCustomerOrders(): Promise<OrdersFeed> {
   };
 
   const [shopSnap, taskSnap, set14, bundle, prerelease, ma6, l13, mat, recSnap] = await Promise.all([
-    safe("ร้านออนไลน์", () => db.collection("shop-orders").select("status", "customer", "items", "total", "createdAt", "shippedAt").get(), null),
-    safe("ใบงานส่งของ", () => db.collection("delivery_tasks").select("orderId", "status", "trackingNumber", "shippedAt").get(), null),
+    safe("ร้านออนไลน์", () => db.collection("shop-orders").select("status", "customer", "items", "total", "createdAt", "shippedAt", "removed", "removedBy", "removedAt", "removedReason").get(), null),
+    safe("ใบงานส่งของ", () => db.collection("delivery_tasks").select("orderId", "status", "trackingNumber", "shippedAt", "removed").get(), null),
     safe("Set 14", () => db.collection("set14-reservations").get(), null),
     safe("Bundle", () => db.collection("bundle-reservations").get(), null),
     safe("Pre-release", () => db.collection("prerelease-reservations").get(), null),
@@ -107,14 +108,14 @@ export async function fetchCustomerOrders(): Promise<OrdersFeed> {
   const tasks = new Map<string, DeliveryRaw>();
   taskSnap?.docs.forEach((d) => {
     const v = d.data();
-    if (v.orderId) tasks.set(String(v.orderId), { id: d.id, orderId: String(v.orderId), status: v.status, trackingNumber: v.trackingNumber, shippedAt: v.shippedAt });
+    if (!isRemoved(v) && v.orderId) tasks.set(String(v.orderId), { id: d.id, orderId: String(v.orderId), status: v.status, trackingNumber: v.trackingNumber, shippedAt: v.shippedAt });
   });
 
   const out: CustomerOrder[] = [];
   shopSnap?.docs.forEach((d) => {
     const v = d.data();
     const o = fromShop({ id: d.id, status: v.status, customer: v.customer, items: v.items, total: v.total, createdAt: iso(v.createdAt), shippedAt: iso(v.shippedAt) }, tasks.get(d.id));
-    if (o) out.push(o);
+    if (o) out.push({ ...o, ...removalFields(v) });
   });
   const now = Date.now();
   for (const [source, snap] of [["set14", set14], ["bundle", bundle], ["prerelease", prerelease]] as const) {
@@ -122,7 +123,7 @@ export async function fetchCustomerOrders(): Promise<OrdersFeed> {
       const v = d.data();
       const raw: ReservationRaw = { ...(v as ReservationRaw), id: d.id, createdAt: iso(v.createdAt), expiresAt: iso(v.expiresAt) };
       const o = fromReservation(source, raw, now);
-      if (o) out.push(o);
+      if (o) out.push({ ...o, ...removalFields(v) });
     });
   }
   ma6.slice(1).forEach((row, i) => {
@@ -150,7 +151,7 @@ export async function fetchCustomerOrders(): Promise<OrdersFeed> {
     loadedAt: new Date().toISOString()
   };
   cache = { at: Date.now(), feed };
-  return feed;
+  return { ...feed, orders: visibleRecords(feed.orders, showRemoved) };
 }
 
 // ---------- บันทึกการส่งมอบ ----------

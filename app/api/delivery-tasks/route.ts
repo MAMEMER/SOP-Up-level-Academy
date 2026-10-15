@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   try {
     const [tasks, shiftToday] = await Promise.all([
-      syncDeliveryTasks(now),
+      syncDeliveryTasks(now, params.get("showRemoved") === "1"),
       staffCode ? fetchShiftForStaff(branch, today, staffCode) : Promise.resolve(null)
     ]);
     const viewer = { isAdmin: isAdmin(user), staffCode: staffCode || null, shiftToday, today };

@@ -32,8 +32,8 @@ async function post(body: Record<string, unknown>): Promise<void> {
 }
 
 /** includeClosed = ขอใบที่ปิดไปแล้วมาด้วย (ตัวกรอง "ทั้งหมด / ปิดแล้ว") */
-export async function fetchDeliveryFeed(branch: string, includeClosed = false): Promise<DeliveryFeed> {
-  const query = `branch=${encodeURIComponent(branch)}${includeClosed ? "&includeClosed=1" : ""}`;
+export async function fetchDeliveryFeed(branch: string, includeClosed = false, showRemoved = false): Promise<DeliveryFeed> {
+  const query = `branch=${encodeURIComponent(branch)}${includeClosed ? "&includeClosed=1" : ""}${showRemoved ? "&showRemoved=1" : ""}`;
   const res = await fetch(`${ENDPOINT}?${query}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`delivery-tasks read failed: ${res.status}`);
   return (await res.json()) as DeliveryFeed;

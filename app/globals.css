@@ -8772,3 +8772,12 @@ p.ab-help{padding-left:0}
 .orders-board__arrival li { flex-wrap: wrap; }
 /* globals ใส่กรอบ input ด้วย !important — ช่องค้นหานี้มีกรอบที่ตัว label แล้ว ต้องลบกรอบซ้อน */
 .orders-board__search input[type="search"] { border: none !important; box-shadow: none !important; background: transparent !important; border-radius: 0 !important; min-height: 0; padding: 10px 0; }
+
+/* GB audit records remain readable, with no active fulfillment controls. */
+.removed-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-size: 16px; }
+.removed-toggle input { width: 20px; height: 20px; flex-shrink: 0; }
+.orders-row.is-removed, .delivery-item.is-removed { background: color-mix(in srgb, var(--color-ink-soft) 10%, var(--color-cream)); color: var(--color-ink-soft); }
+.orders-row.is-removed .parcel-order__pill { background: transparent; color: inherit; }
+.removed-note { color: var(--color-ink-soft); overflow-wrap: anywhere; font-size: 14px; }
+
+.removed-toggle:focus-within { outline: 2px solid var(--color-ink-soft); outline-offset: 2px; }

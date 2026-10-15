@@ -25,6 +25,9 @@ import {
   type OrderSource
 } from "../lib/customer-orders.ts";
 
+import { visibleRecords, isRemoved } from "../lib/removed-records.ts";
+import { RemovedToggle, RemovalNote } from "./RemovedRecords.tsx";
+
 type Row = CustomerOrder & { record?: FulfillmentRecord };
 type Feed = { orders: Row[]; lots: Record<OrderSource, LotState>; errors: string[]; isAdmin: boolean; canAct: boolean };
 
@@ -49,6 +52,7 @@ function handTone(o: Row) {
 }
 
 export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" }: { initialFilter?: Filter; initialQuery?: string }) {
+  const [showRemoved, setShowRemoved] = useState(false);
   const [feed, setFeed] = useState<Feed | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>(initialFilter);
@@ -76,7 +80,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
 
   const reload = useCallback(async () => {
     try {
-      const res = await fetch("/api/customer-orders", { cache: "no-store" });
+      const res = await fetch(`/api/customer-orders${showRemoved ? "?showRemoved=1" : ""}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.error || "โหลดไม่สำเร็จ");
       setFeed(data);
@@ -84,7 +88,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [showRemoved]);
 
   useEffect(() => {
     void reload();
@@ -109,7 +113,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
     }
   };
 
-  const orders = feed?.orders || [];
+  const orders = visibleRecords(feed?.orders || [], showRemoved);
   const bySource = useMemo(() => (source ? orders.filter((o) => o.source === source) : orders), [orders, source]);
   const searched = useMemo(() => bySource.filter((o) => matchesQuery(o, query)), [bySource, query]);
   const counts = useMemo(() => orderCounts(searched), [searched]);
@@ -152,9 +156,11 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
         ) : null}
       </label>
 
+      <RemovedToggle checked={showRemoved} onChange={(checked) => { setShowRemoved(checked); setLimit(PAGE); }} />
+
       <div className="parcel-board__toolbar">
         {query.trim() ? (
-          <p className="orders-board__found">พบ {searched.length} ออเดอร์ (ทุกสถานะ)</p>
+          <p className="orders-board__found">พบ {visibleRecords(searched).length} ออเดอร์ที่ใช้งาน (ทุกสถานะ)</p>
         ) : (
           <div className="delivery-board__filters" role="tablist" aria-label="ตัวกรองออเดอร์">
             {FILTERS.map((f) => (
@@ -205,7 +211,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
 
       <ul className="parcel-board__list">
         {shown.slice(0, limit).map((o) => (
-          <li key={o.key} className="parcel-order orders-row">
+          <li key={o.key} className={`parcel-order orders-row${isRemoved(o) ? " is-removed" : ""}`}>
             <div className="parcel-order__head">
               <div className="parcel-order__title">
                 <p className="parcel-order__meta">
@@ -217,6 +223,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
               <span className={`parcel-order__pill parcel-order__pill--${handTone(o)}`}>{HAND_LABEL[o.hand]}</span>
             </div>
 
+            <RemovalNote record={o} />
             <p className="orders-row__items">{o.items || "-"}</p>
 
             <div className="orders-row__facts">
@@ -239,7 +246,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
             {o.address ? <p className="parcel-order__meta">ที่อยู่: {o.address}</p> : null}
             {o.note ? <p className="parcel-order__meta">หมายเหตุ: {o.note}</p> : null}
 
-            {feed?.canAct ? (
+            {feed?.canAct && !isRemoved(o) ? (
               <div className="orders-row__actions">
                 {isTodo(o) && o.method === "pickup" ? (
                   <>

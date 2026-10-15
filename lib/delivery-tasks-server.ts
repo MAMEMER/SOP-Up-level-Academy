@@ -1,4 +1,5 @@
 import "server-only";
+import { visibleRecords, isRemoved, removalFields, type RemovalFields } from "./removed-records.ts";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { isWorkingAssignment, type ShiftAssignment, type ShiftCode } from "./shift-schedule.ts";
 import { allBranchKeys } from "./store-config.ts";
@@ -43,6 +44,7 @@ export const DELIVERY_TRACKING_START = "2026-08-10";
 
 /** ฟิลด์ที่ดึงจาก shop-orders — ตัด `slip` ทิ้งเพราะเป็น base64 รูปสลิปหลัก MB ต่อใบ */
 const ORDER_FIELDS = [
+  "removed",
   "status",
   "slipStatus",
   "customer",
@@ -58,6 +60,7 @@ const ORDER_FIELDS = [
 
 type OrderCustomer = { name?: string; phone?: string; address?: string; note?: string };
 type OrderDoc = {
+  removed?: unknown;
   status?: string;
   slipStatus?: string;
   customer?: OrderCustomer;
@@ -191,14 +194,14 @@ export async function fetchDeliveryTasks(branch: string, now = new Date()): Prom
   if (!hasAdminCredentials()) return [];
   const since = addWorkDays(bangkokWorkDate(now), -LOOKBACK_DAYS);
   const snapshot = await adminDb().collection(TASKS).where("paidWorkDate", ">=", since).get();
-  return snapshot.docs.map((doc) => doc.data() as DeliveryTask).filter((task) => task.branch === branch);
+  return visibleRecords(await withOrderRemovals(snapshot.docs.map((doc) => doc.data() as DeliveryTask))).filter((task) => task.branch === branch);
 }
 
 /**
  * ดึงออเดอร์ที่จ่ายแล้วจากเว็บกิลด์ แล้วสร้างใบงานส่งของสำหรับใบที่ยังไม่มี — ใต้ DELIVERY_BRANCH เสมอ
  * ไม่ว่าใครเป็นคนเปิดหน้า. คืนใบงานทั้งหมดของสาขาส่งของช่วงล่าสุด (ของเดิม + ที่เพิ่งสร้าง).
  */
-export async function syncDeliveryTasks(now = new Date()): Promise<DeliveryTask[]> {
+export async function syncDeliveryTasks(now = new Date(), showRemoved = false): Promise<DeliveryTask[]> {
   const branch = DELIVERY_BRANCH;
   if (!hasAdminCredentials()) return [];
   const since0 = addWorkDays(bangkokWorkDate(now), -LOOKBACK_DAYS);
@@ -220,7 +223,7 @@ export async function syncDeliveryTasks(now = new Date()): Promise<DeliveryTask[
       .get();
   } catch {
     // อ่านออเดอร์ไม่ได้ (สิทธิ์/index) — ยังต้องคืนใบงานที่มีอยู่ ไม่ให้หน้าจอว่างเปล่า
-    return existing;
+    return visibleRecords(await withOrderRemovals(existing), showRemoved);
   }
 
   const windowsByDate = new Map<string, ShiftWindows>();
@@ -230,7 +233,7 @@ export async function syncDeliveryTasks(now = new Date()): Promise<DeliveryTask[
   for (const doc of orders.docs) {
     if (known.has(doc.id)) continue;
     const order = doc.data() as OrderDoc;
-    if (!isPaidOrder(order)) continue;
+    if (isRemoved(order) || !isPaidOrder(order)) continue;
 
     const paidAt = paidAtOf(order);
     if (!paidAt) continue;
@@ -276,7 +279,20 @@ export async function syncDeliveryTasks(now = new Date()): Promise<DeliveryTask[
     }
   }
 
-  return [...existing, ...created];
+  return visibleRecords(await withOrderRemovals([...existing, ...created]), showRemoved);
+}
+
+/** A removed source order must also hide an already-created delivery task. */
+async function withOrderRemovals(tasks: DeliveryTask[]): Promise<DeliveryTask[]> {
+  const refs = [...new Set(tasks.map((task) => task.orderId).filter(Boolean))];
+  if (!refs.length) return tasks;
+  const removed = new Map<string, RemovalFields>();
+  for (let i = 0; i < refs.length; i += 100) {
+    const docs = await adminDb().getAll(...refs.slice(i, i + 100).map((id) => adminDb().collection(ORDERS).doc(id)),
+      { fieldMask: ["removed", "removedBy", "removedAt", "removedReason"] });
+    for (const doc of docs) if (doc.exists && isRemoved(doc.data()!)) removed.set(doc.id, removalFields(doc.data()!));
+  }
+  return tasks.map((task) => isRemoved(task) ? task : { ...task, ...removed.get(task.orderId) });
 }
 
 /** พนักงานรับงานไปแพ็ค */

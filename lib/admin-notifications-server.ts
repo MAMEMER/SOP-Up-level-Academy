@@ -1,4 +1,5 @@
 import "server-only";
+import { isRemoved } from "./removed-records.ts";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { buildAdminNotifications, type AdminNotification, type NotificationInput } from "./admin-notifications.ts";
 import { deliveryTaskState, type DeliveryTask } from "./delivery-tasks.ts";
@@ -57,18 +58,17 @@ async function openTicketCount(): Promise<number> {
 
 /**
  * นับงานค้างในเว็บกิลด์ (โปรเจกต์ Firebase เดียวกัน อ่านตรงด้วย adminDb() ได้เลย).
- * ใช้ aggregate .count() ทุกหมวด — ได้แค่ตัวเลข ไม่ดึงตัว document ลงมา จึงไม่แตะฟิลด์
- * slip ของ shop_orders (เป็น base64 รูปหลาย MB) และไม่เปิด users ทั้ง collection.
+ * อ่านเฉพาะ removed เพื่อกรองก่อนนับ ไม่อ่าน slip หรือข้อมูลส่วนตัวของ users.
  * ⚠️ shop_orders (ขีดล่าง) = ร้านค้าในเว็บกิลด์ คนละอันกับ shop-orders (ขีดกลาง) ของ SOP.
  */
 async function countWhereEq(collection: string, field: string, value: string): Promise<number> {
-  const snapshot = await adminDb().collection(collection).where(field, "==", value).count().get();
-  return snapshot.data().count;
+  const snapshot = await adminDb().collection(collection).where(field, "==", value).select("removed").get();
+  return snapshot.docs.filter((doc) => !isRemoved(doc.data())).length;
 }
 
 async function countWhereIn(collection: string, field: string, values: string[]): Promise<number> {
-  const snapshot = await adminDb().collection(collection).where(field, "in", values).count().get();
-  return snapshot.data().count;
+  const snapshot = await adminDb().collection(collection).where(field, "in", values).select("removed").get();
+  return snapshot.docs.filter((doc) => !isRemoved(doc.data())).length;
 }
 
 async function guildCounts(): Promise<NotificationInput["guild"]> {
