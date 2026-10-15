@@ -8732,3 +8732,38 @@ p.ab-help{padding-left:0}
 
 .app-shell > .opening-announcement { max-width: 1120px; margin: 0 auto; }
 .app-shell:has(.opening-announcement) > .sidebar { position: static; }
+
+/* ---------- ออเดอร์ลูกค้า (/orders) + การ์ดหน้าหลัก ---------- */
+.orders-board__search { display: flex; align-items: center; gap: 8px; min-height: 48px; margin: 4px 0 6px; padding: 0 14px; border: 1px solid rgba(45,49,66,0.14); border-radius: 999px; background: rgba(255,255,255,0.9); color: var(--color-ink-soft); }
+.orders-board__search:focus-within { border-color: var(--color-orange); box-shadow: 0 0 0 3px rgba(255,140,66,0.18); }
+.orders-board__search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 16px; color: var(--color-ink); padding: 10px 0; }
+.orders-board__search button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px; border: none; background: none; color: var(--color-ink-soft); cursor: pointer; }
+.orders-board__found { margin: 10px 0 14px; font-size: 14px; color: var(--color-ink-soft); }
+.orders-board__source { min-height: 44px; max-width: 100%; padding: 8px 12px; border: 1px solid rgba(45,49,66,0.14); border-radius: 12px; background: rgba(255,255,255,0.85); font: inherit; font-size: 16px; color: var(--color-ink); }
+.orders-board__arrival { margin: 4px 0 8px; padding: 10px 14px; border-radius: 14px; background: rgba(45,49,66,0.04); }
+.orders-board__arrival summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 8px 0; }
+.orders-board__arrival ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.orders-board__arrival li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+.orders-board__more { align-self: center; margin-top: 12px; }
+.orders-row__items { margin: 0; font-size: 15px; color: var(--color-ink); overflow-wrap: anywhere; }
+.orders-row__facts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13.5px; color: var(--color-ink-soft); }
+.orders-row__phone { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; color: var(--color-orange-deep); font-weight: 600; text-decoration: none; }
+.orders-row__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.orders-row__source { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 4px; font-size: 13px; color: var(--color-ink-soft); }
+.orders-row__undo-confirm { border-color: #c0392b; color: #a8321f; }
+.orders-row__form { display: flex; flex-wrap: wrap; gap: 8px; }
+.orders-row__form input { flex: 1 1 220px; min-width: 0; min-height: 44px; padding: 8px 14px; border: 1px solid rgba(45,49,66,0.18); border-radius: 12px; font: inherit; font-size: 16px; }
+.orders-todo__counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.orders-todo__counts a { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.75); border: 1px solid rgba(45,49,66,0.08); color: var(--color-ink-soft); font-size: 13px; text-decoration: none; }
+.orders-todo__counts b { font-size: 22px; line-height: 1.1; color: var(--color-ink); font-weight: 600; }
+.orders-todo__where { margin-top: 8px; }
+.orders-todo__where summary { cursor: pointer; font-weight: 600; font-size: 15px; padding: 12px 0; }
+.orders-todo__where ul { list-style: none; margin: 0; padding: 0; }
+.orders-todo__where a { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 48px; padding: 8px 0; border-bottom: 1px solid rgba(45,49,66,0.08); color: var(--color-ink); text-decoration: none; font-size: 14.5px; }
+.orders-todo__where li:last-child a { border-bottom: none; }
+.orders-todo__place { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; color: var(--color-orange-deep); font-weight: 600; font-size: 13.5px; }
+.orders-board__lot { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.orders-board__lot .delivery-board__filter { min-height: 40px; padding: 6px 12px; font-size: 13px; }
+.orders-board__arrival li { flex-wrap: wrap; }
+/* globals ใส่กรอบ input ด้วย !important — ช่องค้นหานี้มีกรอบที่ตัว label แล้ว ต้องลบกรอบซ้อน */
+.orders-board__search input[type="search"] { border: none !important; box-shadow: none !important; background: transparent !important; border-radius: 0 !important; min-height: 0; padding: 10px 0; }
