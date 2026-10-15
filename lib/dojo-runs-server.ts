@@ -23,6 +23,7 @@ function toRun(id: string, p: FirebaseFirestore.DocumentData, version: string): 
       const x = st[s.key] || {};
       return {
         key: s.key, label: s.label, status: text(x.status) || 'todo', summary: text(x.summary), at: ms(x.at),
+        hookFired: x.hook_fired === true,
         progress: typeof x.progress === 'number' ? x.progress : null, progressNote: text(x.progress_note), progressAt: ms(x.progress_at),
         items: items(x.items), cands: items(x.cands), picked: x.picked != null ? Number(x.picked) : null,
         metrics: Array.isArray(x.metrics) ? x.metrics.map((m: any) => ({ label: text(m?.label), value: text(m?.value) })) : [],

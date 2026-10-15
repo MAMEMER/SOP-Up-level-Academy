@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canApprove, canRedo, redoPatch, runName, sortRuns, STAGE_KEYS, type Run } from '../lib/dojo-runs.ts';
+import { canApprove, canRedo, proceedStage, proceedPatch, redoPatch, runName, sortRuns, STAGE_KEYS, type Run } from '../lib/dojo-runs.ts';
 import { adminSectionsFor } from '../lib/admin-sitemap.ts';
 
 test('Fixing a stage reruns it and marks only the later stages stale', () => {
@@ -47,7 +47,7 @@ test('Copy waits for a person before the pipeline moves on', async () => {
   assert.equal(proceedStage({ status: 'waiting', stages: st('waiting') }), 'copy');
   assert.equal(proceedStage({ status: 'queued', stages: st('running') }), null);
   assert.equal(proceedStage({ status: 'waiting', stages: [{ key: 'review', status: 'waiting' }] as Run['stages'] }), null);
-  assert.deepEqual(proceedPatch('copy'), { status: 'continue', redo: null, 'stages.copy.status': 'done' });
+  assert.deepEqual(proceedPatch('copy'), { status: 'continue', redo: null, 'stages.copy.status': 'done', 'stages.copy.progress': 100, 'stages.copy.progress_note': '' });
 });
 
 test('The page can tell working from waiting in line and from stuck', async () => {
@@ -58,4 +58,45 @@ test('The page can tell working from waiting in line and from stuck', async () =
   assert.equal(liveState({ status: 'queued', live: { state: 'pending', at: now, started: null } }, now), 'queued');
   assert.equal(liveState({ status: 'queued', live: { state: 'running', at: now - 30_000, started: now - 60_000 } }, now), 'working');
   assert.equal(liveState({ status: 'queued', live: { state: 'running', at: now - 7 * 60_000, started: null } }, now), 'stalled');
+});
+
+test('Proceed recovers finished outputs from a running stage only when the run is waiting', () => {
+  for (const output of [
+    { items: [{ img: 'https://example.com/copy.png', caption: '' }] },
+    { cands: [{ img: 'https://example.com/ref.png', caption: '' }] },
+    { progress: 99 }, { progress: 100 }, { hookFired: true }
+  ]) {
+    const stages: Run['stages'] = [{
+      key: 'copy', label: 'copy', status: 'running', summary: '', at: 0,
+      progress: null, progressNote: 'finishing', progressAt: 0,
+      items: [], cands: [], picked: null, metrics: [], links: [], ...output
+    }];
+    const before = structuredClone(stages);
+    assert.equal(proceedStage({ status: 'waiting', stages }), 'copy');
+    assert.deepEqual(stages, before, 'resolving must not mutate UI or transaction inputs');
+    for (const status of ['running', 'queued', 'continue', 'approved', 'done']) {
+      assert.equal(proceedStage({ status, stages }), null);
+    }
+    const patch = proceedPatch('copy');
+    assert.equal(patch['stages.copy.status'], 'done');
+    assert.equal(patch['stages.copy.progress'], 100);
+    assert.equal(patch['stages.copy.progress_note'], '');
+  }
+});
+
+test('Proceed preserves the waiting gate and rejects unfinished or review stages', () => {
+  const run = (stages: unknown) => ({ status: 'waiting', stages: stages as Run['stages'] });
+  assert.equal(proceedStage(run([
+    { key: 'ref', status: 'running', progress: 99 },
+    { key: 'copy', status: 'waiting' }
+  ])), 'copy');
+  for (const stage of [
+    { key: 'copy', status: 'running', progress: 98, items: [], cands: [], hookFired: false },
+    { key: 'copy', status: 'running' },
+    { key: 'copy', status: 'todo', progress: 100 },
+    { key: 'copy', status: 'failed', progress: 100 },
+    { key: 'review', status: 'running', progress: 100, hookFired: true },
+    { key: 'review', status: 'waiting' }
+  ]) assert.equal(proceedStage(run([stage])), null);
+  assert.equal(proceedStage(run([])), null);
 });

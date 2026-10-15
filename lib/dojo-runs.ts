@@ -30,6 +30,7 @@ export const RUN_STATUS_TH: Record<string, string> = {
 export type RunItem = { img: string; caption: string };
 export type RunStage = {
   key: StageKey; label: string; status: string; summary: string; at: number;
+  hookFired?: boolean;
   /** % ที่ Claude รายงานระหว่างทำ (0–100) + กำลังทำอะไร */
   progress: number | null; progressNote: string; progressAt: number;
   items: RunItem[]; cands: RunItem[]; picked: number | null;
@@ -81,10 +82,17 @@ export function redoPatch(stage: StageKey, existing: StageKey[], note: string, b
 export function proceedStage(run: Pick<Run, 'status' | 'stages'>): StageKey | null {
   if (run.status === 'approved' || run.status === 'done') return null;
   const s = run.stages.find(x => x.status === 'waiting' && x.key !== 'review');
-  return s ? s.key : null;
+  if (s) return s.key;
+  // The worker can finish outputs and pause the run before closing its stage.
+  if (run.status !== 'waiting') return null;
+  const stuck = run.stages.find(x => x.status === 'running' && x.key !== 'review' && (
+    x.items?.length > 0 || x.cands?.length > 0 || (x.progress ?? 0) >= 99 || x.hookFired === true
+  ));
+  return stuck ? stuck.key : null;
 }
 export function proceedPatch(stage: StageKey) {
-  return { status: 'continue', redo: null, [`stages.${stage}.status`]: 'done' };
+  return { status: 'continue', redo: null, [`stages.${stage}.status`]: 'done',
+    [`stages.${stage}.progress`]: 100, [`stages.${stage}.progress_note`]: '' };
 }
 
 export function canRedo(run: Pick<Run, 'status'>) { return run.status !== 'approved' && run.status !== 'done'; }
