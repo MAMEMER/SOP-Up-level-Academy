@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, Plus, RefreshCw, RotateCcw, Send, X, ExternalLink } from 'lucide-react';
+import { Check, Plus, RefreshCw, RotateCcw, Send, Trash2, X, ExternalLink } from 'lucide-react';
 import { RUN_JOBS, RUN_STAGES, RUN_STATUS_TH, canApprove, canRedo, liveState, proceedStage, type Run, type RunStage } from '../lib/dojo-runs.ts';
 import './DojoRuns.css';
 
@@ -50,7 +50,9 @@ export function DojoRuns({ reviewer, authenticated }: { reviewer: string; authen
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
       setRuns(d.runs);
-      setCur(c => (c && d.runs.some((x: Run) => x.id === c)) ? c : (new URLSearchParams(location.search).get('run') || d.runs[0]?.id || null));
+      const has = (id: string | null) => !!id && d.runs.some((x: Run) => x.id === id);
+      const fromUrl = new URLSearchParams(location.search).get('run');
+      setCur(c => has(c) ? c : has(fromUrl) ? fromUrl : (d.runs[0]?.id || null));
       if (!quiet) setNotice('');
     } catch (e) { if (!quiet) setNotice(messages[e instanceof Error ? e.message : ''] || messages.read_failed); }
     finally { if (!quiet) setLoading(false); }
@@ -94,6 +96,16 @@ export function DojoRuns({ reviewer, authenticated }: { reviewer: string; authen
 function RunDetail({ run, reviewer, onZoom, onSaved }: { run: Run; reviewer: string; onZoom: (u: string) => void; onSaved: (m: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [armDelete, setArmDelete] = useState(false);
+  useEffect(() => { if (!armDelete) return; const t = setTimeout(() => setArmDelete(false), 4000); return () => clearTimeout(t); }, [armDelete]);
+  // Two taps, no browser confirm dialog: first tap arms, second (within 4s) deletes.
+  async function remove() {
+    if (!armDelete) { setArmDelete(true); return; }
+    setBusy(true); setError('');
+    try { await post({ action: 'delete', id: run.id }); onSaved('ลบงานแล้ว'); }
+    catch (e) { setError(messages[e instanceof Error ? e.message : ''] || messages.write_failed); }
+    finally { setBusy(false); setArmDelete(false); }
+  }
   async function approve() {
     setBusy(true); setError('');
     try { await post({ action: 'approve', id: run.id }); onSaved('ผ่านแล้ว ระบบจะเอาเข้าเครื่องมือทำโพสให้'); }
@@ -107,6 +119,7 @@ function RunDetail({ run, reviewer, onZoom, onSaved }: { run: Run; reviewer: str
     <div className="runs-head-actions">
       <span className={`runs-chip s-${run.status}`}>{RUN_STATUS_TH[run.status] || run.status}</span>
       {canApprove(run) && <button className="btn" onClick={approve} disabled={busy}><Check size={18} />ผ่าน ลงเทมเพลต</button>}
+      {run.status !== 'approved' && <button className="btn-soft" onClick={remove} disabled={busy}><Trash2 size={18} />{armDelete ? 'กดอีกครั้งเพื่อลบ' : 'ลบงานนี้'}</button>}
     </div>
     {error && <p role="alert" className="input-status warning">{error}</p>}
     <LiveBar run={run} />
