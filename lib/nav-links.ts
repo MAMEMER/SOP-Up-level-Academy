@@ -27,6 +27,7 @@ export const staffGroups: NavGroup[] = [
       // ส่งต่องานย้ายเข้ามาอยู่ในการ์ดของ "งานที่มอบหมาย" แล้ว (ใบงาน iDBqn3jE) — หน้า /handoff
       // เดิมยังเปิดได้จากลิงก์ตรงเพื่อดูงานที่ค้างอยู่ในระบบเก่า แต่ไม่ต้องมีเมนูซ้ำอีกช่อง
       { href: "/my-tasks/file", label: "แฟ้มงาน" },
+      { href: "/orders", label: "ออเดอร์ลูกค้า" },
       { href: "/parcels", label: "พัสดุการ์ด" },
       { href: "/my-documents", label: "เอกสารของฉัน" }
     ]
