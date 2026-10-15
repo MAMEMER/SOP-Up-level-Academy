@@ -4,7 +4,7 @@ import { canManageStaffAccounts } from '../../../../lib/owner.ts';
 import { hasSessionSecret } from '../../../../lib/session-jwt.ts';
 import { hasAdminCredentials } from '../../../../lib/firebase-admin.ts';
 import { RUN_JOBS, STAGE_KEYS, type StageKey } from '../../../../lib/dojo-runs.ts';
-import { approveRun, createRun, listRuns, proceedRun, redoRun } from '../../../../lib/dojo-runs-server.ts';
+import { approveRun, createRun, deleteRun, listRuns, proceedRun, redoRun } from '../../../../lib/dojo-runs-server.ts';
 export const dynamic = 'force-dynamic';
 
 async function access() {
@@ -43,6 +43,10 @@ export async function POST(request: Request) {
     }
     if (b?.action === 'approve' && validId(b.id)) {
       await approveRun(b.id, who);
+      return NextResponse.json({ ok: true });
+    }
+    if (b?.action === 'delete' && validId(b.id)) {
+      await deleteRun(b.id, who);
       return NextResponse.json({ ok: true });
     }
     const job = RUN_JOBS.find(([k]) => k === b?.job);

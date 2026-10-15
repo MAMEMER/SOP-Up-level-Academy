@@ -38,7 +38,8 @@ const versionOf = (d: FirebaseFirestore.DocumentSnapshot) => d.updateTime!.toDat
 
 export async function listRuns(): Promise<Run[]> {
   const snap = await adminDb().collection('poster-dojo').where('kind', '==', 'run').get();
-  return sortRuns(snap.docs.map(d => toRun(d.id, d.data(), versionOf(d))));
+  // Soft-deleted runs (status 'deleted', from either review page) never come back to the list.
+  return sortRuns(snap.docs.filter(d => d.data().status !== 'deleted').map(d => toRun(d.id, d.data(), versionOf(d))));
 }
 
 type Who = { email: string; name: string };
@@ -49,7 +50,7 @@ export async function redoRun(id: string, stage: StageKey, note: string, pick: n
   await db.runTransaction(async tx => {
     const d = await tx.get(ref);
     const p = d.data();
-    if (!p || p.kind !== 'run') throw new Error('not_found');
+    if (!p || p.kind !== 'run' || p.status === 'deleted') throw new Error('not_found');
     const run = toRun(id, p, versionOf(d));
     if (!canRedo(run)) throw new Error('conflict');
     if (pick != null && (stage !== 'ref' || pick < 1 || pick > run.stages[0].cands.length)) throw new Error('invalid_request');
@@ -70,7 +71,7 @@ export async function proceedRun(id: string, stage: StageKey, who: Who) {
   await db.runTransaction(async tx => {
     const d = await tx.get(ref);
     const p = d.data();
-    if (!p || p.kind !== 'run') throw new Error('not_found');
+    if (!p || p.kind !== 'run' || p.status === 'deleted') throw new Error('not_found');
     if (proceedStage(toRun(id, p, versionOf(d))) !== stage) throw new Error('conflict');
     tx.update(ref, {
       ...proceedPatch(stage),
@@ -86,11 +87,27 @@ export async function approveRun(id: string, who: Who) {
   await db.runTransaction(async tx => {
     const d = await tx.get(ref);
     const p = d.data();
-    if (!p || p.kind !== 'run') throw new Error('not_found');
+    if (!p || p.kind !== 'run' || p.status === 'deleted') throw new Error('not_found');
     if (!canApprove(toRun(id, p, versionOf(d)))) throw new Error('conflict');
     tx.update(ref, {
       status: 'approved', approved_by: who.email, approved_by_name: who.name,
       log: FieldValue.arrayUnion({ stage: 'template', note: 'ผ่าน ลงเทมเพลต', by: who.email, by_name: who.name, at: Date.now() }),
+      updated_at: FieldValue.serverTimestamp()
+    });
+  });
+}
+
+export async function deleteRun(id: string, who: Who) {
+  const db = adminDb();
+  const ref = db.collection('poster-dojo').doc(id);
+  await db.runTransaction(async tx => {
+    const d = await tx.get(ref);
+    const p = d.data();
+    if (!p || p.kind !== 'run' || p.status === 'deleted') throw new Error('not_found');
+    // Same soft delete as dojo-run.html: the worker skips it and run-stage refuses to write over it.
+    tx.update(ref, {
+      status: 'deleted', prev_status: p.status ?? null, deleted_by: who.email, deleted_at: FieldValue.serverTimestamp(),
+      log: FieldValue.arrayUnion({ stage: 'ref', note: 'ลบงานนี้', by: who.email, by_name: who.name, at: Date.now() }),
       updated_at: FieldValue.serverTimestamp()
     });
   });
