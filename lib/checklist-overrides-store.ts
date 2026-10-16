@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store for the owner-edited weekly/monthly checklist overrides. Goes through the
 // authenticated /api/checklist-overrides route (Admin SDK, session-verified) — the same shape
@@ -18,7 +19,7 @@ export type ChecklistOverridesMeta = { updatedAt: string | null; updatedBy: stri
 
 /** Whole scope document (items + ลำดับ/ปิดหัวข้อ/หัวข้อที่เพิ่มเอง). */
 export async function fetchChecklistScopeConfig(scope: ChecklistScope): Promise<ChecklistScopeConfig> {
-  const res = await fetch(`/api/checklist-overrides?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/checklist-overrides?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
   if (!res.ok) return emptyChecklistScopeConfig;
   return normalizeScopeConfig((await res.json()) as Partial<ChecklistScopeConfig>);
 }
@@ -31,7 +32,7 @@ export async function fetchChecklistOverrides(scope: ChecklistScope): Promise<Ch
 export async function fetchChecklistConfigWithMeta(
   scope: ChecklistScope
 ): Promise<{ config: ChecklistScopeConfig; meta: ChecklistOverridesMeta }> {
-  const res = await fetch(`/api/checklist-overrides?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/checklist-overrides?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
   if (!res.ok) return { config: emptyChecklistScopeConfig, meta: { updatedAt: null, updatedBy: null } };
   const data = (await res.json()) as Partial<ChecklistScopeConfig> & { updatedAt?: string | null; updatedBy?: string | null };
   return {
@@ -44,7 +45,7 @@ export async function saveChecklistOverrides(input: {
   scope: ChecklistScope;
   config: ChecklistScopeConfig;
 }): Promise<ChecklistOverridesMeta> {
-  const res = await fetch("/api/checklist-overrides", {
+  const res = await rehearsalFetch("/api/checklist-overrides", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ scope: input.scope, ...input.config })

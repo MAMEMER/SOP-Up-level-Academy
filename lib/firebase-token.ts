@@ -13,7 +13,7 @@ const jwks = createRemoteJWKSet(
   new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
 );
 
-export type VerifiedGoogleUser = { email: string; uid: string };
+export type VerifiedGoogleUser = { email: string; uid: string; rehearsalRole: string };
 
 export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoogleUser | null> {
   try {
@@ -23,8 +23,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoog
     });
     const email = typeof payload.email === "string" ? payload.email : undefined;
     const uid = (typeof payload.user_id === "string" ? payload.user_id : undefined) || (payload.sub as string | undefined);
-    if (!email || !uid) return null;
-    return { email, uid };
+    if (!email || !uid || !uid.startsWith("test_") || payload.rehearsal !== true || !["owner","admin","sop"].includes(String(payload.rehearsalRole))) return null;
+    return { email, uid, rehearsalRole: String(payload.rehearsalRole) };
   } catch {
     return null;
   }

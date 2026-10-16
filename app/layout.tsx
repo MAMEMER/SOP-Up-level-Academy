@@ -25,10 +25,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        {children}
-        <HelpChat />
-        <BugReportFab />
-        <SupportFab />
+        <aside className="rehearsal-banner">เว็บทดสอบ — ไม่ใช่ของจริง ไม่มีการเก็บเงิน</aside>{children}
+
+
+
       </body>
     </html>
   );

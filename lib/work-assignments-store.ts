@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store for owner→staff task assignments and staff↔staff handoffs.
 // Fix 1: work_assignments + work_handoffs used to be world read/write via the Firebase
@@ -67,13 +68,13 @@ export type WorkHandoff = {
 
 async function getJson<T>(params: Record<string, string>): Promise<T> {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`/api/work-tasks?${qs}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/work-tasks?${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`work-tasks read failed: ${res.status}`);
   return (await res.json()) as T;
 }
 
 async function post(body: Record<string, unknown>): Promise<void> {
-  const res = await fetch("/api/work-tasks", {
+  const res = await rehearsalFetch("/api/work-tasks", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)

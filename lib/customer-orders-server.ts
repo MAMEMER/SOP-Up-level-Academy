@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "./rehearsal-network.ts";
 import "server-only";
 import { JWT } from "google-auth-library";
 import { adminDb } from "./firebase-admin.ts";
@@ -41,7 +42,7 @@ async function sheetRows(sheet: keyof typeof SHEETS): Promise<string[][]> {
   });
   const { token } = await jwt.getAccessToken();
   const { id, range } = SHEETS[sheet];
-  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${encodeURIComponent(range)}`, {
+  const res = await rehearsalFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${encodeURIComponent(range)}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });

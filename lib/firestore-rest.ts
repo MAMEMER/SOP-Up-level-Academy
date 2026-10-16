@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "./rehearsal-network.ts";
 // Minimal server-side Firestore access for the SOP manual-entry records (complaint /
 // assigned work / attendance) so they PERSIST on Vercel — the old local-JSON store is
 // wiped on every serverless cold start.
@@ -85,7 +86,7 @@ export async function restListCollection<T>(collection: string): Promise<T[]> {
   try {
     do {
       const url = `${BASE}/${collection}?key=${API_KEY}&pageSize=300${pageToken ? `&pageToken=${pageToken}` : ""}`;
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await rehearsalFetch(url, { cache: "no-store" });
       if (!res.ok) break;
       const data = (await res.json()) as { documents?: Array<{ fields?: Record<string, Record<string, unknown>> }>; nextPageToken?: string };
       for (const doc of data.documents || []) docs.push(decodeDoc(doc) as T);
@@ -116,7 +117,7 @@ export async function restUpsertDoc(collection: string, docId: string, data: Rec
     .map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`)
     .join("&");
   const url = `${BASE}/${collection}/${encodeURIComponent(docId)}?key=${API_KEY}&${mask}`;
-  const res = await fetch(url, {
+  const res = await rehearsalFetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields }),
@@ -132,6 +133,6 @@ export async function restDeleteDoc(collection: string, docId: string): Promise<
     return;
   }
   const url = `${BASE}/${collection}/${encodeURIComponent(docId)}?key=${API_KEY}`;
-  const res = await fetch(url, { method: "DELETE", cache: "no-store" });
+  const res = await rehearsalFetch(url, { method: "DELETE", cache: "no-store" });
   if (!res.ok && res.status !== 404) throw new Error(`Firestore delete failed: ${res.status}`);
 }

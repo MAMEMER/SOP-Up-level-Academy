@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store for Weekly / Monthly Stock Runs. Talks to the authenticated /api/stock-runs
 // route (Admin SDK, session-verified) — never the Firebase browser SDK — so writes are
@@ -8,13 +9,13 @@ import type { StockCountLine, StockRun, StockRunKind } from "./stock-runs.ts";
 
 async function getJson<T>(params: Record<string, string>): Promise<T> {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`/api/stock-runs?${qs}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/stock-runs?${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`stock-runs read failed: ${res.status}`);
   return (await res.json()) as T;
 }
 
 async function post(body: Record<string, unknown>): Promise<void> {
-  const res = await fetch("/api/stock-runs", {
+  const res = await rehearsalFetch("/api/stock-runs", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)

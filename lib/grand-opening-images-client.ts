@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 import { thumbnailFor } from "./staff-doc-files-client.ts";
 import { downscaleImage } from "./image-downscale.ts";
 import { resolveMimeType } from "./staff-documents.ts";
@@ -12,5 +13,5 @@ export async function prepareOpeningImage(original: File) {
   if (!validOpeningImage(file.type, file.size)) throw new Error("รับรูป JPG, PNG, WebP หรือ GIF ไม่เกิน 4MB หากเป็น HEIC ให้แปลงเป็น JPG ก่อน");
   const thumbnail = await thumbnailFor(file);
   if (!thumbnail) throw new Error("อ่านรูปไม่ได้ ลองบันทึกเป็น JPG แล้วแนบใหม่");
-  return { file, thumbnail: new File([await (await fetch(thumbnail)).blob()], "thumbnail.jpg", { type: "image/jpeg" }) };
+  return { file, thumbnail: new File([await (await rehearsalFetch(thumbnail)).blob()], "thumbnail.jpg", { type: "image/jpeg" }) };
 }

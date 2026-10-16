@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkRecordDoc, WorkRecordOwner, WorkRecordScope } from "./work-records.ts";
@@ -10,7 +11,7 @@ import type { WorkRecordDoc, WorkRecordOwner, WorkRecordScope } from "./work-rec
 export type SaveStatus = "idle" | "saving" | "saved" | "error" | "read-only";
 
 async function readRecords(params: URLSearchParams): Promise<{ records: WorkRecordDoc[]; storageReady: boolean }> {
-  const res = await fetch(`/api/work-records?${params.toString()}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/work-records?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) return { records: [], storageReady: false };
   return (await res.json()) as { records: WorkRecordDoc[]; storageReady: boolean };
 }
@@ -38,7 +39,7 @@ export async function saveWorkRecord(
   data: Record<string, unknown>,
   owner: WorkRecordOwner = "me"
 ) {
-  const res = await fetch("/api/work-records", {
+  const res = await rehearsalFetch("/api/work-records", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scope, scopeKey, owner, data })

@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store ของพัสดุการ์ด — คุยกับ /api/parcel-orders เท่านั้น (Admin SDK + session ฝั่ง server).
 
@@ -11,7 +12,7 @@ const ENDPOINT = "/api/parcel-orders";
 async function post<T = { ok: true }>(body: Record<string, unknown>): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(ENDPOINT, {
+    res = await rehearsalFetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -29,7 +30,7 @@ async function post<T = { ok: true }>(body: Record<string, unknown>): Promise<T>
 
 export async function fetchParcelFeed(branch?: string): Promise<ParcelFeed> {
   const query = branch ? `?branch=${encodeURIComponent(branch)}` : "";
-  const res = await fetch(`${ENDPOINT}${query}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`${ENDPOINT}${query}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`parcel read failed: ${res.status}`);
   return (await res.json()) as ParcelFeed;
 }

@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 import { downscaleImage } from "./image-downscale.ts";
 import { MAX_FILE_BYTES, resolveMimeType, type FileKind } from "./staff-documents.ts";
@@ -82,7 +83,7 @@ export async function uploadDocFile(file: File, kind: FileKind): Promise<{ path:
   body.append("kind", kind);
   let res: Response;
   try {
-    res = await fetch("/api/staff-documents/upload", { method: "POST", body });
+    res = await rehearsalFetch("/api/staff-documents/upload", { method: "POST", body });
   } catch {
     throw new Error("อัปโหลดไม่สำเร็จ — เช็กอินเทอร์เน็ตแล้วลองใหม่");
   }

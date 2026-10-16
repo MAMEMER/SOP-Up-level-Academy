@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "./rehearsal-network.ts";
 // Live StoreHub Open API client (server-only). Basic auth with STOREHUB_USER/PASS.
 // Provides the pieces SOP needs that the API actually exposes: employees (id→name) and
 // timesheets (clock-in/out). NOTE: StoreHub has NO stock-take endpoint — stocktakes
@@ -21,7 +22,7 @@ export async function storeHubGet<T>(path: string): Promise<T> {
 }
 
 async function shFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await rehearsalFetch(`${BASE}${path}`, {
     headers: { Authorization: authHeader(), Accept: "application/json" },
     cache: "no-store"
   });

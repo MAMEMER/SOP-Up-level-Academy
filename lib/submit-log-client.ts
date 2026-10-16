@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // ประวัติการกดปุ่ม "ส่งงาน" — เขียนตอนกด ไม่ใช่ตอนบันทึกสำเร็จ จึงใช้ตรวจได้ว่าน้องกดจริง
 // ไหมแม้ในรอบที่ระบบบันทึกไม่ผ่าน (ดู app/api/submit-log/route.ts)
@@ -25,7 +26,7 @@ export function logSubmitPress(input: {
   pressedAt: string;
   ok: boolean;
 }): void {
-  void fetch("/api/submit-log", {
+  void rehearsalFetch("/api/submit-log", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -34,7 +35,7 @@ export function logSubmitPress(input: {
 }
 
 export async function fetchSubmitLog(workDate: string): Promise<SubmitLogEntry[]> {
-  const res = await fetch(`/api/submit-log?workDate=${encodeURIComponent(workDate)}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/submit-log?workDate=${encodeURIComponent(workDate)}`, { cache: "no-store" });
   if (!res.ok) return [];
   const payload = (await res.json()) as { entries?: SubmitLogEntry[] };
   return payload.entries || [];

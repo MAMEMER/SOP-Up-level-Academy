@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store สำหรับงานส่งของจากออเดอร์เว็บกิลด์ — คุยกับ /api/delivery-tasks เท่านั้น
 // (Admin SDK + session ฝั่ง server) ไม่แตะ Firestore ตรงจากเบราว์เซอร์.
@@ -17,7 +18,7 @@ export type DeliveryFeed = {
 const ENDPOINT = "/api/delivery-tasks";
 
 async function post(body: Record<string, unknown>): Promise<void> {
-  const res = await fetch(ENDPOINT, {
+  const res = await rehearsalFetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -34,7 +35,7 @@ async function post(body: Record<string, unknown>): Promise<void> {
 /** includeClosed = ขอใบที่ปิดไปแล้วมาด้วย (ตัวกรอง "ทั้งหมด / ปิดแล้ว") */
 export async function fetchDeliveryFeed(branch: string, includeClosed = false): Promise<DeliveryFeed> {
   const query = `branch=${encodeURIComponent(branch)}${includeClosed ? "&includeClosed=1" : ""}`;
-  const res = await fetch(`${ENDPOINT}?${query}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`${ENDPOINT}?${query}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`delivery-tasks read failed: ${res.status}`);
   return (await res.json()) as DeliveryFeed;
 }

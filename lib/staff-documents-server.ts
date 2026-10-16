@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "./rehearsal-network.ts";
 import "server-only";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminBucket, adminDb, hasAdminCredentials } from "./firebase-admin.ts";
@@ -132,7 +133,7 @@ export async function callDriveBridge(payload: Record<string, unknown>): Promise
   const timer = setTimeout(() => controller.abort(), GAS_TIMEOUT_MS);
   try {
     // Apps Script ตอบ 302 ไปที่ googleusercontent — fetch ตาม redirect ให้เอง
-    const res = await fetch(url, {
+    const res = await rehearsalFetch(url, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ ...payload, secret }),

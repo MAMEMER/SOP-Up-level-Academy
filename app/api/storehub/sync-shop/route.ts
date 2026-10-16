@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "../../../../lib/rehearsal-network.ts";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { FieldValue } from "firebase-admin/firestore";
@@ -41,7 +42,7 @@ function authHeader(): string {
 }
 
 async function sh<T>(path: string): Promise<T> {
-  const res = await fetch(`${STOREHUB_BASE}${path}`, {
+  const res = await rehearsalFetch(`${STOREHUB_BASE}${path}`, {
     headers: { Authorization: authHeader(), Accept: "application/json" },
     cache: "no-store",
   });

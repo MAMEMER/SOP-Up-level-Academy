@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "./rehearsal-network.ts";
 // "ของที่ต้องสั่ง" — รายการสินค้าที่คงเหลือถึง/ต่ำกว่าจุดสั่งซื้อ สำหรับแจ้งพนักงานอัตโนมัติใน SOP.
 //
 // แหล่งข้อมูลหลัก = **StoreHub Open API** (Basic auth, api.storehubhq.com) ซึ่งมีของครบพอดี:
@@ -535,7 +536,7 @@ export async function fetchSupplyNeedsFromFeed(threshold = DEFAULT_THRESHOLD): P
   // (เช่นที่หน้า supplyNeeds เรียกใช้) แล้ววาง session cookie ที่ copy จาก browser ได้เลย —
   // ไม่ต้องทำ export กลาง. (cookie หมดอายุตาม session ของ StoreHub จึงต้องอัปเดตเป็นครั้งคราว.)
   const cookie = process.env.STOREHUB_SUPPLY_NEEDS_COOKIE;
-  const res = await fetch(url, {
+  const res = await rehearsalFetch(url, {
     headers: {
       Accept: "application/json, text/csv, */*",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

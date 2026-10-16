@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store for the shift planner. Fix 1: these four collections (schedule_shifts,
 // schedule_events, schedule_actual, store_audit) used to be world read/write via the
@@ -67,13 +68,13 @@ export type MonthPlan = {
 
 async function getJson<T>(params: Record<string, string>): Promise<T> {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`/api/schedule?${qs}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/schedule?${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`schedule read failed: ${res.status}`);
   return (await res.json()) as T;
 }
 
 async function post(body: Record<string, unknown>): Promise<void> {
-  const res = await fetch("/api/schedule", {
+  const res = await rehearsalFetch("/api/schedule", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
@@ -100,7 +101,7 @@ export async function fetchBranchShiftConfigs(): Promise<BranchShiftConfig[]> {
 
 /** บันทึกเวลากะของสาขาหนึ่ง — คืนค่าที่ server ล้างแล้ว */
 export async function saveBranchShiftConfig(config: BranchShiftConfig): Promise<BranchShiftConfig> {
-  const res = await fetch("/api/schedule", {
+  const res = await rehearsalFetch("/api/schedule", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action: "saveBranchShifts", ...config })

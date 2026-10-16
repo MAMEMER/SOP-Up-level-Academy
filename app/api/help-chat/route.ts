@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "../../../lib/rehearsal-network.ts";
 // Help chatbot for the SOP site — answers "อะไรคืออะไร / กดตรงไหน".
 // Uses Claude when ANTHROPIC_API_KEY is set; otherwise falls back to a built-in
 // keyword-matched site guide so the widget is useful out of the box.
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await rehearsalFetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({

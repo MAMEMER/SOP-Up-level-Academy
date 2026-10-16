@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store for the owner-edited daily checklist config. Fix 1: sop_daily_checklist
 // used to be world read/write via the Firebase client SDK; it now goes through the
@@ -30,7 +31,7 @@ export type ChecklistConfigMeta = { updatedAt: string | null; updatedBy: string 
 export async function fetchChecklistConfigWithMeta(
   branch: string
 ): Promise<{ config: ChecklistConfig } & ChecklistConfigMeta> {
-  const res = await fetch(`/api/checklist-config?branch=${encodeURIComponent(branch)}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/checklist-config?branch=${encodeURIComponent(branch)}`, { cache: "no-store" });
   if (!res.ok) return { config: emptyChecklistConfig, updatedAt: null, updatedBy: null };
   const data = (await res.json()) as { config?: ChecklistConfig; updatedAt?: string | null; updatedBy?: string | null };
   return {
@@ -50,7 +51,7 @@ export async function saveChecklistConfig(input: {
   config: ChecklistConfig;
   updatedBy: string;
 }): Promise<ChecklistConfigMeta> {
-  const res = await fetch("/api/checklist-config", {
+  const res = await rehearsalFetch("/api/checklist-config", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ branch: input.branch, config: input.config })

@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store สำหรับ "งานสั่ง" ของร้าน — ผ่าน /api/store-tasks (Admin SDK + session)
 // เหมือน store อื่นในระบบ ไม่มีการเขียน Firestore ตรงจาก browser.
@@ -19,7 +20,7 @@ export type StoreTasksPayload = {
 
 export async function fetchStoreTasks(branch: string, date?: string): Promise<StoreTasksPayload> {
   const qs = new URLSearchParams({ branch, ...(date ? { date } : {}) }).toString();
-  const res = await fetch(`/api/store-tasks?${qs}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/store-tasks?${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`store-tasks read failed: ${res.status}`);
   const data = (await res.json()) as Partial<StoreTasksPayload>;
   return {
@@ -32,7 +33,7 @@ export async function fetchStoreTasks(branch: string, date?: string): Promise<St
 }
 
 async function post(body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await fetch("/api/store-tasks", {
+  const res = await rehearsalFetch("/api/store-tasks", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
@@ -112,7 +113,7 @@ export async function fetchStoreTaskRange(
   to: string
 ): Promise<{ tasks: WorkSpec[]; recordsByDate: Record<string, Record<string, TaskRecord>> }> {
   const qs = new URLSearchParams({ branch, from, to }).toString();
-  const res = await fetch(`/api/store-tasks?${qs}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/store-tasks?${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`store-tasks range failed: ${res.status}`);
   const data = (await res.json()) as { tasks?: WorkSpec[]; recordsByDate?: Record<string, Record<string, TaskRecord>> };
   return { tasks: data.tasks ?? [], recordsByDate: data.recordsByDate ?? {} };

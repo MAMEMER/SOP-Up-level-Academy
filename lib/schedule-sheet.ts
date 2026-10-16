@@ -1,3 +1,4 @@
+import { rehearsalFetch } from "./rehearsal-network.ts";
 // Live schedule reader for a CLEAN normalized Google-Sheet tab.
 //
 // The legacy month-grid tab (JUN26/JUL26) cannot be parsed reliably: the day-number
@@ -120,7 +121,7 @@ export function parseScheduleSheetCsv(csvText: string): ScheduleSheetResult {
 /** Fetches + parses the clean schedule tab. Returns empty result on any failure. */
 export async function fetchScheduleFromSheet(csvUrl: string): Promise<ScheduleSheetResult> {
   try {
-    const response = await fetch(csvUrl, { cache: "no-store" });
+    const response = await rehearsalFetch(csvUrl, { cache: "no-store" });
     if (!response.ok) return { schedules: [], leaves: [] };
     return parseScheduleSheetCsv(await response.text());
   } catch {

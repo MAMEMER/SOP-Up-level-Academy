@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 import type { ReviewScope, ReviewStatus, ReviewVerdict } from "./review-verdicts.ts";
 
@@ -8,7 +9,7 @@ import type { ReviewScope, ReviewStatus, ReviewVerdict } from "./review-verdicts
 
 export async function fetchVerdicts(scope: ReviewScope, scopeKey: string): Promise<ReviewVerdict[]> {
   const params = new URLSearchParams({ scope, scopeKey });
-  const res = await fetch(`/api/review-verdicts?${params.toString()}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/review-verdicts?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) return [];
   const body = (await res.json().catch(() => null)) as { verdicts?: ReviewVerdict[] } | null;
   return body?.verdicts ?? [];
@@ -24,7 +25,7 @@ export async function saveVerdict(input: {
   status: ReviewStatus;
   note: string;
 }): Promise<ReviewVerdict> {
-  const res = await fetch("/api/review-verdicts", {
+  const res = await rehearsalFetch("/api/review-verdicts", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input)

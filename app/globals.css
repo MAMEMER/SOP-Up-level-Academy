@@ -8772,3 +8772,6 @@ p.ab-help{padding-left:0}
 .orders-board__arrival li { flex-wrap: wrap; }
 /* globals ใส่กรอบ input ด้วย !important — ช่องค้นหานี้มีกรอบที่ตัว label แล้ว ต้องลบกรอบซ้อน */
 .orders-board__search input[type="search"] { border: none !important; box-shadow: none !important; background: transparent !important; border-radius: 0 !important; min-height: 0; padding: 10px 0; }
+
+.rehearsal-banner{position:sticky;top:0;z-index:2147483646;background:var(--color-danger,#991b1b);color:var(--color-paper,#fff8f0);padding:10px 12px;text-align:center;font-family:Mitr,sans-serif;overflow-wrap:anywhere}button,input,select{min-height:44px}input,select{font-size:16px}
+.auth-page form{display:grid;gap:16px;max-width:420px}.auth-page form label{display:grid;gap:6px}.auth-page form input{width:100%;min-width:0}.auth-page form button{justify-self:start}

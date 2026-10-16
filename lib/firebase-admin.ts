@@ -1,3 +1,6 @@
+import { createRequire } from "node:module";
+const rehearsalRequire = createRequire(import.meta.url);
+rehearsalRequire("./rehearsal-guard.cjs").installFirestoreGuard(rehearsalRequire("firebase-admin/firestore"));
 import "server-only";
 import { cert, getApp, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
@@ -52,5 +55,11 @@ export const adminStorageBucket = STORAGE_BUCKET;
 /** Storage bucket via the service account — bypasses client Firebase Auth for uploads. */
 export function adminBucket() {
   if (!hasAdminCredentials()) throw new Error("Firebase admin credentials are not configured");
-  return getStorage(adminApp()).bucket(STORAGE_BUCKET);
+  const bucket = getStorage(adminApp()).bucket(STORAGE_BUCKET);
+  const file = bucket.file.bind(bucket);
+  return new Proxy(bucket, { get(target, prop) {
+    if (prop === "file") return (name: string) => file(rehearsalRequire("./rehearsal-guard.cjs").assertTestPath(name));
+    if (["upload", "deleteFiles", "delete", "getFiles"].includes(String(prop))) return () => { throw Error("rehearsal-storage-operation-disabled"); };
+    const value = Reflect.get(target, prop); return typeof value === "function" ? value.bind(target) : value;
+  } });
 }

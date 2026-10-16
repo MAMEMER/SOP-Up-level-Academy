@@ -1,3 +1,4 @@
+import { verifyGoogleIdToken } from "./firebase-token.ts";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import type { Role } from "./permissions.ts";
@@ -44,34 +45,12 @@ function toCurrentUser(uid: string, sopUser: SopUser, actual: SopUser): CurrentU
 // via the SOP allow-list (sop-users.ts). When no SESSION_SECRET is configured (local
 // dev), fall back to a preview admin so the app runs with `npm run dev` and no login.
 export async function requireUser(): Promise<CurrentUser> {
-  // pulls the /admin/staff list into sopUsers + employeeDirectory before anything reads them
-  await ensureStaffLoaded();
-  const jar = await cookies();
-
-  const actual: SopUser | undefined = hasSessionSecret()
-    ? await (async () => {
-        const cookie = jar.get(SOP_SESSION_COOKIE)?.value;
-        if (!cookie) redirect("/login");
-        const session = await verifySession(cookie);
-        if (!session) redirect("/login");
-        const sopUser = sopUserForEmail(session.email);
-        if (!sopUser) redirect("/login?denied=1");
-        return sopUser;
-      })()
-    : sopUserForEmail("champ.championest@gmail.com");
-
-  if (!actual) redirect("/login?denied=1");
-
-  const uid = hasSessionSecret() ? actual.email : "preview-admin-champ";
-  const viewAs = jar.get(VIEW_AS_COOKIE)?.value;
-  if (viewAs) {
-    const target = sopUserForEmail(viewAs);
-    if (target && canImpersonate(actual.role, target.role)) {
-      return toCurrentUser(uid, target, actual);
-    }
-  }
-
-  return toCurrentUser(uid, actual, actual);
+  const token = (await cookies()).get("test_sop_rehearsal")?.value;
+  const verified = token ? await verifyGoogleIdToken(token) : null;
+  if (!verified) redirect("/login");
+  return {id: verified.uid, name: "ผู้ทดสอบ " + verified.rehearsalRole, email: verified.email,
+    role: verified.rehearsalRole === "sop" ? "employee" : "admin", departmentId: "front-store",
+    actualEmail: verified.email, actualName: "ผู้ทดสอบ " + verified.rehearsalRole, isImpersonating: false};
 }
 
 /** The signed-in account, ignoring any impersonation — for audit fields and view-as guards. */

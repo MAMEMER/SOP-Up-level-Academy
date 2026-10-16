@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client store for the shared weekly/monthly checklist. Fix 1: sop_shared_tasks used to be
 // world read/write via the Firebase client SDK; it now goes through the authenticated
@@ -33,7 +34,7 @@ export async function fetchSharedTicks(
   periodKey: string
 ): Promise<SharedTasksPayload> {
   const qs = new URLSearchParams({ branch, period, periodKey }).toString();
-  const res = await fetch(`/api/shared-tasks?${qs}`, { cache: "no-store" });
+  const res = await rehearsalFetch(`/api/shared-tasks?${qs}`, { cache: "no-store" });
   if (!res.ok) return { ticks: {}, progress: {} };
   const data = (await res.json()) as Partial<SharedTasksPayload>;
   return { ticks: data.ticks ?? {}, progress: data.progress ?? {} };
@@ -51,7 +52,7 @@ export async function updateSharedProgress(input: {
   value?: string;
   photos?: string[];
 }): Promise<SharedTasksPayload> {
-  const res = await fetch("/api/shared-tasks", {
+  const res = await rehearsalFetch("/api/shared-tasks", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -89,7 +90,7 @@ export async function setSharedTick(input: {
   /** รูปที่แนบตอนติ๊ก (อัปโหลดผ่าน /api/evidence-upload มาแล้ว) */
   photos?: string[];
 }): Promise<Record<string, SharedTick>> {
-  const res = await fetch("/api/shared-tasks", {
+  const res = await rehearsalFetch("/api/shared-tasks", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({

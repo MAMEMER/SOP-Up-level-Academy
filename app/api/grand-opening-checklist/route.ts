@@ -14,7 +14,7 @@ const snapshotData = (docs: { id: string; data: () => unknown }[]) => {
   const board = (docs.find(doc => doc.id === "__board")?.data() as OpeningBoard | undefined) || initialOpeningBoard;
   return { board, rows: activeOpeningRows(mergeOpeningItems(docs.filter(doc => doc.id !== "__board").map(doc => ({ ...(doc.data() as OpeningItem), id: doc.id }))), board) };
 };
-const available = () => hasAdminCredentials() && hasSessionSecret();
+const available = () => hasAdminCredentials();
 const idSchema = z.string().regex(/^[\w-]{1,100}$/).refine(value => value !== "__board");
 export async function GET(request: Request) {
   await actor();
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     const thumbnail = form?.get("thumbnail");
     if (!idSchema.safeParse(id).success || !form?.has("revision") || !Number.isInteger(revision) || revision < 0 || !(file instanceof File) || !validOpeningImage(file.type, file.size) || !(thumbnail instanceof File) || thumbnail.type !== "image/jpeg" || thumbnail.size <= 0 || thumbnail.size > 100000) return badRequest("รับรูป JPG, PNG, WebP หรือ GIF ไม่เกิน 4MB พร้อมภาพย่อ");
     const imageId = randomUUID();
-    const path = `sop-grand-opening/${id}/${imageId}`;
+    const path = `test_sop-grand-opening/${id}/${imageId}`;
     attachment = { id: imageId, path, thumbnailPath: `${path}-thumb`, name: file.name.slice(0, 200), mimeType: file.type, size: file.size, uploadedBy: user.actualName, uploadedAt: new Date().toISOString() };
     try {
       for (const [target, source] of [[path, file], [attachment.thumbnailPath, thumbnail]] as const) {

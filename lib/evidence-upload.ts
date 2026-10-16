@@ -1,4 +1,5 @@
 "use client";
+import { rehearsalFetch } from "./rehearsal-network.ts";
 
 // Client helper: POST one evidence image to the server route, which uploads it to Firebase
 // Storage with the service account (authorized by the SOP session cookie). No client-side
@@ -27,7 +28,7 @@ export async function uploadEvidenceImage(file: File, kind: UploadKind = "eviden
 
   let res: Response;
   try {
-    res = await fetch("/api/evidence-upload", { method: "POST", body });
+    res = await rehearsalFetch("/api/evidence-upload", { method: "POST", body });
   } catch {
     throw new Error("อัปโหลดไม่สำเร็จ — เช็กอินเทอร์เน็ตแล้วลองใหม่");
   }
