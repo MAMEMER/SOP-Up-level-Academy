@@ -17,7 +17,13 @@ import {
   type LotState,
   type OrderSource,
   type ReservationRaw,
-  type ShopRaw
+  type ShopRaw,
+  type OrderMeta,
+  applyMeta,
+  MAX_ORDER_PHOTOS,
+  SET14_SHEET_HEADER,
+  set14SheetCells,
+  sheetRowsFor
 } from "./customer-orders.ts";
 
 // อ่านออเดอร์ทุกช่องทาง (อ่านอย่างเดียว) + สิ่งที่พนักงานบันทึกใน sop_order_fulfillment.
@@ -25,6 +31,7 @@ import {
 
 export const FULFILLMENT = "sop_order_fulfillment";
 export const SOURCES = "sop_order_sources";
+export const META = "sop_order_meta";
 
 const SHEETS = {
   ma6: { id: "1QeoXLtY1NgFkuCX_x3PFwRf9JqfI7jpP2lJv6dx1XEc", range: "Form Responses 1!A1:Q" },
@@ -97,6 +104,9 @@ export async function fetchCustomerOrders(): Promise<OrdersFeed> {
     safe("ชีต Mega Tactic", () => sheetRows("mat"), []),
     safe("บันทึกการส่งมอบ", () => db.collection(FULFILLMENT).get(), null)
   ]);
+  const metaSnap = await safe("ข้อมูลที่พนักงานแก้", () => db.collection(META).get(), null);
+  const metas = new Map<string, OrderMeta>();
+  metaSnap?.docs.forEach((d) => metas.set(d.id, d.data() as OrderMeta));
   const lots = { ...DEFAULT_LOT };
   const srcSnap = await safe("สถานะล็อต", () => db.collection(SOURCES).get(), null);
   srcSnap?.docs.forEach((d) => {
@@ -144,7 +154,7 @@ export async function fetchCustomerOrders(): Promise<OrdersFeed> {
   recSnap?.docs.forEach((d) => records.set(d.id, d.data() as FulfillmentRecord));
 
   const feed: OrdersFeed = {
-    orders: sortOrders(out.map((o) => applyFulfillment(applyLot(o, lots[o.source]), records.get(o.key)))),
+    orders: sortOrders(out.map((o) => applyFulfillment(applyLot(applyMeta(o, metas.get(o.key)), lots[o.source]), records.get(o.key)))),
     lots,
     errors,
     loadedAt: new Date().toISOString()
@@ -192,6 +202,54 @@ export async function recordHandover(
   }
   await batch.commit();
   invalidateOrders();
+  if (key.startsWith("set14__")) await syncSet14Sheet(key.slice(7));
+}
+
+// ---------- เขียนสถานะรับของกลับไปที่ชีตออเดอร์ Set 14 ----------
+// แชมป์อยากเห็นในชีตด้วย — Firestore ยังเป็นตัวจริง ถ้าชีตพังการบันทึกไม่พัง
+const SET14_SHEET_ID = "1FxgqJmzfdwlGp3Qm1e_d9tip985VkJl9Yh28dLfUbG4";
+const SET14_TAB = "ออเดอร์";
+let writeJwt: JWT | null = null;
+async function syncSet14Sheet(reservationId: string): Promise<void> {
+  try {
+    const db = adminDb();
+    const key = `set14__${reservationId}`;
+    const [snap, recDoc, metaDoc] = await Promise.all([
+      db.collection("set14-reservations").doc(reservationId).get(),
+      db.collection(FULFILLMENT).doc(key).get(),
+      db.collection(META).doc(key).get()
+    ]);
+    const orderId = String(snap.get("orderId") || "");
+    writeJwt ??= new JWT({
+      email: process.env.FIREBASE_CLIENT_EMAIL,
+      key: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+    });
+    const { token } = await writeJwt.getAccessToken();
+    const base = `https://sheets.googleapis.com/v4/spreadsheets/${SET14_SHEET_ID}/values`;
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const colB = await fetch(`${base}/${encodeURIComponent(`${SET14_TAB}!B:B`)}`, { headers, cache: "no-store" });
+    if (!colB.ok) throw new Error(`read ${colB.status}`);
+    const rows = sheetRowsFor(((await colB.json()) as { values?: string[][] }).values || [], [orderId, reservationId]);
+    if (!rows.length) throw new Error(`no sheet row for ${reservationId}`);
+    const cells = set14SheetCells(
+      recDoc.exists ? (recDoc.data() as FulfillmentRecord) : null,
+      metaDoc.exists ? (metaDoc.data() as OrderMeta) : null,
+      { method: String(snap.get("fulfillment") || "pickup"), address: String(snap.get("address") || "") }
+    );
+    const data = [
+      { range: `${SET14_TAB}!T1:Y1`, values: [[...SET14_SHEET_HEADER]] },
+      ...rows.map((n) => ({ range: `${SET14_TAB}!T${n}:Y${n}`, values: [cells] }))
+    ];
+    const res = await fetch(`${base}:batchUpdate`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ valueInputOption: "RAW", data })
+    });
+    if (!res.ok) throw new Error(`write ${res.status} ${(await res.text()).slice(0, 160)}`);
+  } catch (err) {
+    console.error("[orders] set14 sheet sync failed", reservationId, err);
+  }
 }
 
 export async function undoHandover(key: string, by: string, byName: string): Promise<void> {
@@ -201,6 +259,32 @@ export async function undoHandover(key: string, by: string, byName: string): Pro
   batch.set(db.collection(`${FULFILLMENT}_log`).doc(), { key, action: "undo", by, byName, at: new Date().toISOString() });
   await batch.commit();
   invalidateOrders();
+  if (key.startsWith("set14__")) await syncSet14Sheet(key.slice(7));
+}
+
+/** วิธีรับ / ที่อยู่ / ค่าส่งเพิ่ม / รูปหลักฐาน — เขียนทับทั้งก้อน และเก็บ log ทุกครั้ง */
+export async function saveOrderMeta(
+  key: string,
+  input: { method?: "pickup" | "ship"; address: string; shipFeePaid: boolean; photos: string[] },
+  by: string,
+  byName: string
+): Promise<void> {
+  const db = adminDb();
+  const meta: OrderMeta = {
+    ...(input.method ? { method: input.method } : {}),
+    address: input.address,
+    shipFeePaid: input.shipFeePaid,
+    photos: input.photos.slice(0, MAX_ORDER_PHOTOS),
+    by,
+    byName,
+    at: new Date().toISOString()
+  };
+  const batch = db.batch();
+  batch.set(db.collection(META).doc(key), meta);
+  batch.set(db.collection(`${FULFILLMENT}_log`).doc(), { key, action: "meta", ...meta });
+  await batch.commit();
+  invalidateOrders();
+  if (key.startsWith("set14__")) await syncSet14Sheet(key.slice(7));
 }
 
 export async function setSourceLot(source: OrderSource, lot: LotState, by: string): Promise<void> {
