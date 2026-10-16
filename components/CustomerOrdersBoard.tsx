@@ -5,7 +5,8 @@
 // logic อยู่ที่ lib/customer-orders.ts · ข้อมูลจาก /api/customer-orders.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, PackageCheck, Phone, Search, Truck, Undo2, X } from "lucide-react";
+import { Camera, Check, ExternalLink, PackageCheck, Phone, Search, Store, Truck, Undo2, X } from "lucide-react";
+import { EvidencePhotosInput } from "./EvidencePhotosInput.tsx";
 import {
   FILTERS,
   HAND_LABEL,
@@ -13,19 +14,21 @@ import {
   PAY_LABEL,
   SOURCE_ADMIN,
   SOURCE_LABEL,
+  MAX_ORDER_PHOTOS,
+  canSwitchMethod,
   isDone,
   isTodo,
   matchesFilter,
   matchesQuery,
   orderCounts,
-  type CustomerOrder,
+  owesShipFee,
+  type OrderWithMeta,
   type Filter,
-  type FulfillmentRecord,
   type LotState,
   type OrderSource
 } from "../lib/customer-orders.ts";
 
-type Row = CustomerOrder & { record?: FulfillmentRecord };
+type Row = OrderWithMeta;
 type Feed = { orders: Row[]; lots: Record<OrderSource, LotState>; errors: string[]; isAdmin: boolean; canAct: boolean };
 
 const REFRESH_MS = 60_000;
@@ -59,6 +62,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
   const [open, setOpen] = useState<{ key: string; mode: "ship" | "partial" } | null>(null);
   const [draft, setDraft] = useState("");
   const [confirmUndo, setConfirmUndo] = useState("");
+  const [details, setDetails] = useState("");
 
   // คำค้นค้างไว้ข้ามการรีเฟรช — ลูกค้ายืนรออยู่หน้าร้าน ห้ามหาย
   useEffect(() => {
@@ -101,6 +105,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
       setOpen(null);
       setDraft("");
       setConfirmUndo("");
+      setDetails("");
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -230,7 +235,15 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
               <span className={`parcel-order__pill parcel-order__pill--${payTone(o)}`} title={o.payText}>
                 {PAY_LABEL[o.pay]}
               </span>
-              <span>{o.method === "ship" ? "จัดส่ง" : o.method === "pickup" ? "รับที่ร้าน" : "งานแข่ง"}</span>
+              <span>
+                {o.method === "ship" ? "จัดส่ง" : o.method === "pickup" ? "รับที่ร้าน" : "งานแข่ง"}
+                {o.originalMethod ? ` (เปลี่ยนจาก${o.originalMethod === "ship" ? "จัดส่ง" : "รับที่ร้าน"})` : ""}
+              </span>
+              {o.originalMethod === "pickup" && o.method === "ship" ? (
+                <span className={`parcel-order__pill parcel-order__pill--${o.meta?.shipFeePaid ? "done" : "late"}`}>
+                  {o.meta?.shipFeePaid ? "จ่ายค่าส่งเพิ่มแล้ว" : "ยังไม่จ่ายค่าส่งเพิ่ม"}
+                </span>
+              ) : null}
             </div>
 
             {o.due ? <p className="parcel-order__note">เก็บเงินส่วนที่เหลือ {baht(o.due)} ก่อนส่งของ</p> : null}
@@ -238,6 +251,17 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
             {o.handText !== HAND_LABEL[o.hand] ? <p className="parcel-order__status">{o.handText}</p> : null}
             {o.address ? <p className="parcel-order__meta">ที่อยู่: {o.address}</p> : null}
             {o.note ? <p className="parcel-order__meta">หมายเหตุ: {o.note}</p> : null}
+            {o.meta?.photos?.length ? (
+              <div className="orders-row__photos">
+                {o.meta.photos.map((u, i) => (
+                  <a key={u} href={u} target="_blank" rel="noreferrer" aria-label={`รูปหลักฐาน ${i + 1}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="" loading="lazy" />
+                  </a>
+                ))}
+              </div>
+            ) : null}
+            {o.meta?.byName && details !== o.key ? <p className="parcel-order__meta">แก้ข้อมูลล่าสุด: {o.meta.byName} · {day(o.meta.at || null)}</p> : null}
 
             {feed?.canAct ? (
               <div className="orders-row__actions">
@@ -253,7 +277,7 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
                   </>
                 ) : null}
                 {isTodo(o) && o.method === "ship" ? (
-                  <button type="button" className="parcel-board__new" onClick={() => { setOpen({ key: o.key, mode: "ship" }); setDraft(""); }}>
+                  <button type="button" className="parcel-board__new" title={owesShipFee(o) ? "ลูกค้ายังไม่จ่ายค่าส่งเพิ่ม" : undefined} onClick={() => { setOpen({ key: o.key, mode: "ship" }); setDraft(""); }}>
                     <Truck size={16} aria-hidden />
                     ส่งแล้ว
                   </button>
@@ -271,11 +295,19 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
                     </button>
                   )
                 ) : null}
+                <button type="button" className="parcel-board__receive" aria-expanded={details === o.key} onClick={() => setDetails(details === o.key ? "" : o.key)}>
+                  <Camera size={16} aria-hidden />
+                  {canSwitchMethod(o) ? "วิธีรับ · ที่อยู่ · รูป" : "แนบรูปหลักฐาน"}
+                </button>
                 <a className="orders-row__source" href={SOURCE_ADMIN[o.source].url} target="_blank" rel="noreferrer">
                   ดูต้นทาง: {SOURCE_ADMIN[o.source].label}
                   <ExternalLink size={14} aria-hidden />
                 </a>
               </div>
+            ) : null}
+
+            {details === o.key && feed?.canAct ? (
+              <OrderDetailsForm order={o} busy={busy === o.key} onCancel={() => setDetails("")} onSave={(b) => post({ action: "meta", key: o.key, ...b }, o.key)} />
             ) : null}
 
             {open?.key === o.key ? (
@@ -318,6 +350,88 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
         </button>
       ) : null}
     </article>
+  );
+}
+
+/** ลูกค้าเปลี่ยนใจ รับที่ร้าน ↔ จัดส่ง · ค่าส่งเพิ่ม · ที่อยู่ · รูปหลักฐาน (ถ่ายตอนมารับ / สลิปค่าส่ง) */
+function OrderDetailsForm({
+  order,
+  busy,
+  onCancel,
+  onSave
+}: {
+  order: Row;
+  busy: boolean;
+  onCancel: () => void;
+  onSave: (b: { method?: "pickup" | "ship"; address: string; shipFeePaid: boolean; photos: string[] }) => Promise<void>;
+}) {
+  const switchable = canSwitchMethod(order);
+  const original = order.originalMethod || order.method;
+  const [method, setMethod] = useState<"pickup" | "ship">(order.method === "ship" ? "ship" : "pickup");
+  const [address, setAddress] = useState(order.meta?.address || (order.method === "ship" ? order.address : ""));
+  const [feePaid, setFeePaid] = useState(order.meta?.shipFeePaid === true);
+  const [photos, setPhotos] = useState((order.meta?.photos || []).join("\n"));
+  const movedToShip = switchable && method === "ship" && original === "pickup";
+
+  return (
+    <form
+      className="orders-row__details"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void onSave({
+          method: switchable ? method : undefined,
+          address: method === "ship" ? address.trim() : "",
+          shipFeePaid: movedToShip && feePaid,
+          photos: photos.split("\n").map((u) => u.trim()).filter(Boolean)
+        });
+      }}
+    >
+      {switchable ? (
+        <div className="orders-row__switch" role="radiogroup" aria-label="วิธีรับของ">
+          <button type="button" role="radio" aria-checked={method === "pickup"} className={method === "pickup" ? "is-on" : ""} onClick={() => setMethod("pickup")}>
+            <Store size={16} aria-hidden />
+            รับที่ร้าน
+          </button>
+          <button type="button" role="radio" aria-checked={method === "ship"} className={method === "ship" ? "is-on" : ""} onClick={() => setMethod("ship")}>
+            <Truck size={16} aria-hidden />
+            จัดส่ง
+          </button>
+        </div>
+      ) : null}
+
+      {switchable && method === "ship" ? (
+        <>
+          <label className="orders-row__field">
+            <span>ที่อยู่จัดส่ง</span>
+            <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={3} placeholder="ชื่อผู้รับ · เบอร์ · ที่อยู่ · รหัสไปรษณีย์" required />
+          </label>
+          {movedToShip ? (
+            <label className="orders-row__check">
+              <input type="checkbox" checked={feePaid} onChange={(e) => setFeePaid(e.target.checked)} />
+              <span>ลูกค้าจ่ายค่าส่งเพิ่มแล้ว</span>
+            </label>
+          ) : null}
+        </>
+      ) : null}
+
+      <EvidencePhotosInput
+        value={photos}
+        onChange={setPhotos}
+        max={MAX_ORDER_PHOTOS}
+        disabled={busy}
+        label={method === "ship" ? "รูปหลักฐาน (สลิปค่าส่ง / ใบเสร็จขนส่ง)" : "รูปหลักฐาน (ถ่ายตอนลูกค้ามารับ)"}
+      />
+
+      <div className="orders-row__details-actions">
+        <button type="submit" className="parcel-board__new" disabled={busy}>
+          <Check size={16} aria-hidden />
+          บันทึก
+        </button>
+        <button type="button" className="parcel-board__receive" onClick={onCancel}>
+          ยกเลิก
+        </button>
+      </div>
+    </form>
   );
 }
 

@@ -351,6 +351,41 @@ export const LOT_LABEL: Record<LotState, string> = { waiting: "ยังไม�
 export const DEFAULT_LOT: Record<OrderSource, LotState> = {
   shop: "open", set14: "waiting", bundle: "waiting", prerelease: "open", ma6: "open", lorcana13: "open", mat: "open"
 };
+// ---------- ข้อมูลที่พนักงานแก้เอง (sop_order_meta/{key}) ----------
+// ลูกค้าเปลี่ยนใจ รับที่ร้าน ↔ จัดส่ง · ค่าส่งเพิ่มจ่ายแล้วหรือยัง · ที่อยู่ใหม่ · รูปหลักฐาน (ถ่ายตอนรับ / สลิปค่าส่ง)
+export type OrderMeta = {
+  method?: "pickup" | "ship";
+  address?: string;
+  shipFeePaid?: boolean;
+  photos?: string[];
+  by?: string;
+  byName?: string;
+  at?: string;
+};
+export const MAX_ORDER_PHOTOS = 4;
+
+/** เปลี่ยนวิธีรับได้เฉพาะพรีออเดอร์ (ร้านออนไลน์มีใบงานส่งของของมันเอง · งานแข่งไม่มีของให้ส่ง) */
+export const canSwitchMethod = (o: Pick<CustomerOrder, "source" | "method">) => o.source !== "shop" && o.method !== "event";
+
+export type OrderWithMeta = CustomerOrder & { record?: FulfillmentRecord; meta?: OrderMeta; originalMethod?: Method };
+
+export function applyMeta(order: CustomerOrder, meta?: OrderMeta): CustomerOrder & { meta?: OrderMeta; originalMethod?: Method } {
+  if (!meta) return order;
+  const switched = meta.method && canSwitchMethod(order) && meta.method !== order.method ? meta.method : null;
+  const out: CustomerOrder & { meta?: OrderMeta; originalMethod?: Method } = { ...order, meta };
+  if (switched) {
+    out.originalMethod = order.method;
+    out.method = switched;
+    if (order.hand === "to_hand" || order.hand === "to_ship") out.hand = switched === "ship" ? "to_ship" : "to_hand";
+    out.handText = HAND_LABEL[out.hand];
+  }
+  if (meta.address && out.method === "ship") out.address = meta.address;
+  return out;
+}
+
+/** ย้ายไปจัดส่งจากที่เคยรับที่ร้าน = ลูกค้าต้องจ่ายค่าส่งเพิ่มก่อนส่ง */
+export const owesShipFee = (o: OrderWithMeta) => o.originalMethod === "pickup" && o.method === "ship" && !o.meta?.shipFeePaid;
+
 export function applyLot(order: CustomerOrder, lot: LotState): CustomerOrder {
   if (lot === "open" || (order.hand !== "to_hand" && order.hand !== "to_ship")) return order;
   if (lot === "waiting") return { ...order, hand: "waiting_stock", handText: "ของล็อตนี้ยังไม่ถึงร้าน" };
@@ -359,6 +394,41 @@ export function applyLot(order: CustomerOrder, lot: LotState): CustomerOrder {
 }
 
 // ---------- ที่พนักงานกดบันทึก ชนะที่เดาจากต้นทาง ----------
+// ชีตออเดอร์ Set 14: เขียนต่อท้าย T–Y (S เป็นหมายเหตุที่แอดมินพิมพ์เอง ห้ามทับ · J/K เป็นข้อมูลตอนสั่ง เก็บไว้เทียบ)
+export const SET14_SHEET_HEADER = ["รับของ", "บันทึกโดย", "วิธีรับ (ล่าสุด)", "ที่อยู่จัดส่ง (ล่าสุด)", "ค่าส่งเพิ่ม", "รูปหลักฐาน"] as const;
+const sheetWhen = (at: string) => {
+  const t = new Date(Date.parse(at) + 7 * 3600_000).toISOString();
+  return `${t.slice(8, 10)}/${t.slice(5, 7)}/${t.slice(0, 4)} ${t.slice(11, 16)}`;
+};
+export function set14SheetCells(
+  rec: FulfillmentRecord | null,
+  meta: OrderMeta | null,
+  original: { method: string; address: string }
+): string[] {
+  const label = !rec ? ""
+    : rec.state === "picked_up" ? "รับแล้ว ✅"
+    : rec.state === "shipped" ? `ส่งแล้ว${rec.tracking ? ` · ${rec.tracking}` : ""}`
+    : `รับไปบางส่วน${rec.note ? ` · ${rec.note}` : ""}`;
+  const method = meta?.method || (original.method === "ship" ? "ship" : "pickup");
+  const switched = method !== (original.method === "ship" ? "ship" : "pickup");
+  return [
+    label,
+    rec ? `${rec.byName || rec.by} · ${sheetWhen(rec.at)}` : "",
+    `${method === "ship" ? "จัดส่ง" : "รับที่ร้าน"}${switched ? " (เปลี่ยน)" : ""}`,
+    method === "ship" ? meta?.address || original.address : "",
+    switched && method === "ship" ? (meta?.shipFeePaid ? "จ่ายแล้ว" : "ยังไม่จ่าย") : "",
+    (meta?.photos || []).join("\n")
+  ];
+}
+
+/** แถวในชีตที่เป็นของออเดอร์นี้ (1 แถว = 1 ชิ้น) — คืนเลขแถวแบบ 1-based, ข้ามหัวตาราง */
+export function sheetRowsFor(columnB: string[][], orderIds: string[]): number[] {
+  const ids = new Set(orderIds.filter(Boolean));
+  const rows: number[] = [];
+  columnB.forEach((r, i) => { if (i > 0 && ids.has(str(r[0]))) rows.push(i + 1); });
+  return rows;
+}
+
 export function applyFulfillment(order: CustomerOrder, rec?: FulfillmentRecord): CustomerOrder & { record?: FulfillmentRecord } {
   if (!rec) return order;
   if (rec.state === "partial") {

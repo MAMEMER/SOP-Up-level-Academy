@@ -8,13 +8,15 @@ import {
   fetchCustomerOrders,
   isOrderKey,
   recordHandover,
+  saveOrderMeta,
   setSourceLot,
   undoHandover
 } from "../../../lib/customer-orders-server.ts";
 
 // ออเดอร์ลูกค้าทุกช่องทาง. GET = รายการทั้งหมด (พนักงานทุกคน — ต้องใช้ตอนลูกค้ามารับของ)
 // POST hand / undo = พนักงานบันทึกการส่งมอบ · lot = เจ้าของร้านตั้งสถานะล็อต (ยังไม่ถึง / ต้องส่งมอบ / ปิดล็อต).
-// ไม่เขียนกลับไปที่ชีตหรือออเดอร์ต้นทาง. ตัวตนมาจาก session เสมอ.
+// POST meta = เปลี่ยนวิธีรับ / ที่อยู่ / ค่าส่งเพิ่ม / รูปหลักฐาน.
+// ไม่แก้ออเดอร์ต้นทาง · Set 14 เขียนสถานะลงคอลัมน์ท้ายชีตออเดอร์ให้ด้วย. ตัวตนมาจาก session เสมอ.
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +73,14 @@ export async function POST(request: Request) {
       const note = str(body.note, 300);
       if (state === "partial" && !note) return badRequest("note_required");
       await recordHandover(key, { state, tracking: str(body.tracking, 60), note }, by, byName);
+      return NextResponse.json({ ok: true });
+    }
+    if (body.action === "meta") {
+      const method = body.method === "ship" || body.method === "pickup" ? body.method : undefined;
+      const photos = Array.isArray(body.photos)
+        ? body.photos.filter((u): u is string => typeof u === "string" && /^https:\/\/(firebasestorage|storage)\.googleapis\.com\//.test(u)).slice(0, 4)
+        : [];
+      await saveOrderMeta(key, { method, address: str(body.address, 400), shipFeePaid: body.shipFeePaid === true, photos }, by, byName);
       return NextResponse.json({ ok: true });
     }
     return badRequest("unknown_action");

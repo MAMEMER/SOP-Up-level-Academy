@@ -129,3 +129,30 @@ test("search by phone tail, name or ref; filters and counts agree; todo sorts fi
   assert.equal(sortOrders([b, c, a])[0], a);
   assert.equal(sheetDate("not a date"), null);
 });
+
+test("Set 14 pickup switched to ship: becomes a ship task, owes the extra fee until ticked", async () => {
+  const { applyMeta, owesShipFee } = await import("../lib/customer-orders.ts");
+  const base = fromReservation("set14", { id: "abc", status: "paid", name: "A", phone: "0811111111", fulfillment: "pickup", total: 4699 })!;
+  const moved = applyMeta(base, { method: "ship", address: "99 ถ.สุขุมวิท กทม 10110", shipFeePaid: false });
+  assert.equal(moved.method, "ship");
+  assert.equal(moved.hand, "to_ship");
+  assert.equal(moved.address, "99 ถ.สุขุมวิท กทม 10110");
+  assert.equal(owesShipFee(moved), true);
+  assert.equal(owesShipFee(applyMeta(base, { method: "ship", address: "x", shipFeePaid: true })), false);
+  // ship → pickup: back to a hand-over task, no fee question
+  const ship = fromReservation("set14", { id: "s", status: "paid", fulfillment: "ship", address: "old" })!;
+  const back = applyMeta(ship, { method: "pickup" });
+  assert.equal(back.hand, "to_hand");
+  assert.equal(owesShipFee(back), false);
+  // photos alone don't touch the method
+  assert.equal(applyMeta(base, { photos: ["https://firebasestorage.googleapis.com/x"] }).method, "pickup");
+});
+
+test("Set 14 sheet cells: handover + switch + fee + photos; undo clears only the handover cells", async () => {
+  const { set14SheetCells, sheetRowsFor } = await import("../lib/customer-orders.ts");
+  const rec = { state: "picked_up" as const, by: "S01", byName: "มุก", at: "2026-10-16T05:30:00.000Z" };
+  const cells = set14SheetCells(rec, { method: "ship", address: "addr", shipFeePaid: true, photos: ["u1", "u2"] }, { method: "pickup", address: "" });
+  assert.deepEqual(cells, ["รับแล้ว ✅", "มุก · 16/10/2026 12:30", "จัดส่ง (เปลี่ยน)", "addr", "จ่ายแล้ว", "u1\nu2"]);
+  assert.deepEqual(set14SheetCells(null, null, { method: "pickup", address: "" }), ["", "", "รับที่ร้าน", "", "", ""]);
+  assert.deepEqual(sheetRowsFor([["เลขออเดอร์"], ["a"], ["b"], ["a"]], ["a", ""]), [2, 4]);
+});
