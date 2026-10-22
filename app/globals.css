@@ -8801,3 +8801,39 @@ p.ab-help{padding-left:0}
 .orders-row__photos { display: flex; flex-wrap: wrap; gap: 8px; }
 .orders-row__photos a { display: block; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(45,49,66,0.12); }
 .orders-row__photos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* ---------- เงินเดือนพนักงาน (/admin/payroll) ---------- */
+.payroll-board__period { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 12px; padding: 4px; border-radius: 999px; background: rgba(255,255,255,0.75); border: 1px solid rgba(45,49,66,0.08); }
+.payroll-board__period strong { font-size: 16px; font-weight: 600; text-align: center; }
+.payroll-board__period button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: none; border-radius: 999px; background: transparent; color: var(--color-ink); cursor: pointer; }
+.payroll-board__totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.payroll-board__totals > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.75); border: 1px solid rgba(45,49,66,0.08); min-width: 0; }
+.payroll-board__totals span { font-size: 12.5px; color: var(--color-ink-soft); }
+.payroll-board__totals b { font-size: 18px; font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.payroll-board__totals > button { grid-column: 1 / -1; justify-self: start; }
+.payroll-card__net { flex: 0 0 auto; font-size: 20px; font-weight: 600; color: var(--color-ink); white-space: nowrap; }
+.payroll-card__rows { margin: 0; display: flex; flex-direction: column; }
+.payroll-card__rows > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 4px 12px; padding: 8px 0; border-top: 1px dashed rgba(45,49,66,0.1); }
+.payroll-card__rows dt { font-size: 14px; color: var(--color-ink-soft); }
+.payroll-card__rows dd { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; min-width: 0; }
+.payroll-card__rows dd > span:first-child { font-weight: 600; font-size: 15px; }
+.payroll-card__rows dd small { font-size: 12.5px; color: var(--color-ink-soft); overflow-wrap: anywhere; }
+.payroll-card__rows .is-minus { color: #a8321f; }
+.payroll-card__rows .is-plus { color: #2e7d5b; }
+.payroll-card__link { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; border: none; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--color-ink-soft); cursor: pointer; }
+.payroll-card__void { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.payroll-card__void input { min-height: 40px; font-size: 16px; padding: 6px 10px; }
+.payroll-card__ot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; background: rgba(255,199,142,0.22); font-size: 13.5px; color: var(--color-ink); }
+.payroll-card__ot span { flex: 1 1 200px; }
+.payroll-card__form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.payroll-card__form input, .payroll-card__form select { flex: 1 1 160px; min-width: 0; min-height: 44px; padding: 8px 12px; font: inherit; font-size: 16px; }
+.payroll-card__form input[aria-label="เหตุผล"] { flex-basis: 100%; }
+.payroll-card__sign { display: flex; gap: 6px; flex-basis: 100%; }
+.payroll-card__sign .delivery-board__filter { display: inline-flex; align-items: center; gap: 4px; }
+.payroll-card__days summary { cursor: pointer; font-size: 13.5px; color: var(--color-ink-soft); padding: 8px 0; }
+.payroll-card__days p { margin: 4px 0; font-size: 13px; color: var(--color-ink-soft); overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .payroll-board__totals { grid-template-columns: 1fr 1fr; }
+  .payroll-board__totals > div:first-child { grid-column: 1 / -1; }
+}
+.payroll-card__form input[aria-label="ค่า OT ต่อชั่วโมง"] { flex-basis: 100%; }
+.payroll-board__period button svg { width: 22px; height: 22px; }
