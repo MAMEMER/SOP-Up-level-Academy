@@ -3,7 +3,8 @@
 // Flow ที่แชมป์วางไว้:
 //   1. เจ้าของร้านสั่งการ์ด → ลงออเดอร์ที่นี่ พร้อมรูปที่พ่อค้าส่งมา + บอกว่าแต่ละใบ
 //      "เก็บไว้ก่อน (ยังไม่ขาย)" หรือ "ลงแฟ้มขาย ราคา X บาท" · ปลายทาง default บางแค
-//   2. พัสดุมาถึงร้าน → แอดมินหน้าร้านถ่ายวิดีโอตอนแกะ อัปโหลด (= รับพัสดุ)
+//   2. พัสดุมาถึงร้าน → แอดมินหน้าร้านถ่ายรูป หรือวิดีโอตอนแกะ อัปโหลด (= รับพัสดุ)
+//      (เน็ตร้านช้า → ถ่ายรูปพอ วิดีโอเป็นทางเลือก)
 //   3. เทียบของกับออเดอร์ทีละรายการ: ตรง → เอาลงตามที่บอก แล้วกด "ลงแล้ว"
 //                                      ไม่ตรง/ขาด → แจ้งปัญหา เจ้าของร้านไปตามพ่อค้า
 //
@@ -430,6 +431,23 @@ export function normaliseItems(raw: unknown, makeId: (index: number) => string):
 
 export function normalisePhotos(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter(isStorageUrl).slice(0, MAX_PHOTOS) : [];
+}
+
+/**
+ * ต่อรูปตอนรับของเข้าของเดิม — append-only: รูปเดิมอยู่ครบ ตัดซ้ำ แล้วรับใหม่ได้เท่าที่ยังไม่เต็ม.
+ * คืน added = จำนวนรูปใหม่ที่เข้าไปจริง.
+ */
+export function appendArrivalPhotos(existing: string[] | undefined, raw: unknown): { photos: string[]; added: number } {
+  const current = existing || [];
+  const fresh = normalisePhotos(raw).filter((url, index, list) => !current.includes(url) && list.indexOf(url) === index);
+  const room = Math.max(0, MAX_PHOTOS - current.length);
+  const added = fresh.slice(0, room);
+  return { photos: [...current, ...added], added: added.length };
+}
+
+/** มีหลักฐานตอนรับของแล้วหรือยัง — วิดีโอแกะกล่อง หรือรูปอย่างน้อย 1 รูป อย่างใดอย่างหนึ่งก็พอ */
+export function hasArrivalEvidence(order: Pick<ParcelOrder, "unboxVideoUrl" | "arrivalPhotos">): boolean {
+  return Boolean(order.unboxVideoUrl) || Boolean(order.arrivalPhotos?.length);
 }
 
 export { cleanText as cleanParcelText, cleanNumber as cleanParcelNumber };

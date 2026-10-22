@@ -2,6 +2,7 @@
 
 // Client store ของพัสดุการ์ด — คุยกับ /api/parcel-orders เท่านั้น (Admin SDK + session ฝั่ง server).
 
+import { downscaleImage } from "./image-downscale.ts";
 import type { ParcelCheck, ParcelItem, ParcelOrder, ParcelPlan } from "./parcel-orders.ts";
 
 export type ParcelFeed = { orders: ParcelOrder[]; today: string; isAdmin: boolean; staffCode: string };
@@ -119,4 +120,62 @@ export async function uploadUnboxVideo(id: string, file: File, onProgress: (rati
   });
   onProgress(1);
   await post({ action: "arrived", id, path: session.path });
+}
+
+/** รูปรับของ: ย่อให้ด้านยาว 1600px JPEG ~0.75 (ราว 200–400KB) — เน็ตร้านช้าก็อัปทัน */
+const ARRIVAL_PHOTO_OPTIONS = { maxDimension: 1600, quality: 0.75, skipBelowBytes: 300 * 1024 };
+
+function uploadPhoto(file: File, onProgress: (ratio: number) => void): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const body = new FormData();
+    body.append("file", file);
+    body.append("kind", "evidence");
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/evidence-upload");
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      let data: { url?: string; error?: string } | null = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = null;
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data?.url) return resolve(data.url);
+      if (xhr.status === 401 || xhr.responseURL.includes("/login")) return reject(new Error("เซสชันหมดอายุ — เข้าสู่ระบบใหม่แล้วลองอีกครั้ง"));
+      if (data?.error === "too_large") return reject(new Error("รูปใหญ่เกิน 5MB — ลองถ่ายใหม่"));
+      if (data?.error === "not_an_image") return reject(new Error("ไฟล์ต้องเป็นรูปภาพ"));
+      reject(new Error(`อัปรูปไม่สำเร็จ (${xhr.status}) ลองใหม่อีกครั้ง`));
+    };
+    xhr.onerror = () => reject(new Error("อัปรูปไม่สำเร็จ — เช็กอินเทอร์เน็ตแล้วลองใหม่"));
+    xhr.send(body);
+  });
+}
+
+/**
+ * รับพัสดุด้วยรูป (ทางเลือกแทนวิดีโอ): ย่อรูปในเครื่อง → อัปทีละรูปผ่าน /api/evidence-upload →
+ * แจ้ง server ให้ต่อท้าย arrivalPhotos. uploaded = cache ของรูปที่อัปขึ้นไปแล้ว — กดลองใหม่
+ * จะอัปเฉพาะรูปที่ยังค้าง ไม่อัปซ้ำ.
+ */
+export async function uploadArrivalPhotos(
+  id: string,
+  files: File[],
+  onProgress: (ratio: number) => void,
+  uploaded: Map<File, string> = new Map()
+): Promise<void> {
+  const urls: string[] = [];
+  for (const [index, file] of files.entries()) {
+    const step = (ratio: number) => onProgress(Math.min(0.99, (index + ratio) / files.length));
+    let url = uploaded.get(file);
+    if (!url) {
+      step(0);
+      const small = await downscaleImage(file, ARRIVAL_PHOTO_OPTIONS);
+      url = await uploadPhoto(small, step);
+      uploaded.set(file, url);
+    }
+    urls.push(url);
+  }
+  await post({ action: "arrivedPhotos", id, photos: urls });
+  onProgress(1);
 }

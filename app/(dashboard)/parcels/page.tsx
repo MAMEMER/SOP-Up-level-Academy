@@ -4,7 +4,7 @@ import { resolveEmployeeByEmail } from "../../../lib/employee-directory.ts";
 import { workBranchFor } from "../../../lib/delivery-tasks-server.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
 
-// พัสดุการ์ด: เจ้าของร้านลงออเดอร์การ์ดที่สั่งจากพ่อค้า → แอดมินหน้าร้านรับพัสดุ (วิดีโอแกะกล่อง)
+// พัสดุการ์ด: เจ้าของร้านลงออเดอร์การ์ดที่สั่งจากพ่อค้า → แอดมินหน้าร้านรับพัสดุ (รูปหรือวิดีโอแกะกล่อง)
 // → เช็คทีละรายการ → ลงตามที่บอก. เจ้าของร้านเห็นทุกสาขา · พนักงานเห็นสาขาที่เข้ากะวันนี้.
 export const dynamic = "force-dynamic";
 

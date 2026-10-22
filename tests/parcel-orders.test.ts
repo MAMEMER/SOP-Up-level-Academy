@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  appendArrivalPhotos,
   arrivalDueDate,
+  hasArrivalEvidence,
   matchCandidates,
   mergeParcelInto,
   normaliseItems,
@@ -152,4 +154,25 @@ test("จับคู่แล้ว: เดดไลน์แอดมินน
     workedAtBranch: new Set(["ICE:2026-10-08:bangkae", "ICE:2026-10-10:bangkae", "ICE:2026-10-11:bangkae"])
   });
   assert.deepEqual(adj.map((a) => a.workDate), ["2026-10-11"]);
+});
+
+test("arrival photos append-only: keep existing, dedupe, ignore non-storage urls, cap at 20", () => {
+  const url = (n: number) => `https://firebasestorage.googleapis.com/p${n}`;
+  const first = appendArrivalPhotos(undefined, [url(1), url(1), "https://evil.example/x.jpg"]);
+  assert.deepEqual(first, { photos: [url(1)], added: 1 });
+  const second = appendArrivalPhotos(first.photos, [url(1), url(2)]);
+  assert.deepEqual(second, { photos: [url(1), url(2)], added: 1 });
+  const full = Array.from({ length: 19 }, (_, i) => url(i + 10));
+  const capped = appendArrivalPhotos(full, [url(1), url(2)]);
+  assert.equal(capped.photos.length, 20);
+  assert.deepEqual(capped.photos.slice(0, 19), full);
+  assert.equal(capped.added, 1);
+  assert.equal(appendArrivalPhotos(capped.photos, [url(99)]).added, 0);
+});
+
+test("arrival evidence: video OR photos counts", () => {
+  assert.equal(hasArrivalEvidence({}), false);
+  assert.equal(hasArrivalEvidence({ arrivalPhotos: [] }), false);
+  assert.equal(hasArrivalEvidence({ unboxVideoUrl: "https://firebasestorage.googleapis.com/v" }), true);
+  assert.equal(hasArrivalEvidence({ arrivalPhotos: ["https://firebasestorage.googleapis.com/p"] }), true);
 });
