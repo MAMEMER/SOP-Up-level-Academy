@@ -10,6 +10,7 @@ import {
   createVideoUploadSession,
   listParcelOrders,
   markArrivedByOwner,
+  markArrivedWithPhotos,
   markArrivedWithVideo,
   notifyOwner,
   problemAlertText,
@@ -95,6 +96,9 @@ export async function POST(request: Request) {
       }
       case "arrived":
         return reply(await markArrivedWithVideo(id, str(body.path), by));
+      // รับพัสดุด้วยรูป (ทางเลือกแทนวิดีโอ เวลาเน็ตร้านช้า)
+      case "arrivedPhotos":
+        return reply(await markArrivedWithPhotos(id, body.photos, by));
       case "check": {
         const raw = str(body.check);
         const check: ParcelCheck | null = raw === "ok" || raw === "wrong" || raw === "missing" ? raw : null;

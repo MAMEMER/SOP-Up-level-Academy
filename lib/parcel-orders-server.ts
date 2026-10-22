@@ -7,6 +7,7 @@ import { restListCollection } from "./firestore-rest.ts";
 import { allBranchKeys } from "./store-config.ts";
 import {
   PARCEL_COLLECTION,
+  appendArrivalPhotos,
   allItemsHandled,
   arrivalDueDate,
   bangkokDate,
@@ -319,6 +320,29 @@ export async function markArrivedWithVideo(id: string, path: string, by: string)
   });
 }
 
+/**
+ * แอดมินรับพัสดุด้วยรูป (เน็ตร้านช้า อัปวิดีโอไม่ไหว) — รูปอัปผ่าน /api/evidence-upload แล้ว
+ * ส่ง URL มา. ต่อท้าย arrivalPhotos เท่านั้น ไม่ลบ/ทับของเดิม (วิดีโอ/รูปที่มีอยู่อยู่ครบ).
+ */
+export async function markArrivedWithPhotos(id: string, photos: unknown, by: string) {
+  return mutate(id, (order, now) => {
+    if (order.cancelled) return { error: "ออเดอร์นี้ยกเลิกแล้ว" };
+    const sent = normalisePhotos(photos);
+    if (!sent.length) return { error: "ไม่พบรูปที่อัปโหลด ลองอัปใหม่อีกครั้ง" };
+    const { photos: arrivalPhotos, added } = appendArrivalPhotos(order.arrivalPhotos, sent);
+    // ส่งซ้ำ (เน็ตหลุดตอนรอคำตอบแล้วกดลองใหม่) = รูปมีครบอยู่แล้ว ถือว่าสำเร็จ
+    const alreadySaved = sent.every((url) => order.arrivalPhotos?.includes(url));
+    if (!added && !alreadySaved) return { error: "รูปเต็มแล้ว (สูงสุด 20 รูป)" };
+    return {
+      ...order,
+      arrivalPhotos,
+      arrivedDate: order.arrivedDate || bangkokDate(now),
+      arrivedAt: order.arrivedAt || now.toISOString(),
+      arrivedBy: order.arrivedBy || by
+    };
+  });
+}
+
 /** เจ้าของร้านบันทึกว่าถึงร้านแล้ว (เช่น เช็คเลขพัสดุว่าส่งถึงแล้ว) — เริ่มนับเดดไลน์ฝั่งแอดมิน */
 export async function markArrivedByOwner(id: string, arrivedDate: string, by: string) {
   if (!isIsoDate(arrivedDate)) return { error: "วันที่ไม่ถูกต้อง" };
@@ -330,7 +354,7 @@ export async function markArrivedByOwner(id: string, arrivedDate: string, by: st
 
 export async function checkItem(id: string, itemId: string, check: ParcelCheck | null, note: string, by: string) {
   return mutate(id, (order, now) => {
-    if (!order.arrivedDate) return { error: "อัปวิดีโอแกะกล่องก่อน แล้วค่อยเช็คของ" };
+    if (!order.arrivedDate) return { error: "อัปรูปหรือวิดีโอตอนรับของก่อน แล้วค่อยเช็คของ" };
     if (order.unmatched) return { error: "รอเจ้าของร้านจับคู่ออเดอร์ก่อน แล้วค่อยเช็คของ" };
     const item = order.items.find((entry) => entry.id === itemId);
     if (!item) return { error: "ไม่พบรายการ" };

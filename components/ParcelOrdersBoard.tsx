@@ -1,7 +1,7 @@
 "use client";
 
 // "พัสดุการ์ด" — การ์ดที่เจ้าของร้านสั่งจากพ่อค้า ส่งมาที่ร้าน.
-// แอดมินหน้าร้าน: ของมา → อัปวิดีโอแกะกล่อง → เทียบทีละรายการ (ตรง / ไม่ตรง / ไม่มี) →
+// แอดมินหน้าร้าน: ของมา → ถ่ายรูป หรืออัปวิดีโอแกะกล่อง (อย่างใดก็ได้ เน็ตช้าใช้รูป) → เทียบทีละรายการ (ตรง / ไม่ตรง / ไม่มี) →
 // ลงตามที่บอก (เก็บไว้ก่อน หรือ ลงแฟ้มขาย ราคา X) → กด "ลงแล้ว".
 // เดดไลน์และ KPI อยู่ที่ lib/parcel-orders.ts.
 //
@@ -12,8 +12,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Clapperboard, Plus, ExternalLink, Link2, PackageCheck, PackageOpen, PackagePlus, PencilLine, Undo2, X } from "lucide-react";
+import { Camera, Check, Clapperboard, ImageIcon, Plus, RotateCcw, ExternalLink, Link2, PackageCheck, PackagePlus, PencilLine, Undo2, X } from "lucide-react";
 import {
+  hasArrivalEvidence,
   itemDestination,
   matchCandidates,
   parcelCounts,
@@ -34,6 +35,7 @@ import {
   reportParcelProblem,
   resolveParcelProblem,
   storeParcelItem,
+  uploadArrivalPhotos,
   uploadUnboxVideo
 } from "../lib/parcel-orders-store.ts";
 import { branchShortName } from "../lib/store-config.ts";
@@ -163,7 +165,7 @@ export function ParcelOrdersBoard({
       ) : (
         <>
         <p className="parcel-board__hint">
-          ของต้องถึงร้านภายใน 5 วันหลังสั่ง · ถึงแล้วถ่ายวิดีโอตอนแกะ เช็คกับรายการ แล้วลงตามที่บอก ให้จบภายในวันที่ของถึงหรือวันถัดไป
+          ของต้องถึงร้านภายใน 5 วันหลังสั่ง · ถึงแล้วถ่ายรูปหรือวิดีโอตอนแกะ เช็คกับรายการ แล้วลงตามที่บอก ให้จบภายในวันที่ของถึงหรือวันถัดไป
           · ของมาแต่ไม่มีในรายการ ลงไว้ก่อนได้ เจ้าของร้านจับคู่ทีหลัง
         </p>
         <div className="parcel-board__toolbar">
@@ -289,6 +291,10 @@ function ParcelOrderCard({
 }) {
   const state = parcelState(order, today);
   const [progress, setProgress] = useState<number | null>(null);
+  // งานอัปที่ค้าง (ล้ม) — เก็บไฟล์ไว้ให้กด "ลองใหม่" ได้โดยไม่ต้องเลือกไฟล์ซ้ำ
+  const [pending, setPending] = useState<{ kind: "photo" | "video"; files: File[] } | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const uploadedPhotos = useRef(new Map<File, string>());
   const [noteFor, setNoteFor] = useState<{ itemId: string; check: ParcelCheck } | null>(null);
   const [note, setNote] = useState("");
   const [problemOpen, setProblemOpen] = useState(false);
@@ -298,18 +304,32 @@ function ParcelOrderCard({
   const [ownerArriveOpen, setOwnerArriveOpen] = useState(false);
   const [matchTo, setMatchTo] = useState("");
   const unmatched = state === "unmatched";
-  const fileRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
+  const evidence = hasArrivalEvidence(order);
   const arrived = Boolean(order.arrivedDate);
   const working = busy.startsWith(order.id);
   const problems = order.problems || [];
   const handledCount = order.items.filter((item) => item.check && (item.check !== "ok" || item.storedAt)).length;
 
-  async function onVideo(file: File | undefined) {
-    if (!file) return;
+  async function upload(job: { kind: "photo" | "video"; files: File[] }) {
+    if (!job.files.length) return;
+    setPending(job);
+    setUploadError("");
     setProgress(0);
-    await run(`${order.id}:video`, () => uploadUnboxVideo(order.id, file, setProgress));
+    await run(`${order.id}:${job.kind}`, async () => {
+      try {
+        if (job.kind === "photo") await uploadArrivalPhotos(order.id, job.files, setProgress, uploadedPhotos.current);
+        else await uploadUnboxVideo(order.id, job.files[0], setProgress);
+        setPending(null);
+        uploadedPhotos.current.clear();
+      } catch (caught) {
+        setUploadError(caught instanceof Error ? caught.message : "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง");
+      }
+    });
     setProgress(null);
-    if (fileRef.current) fileRef.current.value = "";
+    if (photoRef.current) photoRef.current.value = "";
+    if (videoRef.current) videoRef.current.value = "";
   }
 
   return (
@@ -384,29 +404,75 @@ function ParcelOrderCard({
       ) : null}
       {unmatched && !isAdmin ? <p className="parcel-order__meta">ลงไว้แล้ว รอเจ้าของร้านบอกว่าเป็นออเดอร์ไหน แล้วค่อยเช็คของ</p> : null}
 
-      {/* ขั้น 1: รับพัสดุ = อัปวิดีโอแกะกล่อง */}
-      {(!arrived || (unmatched && !order.unboxVideoUrl)) && canAct && state !== "cancelled" ? (
+      {/* ขั้น 1: รับพัสดุ = ถ่ายรูป หรืออัปวิดีโอแกะกล่อง อย่างใดอย่างหนึ่ง */}
+      {(!arrived || (unmatched && !evidence)) && canAct && state !== "cancelled" ? (
         <div className="parcel-order__arrive">
-          <label className={`parcel-order__video-btn ${working ? "is-busy" : ""}`}>
-            <PackageOpen size={18} aria-hidden />
-            <span>{progress !== null ? `กำลังอัปวิดีโอ ${Math.round(progress * 100)}%` : "ของมาแล้ว — อัปวิดีโอแกะกล่อง"}</span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="video/*"
-              capture="environment"
-              disabled={working}
-              onChange={(event) => void onVideo(event.target.files?.[0])}
-            />
-          </label>
+          <p className="parcel-order__arrive-label">ของมาแล้ว — ส่งหลักฐานตอนแกะกล่อง (รูปหรือวิดีโอก็ได้)</p>
+          <div className="parcel-order__arrive-options">
+            <label className={`parcel-order__video-btn ${working ? "is-busy" : ""}`}>
+              <Camera size={18} aria-hidden />
+              <span>ถ่าย/เลือกรูป</span>
+              <input
+                ref={photoRef}
+                type="file"
+                accept="image/*"
+                multiple
+                disabled={working}
+                onChange={(event) => void upload({ kind: "photo", files: Array.from(event.target.files || []).slice(0, 20) })}
+              />
+            </label>
+            <label className={`parcel-order__alt-btn ${working ? "is-busy" : ""}`}>
+              <Clapperboard size={18} aria-hidden />
+              <span>อัปวิดีโอแกะกล่อง</span>
+              <input
+                ref={videoRef}
+                type="file"
+                accept="video/*"
+                disabled={working}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void upload({ kind: "video", files: [file] });
+                }}
+              />
+            </label>
+          </div>
+          <p className="parcel-order__hint">
+            วิดีโอไฟล์ใหญ่ อัปนาน — เน็ตร้านช้าให้ถ่ายรูปแทน: หน้ากล่องเห็นป้ายชื่อ + การ์ดในกล่องให้ครบทุกใบ
+          </p>
           {progress !== null ? (
-            <div className="parcel-order__progress" aria-hidden>
-              <span style={{ width: `${Math.round(progress * 100)}%` }} />
+            <>
+              <p className="parcel-order__progress-label" aria-live="polite">
+                {pending?.kind === "video" ? "กำลังอัปวิดีโอ" : `กำลังอัปรูป ${pending?.files.length || ""} รูป`} {Math.round(progress * 100)}%
+              </p>
+              <div className="parcel-order__progress" aria-hidden>
+                <span style={{ width: `${Math.round(progress * 100)}%` }} />
+              </div>
+            </>
+          ) : null}
+          {uploadError && pending && progress === null ? (
+            <div className="parcel-order__upload-error" role="alert">
+              <span>{uploadError}</span>
+              <div className="parcel-order__upload-actions">
+                <button type="button" disabled={working} onClick={() => void upload(pending)}>
+                  <RotateCcw size={15} aria-hidden /> ลองใหม่
+                </button>
+                <button
+                  type="button"
+                  className="parcel-order__text-btn"
+                  onClick={() => {
+                    setPending(null);
+                    setUploadError("");
+                    uploadedPhotos.current.clear();
+                  }}
+                >
+                  ยกเลิก
+                </button>
+              </div>
             </div>
           ) : null}
           {isAdmin && !arrived && !ownerArriveOpen ? (
             <button type="button" className="parcel-order__text-btn" onClick={() => setOwnerArriveOpen(true)}>
-              เจ้าของร้าน: บันทึกว่าถึงร้านแล้ว (ไม่มีวิดีโอ)
+              เจ้าของร้าน: บันทึกว่าถึงร้านแล้ว (ไม่มีรูป/วิดีโอ)
             </button>
           ) : null}
           {isAdmin && ownerArriveOpen ? (
@@ -429,6 +495,11 @@ function ParcelOrderCard({
           <Clapperboard size={16} aria-hidden /> วิดีโอแกะกล่อง
           {order.arrivedBy ? ` · ${who(order.arrivedBy)}` : ""} · ถึง {order.arrivedDate}
         </a>
+      ) : arrived && !unmatched && order.arrivalPhotos?.length ? (
+        <p className="parcel-order__video">
+          <ImageIcon size={16} aria-hidden /> รับของด้วยรูป {order.arrivalPhotos.length} รูป
+          {order.arrivedBy ? ` · ${who(order.arrivedBy)}` : ""} · ถึง {order.arrivedDate}
+        </p>
       ) : arrived && !unmatched ? (
         <p className="parcel-order__meta">ถึงร้าน {order.arrivedDate} (เจ้าของร้านบันทึก)</p>
       ) : null}

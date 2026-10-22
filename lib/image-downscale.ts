@@ -36,19 +36,24 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-export async function downscaleImage(file: File): Promise<File> {
+export type DownscaleOptions = { maxDimension?: number; quality?: number; skipBelowBytes?: number };
+
+export async function downscaleImage(file: File, options: DownscaleOptions = {}): Promise<File> {
+  const maxDimension = options.maxDimension ?? MAX_DIMENSION;
+  const quality = options.quality ?? JPEG_QUALITY;
+  const skipBelowBytes = options.skipBelowBytes ?? SKIP_BELOW_BYTES;
   // Only touch raster images; leave PDFs / non-images (assign-attachment PDFs) alone.
   if (!file.type.startsWith("image/")) return file;
   // GIFs would lose animation; SVGs are already tiny — skip both.
   if (file.type === "image/gif" || file.type === "image/svg+xml") return file;
-  if (file.size <= SKIP_BELOW_BYTES) return file;
+  if (file.size <= skipBelowBytes) return file;
 
   try {
     const img = await loadImage(file);
     const { width, height } = img;
     if (!width || !height) return file;
 
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+    const scale = Math.min(1, maxDimension / Math.max(width, height));
     const targetW = Math.max(1, Math.round(width * scale));
     const targetH = Math.max(1, Math.round(height * scale));
 
@@ -60,7 +65,7 @@ export async function downscaleImage(file: File): Promise<File> {
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
+      canvas.toBlob(resolve, "image/jpeg", quality)
     );
     if (!blob) return file;
     // If re-encoding somehow produced a larger file (rare, already-optimized small JPEG),
