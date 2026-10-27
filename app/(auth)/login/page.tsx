@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, googleProvider, db } from "../../../lib/firebase-client.ts";
+import { safeNextPath } from "../../../lib/masterplan-access.ts";
 import { CircleCheck } from "lucide-react";
 
 // The account Google returned but the SOP allow-list rejected. Captured so we can show
@@ -41,7 +42,11 @@ export default function LoginPage() {
         body: JSON.stringify({ idToken })
       });
       if (res.ok) {
-        router.push("/");
+        // ?next= (same-site paths only) wins; a Masterplan-only account (not SOP staff) lands
+        // on /masterplan; everyone else goes to the SOP home exactly as before.
+        const result = (await res.json().catch(() => ({}))) as { sop?: boolean; masterplan?: boolean };
+        const next = safeNextPath(new URLSearchParams(window.location.search).get("next"));
+        router.push(next ?? (result.masterplan && result.sop === false ? "/masterplan" : "/"));
         router.refresh();
       } else if (res.status === 403) {
         // capture WHO was rejected before signing out, so we can show it + let them request access

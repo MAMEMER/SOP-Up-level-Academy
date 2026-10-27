@@ -10,12 +10,18 @@
 import { cookies } from "next/headers";
 import { verifySession } from "../../../lib/session-jwt.ts";
 import { SOP_SESSION_COOKIE } from "../../../lib/auth-session.ts";
+import { sopUserForEmail } from "../../../lib/sop-users.ts";
+import { ensureStaffLoaded } from "../../../lib/staff-store.ts";
 
+// A valid cookie alone is not enough: Masterplan-only members also hold one. Only accounts
+// on the SOP allow-list may use the SOP help chat.
 async function sessionEmail(): Promise<string | null> {
   const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
   if (!cookie) return null;
   const claims = await verifySession(cookie);
-  return claims?.email ?? null;
+  if (!claims) return null;
+  await ensureStaffLoaded();
+  return sopUserForEmail(claims.email) ? claims.email : null;
 }
 
 // In-memory sliding-window limiter. Per serverless instance (best-effort — the whole

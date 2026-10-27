@@ -6,6 +6,7 @@
 // live in HelpChat / BugReportFab — this only fires their open events.
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Bug, MessageCircle, MessageCircleQuestion, X } from "lucide-react";
 
 export const OPEN_CHAT_EVENT = "sop:open-chat";
@@ -47,6 +48,19 @@ export function SupportFab() {
     setMenu(false);
     window.dispatchEvent(new Event(name));
   };
+
+  // /masterplan has no SOP help chat (it answers SOP questions and refuses non-staff), so the
+  // button there opens the bug report directly.
+  const pathname = usePathname() || "";
+  if (pathname.startsWith("/masterplan")) {
+    return (
+      <div ref={rootRef} className={`support-fab${away ? " is-away" : ""}`}>
+        <button className="support-fab-btn" onClick={() => fire(OPEN_BUG_EVENT)} aria-label="แจ้งบัค / แนะนำ">
+          <Bug size={20} aria-hidden />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div ref={rootRef} className={`support-fab${away && !menu ? " is-away" : ""}`}>

@@ -3,11 +3,15 @@ import { cookies } from "next/headers";
 import { verifyGoogleIdToken } from "../../../../lib/firebase-token.ts";
 import { mintSession } from "../../../../lib/session-jwt.ts";
 import { sopUserForEmail } from "../../../../lib/sop-users.ts";
+import { memberForEmail } from "../../../../lib/masterplan-access.ts";
 import { SOP_SESSION_COOKIE, SOP_SESSION_EXPIRES_IN_MS as EXPIRES_IN_MS } from "../../../../lib/auth-session.ts";
 import { ensureStaffLoaded } from "../../../../lib/staff-store.ts";
 
 // POST: verify a Google ID token, check the SOP allow-list, and issue our own session
 // cookie (jose HS256 — no firebase-admin). Rejects any email not on the allow-list.
+// The Masterplan workspace's fixed 4-person list (masterplan-access.ts) may also sign in:
+// the cookie only proves WHO they are. Every SOP page still runs requireUser(), which checks
+// sopUserForEmail() on each request, so a Masterplan-only account is denied there.
 export async function POST(request: Request) {
   const { idToken } = await request.json().catch(() => ({ idToken: null }));
   if (!idToken || typeof idToken !== "string") {
@@ -21,7 +25,9 @@ export async function POST(request: Request) {
 
   // the allow-list lives in Firestore (managed at /admin/staff), not in code
   await ensureStaffLoaded();
-  if (!sopUserForEmail(verified.email)) {
+  const isSopUser = Boolean(sopUserForEmail(verified.email));
+  const isMasterplanMember = Boolean(memberForEmail(verified.email));
+  if (!isSopUser && !isMasterplanMember) {
     return NextResponse.json({ error: "not_allowed" }, { status: 403 });
   }
 
@@ -33,7 +39,7 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: EXPIRES_IN_MS / 1000
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, sop: isSopUser, masterplan: isMasterplanMember });
 }
 
 // DELETE: sign out — clear the session cookie.

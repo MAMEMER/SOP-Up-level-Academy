@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySession } from "../../../../lib/session-jwt.ts";
 import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
+import { sopUserForEmail } from "../../../../lib/sop-users.ts";
+import { ensureStaffLoaded } from "../../../../lib/staff-store.ts";
 import { fetchSupplyNeeds, hasSupplyNeedsSource } from "../../../../lib/storehub-supply-needs.ts";
 import { allBranchKeys } from "../../../../lib/store-config.ts";
 
@@ -9,10 +11,15 @@ import { allBranchKeys } from "../../../../lib/store-config.ts";
 // พนักงานเห็นรายการที่ต้องสั่งได้เลย โดยไม่ต้อง copy CSV มาวางเอง.
 // ต้อง login (session ใดก็ได้) — ข้อมูลเป็นแค่ชื่อสินค้า + จำนวนคงเหลือ ทุก role ใช้ได้.
 
+// A valid cookie alone is not enough: Masterplan-only members also hold one, so the
+// session email must be on the SOP allow-list.
 async function isLoggedIn(): Promise<boolean> {
   const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
   if (!cookie) return false;
-  return Boolean(await verifySession(cookie));
+  const session = await verifySession(cookie);
+  if (!session) return false;
+  await ensureStaffLoaded();
+  return Boolean(sopUserForEmail(session.email));
 }
 
 export async function GET(request: Request) {

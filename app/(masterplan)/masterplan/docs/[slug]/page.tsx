@@ -1,0 +1,61 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { AiPanel } from "../../../../../components/masterplan/AiPanel.tsx";
+import { DocView } from "../../../../../components/masterplan/DocView.tsx";
+import { MpHead } from "../../../../../components/masterplan/MpHead.tsx";
+import { memberName } from "../../../../../lib/masterplan-access.ts";
+import { requireMasterplanMember } from "../../../../../lib/masterplan-auth.ts";
+import { openProposalsFor, thaiDateTime } from "../../../../../lib/masterplan-format.ts";
+import { aiSections, docSectionViews } from "../../../../../lib/masterplan-markdown.ts";
+import { getDoc, getScratch, listProposals } from "../../../../../lib/masterplan-store.ts";
+import { DEFAULT_DOC_TITLES, MASTER_SLUG, REFERENCE_SLUGS } from "../../../../../lib/masterplan.ts";
+
+// Reference docs (Mission A–D, research, roadmap) — read-only; "เสนอแก้ตรงนี้" still works
+// (the proposal targets ฉบับกลาง, quoting the reference text).
+
+export const dynamic = "force-dynamic";
+
+export default async function ReferenceDocPage({ params }: { params: Promise<{ slug: string }> }) {
+  const member = await requireMasterplanMember();
+  const { slug } = await params;
+  if (slug === MASTER_SLUG) redirect("/masterplan/plan");
+  if (!(REFERENCE_SLUGS as readonly string[]).includes(slug)) notFound();
+  const [doc, scratch, proposals] = await Promise.all([getDoc(slug), getScratch(member.key), listProposals()]);
+  const fallbackTitle = DEFAULT_DOC_TITLES[slug as keyof typeof DEFAULT_DOC_TITLES];
+
+  if (!doc) {
+    return (
+      <>
+        <MpHead eyebrow="เอกสารอ้างอิง" title={fallbackTitle} sub="ยังไม่ได้นำเข้าเอกสารนี้" />
+        {member.editor ? (
+          <Link href="/masterplan/import" className="mp-btn mp-btn--primary">
+            ไปหน้านำเข้าเอกสาร
+          </Link>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <MpHead
+        eyebrow="เอกสารอ้างอิง · อ่านอย่างเดียว"
+        title={doc.title}
+        sub={`เวอร์ชัน ${doc.version} · นำเข้าล่าสุด ${thaiDateTime(doc.updatedAt)} โดย ${memberName(doc.updatedBy)}`}
+      />
+      <details className="mp-fold">
+        <summary>ให้ AI ช่วยคิดจากเอกสารนี้</summary>
+        <AiPanel
+          memberKey={member.key}
+          memberName={member.name}
+          docTitle={doc.title}
+          docText={doc.markdown}
+          sections={aiSections(doc.markdown)}
+          scratch={scratch?.markdown ?? ""}
+          openProposals={openProposalsFor(proposals, member.key)}
+        />
+      </details>
+      <DocView slug={slug} docLabel={doc.title} version={doc.version} sections={docSectionViews(doc.markdown)} canEditDirect={false} />
+    </>
+  );
+}
