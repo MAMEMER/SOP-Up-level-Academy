@@ -9322,3 +9322,12 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .mp-kshape { margin: 0; padding: 12px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.75); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .mp-kerrors { margin: 6px 0; padding-left: 20px; color: var(--mp-red); font-size: 14px; line-height: 1.6; }
 @media (min-width: 760px) { .mp-krow--step { grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) 96px auto; } }
+/* KPI filters: chips wrap (no hidden overflow); label above on phones, beside on wide screens */
+.mp-filters--wrap { gap: 12px; }
+.mp-filters--wrap .mp-filter { flex-wrap: wrap; overflow: visible; gap: 6px; }
+.mp-filters--wrap .mp-filter__label { flex: 0 0 100%; width: auto; }
+.mp-root .mp-filters--wrap .mp-filter a { min-height: 44px; }
+@media (min-width: 760px) {
+  .mp-filters--wrap { gap: 4px; }
+  .mp-filters--wrap .mp-filter__label { flex: 0 0 64px; }
+}

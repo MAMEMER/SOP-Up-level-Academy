@@ -109,7 +109,7 @@ export default async function KpisPage({ searchParams }: { searchParams: Promise
             </Link>
           </nav>
 
-          <div className="mp-filters" aria-label="กรองตัวชี้วัด">
+          <div className="mp-filters mp-filters--wrap" aria-label="กรองตัวชี้วัด">
             <div className="mp-filter">
               <span className="mp-filter__label">Mission</span>
               <Link href={href(current, { mission: "" })} className={!mission ? "is-active" : undefined}>
