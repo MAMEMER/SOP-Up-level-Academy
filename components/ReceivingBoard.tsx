@@ -483,7 +483,11 @@ export function ReceivingBoard() {
 
   useEffect(() => {
     void load();
-    // เปิดฟอร์มต่อถ้ามีร่างค้าง
+    // ลิงก์ตรงไปที่บิล (?bill=<id>) หรือฟอร์มใหม่ (?new=1) · ไม่งั้นเปิดฟอร์มต่อถ้ามีร่างค้าง
+    const params = new URLSearchParams(window.location.search);
+    const bill = params.get("bill");
+    if (bill) return setView(bill);
+    if (params.get("new")) return setView("new");
     try {
       if (localStorage.getItem(DRAFT_KEY)) setView("new");
     } catch {
@@ -546,7 +550,7 @@ export function ReceivingBoard() {
         <ul className="rcv-list">
           {list.map((receiving) => {
             const qty = receiving.lines.reduce((sum, line) => sum + line.qty, 0);
-            const total = owner ? receivingTotal(receiving) : null;
+            const total = owner && receiving.status !== STATUS_CANCELLED ? receivingTotal(receiving) : null;
             return (
               <li key={receiving.id}>
                 <button type="button" onClick={() => setView(receiving.id)}>
