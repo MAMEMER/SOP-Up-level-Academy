@@ -18,6 +18,7 @@ export function MpNav({ memberKey, memberName }: { memberKey: string; memberName
     { href: `/masterplan/scratch/${memberKey}`, label: "กระดาษทด", match: ["/masterplan/scratch"] },
     { href: "/masterplan/proposals", label: "ข้อเสนอ", match: ["/masterplan/proposals"] },
     { href: "/masterplan/meeting", label: "คุยวันนี้", match: ["/masterplan/meeting"] },
+    { href: "/masterplan/kpis", label: "ตัวชี้วัด", match: ["/masterplan/kpis"] },
     { href: "/masterplan/tasks", label: "งาน", match: ["/masterplan/tasks"] },
     { href: "/masterplan/history", label: "ประวัติ", match: ["/masterplan/history"] },
     { href: "/masterplan/ai", label: "AI ของฉัน", match: ["/masterplan/ai"] }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Bot, CalendarCheck, FileText, History, ListTodo, NotebookPen, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, CalendarCheck, FileText, Gauge, History, ListTodo, NotebookPen, Upload } from "lucide-react";
 import { MpHead } from "../../../components/masterplan/MpHead.tsx";
 import { memberName } from "../../../lib/masterplan-access.ts";
 import { requireMasterplanMember } from "../../../lib/masterplan-auth.ts";
@@ -104,7 +104,7 @@ export default async function MasterplanHome() {
             <ul className="mp-lines">
               {changelog.map((line) => (
                 <li key={line.id} className="mp-line">
-                  <span className="mp-code">v{line.version}</span>
+                  <span className="mp-code">{line.slug === "kpis" ? "KPI" : `v${line.version}`}</span>
                   <span className="mp-line__text mp-ellipsis">{line.summary}</span>
                   <span className="mp-line__meta">
                     {memberName(line.by)} · {thaiDateTime(line.at)}
@@ -157,6 +157,11 @@ export default async function MasterplanHome() {
             </Link>
           </li>
           <li>
+            <Link href="/masterplan/kpis">
+              <Gauge size={18} aria-hidden="true" /> ตัวชี้วัด (สถานะการวัด)
+            </Link>
+          </li>
+          <li>
             <Link href="/masterplan/tasks">
               <ListTodo size={18} aria-hidden="true" /> งาน
             </Link>
@@ -174,7 +179,7 @@ export default async function MasterplanHome() {
           {member.editor ? (
             <li>
               <Link href="/masterplan/import">
-                <Upload size={18} aria-hidden="true" /> นำเข้าเอกสาร / งาน
+                <Upload size={18} aria-hidden="true" /> นำเข้าเอกสาร / งาน / ตัวชี้วัด
               </Link>
             </li>
           ) : null}
