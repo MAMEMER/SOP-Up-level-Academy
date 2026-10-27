@@ -16,6 +16,8 @@ import type { Role } from "./permissions.ts";
 // signed in. ไอซ์ (phooreephat.k) resigned 2026-08-01.
 // 2026-08-24: Champ สั่งเพิ่ม น้ำ (chutikanung) เป็น admin — สิทธิ์จัดการงาน
 // เท่านั้น ไม่ใช่ owner และไม่ได้อยู่ชั้นแก้บัญชีผู้ใช้ (ดู lib/owner.ts).
+// 2026-10-27: Champ สั่งเพิ่ม ท้อป (kananut.top) เป็น admin + owner (ดูได้ทั้งหมด)
+// แต่ไม่อยู่ชั้นแก้บัญชีผู้ใช้.
 
 export type SopUser = {
   email: string;
@@ -30,6 +32,7 @@ export const sopUsers: SopUser[] = [
   { email: "kittibhonlim@gmail.com", name: "เคน", role: "admin", departmentId: "admin" },
   { email: "sin.sirisa@gmail.com", name: "มุก", role: "admin", departmentId: "admin" },
   { email: "chutikanung@gmail.com", name: "น้ำ", role: "admin", departmentId: "admin" },
+  { email: "kananut.top@gmail.com", name: "ท้อป", role: "admin", departmentId: "admin" },
   { email: "thanakornjoeblack@gmail.com", name: "Kongh", role: "employee", departmentId: "front-store" },
   { email: "waranon4work@gmail.com", name: "Non", role: "employee", departmentId: "front-store" },
   { email: "wipop.tho@gmail.com", name: "Pee", role: "employee", departmentId: "front-store" },

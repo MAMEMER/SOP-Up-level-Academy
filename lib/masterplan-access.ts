@@ -3,7 +3,7 @@
 //
 // This list is SEPARATE from the SOP allow-list (sop-users.ts). Being here grants the
 // Masterplan pages only: requireUser() still checks sopUserForEmail(), so an account that
-// is only here (ท้อป) is denied on every SOP page.
+// is only here is denied on every SOP page. (ท้อป was masterplan-only until 2026-10-27; Champ then gave him full SOP view — see owner.ts.)
 //
 // editor = may apply accepted proposals to ฉบับกลาง and edit it directly (with a reason
 // that goes to the changelog), and may import documents.

@@ -15,12 +15,13 @@ describe("owner tier", () => {
     assert.equal(isOwner(null), false);
     assert.equal(isOwner(undefined), false);
   });
-  it("owner list = partners + มุก (2026-10-09), nobody else", () => {
+  it("owner list = partners + มุก (2026-10-09) + ท้อป (2026-10-27), nobody else", () => {
     assert.deepEqual(OWNER_EMAILS, [
       "champ.championest@gmail.com",
       "namenrw@gmail.com",
       "kittibhonlim@gmail.com",
       "sin.sirisa@gmail.com",
+      "kananut.top@gmail.com",
     ]);
   });
 });

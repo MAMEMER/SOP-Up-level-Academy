@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MASTERPLAN_MEMBERS, memberByKey, memberForEmail, safeNextPath } from "../lib/masterplan-access.ts";
 import { sopUserForEmail } from "../lib/sop-users.ts";
+import { canManageStaffAccounts, isOwner } from "../lib/owner.ts";
 
 describe("masterplan members", () => {
   it("is exactly the 4 leaders, with แชมป์ + ท้อป as editors", () => {
@@ -33,10 +34,16 @@ describe("masterplan members", () => {
   });
 });
 
-describe("masterplan-only account gets no SOP access", () => {
-  it("ท้อป is a masterplan member but NOT on the SOP allow-list", () => {
+describe("masterplan and SOP lists stay separate", () => {
+  it("ท้อป is on both lists (Champ, 27 Oct 2026: full view)", () => {
     assert.ok(memberForEmail("kananut.top@gmail.com"));
-    assert.equal(sopUserForEmail("kananut.top@gmail.com"), undefined);
+    assert.equal(sopUserForEmail("kananut.top@gmail.com")?.role, "admin");
+    assert.equal(isOwner("kananut.top@gmail.com"), true);
+    assert.equal(canManageStaffAccounts("kananut.top@gmail.com"), false);
+  });
+  it("an outsider is on neither list", () => {
+    assert.equal(memberForEmail("someone.else@gmail.com"), undefined);
+    assert.equal(sopUserForEmail("someone.else@gmail.com"), undefined);
   });
 });
 

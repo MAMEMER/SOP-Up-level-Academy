@@ -2,7 +2,9 @@
 // (salary deductions, sales/stock value). Regular admins (e.g. managers) see
 // everything else but NOT owner-only figures.
 
-export const OWNER_EMAILS = ["champ.championest@gmail.com", "namenrw@gmail.com", "kittibhonlim@gmail.com", "sin.sirisa@gmail.com"];
+// ท้อป (kananut.top) เพิ่ม 27 ต.ค. 2026 — Champ สั่ง "ท้อปเข้าดูได้ทั้งหมด" (ทำ Masterplan/การเงิน).
+// ดูได้ทุกอย่างรวมเงินเดือน แต่ไม่ได้อยู่ใน STAFF_ADMIN_EMAILS (แก้บัญชีผู้ใช้ไม่ได้).
+export const OWNER_EMAILS = ["champ.championest@gmail.com", "namenrw@gmail.com", "kittibhonlim@gmail.com", "sin.sirisa@gmail.com", "kananut.top@gmail.com"];
 
 export function isOwner(email?: string | null): boolean {
   return !!email && OWNER_EMAILS.includes(email.trim().toLowerCase());
