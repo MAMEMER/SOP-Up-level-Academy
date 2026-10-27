@@ -1,6 +1,7 @@
 import { mpStore } from "../../../../../lib/masterplan-store.ts";
 import { NO_STORE_HEADERS, gateToken } from "../../../../../lib/masterplan-token-route.ts";
 import { READ_CAP, docToc, readSectionText, resolveSection } from "../../../../../lib/masterplan-mcp.ts";
+import { POST as connectorPost } from "../../mcp/[token]/route.ts";
 import { DEFAULT_DOC_TITLES, DOC_SLUGS, isDocSlug, type MpDoc } from "../../../../../lib/masterplan.ts";
 
 // Read-only link for AIs without MCP connectors (ChatGPT, Gemini, Grok…):
@@ -10,6 +11,9 @@ import { DEFAULT_DOC_TITLES, DOC_SLUGS, isDocSlug, type MpDoc } from "../../../.
 // text/markdown, no-store, noindex. Same token gate + rate limit as the MCP route.
 
 export const dynamic = "force-dynamic";
+
+// People paste this read link into Claude's custom-connector box too; answer MCP there as well.
+export const POST = connectorPost;
 
 const md = (text: string, status = 200) =>
   new Response(text, { status, headers: { ...NO_STORE_HEADERS, "Content-Type": "text/markdown; charset=utf-8" } });

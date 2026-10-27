@@ -184,7 +184,7 @@ describe("tool permission matrix", () => {
     ((await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, c))?.result as { tools: { name: string }[] }).tools.map((t) => t.name).sort();
   it("tools/list is exactly the allowed set (+ edit_reference_section for editors only)", async () => {
     assert.deepEqual(await listFor(ctx), [...allowed, "edit_reference_section"].sort()); // ท้อป = editor
-    assert.deepEqual(await listFor({ ...ctx, member: memberByKey("name")! }), [...allowed].sort());
+    assert.deepEqual(await listFor({ ...ctx, member: memberByKey("name")! }), [...allowed, "edit_reference_section"].sort()); // เนม = editor
     assert.deepEqual(await listFor({ ...ctx, member: memberByKey("muk")! }), [...allowed].sort());
     for (const tool of TOOLS) assert.equal((tool.inputSchema as { type: string }).type, "object");
   });
@@ -314,7 +314,7 @@ describe("editing reference docs", () => {
     assert.equal(line.via, "ai-token");
   });
   it("non-editor token: tool is absent and rejected", async () => {
-    const res = await edit({}, { ...ctx, member: memberByKey("name")!, tokenLabel: "x" });
+    const res = await edit({}, { ...ctx, member: memberByKey("muk")!, tokenLabel: "x" });
     assert.equal(res?.error?.code, RPC.INVALID_PARAMS);
     assert.equal((await store.getOne<MpDoc>("mp_docs", "mission-b"))!.version, 4);
   });

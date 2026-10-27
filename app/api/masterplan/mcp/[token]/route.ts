@@ -5,7 +5,8 @@ import { RPC, handleBody, rpcError } from "../../../../../lib/masterplan-mcp.ts"
 
 // Masterplan MCP server for a Claude custom connector (Streamable HTTP, stateless, JSON
 // responses only). claude.ai connectors take just a URL, so the per-person token is in the
-// path. Invalid / revoked token → 401 with a generic JSON-RPC error (no detail).
+// path. Invalid / revoked token → 404, not 401: a 401 makes claude.ai start an OAuth sign-in
+// that this server does not have ("Couldn't register with … sign-in service").
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const gate = await gateToken(token);
   if (!gate.ok) {
     return gate.status === 401
-      ? json(rpcError(null, RPC.UNAUTHORIZED, "Unauthorized"), 401)
+      ? json(rpcError(null, RPC.UNAUTHORIZED, "ลิงก์นี้ใช้ไม่ได้หรือถูกยกเลิกแล้ว สร้างลิงก์ใหม่ที่ sop.uplevelguild.com/masterplan/ai"), 404)
       : json(rpcError(null, -32000, "Rate limit exceeded — slow down"), 429);
   }
 
