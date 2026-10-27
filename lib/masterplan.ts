@@ -54,7 +54,10 @@ export type MpDoc = {
   updatedBy: string;
 };
 
-export type MpScratch = { member: string; markdown: string; updatedAt: string };
+/** Set on records written through a per-person AI token (MCP connector / read link). */
+export type ViaAi = { via?: "ai-token"; viaLabel?: string };
+
+export type MpScratch = { member: string; markdown: string; updatedAt: string } & ViaAi;
 
 export type MpProposal = {
   id: string;
@@ -72,7 +75,7 @@ export type MpProposal = {
   decisionNote: string;
   createdAt: string;
   updatedAt: string;
-};
+} & ViaAi;
 
 export type MpTask = {
   id: string;
@@ -87,7 +90,7 @@ export type MpTask = {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
-};
+} & ViaAi;
 
 export type MpMeetingDecision = { proposalId: string; code: string; verdict: Verdict; note: string };
 export type MpMeeting = {
@@ -106,7 +109,9 @@ export type MpChangelog = {
   version: number;
   proposalCode: string | null;
   summary: string;
-};
+  /** which doc changed (absent on older lines = ฉบับกลาง) */
+  slug?: string;
+} & ViaAi;
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 

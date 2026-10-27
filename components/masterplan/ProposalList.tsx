@@ -67,7 +67,8 @@ function ProposalRow({ proposal, me, editor }: { proposal: MpProposal; me: strin
         <span className="mp-code">{proposal.code}</span>
         <span className={`mp-status ${statusClass(proposal.status)}`}>{proposal.status}</span>
         <span className="mp-meta mp-ellipsis">
-          {memberName(proposal.proposer)} · {proposal.kind} · {proposal.missions.map((m) => (m === "ภาพรวม" ? m : `M-${m}`)).join(" ")}
+          {memberName(proposal.proposer)}
+          {proposal.via === "ai-token" ? " (ผ่าน AI)" : ""} · {proposal.kind} · {proposal.missions.map((m) => (m === "ภาพรวม" ? m : `M-${m}`)).join(" ")}
         </span>
       </div>
       <h3 className="mp-prop__title">{proposal.title}</h3>

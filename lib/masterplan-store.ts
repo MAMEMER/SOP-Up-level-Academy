@@ -14,6 +14,7 @@ import {
   type MpScratch,
   type MpTask
 } from "./masterplan.ts";
+import type { MpStore } from "./masterplan-tokens.ts";
 
 // Storage for the Masterplan workspace (collections prefixed mp_). Server-side only:
 // every read/write goes through /masterplan pages or /api/masterplan routes, which check
@@ -26,7 +27,7 @@ import {
 //   unavailable                  → on Vercel without credentials (a serverless disk is
 //                                  wiped on cold start, so "saving" there would lose data)
 
-export type MpCollection = "mp_docs" | "mp_scratch" | "mp_proposals" | "mp_tasks" | "mp_meetings" | "mp_changelog" | "mp_meta";
+export type MpCollection = "mp_docs" | "mp_scratch" | "mp_proposals" | "mp_tasks" | "mp_meetings" | "mp_changelog" | "mp_meta" | "mp_tokens";
 
 const LOCAL_STORE = join(process.cwd(), ".data", "masterplan.json");
 const runningOnVercel = Boolean(process.env.VERCEL);
@@ -244,7 +245,7 @@ export async function saveDocVersion(input: {
     throw new Error(state.failure || "save failed");
   }
   const note = input.changelog(saved.version);
-  await addChangelog({ at: now, by: input.by, version: saved.version, proposalCode: note.proposalCode, summary: note.summary });
+  await addChangelog({ at: now, by: input.by, version: saved.version, proposalCode: note.proposalCode, summary: note.summary, slug: input.slug });
   return saved;
 }
 
@@ -278,3 +279,13 @@ export async function listChangelog(limit?: number): Promise<MpChangelog[]> {
 export async function listMeetings(): Promise<MpMeeting[]> {
   return (await listAll<MpMeeting>("mp_meetings")).sort((a, b) => b.date.localeCompare(a.date));
 }
+
+/** The store as the token/MCP layer sees it (masterplan-tokens.ts MpStore). */
+export const mpStore: MpStore = {
+  getOne: <T,>(collection: string, id: string) => getOne<T>(collection as MpCollection, id),
+  listAll: <T,>(collection: string) => listAll<T>(collection as MpCollection),
+  putOne: <T extends object>(collection: string, id: string, data: T) => putOne<T>(collection as MpCollection, id, data),
+  updateOne: <T extends object, R = T>(collection: string, id: string, mutate: (current: T | null) => { data: T; result: R } | null) =>
+    updateOne<T, R>(collection as MpCollection, id, mutate),
+  nextSequence
+};

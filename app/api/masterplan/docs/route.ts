@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { masterplanApiMember } from "../../../../lib/masterplan-auth.ts";
-import { bad, editorsOnly, readBody, storeError, text } from "../../../../lib/masterplan-api.ts";
-import { saveDocVersion } from "../../../../lib/masterplan-store.ts";
-import { MASTER_SLUG, checkDocSize, isDocSlug, replaceSectionBody, splitSections } from "../../../../lib/masterplan.ts";
-import { plainHeading } from "../../../../lib/masterplan-markdown.ts";
+import { bad, editorsOnly, fail, readBody, storeError, text } from "../../../../lib/masterplan-api.ts";
+import { editDocSection } from "../../../../lib/masterplan-docs.ts";
+import { mpStore, saveDocVersion } from "../../../../lib/masterplan-store.ts";
+import { checkDocSize, isDocSlug } from "../../../../lib/masterplan.ts";
 
 // Masterplan documents (mp_docs). Editors only (แชมป์ / ท้อป):
 //  action "import"       — replace a whole doc with pasted/uploaded markdown (changelog "นำเข้า")
-//  action "edit-section" — edit one section of ฉบับกลาง directly; a reason is required
+//  action "edit-section" — edit one section of ฉบับกลาง or a reference doc directly; a reason
+//                          is required (lib/masterplan-docs.ts editDocSection)
 // Both bump the version and are rejected on a version conflict.
 
 export const dynamic = "force-dynamic";
@@ -42,29 +43,18 @@ export async function POST(request: Request) {
     }
 
     if (action === "edit-section") {
-      if (slug !== MASTER_SLUG) return bad("แก้ตรงได้เฉพาะฉบับกลาง");
-      const reason = text(body.reason).trim();
-      if (!reason) return bad("ต้องใส่เหตุผลที่แก้ตรง");
-      if (reason.length > 2000) return bad("เหตุผลยาวเกินไป");
-      const baseVersion = Number(body.baseVersion);
-      const sectionIndex = Number(body.sectionIndex);
-      if (!Number.isInteger(baseVersion) || !Number.isInteger(sectionIndex)) return bad("ข้อมูลไม่ครบ");
-      const baseBody = text(body.baseBody);
-      const newBody = text(body.newBody).replace(/\r\n?/g, "\n");
-      let heading = "";
-      const doc = await saveDocVersion({
+      // editors may edit ฉบับกลาง and every reference doc section by section (reason required)
+      const edited = await editDocSection(mpStore, {
         slug,
-        baseVersion,
-        by: member.key,
-        compute: (current) => {
-          if (!current) return { error: "ยังไม่มีฉบับกลาง" };
-          heading = plainHeading(splitSections(current.markdown)[sectionIndex]?.heading || "ส่วนนำ");
-          const next = replaceSectionBody(current.markdown, sectionIndex, baseBody, newBody);
-          return next.ok ? next.value : { error: next.error };
-        },
-        changelog: () => ({ summary: `แก้ตรง: ${heading || "ส่วนนำ"} — ${reason}`, proposalCode: null })
+        sectionIndex: Number(body.sectionIndex),
+        baseVersion: Number(body.baseVersion),
+        baseBody: text(body.baseBody),
+        newBody: text(body.newBody),
+        reason: text(body.reason),
+        by: member.key
       });
-      return NextResponse.json({ ok: true, version: doc.version });
+      if (!edited.ok) return edited.conflict ? fail(409, edited.error) : bad(edited.error);
+      return NextResponse.json({ ok: true, version: edited.version });
     }
 
     return bad("unknown action");

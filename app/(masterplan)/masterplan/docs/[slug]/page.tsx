@@ -10,8 +10,8 @@ import { aiSections, docSectionViews } from "../../../../../lib/masterplan-markd
 import { getDoc, getScratch, listProposals } from "../../../../../lib/masterplan-store.ts";
 import { DEFAULT_DOC_TITLES, MASTER_SLUG, REFERENCE_SLUGS } from "../../../../../lib/masterplan.ts";
 
-// Reference docs (Mission A–D, research, roadmap) — read-only; "เสนอแก้ตรงนี้" still works
-// (the proposal targets ฉบับกลาง, quoting the reference text).
+// Reference docs (Mission A–D, research, roadmap). Editors (แชมป์ / ท้อป) get "แก้ตรง" per
+// section (reason required → changelog); everyone keeps "เสนอแก้ตรงนี้".
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +39,9 @@ export default async function ReferenceDocPage({ params }: { params: Promise<{ s
   return (
     <>
       <MpHead
-        eyebrow="เอกสารอ้างอิง · อ่านอย่างเดียว"
+        eyebrow={member.editor ? "เอกสารอ้างอิง" : "เอกสารอ้างอิง · อ่านอย่างเดียว"}
         title={doc.title}
-        sub={`เวอร์ชัน ${doc.version} · นำเข้าล่าสุด ${thaiDateTime(doc.updatedAt)} โดย ${memberName(doc.updatedBy)}`}
+        sub={`เวอร์ชัน ${doc.version} · แก้ล่าสุด ${thaiDateTime(doc.updatedAt)} โดย ${memberName(doc.updatedBy)}`}
       />
       <details className="mp-fold">
         <summary>ให้ AI ช่วยคิดจากเอกสารนี้</summary>
@@ -55,7 +55,7 @@ export default async function ReferenceDocPage({ params }: { params: Promise<{ s
           openProposals={openProposalsFor(proposals, member.key)}
         />
       </details>
-      <DocView slug={slug} docLabel={doc.title} version={doc.version} sections={docSectionViews(doc.markdown)} canEditDirect={false} />
+      <DocView slug={slug} docLabel={doc.title} version={doc.version} sections={docSectionViews(doc.markdown)} canEditDirect={member.editor} />
     </>
   );
 }
