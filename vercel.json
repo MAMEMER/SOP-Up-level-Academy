@@ -26,6 +26,10 @@
     {
       "path": "/api/parcel-orders/alerts",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/storehub/inventory-snapshot",
+      "schedule": "55 16 * * *"
     }
   ]
 }

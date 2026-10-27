@@ -87,6 +87,7 @@ export const adminSections: SiteSection[] = [
       { href: "/admin/stock-check", label: "ลงผลนับ Stock", detail: "ผลนับของวันนั้น ตรง / ไม่ตรง / ไม่ได้นับ (มีผลกับคะแนน)", keywords: "สต็อก" },
       { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach", keywords: "audit" },
       { href: "/admin/payroll", label: "เงินเดือนพนักงาน", detail: "ประจำ / พาร์ทไทม์ · หักตามคะแนน · OT · ปรับบวก-ลบพร้อมเหตุผล", ownerOnly: true, keywords: "payroll เงินเดือน ค่าแรง ot โอที" },
+      { href: "/admin/receiving", label: "รับของเข้า", detail: "ลงบิลรับของ + รูปบิล · เจ้าของใส่ทุน คิดทุนเฉลี่ยให้เอง", keywords: "รับของ สต็อก บิล ดีลเลอร์ ทุน receiving stock" },
       { href: "/admin/stock-loss", label: "ของหาย น้ำ/ขนม", detail: "มูลค่าของที่หายรายรอบ · จุดที่ควรตาม", ownerOnly: true, keywords: "สต็อกหาย loss" },
       { href: "/admin/line-bot", label: "ผู้ช่วยไลน์ (บอท)", detail: "บอทตอบอะไรไปบ้าง ตอบเร็วแค่ไหน · เตือนแล้วส่งทันไหม", ownerOnly: true, keywords: "line ไลน์ bot golden baby เตือน" },
       { href: "/admin/flower-target", label: "เป้าดอกไม้", detail: "เป้าดอกไม้แต่ละคน · รางวัล · อันดับเดือนนี้", ownerOnly: true, keywords: "ทิป flower" },
