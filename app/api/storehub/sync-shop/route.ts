@@ -6,20 +6,25 @@ import { sopUserForEmail } from "../../../../lib/sop-users.ts";
 import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
 import { hasStoreHubCreds } from "../../../../lib/storehub-api.ts";
 import { adminDb, hasAdminCredentials } from "../../../../lib/firebase-admin.ts";
+import { branchConfigs } from "../../../../lib/store-config.ts";
 import {
-  MAIN_STORE,
   STOREHUB_BASE,
   buildImageIndexes,
   buildMergePayload,
   buildShopRow,
+  combineInventory,
+  soldOutIds,
   stockChanged,
+  totalQty,
+  type InventoryRow,
   type LorcanaCard,
   type PkmCard,
   type StoreHubProduct,
 } from "../../../../lib/storehub-shop-sync.ts";
 
 // Nightly StoreHub → Firestore `shop-products` sync so uplevelguild.com/shop stock stays in
-// step with the till. Pulls /products + /inventory/{mainStore}, joins the catalog images,
+// step with the till. Pulls /products + /inventory/{storeId} for every branch (บางแค +
+// เสนาเฟสท์, from lib/store-config.ts) — qty = total, qtyByBranch = per branch — joins the catalog images,
 // maps category→type and applies the VAT (×1.07) price suggestion — logic ported verbatim
 // from scripts/storehub-shop-sync-reference.mjs (see lib/storehub-shop-sync.ts). Writes with
 // merge:true and a payload that OMITS admin-owned fields (price / priceOverride / listed*),
@@ -29,8 +34,8 @@ import {
 // sync-clockin). Records the outcome to `shop_sync_status/latest` so other screens can tell
 // when the shop last synced.
 
-// StoreHub Open API rate limit: 3 calls/second. This route makes only 3 GETs; a 350ms gap
-// between them keeps us comfortably under the ceiling.
+// StoreHub Open API rate limit: 3 calls/second. This route makes 1 + one GET per branch; a
+// 350ms gap between them keeps us comfortably under the ceiling.
 const RATE_GAP_MS = 350;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -62,8 +67,6 @@ async function isAllowed(request: Request): Promise<boolean> {
   return user?.role === "admin";
 }
 
-type InventoryRow = { productId: string; quantityOnHand?: number };
-
 export async function GET(request: Request) {
   if (!(await isAllowed(request))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   if (!hasStoreHubCreds()) return NextResponse.json({ error: "storehub_not_configured" }, { status: 503 });
@@ -73,11 +76,16 @@ export async function GET(request: Request) {
   const db = adminDb();
 
   try {
-    // --- pull StoreHub (3 calls, spaced for the 3/sec rate limit) ---
+    // --- pull StoreHub (spaced for the 3/sec rate limit) ---
     const products = await sh<StoreHubProduct[]>("/products");
-    await sleep(RATE_GAP_MS);
-    const inventory = await sh<InventoryRow[]>(`/inventory/${MAIN_STORE}`);
-    const qtyById = new Map<string, number>(inventory.map((x) => [x.productId, x.quantityOnHand || 0]));
+    const stores: { branch: string; rows: InventoryRow[] }[] = [];
+    for (const b of branchConfigs) {
+      if (!b.storeHubStoreId) continue;
+      await sleep(RATE_GAP_MS);
+      stores.push({ branch: b.key, rows: await sh<InventoryRow[]>(`/inventory/${b.storeHubStoreId}`) });
+    }
+    const qtyById = combineInventory(stores);
+    const emptyByBranch = Object.fromEntries(stores.map((s) => [s.branch, 0]));
 
     // --- read existing shop-products (preserve admin priceOverride, detect stock changes) ---
     const existingSnap = await db.collection("shop-products").get();
@@ -104,10 +112,11 @@ export async function GET(request: Request) {
     const rows = [];
     for (const p of products) {
       if (p.isParentProduct) continue; // parents have no own stock
-      const qty = qtyById.get(p.id) || 0;
-      if (qty <= 0) continue; // in-stock only
+      const byBranch = qtyById.get(p.id);
+      const qty = totalQty(byBranch);
+      if (qty <= 0) continue; // in-stock only (at any branch)
       const priceOverride = existingOverride.get(p.id) ?? null;
-      const row = buildShopRow(p, qty, priceOverride, idx);
+      const row = buildShopRow(p, qty, priceOverride, idx, byBranch);
       if (stockChanged(existingQty.get(p.id), qty)) changed++;
       rows.push(row);
     }
@@ -127,8 +136,28 @@ export async function GET(request: Request) {
       written += Math.min(450, rows.length - i);
     }
 
+    // --- zero out products that sold out at every branch since the last run ---
+    const soldOut = soldOutIds(
+      existingQty,
+      new Set(rows.map((r) => r.id)),
+      new Set(products.filter((p) => !p.isParentProduct).map((p) => p.id))
+    );
+    for (let i = 0; i < soldOut.length; i += 450) {
+      const batch = db.batch();
+      for (const id of soldOut.slice(i, i + 450)) {
+        batch.set(
+          db.collection("shop-products").doc(id),
+          { qty: 0, qtyByBranch: emptyByBranch, updatedAt: FieldValue.serverTimestamp() },
+          { merge: true }
+        );
+      }
+      await batch.commit();
+    }
+    changed += soldOut.length;
+
     const durationSec = Math.round((Date.now() - startedAt) / 100) / 10;
-    const result = { ok: true as const, products: written, changed, durationSec };
+    const branches = stores.map((s) => s.branch);
+    const result = { ok: true as const, products: written, changed, soldOut: soldOut.length, branches, durationSec };
 
     await db
       .collection("shop_sync_status")
@@ -138,6 +167,8 @@ export async function GET(request: Request) {
           ok: true,
           products: written,
           changed,
+          soldOut: soldOut.length,
+          branches,
           durationSec,
           finishedAt: FieldValue.serverTimestamp(),
           source: "sync-shop",

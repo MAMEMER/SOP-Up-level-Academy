@@ -6,9 +6,51 @@
 // Everything here is side-effect free (no network, no Firestore) so it is unit-tested
 // directly. The route (app/api/storehub/sync-shop/route.ts) does the I/O and calls these.
 
-// Up level Academy (บางแค) — the store whose on-hand inventory backs the online shop.
+// Up level Academy (บางแค) — the main StoreHub store. The online shop now sums on-hand stock
+// across every branch that has a storeHubStoreId in lib/store-config.ts (บางแค + เสนาเฟสท์);
+// see combineInventory below.
 export const MAIN_STORE = "6a268170c008ab000760e21a";
 export const STOREHUB_BASE = "https://api.storehubhq.com";
+
+// On-hand quantity per branch key, e.g. { bangkae: 3, senafest: 1 }.
+export type BranchQty = Record<string, number>;
+export type InventoryRow = { productId: string; quantityOnHand?: number };
+
+// Join per-store /inventory responses into productId → per-branch quantity. Every branch
+// passed in gets a key (0 when the store doesn't carry the product) so the shop can always
+// read qtyByBranch.<branch> without guarding. Negative on-hand (oversold in StoreHub) → 0.
+export function combineInventory(stores: { branch: string; rows: InventoryRow[] }[]): Map<string, BranchQty> {
+  const zero = (): BranchQty => Object.fromEntries(stores.map((s) => [s.branch, 0]));
+  const byId = new Map<string, BranchQty>();
+  for (const { branch, rows } of stores) {
+    for (const r of rows) {
+      const q = byId.get(r.productId) ?? zero();
+      q[branch] = (q[branch] || 0) + Math.max(0, r.quantityOnHand || 0);
+      byId.set(r.productId, q);
+    }
+  }
+  return byId;
+}
+
+export function totalQty(q: BranchQty | undefined): number {
+  if (!q) return 0;
+  return Object.values(q).reduce((sum, n) => sum + n, 0);
+}
+
+// Products that were in stock on the shop last run but no longer have stock at any branch.
+// The in-stock loop skips them, so without this their old qty would stay on the shop forever.
+// Only ids StoreHub still lists are zeroed — never a doc that didn't come from StoreHub.
+export function soldOutIds(
+  existingQty: Map<string, number>,
+  inStockIds: Set<string>,
+  storeHubIds: Set<string>
+): string[] {
+  const out: string[] = [];
+  for (const [id, qty] of existingQty) {
+    if (qty > 0 && !inStockIds.has(id) && storeHubIds.has(id)) out.push(id);
+  }
+  return out;
+}
 
 export type ShopProductType = "single" | "sealed" | "accessory" | "other";
 export type ShopGame = "lorcana" | "pokemon" | "";
@@ -151,7 +193,10 @@ export type ShopRow = {
   storePrice: number | null;
   priceOverride: number | null;
   price: number | null;
+  /** total on-hand across all branches */
   qty: number;
+  /** on-hand per branch key — lets the shop show "บางแค 2 · เสนาเฟสท์ 1" */
+  qtyByBranch: BranchQty;
   trackStock: boolean;
   image: string | null;
 };
@@ -164,7 +209,8 @@ export function buildShopRow(
   prod: StoreHubProduct,
   qty: number,
   priceOverride: number | null,
-  idx: ImageIndexes
+  idx: ImageIndexes,
+  qtyByBranch: BranchQty = {}
 ): ShopRow {
   const { type, game } = classify(prod);
   const image = type === "single" ? matchImage(prod, game, idx) : null;
@@ -183,6 +229,7 @@ export function buildShopRow(
     priceOverride: priceOverride ?? null,
     price,
     qty,
+    qtyByBranch,
     trackStock: !!prod.trackStockLevel,
     image,
   };

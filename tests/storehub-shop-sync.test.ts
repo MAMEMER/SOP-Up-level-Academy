@@ -5,6 +5,9 @@ import {
   buildMergePayload,
   buildShopRow,
   classify,
+  combineInventory,
+  soldOutIds,
+  totalQty,
   computeStorePrice,
   matchImage,
   normK,
@@ -197,5 +200,38 @@ describe("stockChanged", () => {
   });
   it("is false when the quantity is unchanged", () => {
     assert.equal(stockChanged(4, 4), false);
+  });
+});
+
+describe("combineInventory — online shop stock = บางแค + เสนาเฟสท์", () => {
+  const inv = combineInventory([
+    { branch: "bangkae", rows: [{ productId: "a", quantityOnHand: 3 }, { productId: "b", quantityOnHand: 0 }] },
+    { branch: "senafest", rows: [{ productId: "a", quantityOnHand: 1 }, { productId: "c", quantityOnHand: 2 }, { productId: "d", quantityOnHand: -4 }] },
+  ]);
+  it("sums a product stocked at both branches and keeps the split", () => {
+    assert.deepEqual(inv.get("a"), { bangkae: 3, senafest: 1 });
+    assert.equal(totalQty(inv.get("a")), 4);
+  });
+  it("includes a product stocked only at เสนาเฟสท์, with bangkae 0", () => {
+    assert.deepEqual(inv.get("c"), { bangkae: 0, senafest: 2 });
+    assert.equal(totalQty(inv.get("c")), 2);
+  });
+  it("treats negative StoreHub on-hand as 0", () => {
+    assert.equal(totalQty(inv.get("d")), 0);
+  });
+  it("unknown product → total 0", () => {
+    assert.equal(totalQty(inv.get("zzz")), 0);
+  });
+  it("writes qtyByBranch onto the shop row", () => {
+    const row = buildShopRow({ id: "a", name: "X", category: "card", unitPrice: 100 }, 4, null, buildImageIndexes([], []), inv.get("a"));
+    assert.equal(row.qty, 4);
+    assert.deepEqual(buildMergePayload(row).qtyByBranch, { bangkae: 3, senafest: 1 });
+  });
+});
+
+describe("soldOutIds", () => {
+  const existing = new Map([["a", 2], ["b", 0], ["c", 5], ["manual", 3]]);
+  it("zeros only StoreHub products that were in stock and now have none anywhere", () => {
+    assert.deepEqual(soldOutIds(existing, new Set(["a"]), new Set(["a", "b", "c"])), ["c"]);
   });
 });
