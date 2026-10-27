@@ -24,7 +24,7 @@ export default async function ImportPage() {
   });
   return (
     <>
-      <MpHead eyebrow="นำเข้า" title="นำเข้าเอกสารและงาน" sub="วางหรืออัปโหลดไฟล์ .md — แทนที่ทั้งเอกสาร ขึ้นเวอร์ชันใหม่ และลงประวัติว่า &ldquo;นำเข้า&rdquo;" />
+      <MpHead eyebrow="นำเข้า" title="นำเข้าเอกสาร งาน และตัวชี้วัด" sub="วางหรืออัปโหลดไฟล์ .md — แทนที่ทั้งเอกสาร ขึ้นเวอร์ชันใหม่ และลงประวัติว่า &ldquo;นำเข้า&rdquo;" />
       <ImportForms targets={targets} />
     </>
   );

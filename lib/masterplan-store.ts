@@ -15,6 +15,7 @@ import {
   type MpTask
 } from "./masterplan.ts";
 import type { MpStore } from "./masterplan-tokens.ts";
+import { KPI_COLLECTION, kpiId, isKpiCode, sortKpis, type MpKpi } from "./masterplan-kpi.ts";
 
 // Storage for the Masterplan workspace (collections prefixed mp_). Server-side only:
 // every read/write goes through /masterplan pages or /api/masterplan routes, which check
@@ -27,7 +28,7 @@ import type { MpStore } from "./masterplan-tokens.ts";
 //   unavailable                  → on Vercel without credentials (a serverless disk is
 //                                  wiped on cold start, so "saving" there would lose data)
 
-export type MpCollection = "mp_docs" | "mp_scratch" | "mp_proposals" | "mp_tasks" | "mp_meetings" | "mp_changelog" | "mp_meta" | "mp_tokens";
+export type MpCollection = "mp_docs" | "mp_scratch" | "mp_proposals" | "mp_tasks" | "mp_meetings" | "mp_changelog" | "mp_meta" | "mp_tokens" | "mp_kpis";
 
 const LOCAL_STORE = join(process.cwd(), ".data", "masterplan.json");
 const runningOnVercel = Boolean(process.env.VERCEL);
@@ -278,6 +279,14 @@ export async function listChangelog(limit?: number): Promise<MpChangelog[]> {
 
 export async function listMeetings(): Promise<MpMeeting[]> {
   return (await listAll<MpMeeting>("mp_meetings")).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function listKpis(): Promise<MpKpi[]> {
+  return sortKpis(await listAll<MpKpi>(KPI_COLLECTION));
+}
+
+export async function getKpi(code: string): Promise<MpKpi | null> {
+  return isKpiCode(code) ? getOne<MpKpi>(KPI_COLLECTION, kpiId(code)) : null;
 }
 
 /** The store as the token/MCP layer sees it (masterplan-tokens.ts MpStore). */

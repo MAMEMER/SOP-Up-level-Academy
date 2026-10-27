@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
-import { MAX_DOC_BYTES, byteLength, parseTaskImport } from "../../lib/masterplan.ts";
+import { MAX_DOC_BYTES, bangkokDate, byteLength, parseTaskImport } from "../../lib/masterplan.ts";
+import { parseKpiImport, type KpiRowError } from "../../lib/masterplan-kpi.ts";
 import { mpApi, useLocalDraft } from "../../lib/masterplan-client.ts";
 
-// Import a whole doc (paste or .md upload) and import tasks from JSON (idempotent by code).
+// Import a whole doc (paste or .md upload), tasks from JSON (idempotent by code) and KPI
+// status from JSON (upsert by code; an existing target is never overwritten).
 
 type Target = { slug: string; title: string; version: number };
 
@@ -15,6 +17,7 @@ export function ImportForms({ targets }: { targets: Target[] }) {
     <>
       <DocImport targets={targets} />
       <TaskImport />
+      <KpiImport />
     </>
   );
 }
@@ -176,6 +179,89 @@ function TaskImport() {
       <div className="mp-actions">
         <button type="button" className="mp-btn mp-btn--primary" disabled={busy || !preview?.ok} onClick={() => void save()}>
           {busy ? "กำลังนำเข้า…" : "นำเข้างาน"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const KPI_SHAPE = `[{ "code", "mission": "A|B|C|D", "dimension", "name", "tier": "หลัก|เจาะ|ภายนอก|นอกดัชนี", "unit", "direction": "สูงดี|ต่ำดี", "definition", "status": "วัดได้แล้ว|วัดได้บางส่วน|ยังวัดไม่ได้", "dataSources": [{ "system", "fields", "coverage" }], "baseline": null | { "value", "period", "branch", "method", "n" }, "series": [{ "period", "branch", "value" }], "gaps": [""], "nextSteps": [{ "action", "who", "effort": "S|M|L" }], "confidence": "สูง|กลาง|ต่ำ", "source": "audit-YYYY-MM-DD" }]`;
+
+function KpiImport() {
+  const router = useRouter();
+  const [text, setText, clear] = useLocalDraft<string>("mp-import-kpis", "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const [skipped, setSkipped] = useState<KpiRowError[]>([]);
+  const preview = text.trim() ? parseKpiImport(text, bangkokDate()) : null;
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    setSkipped([]);
+    const res = await mpApi<{ created: number; updated: number; skipped: KpiRowError[] }>("kpis", "POST", { action: "import", text });
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    const { created, updated, skipped: rows } = res.data;
+    setDone(`เพิ่มใหม่ ${created} · อัปเดต ${updated}${rows.length ? ` · ข้าม ${rows.length}` : ""}`);
+    setSkipped(rows);
+    clear();
+    router.refresh();
+  }
+
+  const errors = preview?.ok ? preview.value.errors : skipped;
+  return (
+    <div className="mp-block">
+      <h2 className="mp-h2">นำเข้าตัวชี้วัด (JSON)</h2>
+      <p className="mp-sub">
+        อัปเดตตามรหัส (code) — ตัวที่มีอยู่แล้วจะถูกแทนด้วยข้อมูลใหม่ แต่เป้าหมายที่ตั้งไว้แล้วจะไม่ถูกแตะ (เป้าตั้งผ่านข้อเสนอเท่านั้น) และสิ่งที่ติ๊กว่าทำแล้วยังอยู่
+      </p>
+      <details className="mp-fold">
+        <summary>รูปแบบ JSON</summary>
+        <pre className="mp-kshape">{KPI_SHAPE}</pre>
+      </details>
+      <label className="mp-field">
+        <span>วาง JSON</span>
+        <textarea className="mp-textarea mp-textarea--tall" rows={8} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />
+      </label>
+      {preview ? (
+        preview.ok ? (
+          <p className="mp-meta">
+            อ่านได้ {preview.value.rows.length} ตัวชี้วัด{preview.value.errors.length ? ` · มีปัญหา ${preview.value.errors.length} แถว (จะข้าม)` : ""}
+          </p>
+        ) : (
+          <p className="mp-error">{preview.error}</p>
+        )
+      ) : null}
+      {errors.length > 0 ? (
+        <ul className="mp-kerrors">
+          {errors.slice(0, 20).map((e) => (
+            <li key={`${e.row}-${e.code}`}>
+              แถว {e.row}
+              {e.code ? ` (${e.code})` : ""}: {e.error}
+            </li>
+          ))}
+          {errors.length > 20 ? <li>และอีก {errors.length - 20} แถว</li> : null}
+        </ul>
+      ) : null}
+      {error ? (
+        <p className="mp-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {done ? (
+        <p className="mp-ok" role="status">
+          {done}
+        </p>
+      ) : null}
+      <div className="mp-actions">
+        <button type="button" className="mp-btn mp-btn--primary" disabled={busy || !preview?.ok || preview.value.rows.length === 0} onClick={() => void save()}>
+          {busy ? "กำลังนำเข้า…" : "นำเข้าตัวชี้วัด"}
         </button>
       </div>
     </div>

@@ -177,9 +177,12 @@ describe("tool permission matrix", () => {
     "list_tasks",
     "create_task",
     "claim_task",
-    "set_task_status"
+    "set_task_status",
+    "list_kpis",
+    "get_kpi",
+    "update_kpi_status"
   ];
-  const forbidden = ["decide_proposal", "set_verdict", "close_meeting", "apply_proposal", "edit_section", "import_doc", "import_tasks", "create_token", "revoke_token", "write_scratch", "delete_proposal"];
+  const forbidden = ["import_kpis", "set_kpi_target", "decide_proposal", "set_verdict", "close_meeting", "apply_proposal", "edit_section", "import_doc", "import_tasks", "create_token", "revoke_token", "write_scratch", "delete_proposal"];
   const listFor = async (c: McpContext) =>
     ((await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, c))?.result as { tools: { name: string }[] }).tools.map((t) => t.name).sort();
   it("tools/list is exactly the allowed set (+ edit_reference_section for editors only)", async () => {

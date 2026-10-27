@@ -20,7 +20,7 @@ export default async function HistoryPage() {
           <ul className="mp-log">
             {changelog.map((line) => (
               <li key={line.id}>
-                <span className="mp-log__ver">v{line.version}</span>
+                <span className="mp-log__ver">{line.slug === "kpis" ? "KPI" : `v${line.version}`}</span>
                 <span className="mp-log__text">
                   {line.proposalCode ? (
                     <Link href={`/masterplan/proposals#${line.proposalCode}`} className="mp-code">

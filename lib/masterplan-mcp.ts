@@ -4,7 +4,8 @@
 // token, rate-limits, and hands the parsed body here.
 //
 // Every tool acts AS the token's member. Deliberately NOT exposed: meeting verdicts,
-// applying to ฉบับกลาง, direct section edits, import, token management. Writes carry
+// applying to ฉบับกลาง, direct section edits, import, token management, KPI targets
+// (targets only change through proposals). Writes carry
 // via:"ai-token" + the token label.
 
 import type { MasterplanMember } from "./masterplan-access.ts";
@@ -41,6 +42,21 @@ import {
 } from "./masterplan.ts";
 import type { MpStore } from "./masterplan-tokens.ts";
 import { editDocSection } from "./masterplan-docs.ts";
+import {
+  KPI_COLLECTION,
+  KPI_MISSIONS,
+  KPI_STATUSES,
+  KPI_TIERS,
+  compactKpi,
+  countByStatus,
+  countsByMission,
+  isKpiMission,
+  isKpiStatus,
+  isKpiTier,
+  sortKpis,
+  updateKpi,
+  type MpKpi
+} from "./masterplan-kpi.ts";
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] as const;
 export const LATEST_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0];
@@ -60,6 +76,7 @@ const SERVER_INSTRUCTIONS = [
   "Up Level Masterplan — แผน 3 ปีของ Up Level (Vision → Mission A–D → มิติ → KPI) ที่ 4 ผู้นำทำร่วมกัน.",
   "เริ่มด้วย get_overview เสมอ. อ่านเอกสารทีละหัวข้อด้วย read_doc (ห้ามขอทั้งฉบับทีเดียว).",
   "กติกา: ห้ามแต่งตัวเลขเป้าหมายขึ้นเอง · ฉบับกลางแก้ได้ผ่านข้อเสนอ (create_proposal) เท่านั้น · คุณตัดสินมติหรือนำเข้าฉบับกลางไม่ได้ — ทีมตัดสินในการคุยประจำวัน.",
+  "ตัวชี้วัด: list_kpis / get_kpi อ่านสถานะ · update_kpi_status แก้สถานะ/ค่าฐาน/ช่องว่าง/สิ่งที่ต้องทำต่อ (ต้องมีเหตุผล) · เป้าหมาย (target) แก้ผ่าน AI ไม่ได้ ต้องเสนอแบบ kind \"ตั้งเป้า\".",
   "Start with get_overview. Read docs section by section. Never invent target numbers. The central doc changes only through proposals; you cannot decide or apply them."
 ].join("\n");
 
@@ -211,10 +228,11 @@ export const TOOLS: Tool[] = [
     run: async (_args, ctx) => {
       const now = (ctx.now ?? (() => new Date()))();
       const today = bangkokDate(now);
-      const [docs, proposals, tasks] = await Promise.all([
+      const [docs, proposals, tasks, kpis] = await Promise.all([
         ctx.store.listAll<MpDoc>("mp_docs"),
         ctx.store.listAll<MpProposal>("mp_proposals"),
-        ctx.store.listAll<MpTask>("mp_tasks")
+        ctx.store.listAll<MpTask>("mp_tasks"),
+        ctx.store.listAll<MpKpi>(KPI_COLLECTION)
       ]);
       const me = ctx.member;
       return textResult(
@@ -234,6 +252,11 @@ export const TOOLS: Tool[] = [
             myDrafts: proposals.filter((p) => p.status === "ร่าง" && p.proposer === me.key).length,
             myOpenTasks: tasks.filter((t) => t.owner === me.key && t.status !== "เสร็จ").length,
             overdueTasks: tasks.filter((t) => isOverdue(t, today)).length
+          },
+          kpis: {
+            ...countByStatus(kpis),
+            openNextSteps: kpis.reduce((sum, k) => sum + (k.nextSteps ?? []).filter((s) => !s.done).length, 0),
+            byMission: countsByMission(kpis).map(({ mission, counts }) => ({ mission, ...counts }))
           },
           docs: DOC_SLUGS.map((slug) => {
             const doc = docs.find((d) => d.slug === slug);
@@ -572,10 +595,104 @@ export const TOOLS: Tool[] = [
     }
   },
   {
+    name: "list_kpis",
+    title: "รายการตัวชี้วัด",
+    description: "ดูตัวชี้วัด (KPI) พร้อมสถานะการวัด กรองตาม Mission/สถานะ/ระดับ. List KPIs with measurement status; filters: mission (A–D), status, tier.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mission: { type: "string", enum: [...KPI_MISSIONS] },
+        status: { type: "string", enum: [...KPI_STATUSES] },
+        tier: { type: "string", enum: [...KPI_TIERS] }
+      },
+      additionalProperties: false
+    },
+    readOnly: true,
+    run: async (args, ctx) => {
+      const mission = str(args.mission);
+      const status = str(args.status);
+      const tier = str(args.tier);
+      if (mission && !isKpiMission(mission)) throw new ParamsError("invalid mission");
+      if (status && !isKpiStatus(status)) throw new ParamsError("invalid status");
+      if (tier && !isKpiTier(tier)) throw new ParamsError("invalid tier");
+      const list = sortKpis(await ctx.store.listAll<MpKpi>(KPI_COLLECTION)).filter(
+        (k) => (!mission || k.mission === mission) && (!status || k.status === status) && (!tier || k.tier === tier)
+      );
+      return textResult(list.length ? jsonText(list.slice(0, 300).map(compactKpi)) : "ไม่มีตัวชี้วัดตามเงื่อนไข / none");
+    }
+  },
+  {
+    name: "get_kpi",
+    title: "อ่านตัวชี้วัด",
+    description: "อ่านตัวชี้วัดหนึ่งตัวแบบเต็ม: นิยาม แหล่งข้อมูล ค่าฐาน ข้อมูลย้อนหลัง ช่องว่าง สิ่งที่ต้องทำต่อ เป้า. Full KPI by code.",
+    inputSchema: { type: "object", properties: { code: { type: "string" } }, required: ["code"], additionalProperties: false },
+    readOnly: true,
+    run: async (args, ctx) => {
+      const code = requireString(args, "code").trim();
+      const all = await ctx.store.listAll<MpKpi>(KPI_COLLECTION);
+      const kpi = all.find((k) => k.code.toUpperCase() === code.toUpperCase());
+      if (!kpi) return textResult(`ไม่พบตัวชี้วัด ${code} / not found`, true);
+      return textResult(jsonText(kpi));
+    }
+  },
+  {
+    name: "update_kpi_status",
+    title: "อัปเดตสถานะตัวชี้วัด",
+    description:
+      "อัปเดตสถานะการวัด/ค่าฐาน/ช่องว่าง/สิ่งที่ต้องทำต่อ ของตัวชี้วัดในนามของฉัน ต้องมีเหตุผล (ลงประวัติ). ส่งเฉพาะช่องที่จะเปลี่ยน; gaps และ nextSteps แทนทั้งรายการ. แก้เป้าหมาย (target) ไม่ได้ — ต้องเสนอผ่าน create_proposal kind \"ตั้งเป้า\". Update a KPI's status/baseline/gaps/nextSteps as me, with a reason; lists replace whole. Targets cannot be set here.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        code: { type: "string" },
+        status: { type: "string", enum: [...KPI_STATUSES] },
+        baseline: {
+          type: ["object", "null"],
+          properties: { value: { type: ["number", "string"] }, period: { type: "string" }, branch: { type: "string" }, method: { type: "string" }, n: { type: "number" } },
+          required: ["value", "period", "method"]
+        },
+        gaps: { type: "array", items: { type: "string" } },
+        nextSteps: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { action: { type: "string" }, who: { type: "string" }, effort: { type: "string", enum: ["S", "M", "L"] }, done: { type: "boolean" } },
+            required: ["action"]
+          }
+        },
+        reason: { type: "string" }
+      },
+      required: ["code", "reason"],
+      additionalProperties: false
+    },
+    readOnly: false,
+    run: async (args, ctx) => {
+      if ("target" in args) return textResult("แก้เป้าหมายผ่าน AI ไม่ได้ — เสนอผ่าน create_proposal kind \"ตั้งเป้า\" / targets are proposal-only", true);
+      const code = requireString(args, "code").trim();
+      const reason = requireString(args, "reason");
+      const patch: Record<string, unknown> = {};
+      for (const key of ["status", "baseline", "gaps", "nextSteps"] as const) if (args[key] !== undefined) patch[key] = args[key];
+      const unknown = Object.keys(args).filter((k) => !["code", "reason", "status", "baseline", "gaps", "nextSteps"].includes(k));
+      if (unknown.length) return textResult(`แก้ช่องนี้ไม่ได้: ${unknown.join(", ")} / not editable`, true);
+      const all = await ctx.store.listAll<MpKpi>(KPI_COLLECTION);
+      const found = all.find((k) => k.code.toUpperCase() === code.toUpperCase());
+      if (!found) return textResult(`ไม่พบตัวชี้วัด ${code} / not found`, true);
+      const saved = await updateKpi(ctx.store, {
+        code: found.code,
+        patch,
+        reason,
+        by: ctx.member.key,
+        via: { label: ctx.tokenLabel },
+        now: (ctx.now ?? (() => new Date()))()
+      });
+      if (!saved.ok) return textResult(saved.error, true);
+      return textResult(`อัปเดต ${saved.value.code} แล้ว (${saved.value.status}) / updated`);
+    }
+  },
+  {
     name: "edit_reference_section",
     title: "แก้หัวข้อในเอกสารอ้างอิง (เฉพาะผู้แก้)",
     description:
-      "แก้เนื้อหาหัวข้อเดียวในเอกสารอ้างอิง (mission-a..d, research, roadmap) ทันที ต้องมีเหตุผล — ใช้ได้เฉพาะแชมป์/ท้อป และใช้กับฉบับกลางไม่ได้ (ฉบับกลางต้องเสนอผ่าน create_proposal). อ่านหัวข้อด้วย read_doc ก่อน แล้วส่ง baseVersion ที่อ่านมา. newBody = เนื้อหาใต้หัวข้อนี้เท่านั้น (ไม่รวมบรรทัดหัวข้อและหัวข้อย่อย). Editors only: replace one section's own body in a REFERENCE doc (never master). Read it first and pass the version you read as baseVersion; newBody excludes the heading line and sub-sections.",
+      "แก้เนื้อหาหัวข้อเดียวในเอกสารอ้างอิง (mission-a..d, research, roadmap, audit-a..c) ทันที ต้องมีเหตุผล — ใช้ได้เฉพาะแชมป์/ท้อป และใช้กับฉบับกลางไม่ได้ (ฉบับกลางต้องเสนอผ่าน create_proposal). อ่านหัวข้อด้วย read_doc ก่อน แล้วส่ง baseVersion ที่อ่านมา. newBody = เนื้อหาใต้หัวข้อนี้เท่านั้น (ไม่รวมบรรทัดหัวข้อและหัวข้อย่อย). Editors only: replace one section's own body in a REFERENCE doc (never master). Read it first and pass the version you read as baseVersion; newBody excludes the heading line and sub-sections.",
     inputSchema: {
       type: "object",
       properties: {

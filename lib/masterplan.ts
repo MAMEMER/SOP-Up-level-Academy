@@ -10,7 +10,7 @@ import type { MasterplanMemberKey } from "./masterplan-access.ts";
 // ---------------------------------------------------------------- constants
 
 export const MASTER_SLUG = "master";
-export const REFERENCE_SLUGS = ["mission-a", "mission-b", "mission-c", "mission-d", "research", "roadmap"] as const;
+export const REFERENCE_SLUGS = ["mission-a", "mission-b", "mission-c", "mission-d", "research", "roadmap", "audit-a", "audit-b", "audit-c"] as const;
 export const DOC_SLUGS = [MASTER_SLUG, ...REFERENCE_SLUGS] as const;
 export type DocSlug = (typeof DOC_SLUGS)[number];
 
@@ -21,7 +21,11 @@ export const DEFAULT_DOC_TITLES: Record<DocSlug, string> = {
   "mission-c": "Mission C",
   "mission-d": "Mission D",
   research: "งานวิจัยประกอบ",
-  roadmap: "Roadmap"
+  roadmap: "Roadmap",
+  // raw data-audit reports per mission — reference only, never the central doc
+  "audit-a": "ผลตรวจข้อมูลตัวชี้วัด A",
+  "audit-b": "ผลตรวจข้อมูลตัวชี้วัด B (ร่าง)",
+  "audit-c": "ผลตรวจข้อมูลตัวชี้วัด C"
 };
 
 export const MISSIONS = ["ภาพรวม", "A", "B", "C", "D"] as const;
