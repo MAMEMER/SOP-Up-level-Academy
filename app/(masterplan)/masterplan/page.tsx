@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, CalendarCheck, FileText, History, ListTodo, NotebookPen, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, CalendarCheck, FileText, History, ListTodo, NotebookPen, Upload } from "lucide-react";
 import { MpHead } from "../../../components/masterplan/MpHead.tsx";
 import { memberName } from "../../../lib/masterplan-access.ts";
 import { requireMasterplanMember } from "../../../lib/masterplan-auth.ts";
@@ -164,6 +164,11 @@ export default async function MasterplanHome() {
           <li>
             <Link href="/masterplan/history">
               <History size={18} aria-hidden="true" /> ประวัติ
+            </Link>
+          </li>
+          <li>
+            <Link href="/masterplan/ai">
+              <Bot size={18} aria-hidden="true" /> AI ของฉัน (ต่อ Claude / ลิงก์อ่าน)
             </Link>
           </li>
           {member.editor ? (
