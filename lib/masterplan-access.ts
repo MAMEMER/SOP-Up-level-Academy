@@ -20,7 +20,7 @@ export type MasterplanMember = {
 export const MASTERPLAN_MEMBERS: readonly MasterplanMember[] = [
   { key: "champ", name: "แชมป์", email: "champ.championest@gmail.com", editor: true },
   { key: "top", name: "ท้อป", email: "kananut.top@gmail.com", editor: true },
-  { key: "name", name: "เนม", email: "namenrw@gmail.com", editor: false },
+  { key: "name", name: "เนม", email: "namenrw@gmail.com", editor: true },
   { key: "muk", name: "มุก", email: "sin.sirisa@gmail.com", editor: false }
 ];
 

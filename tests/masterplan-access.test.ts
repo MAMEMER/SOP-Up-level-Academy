@@ -5,13 +5,13 @@ import { sopUserForEmail } from "../lib/sop-users.ts";
 import { canManageStaffAccounts, isOwner } from "../lib/owner.ts";
 
 describe("masterplan members", () => {
-  it("is exactly the 4 leaders, with แชมป์ + ท้อป as editors", () => {
+  it("is exactly the 4 leaders, with แชมป์ + ท้อป + เนม as editors", () => {
     assert.deepEqual(
       MASTERPLAN_MEMBERS.map((m) => [m.key, m.email, m.editor]),
       [
         ["champ", "champ.championest@gmail.com", true],
         ["top", "kananut.top@gmail.com", true],
-        ["name", "namenrw@gmail.com", false],
+        ["name", "namenrw@gmail.com", true],
         ["muk", "sin.sirisa@gmail.com", false]
       ]
     );
