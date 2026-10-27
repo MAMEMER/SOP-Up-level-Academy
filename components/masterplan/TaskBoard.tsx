@@ -78,24 +78,23 @@ export function TaskBoard({ tasks, me, today }: { tasks: MpTask[]; me: string; t
       <p className="mp-meta">
         แสดง {filtered.length} จาก {tasks.length} งาน
       </p>
-      <div className="mp-board">
-        {TASK_STATUSES.map((status) => {
-          const items = filtered.filter((t) => t.status === status);
-          return (
-            <div key={status} className="mp-board__col">
-              <h2 className="mp-board__head">
-                {status} <span className="mp-count">{items.length}</span>
-              </h2>
-              {items.length === 0 ? <p className="mp-empty mp-empty--small">-</p> : null}
-              <ul className="mp-list">
-                {items.map((task) => (
-                  <TaskRow key={task.id} task={task} me={me} today={today} />
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
+      {filtered.length === 0 ? <p className="mp-empty">ไม่มีงาน</p> : null}
+      {TASK_STATUSES.map((status) => {
+        const items = filtered.filter((t) => t.status === status);
+        if (items.length === 0) return null;
+        return (
+          <section key={status} className="mp-taskgroup" aria-label={status}>
+            <h2 className="mp-taskgroup__head">
+              {status} <span className="mp-count">{items.length}</span>
+            </h2>
+            <ul className="mp-list">
+              {items.map((task) => (
+                <TaskRow key={task.id} task={task} me={me} today={today} />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
     </>
   );
 }
@@ -118,7 +117,7 @@ function TaskRow({ task, me, today }: { task: MpTask; me: string; today: string 
 
   if (editing) {
     return (
-      <li className="mp-task">
+      <li className="mp-task mp-task--editing">
         <TaskForm draftKey={`mp-edit-task-${task.id}`} task={task} onClose={() => setEditing(false)} />
       </li>
     );
@@ -126,27 +125,34 @@ function TaskRow({ task, me, today }: { task: MpTask; me: string; today: string 
 
   return (
     <li className={`mp-task${overdue ? " is-overdue" : ""}`}>
-      <div className="mp-prop__top">
-        <span className="mp-code">{task.code}</span>
-        {task.missions.length ? <span className="mp-meta">{task.missions.join(" ")}</span> : null}
-      </div>
-      <p className="mp-task__title">{task.title}</p>
-      {task.detail ? <p className="mp-task__detail">{task.detail}</p> : null}
-      <p className="mp-meta">
-        {task.owner ? memberName(task.owner) : "ยังไม่มีคนหยิบ"} ·{" "}
-        <span className={overdue ? "mp-overdue" : undefined}>{task.due ? `ส่ง ${task.due}${overdue ? " (เลยกำหนด)" : ""}` : "ไม่มีกำหนด"}</span>
-      </p>
-      {error ? (
-        <p className="mp-error" role="alert">
-          {error}
+      <div className="mp-task__main">
+        <div className="mp-task__line1">
+          <span className="mp-code">{task.code}</span>
+          {task.missions.length ? (
+            <span className="mp-task__tags">
+              {task.missions.map((m) => (
+                <span key={m} className="mp-tag">
+                  {m}
+                </span>
+              ))}
+            </span>
+          ) : null}
+          <p className="mp-task__title" title={task.title}>
+            {task.title}
+          </p>
+        </div>
+        <p className="mp-task__meta" title={task.detail || undefined}>
+          {task.owner ? memberName(task.owner) : "ยังไม่มีคนหยิบ"} ·{" "}
+          <span className={overdue ? "mp-overdue" : undefined}>{task.due ? `ส่ง ${task.due}${overdue ? " เลยกำหนด" : ""}` : "ไม่มีกำหนด"}</span>
+          {task.detail ? ` · ${task.detail}` : ""}
         </p>
-      ) : null}
-      <div className="mp-prop__tools">
-        {task.owner !== me && task.status !== "เสร็จ" ? (
-          <button type="button" className="mp-tool mp-tool--strong" disabled={busy} onClick={() => void patch({ action: "claim" })}>
-            <Hand size={15} aria-hidden="true" /> หยิบงาน
-          </button>
+        {error ? (
+          <p className="mp-error" role="alert">
+            {error}
+          </p>
         ) : null}
+      </div>
+      <div className="mp-task__actions">
         <label className="mp-sr" htmlFor={`st-${task.id}`}>
           สถานะ
         </label>
@@ -163,6 +169,11 @@ function TaskRow({ task, me, today }: { task: MpTask; me: string; today: string 
             </option>
           ))}
         </select>
+        {task.owner !== me && task.status !== "เสร็จ" ? (
+          <button type="button" className="mp-tool mp-tool--strong" disabled={busy} onClick={() => void patch({ action: "claim" })}>
+            <Hand size={15} aria-hidden="true" /> หยิบงาน
+          </button>
+        ) : null}
         <button type="button" className="mp-tool" onClick={() => setEditing(true)}>
           <Pencil size={15} aria-hidden="true" /> แก้
         </button>
