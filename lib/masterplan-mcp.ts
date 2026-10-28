@@ -30,6 +30,7 @@ import {
   isOverdue,
   isProposalStatus,
   isTaskStatus,
+  isVerdict,
   sectionWithChildren,
   splitSections,
   validateProposalDraft,
@@ -243,7 +244,9 @@ export const TOOLS: Tool[] = [
           rules: [
             "ห้ามแต่งตัวเลขเป้าหมายขึ้นเอง ถ้าไม่มีข้อมูลให้เสนอแบบ kind \"คำถาม\" / Never invent target numbers.",
             "ฉบับกลาง (slug master) แก้ได้ผ่านข้อเสนอเท่านั้น / The central doc changes only via proposals.",
-            "คุณตัดสินมติ (ลง/ไม่ลง/พักไว้) หรือนำเข้าฉบับกลางไม่ได้ ทีมตัดสินในการคุยประจำวัน / You cannot decide or apply proposals.",
+            me.editor
+              ? "บันทึกมติ (ลง/ไม่ลง/พักไว้) ได้ด้วย record_decision เฉพาะเมื่อเจ้าของกุญแจสั่งในแชทชัดเจนเท่านั้น ห้ามตัดสินเอง · นำเข้าฉบับกลางไม่ได้ / record_decision only on the key owner's explicit instruction; never decide yourself; you cannot apply."
+              : "คุณตัดสินมติ (ลง/ไม่ลง/พักไว้) หรือนำเข้าฉบับกลางไม่ได้ ทีมตัดสินในการคุยประจำวัน / You cannot decide or apply proposals.",
             "oldText ต้องคัดลอกจากเอกสารตรงตัว / oldText must be copied verbatim from the doc.",
             "อ่านเอกสารทีละหัวข้อด้วย read_doc / Read docs one section at a time."
           ],
@@ -730,6 +733,50 @@ export const TOOLS: Tool[] = [
       });
       if (!edited.ok) return textResult(edited.error, true);
       return textResult(`แก้ "${edited.heading}" ใน ${doc.title} แล้ว → v${edited.version} / saved as v${edited.version}`);
+    }
+  },
+  {
+    name: "record_decision",
+    title: "บันทึกมติตามที่เจ้าของกุญแจสั่ง",
+    description:
+      "บันทึกมติของข้อเสนอที่รอคุย: ลง / ไม่ลง / พักไว้ หรือ รอคุย (ยกเลิกมติ/เอากลับเข้าวาระ). ใช้เฉพาะเมื่อเจ้าของกุญแจพิมพ์สั่งในแชทชัดเจน ห้ามตัดสินเอง. ใส่ instruction = คำสั่งของเจ้าของกุญแจตามที่พิมพ์. Record a verdict ONLY when the key owner explicitly said so in chat; never decide on your own.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        code: { type: "string", description: "e.g. P-023" },
+        verdict: { type: "string", enum: ["ลง", "ไม่ลง", "พักไว้", "รอคุย"] },
+        instruction: { type: "string", description: "what the key owner said, verbatim (short)" },
+        note: { type: "string", description: "reason / conditions to keep with the decision" }
+      },
+      required: ["code", "verdict", "instruction"],
+      additionalProperties: false
+    },
+    readOnly: false,
+    editorOnly: true,
+    run: async (args, ctx) => {
+      const verdict = requireString(args, "verdict");
+      if (!isVerdict(verdict) && verdict !== "รอคุย") throw new ParamsError("verdict must be ลง / ไม่ลง / พักไว้ / รอคุย");
+      const instruction = requireString(args, "instruction").trim().slice(0, 300);
+      const extra = typeof args.note === "string" ? args.note.trim().slice(0, 1500) : "";
+      const found = await findByCode<MpProposal>(ctx.store, "mp_proposals", args.code);
+      if (!found) return textResult(`ไม่พบข้อเสนอ ${str(args.code)} / not found`, true);
+      const actor = { key: ctx.member.key, editor: ctx.member.editor };
+      const now = (ctx.now ?? (() => new Date()))();
+      const note = `${extra ? `${extra} · ` : ""}บันทึกผ่าน AI (${ctx.tokenLabel}) ตามที่${ctx.member.name}สั่ง: "${instruction}"`;
+      const result = await ctx.store.updateOne<MpProposal, string>("mp_proposals", found.id, (current) => {
+        if (!current || !canTransition(current, verdict, actor)) return null;
+        const next: MpProposal = { ...current, status: verdict, updatedAt: now.toISOString(), via: "ai-token", viaLabel: ctx.tokenLabel };
+        if (isVerdict(verdict)) {
+          next.decidedOn = bangkokDate(now);
+          next.decisionNote = note;
+        } else {
+          next.decidedOn = null;
+          next.decisionNote = "";
+        }
+        return { data: next, result: current.status };
+      });
+      if (!result) return textResult(`เปลี่ยน ${found.code} จาก "${found.status}" เป็น "${verdict}" ไม่ได้ / transition not allowed`, true);
+      return textResult(`${found.code}: ${result} → ${verdict} บันทึกแล้ว / recorded`);
     }
   }
 ];
