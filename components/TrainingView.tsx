@@ -82,6 +82,53 @@ const manualMedia: Record<string, {
   }
 };
 
+// Planogram (การจัดเรียงสินค้า) — a reference manual, not a checklist phase, so it
+// doesn't add anything to the scored checklist.
+const productDisplayPlans = [
+  { src: "/training/planogram-cabinet.jpg", alt: "แปลนจัดตู้ไม้โชว์สินค้า แบ่งเกมตามคอลัมน์" },
+  { src: "/training/planogram-wall.jpg", alt: "แปลนจัดผนังสินค้า 3 ชุด A · B · C" }
+];
+
+const productDisplaySteps = [
+  {
+    title: "แบ่งโซนตามเกม",
+    tasks: [
+      "ตู้ไม้: คอลัมน์ซ้าย Lorcana · กลาง Riftbound / ของเด่นประจำเดือน · ขวา Pokémon",
+      "ผนัง B (สินค้าเกม): แถวบน Pokémon → แถวกลาง Lorcana → แถวล่าง Riftbound",
+      "ชั้นวาง A และผนัง C: อุปกรณ์เสริมเท่านั้น (ซองการ์ด กล่องเด็ค ลูกเต๋า แฟ้ม แผ่นรองเล่น)",
+      "สินค้าเกมเดียวกันต้องอยู่รวมกัน ห้ามกระจายหลายช่อง"
+    ]
+  },
+  {
+    title: "เลือกชั้นตามความสำคัญ",
+    tasks: [
+      "ชั้นบนสุด: ของชิ้นใหญ่ไว้โชว์ ให้เห็นจากไกล",
+      "ระดับสายตา: ชุดใหม่ ของขายดี และป้ายโปรโมชันในกรอบอะคริลิก",
+      "ระดับเอว: ชุดรอง ซอง และของเสริม",
+      "ชั้นล่าง: ของราคาย่อมเยาและของเด็ก"
+    ]
+  },
+  {
+    title: "วางของให้เป็นมาตรฐาน",
+    tasks: [
+      "ทุกกล่องหันหน้าตรง ห่างขอบชั้นประมาณ 2 ซม.",
+      "จัดของไว้กลางช่อง ใช้พื้นที่ประมาณ 70–80% ไม่ชิดซ้ายและไม่โล่งเกินครึ่ง",
+      "วางช่องละ 1, 3 หรือ 5 ชิ้น หรือวางพีระมิด 2+1",
+      "ของใหญ่อยู่หลังหรือบน ของเล็กอยู่หน้า",
+      "ผนังแขวน: เรียงเต็มแถว ไม่เว้นช่องตรงกลาง ไม่แขวนเลยขอบแผง แผ่นรองเล่นต้องแขวน ห้ามตั้งพื้น"
+    ]
+  },
+  {
+    title: "ป้ายและความเรียบร้อย",
+    tasks: [
+      "ป้ายราคาขนาดเดียวกันทั้งร้าน ติดที่ขอบชั้นใต้สินค้า หรือที่ตะขอ",
+      "ติดป้ายชื่อเกม / หมวดที่หัวคอลัมน์หรือหัวชั้น",
+      "เก็บลังสต็อกไว้หลังร้าน หรือตู้บานเลื่อนใต้ตู้ไม้",
+      "ด้านบนตู้: ป้ายโลโก้ร้านตรงกลาง ไม่วางของใช้ เช่น เครื่องพ่นน้ำหอม"
+    ]
+  }
+];
+
 export function TrainingView({ branch }: { branch: string }) {
   // The manual text is owner-editable at /admin/manual-config; the code below is the
   // fallback that ships with the app. Fetched client-side, same as the checklist config.
@@ -336,6 +383,72 @@ export function TrainingView({ branch }: { branch: string }) {
                 </ul>
               </section>
             </div>
+          </div>
+        </article>
+
+        <article id="product-display" className="training-card wi-manual phase-stock">
+          <div className="workflow-card-head">
+            <span className="phase-icon">PG</span>
+            <div>
+              <p className="eyebrow">WI-D1 · ทุกครั้งที่เติมของหรือของเข้าใหม่</p>
+              <h3>คู่มือการจัดเรียงสินค้า (Planogram)</h3>
+            </div>
+          </div>
+
+          <div className="wi-plan-gallery">
+            {productDisplayPlans.map((plan) => (
+              <figure key={plan.src} className="wi-figure wi-plan">
+                <a className="wi-image-link" href={plan.src} target="_blank" rel="noreferrer">
+                  <img src={plan.src} alt={plan.alt} loading="lazy" />
+                </a>
+                <figcaption>{plan.alt} · กดดูรูปตัวอย่างเต็ม</figcaption>
+              </figure>
+            ))}
+          </div>
+
+          <div className="wi-content">
+            <section className="wi-summary-grid">
+              <div>
+                <h4>วัตถุประสงค์</h4>
+                <p>จัดตู้และผนังสินค้าให้เหมือนกันทุกสาขา ลูกค้าหาสินค้าเจอเร็ว และร้านดูเป็นมาตรฐาน</p>
+              </div>
+              <div>
+                <h4>ขอบเขต / เวลา</h4>
+                <p>ตู้ไม้โชว์สินค้า · ชั้นวาง A · ผนังแขวน B และ C · ทุกครั้งที่เติมของ ของเข้าใหม่ หรือเปลี่ยนโปรโมชัน</p>
+              </div>
+            </section>
+
+            <section>
+              <h4>ขั้นตอนการปฏิบัติงาน</h4>
+              <div className="wi-step-list">
+                {productDisplaySteps.map((section, sectionIndex) => (
+                  <div key={section.title} className="wi-step-section">
+                    <strong>{sectionIndex + 1}. {section.title}</strong>
+                    <ol>
+                      {section.tasks.map((task) => (
+                        <li key={task}>{task}</li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="wi-summary-grid">
+              <div>
+                <h4>จุดตรวจหลังจัดเสร็จ</h4>
+                <ul>
+                  <li>สินค้าแต่ละเกมอยู่รวมกลุ่มเดียว ไม่กระจายหลายช่อง</li>
+                  <li>ทุกกล่องหันหน้าตรง ไม่มีช่องโล่งเกินครึ่ง</li>
+                  <li>ทุกชิ้นมีป้ายราคาแบบเดียวกัน</li>
+                  <li>ไม่มีลังสต็อก บับเบิ้ล หรือของส่วนตัวให้ลูกค้าเห็น</li>
+                </ul>
+              </div>
+              <div>
+                <h4>สิ่งที่ต้องระวัง</h4>
+                <p>ห้ามวางลังสต็อกที่มีสติกเกอร์ขนส่งไว้หน้าร้าน ห้ามแปะป้ายกระดาษบนกล่องลัง ให้ใส่กรอบอะคริลิกเสมอ</p>
+              </div>
+            </section>
           </div>
         </article>
 

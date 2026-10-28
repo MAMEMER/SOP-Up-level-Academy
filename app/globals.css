@@ -3410,6 +3410,18 @@ a {
   gap: 14px;
 }
 
+.wi-plan-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.wi-plan img {
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+
 .wi-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4208,6 +4220,7 @@ a {
   .training-grid,
   .training-section-grid,
   .wi-manual-body,
+  .wi-plan-gallery,
   .wi-summary-grid,
   .focus-checklist-grid,
   .detail-grid,

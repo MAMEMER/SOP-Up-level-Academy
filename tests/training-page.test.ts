@@ -50,4 +50,12 @@ describe("training manual page", () => {
     assert.equal(source.includes("ส่งหลักฐานยืนยันในกลุ่ม LINE Admin"), true);
     assert.equal(source.includes("ตัวอย่างข้อความและรูปหลักฐานที่ส่งในกลุ่ม LINE Admin"), true);
   });
+
+  it("includes the product display (planogram) manual with both plan images", () => {
+    const source = readFileSync(new URL("../components/TrainingView.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes("คู่มือการจัดเรียงสินค้า"), true);
+    assert.equal(source.includes("/training/planogram-cabinet.jpg"), true);
+    assert.equal(source.includes("/training/planogram-wall.jpg"), true);
+  });
 });
