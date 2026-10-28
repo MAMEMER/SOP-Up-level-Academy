@@ -185,9 +185,9 @@ describe("tool permission matrix", () => {
   const forbidden = ["import_kpis", "set_kpi_target", "decide_proposal", "set_verdict", "close_meeting", "apply_proposal", "edit_section", "import_doc", "import_tasks", "create_token", "revoke_token", "write_scratch", "delete_proposal"];
   const listFor = async (c: McpContext) =>
     ((await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, c))?.result as { tools: { name: string }[] }).tools.map((t) => t.name).sort();
-  it("tools/list is exactly the allowed set (+ edit_reference_section for editors only)", async () => {
-    assert.deepEqual(await listFor(ctx), [...allowed, "edit_reference_section"].sort()); // ท้อป = editor
-    assert.deepEqual(await listFor({ ...ctx, member: memberByKey("name")! }), [...allowed, "edit_reference_section"].sort()); // เนม = editor
+  it("tools/list is exactly the allowed set (+ editor-only tools)", async () => {
+    assert.deepEqual(await listFor(ctx), [...allowed, "edit_reference_section", "record_decision"].sort()); // ท้อป = editor
+    assert.deepEqual(await listFor({ ...ctx, member: memberByKey("name")! }), [...allowed, "edit_reference_section", "record_decision"].sort()); // เนม = editor
     assert.deepEqual(await listFor({ ...ctx, member: memberByKey("muk")! }), [...allowed].sort());
     for (const tool of TOOLS) assert.equal((tool.inputSchema as { type: string }).type, "object");
   });
@@ -346,5 +346,39 @@ describe("editing reference docs", () => {
     assert.ok((await store.getOne<MpDoc>("mp_docs", "mission-b"))!.markdown.startsWith("# One\none NEW\n\n# Two"));
     const conflict = await editDocSection(store, { slug: "mission-b", sectionIndex: 1, baseVersion: 4, newBody: "y", reason: "r", by: "champ" });
     assert.ok(!conflict.ok && conflict.conflict);
+  });
+});
+
+describe("record_decision (editor tokens, on the key owner's instruction)", () => {
+  const base = { title: "t", missions: ["B"], kind: "เพิ่ม", newText: "n", submit: true };
+  it("records a verdict with the owner's instruction in the note; undo puts it back on the agenda", async () => {
+    await call("create_proposal", base, { ...ctx, member: memberByKey("muk")!, tokenLabel: "Claude ของมุก" }); // P-001 by มุก, รอคุย
+    const res = await call("record_decision", { code: "P-001", verdict: "ลง", instruction: "เอาข้อนี้", note: "เริ่มสาขาบางแคก่อน" });
+    assert.ok(!isErr(res), textOf(res));
+    const p = (await store.getOne<MpProposal>("mp_proposals", "P-001"))!;
+    assert.equal(p.status, "ลง");
+    assert.ok(p.decidedOn);
+    assert.ok(p.decisionNote.includes("เริ่มสาขาบางแคก่อน"));
+    assert.ok(p.decisionNote.includes("ท้อปสั่ง") && p.decisionNote.includes("เอาข้อนี้"));
+    assert.equal(p.proposer, "muk");
+    assert.equal(p.via, "ai-token");
+    assert.ok(!isErr(await call("record_decision", { code: "P-001", verdict: "รอคุย", instruction: "ยกเลิกมติ" })));
+    const back = (await store.getOne<MpProposal>("mp_proposals", "P-001"))!;
+    assert.equal(back.status, "รอคุย");
+    assert.equal(back.decisionNote, "");
+  });
+  it("cannot touch drafts, applied proposals, or bad verdicts; instruction is required", async () => {
+    await call("create_proposal", { ...base, submit: false }); // P-001 ร่าง
+    assert.ok(isErr(await call("record_decision", { code: "P-001", verdict: "ลง", instruction: "เอา" })));
+    await store.updateOne<MpProposal>("mp_proposals", "P-001", (c) => (c ? { data: { ...c, status: "ลงแล้ว" }, result: c } : null));
+    assert.ok(isErr(await call("record_decision", { code: "P-001", verdict: "ไม่ลง", instruction: "ไม่เอา" })));
+    assert.equal((await call("record_decision", { code: "P-001", verdict: "ลงแล้ว", instruction: "x" }))?.error?.code, RPC.INVALID_PARAMS);
+    assert.equal((await call("record_decision", { code: "P-001", verdict: "ลง" }))?.error?.code, RPC.INVALID_PARAMS);
+  });
+  it("non-editor token: tool is absent and rejected", async () => {
+    await call("create_proposal", base);
+    const res = await call("record_decision", { code: "P-001", verdict: "ลง", instruction: "เอา" }, { ...ctx, member: memberByKey("muk")!, tokenLabel: "x" });
+    assert.ok(res?.error || isErr(res));
+    assert.equal((await store.getOne<MpProposal>("mp_proposals", "P-001"))!.status, "รอคุย");
   });
 });
