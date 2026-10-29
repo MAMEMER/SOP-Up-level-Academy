@@ -9005,6 +9005,8 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .mp-check--top > span { display: grid; gap: 2px; min-width: 0; }
 .mp-upload { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; margin: 14px 0; border-radius: 999px; border: 1px dashed rgba(184, 86, 20, 0.5); color: var(--color-orange-deep); font-size: 15px; cursor: pointer; }
 .mp-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.mp-upload.is-busy { opacity: 0.6; cursor: progress; }
+.mp-upload.is-busy input { cursor: progress; }
 .mp-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; }
 .mp-toolbar .mp-field--inline { flex: 1 1 140px; }
 .mp-toolbar > .mp-btn { flex: 0 0 auto; }

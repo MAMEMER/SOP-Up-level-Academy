@@ -695,7 +695,7 @@ export const TOOLS: Tool[] = [
     name: "edit_reference_section",
     title: "แก้หัวข้อในเอกสารอ้างอิง (เฉพาะผู้แก้)",
     description:
-      "แก้เนื้อหาหัวข้อเดียวในเอกสารอ้างอิง (mission-a..d, research, roadmap, audit-a..c, audit-programs) ทันที ต้องมีเหตุผล — ใช้ได้เฉพาะแชมป์/ท้อป และใช้กับฉบับกลางไม่ได้ (ฉบับกลางต้องเสนอผ่าน create_proposal). อ่านหัวข้อด้วย read_doc ก่อน แล้วส่ง baseVersion ที่อ่านมา. newBody = เนื้อหาใต้หัวข้อนี้เท่านั้น (ไม่รวมบรรทัดหัวข้อและหัวข้อย่อย). Editors only: replace one section's own body in a REFERENCE doc (never master). Read it first and pass the version you read as baseVersion; newBody excludes the heading line and sub-sections.",
+      "แก้เนื้อหาหัวข้อเดียวในเอกสารอ้างอิง (mission-a..d, research, roadmap, audit-a..c, audit-programs, products) ทันที ต้องมีเหตุผล — ใช้ได้เฉพาะแชมป์/ท้อป และใช้กับฉบับกลางไม่ได้ (ฉบับกลางต้องเสนอผ่าน create_proposal). อ่านหัวข้อด้วย read_doc ก่อน แล้วส่ง baseVersion ที่อ่านมา. newBody = เนื้อหาใต้หัวข้อนี้เท่านั้น (ไม่รวมบรรทัดหัวข้อและหัวข้อย่อย). Editors only: replace one section's own body in a REFERENCE doc (never master). Read it first and pass the version you read as baseVersion; newBody excludes the heading line and sub-sections.",
     inputSchema: {
       type: "object",
       properties: {
