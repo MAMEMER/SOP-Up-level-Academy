@@ -58,4 +58,13 @@ describe("training manual page", () => {
     assert.equal(source.includes("/training/planogram-cabinet.jpg"), true);
     assert.equal(source.includes("/training/planogram-wall.jpg"), true);
   });
+
+  it("shows each manual as a folder (same style as the task file) that opens one manual at a time", () => {
+    const source = readFileSync(new URL("../components/TrainingView.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.includes('className={on ? "ti-folder is-on" : "ti-folder"}'), true);
+    assert.equal(source.includes("hidden={openId !== phase.id}"), true);
+    assert.equal(source.includes('hidden={openId !== "product-display"}'), true);
+    assert.equal(source.includes('window.addEventListener("hashchange"'), true);
+  });
 });
