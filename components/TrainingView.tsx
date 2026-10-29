@@ -187,7 +187,7 @@ export function TrainingView({ branch }: { branch: string }) {
 
   useEffect(() => {
     const syncFromHash = () => {
-      const id = decodeURIComponent(window.location.hash.slice(1));
+      const id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
       scrollOnOpen.current = Boolean(id);
       setOpenId(id || null);
     };
