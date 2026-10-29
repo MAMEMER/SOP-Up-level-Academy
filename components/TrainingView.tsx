@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { ArrowLeft, Folder, FolderOpen } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { cardStoreWorkflow } from "../lib/card-store-workflow.ts";
 import { fetchChecklistConfig } from "../lib/daily-checklist-store.ts";
 import { applyChecklistConfig, emptyChecklistConfig, type ChecklistConfig } from "../lib/daily-checklist.ts";
@@ -151,6 +152,63 @@ export function TrainingView({ branch }: { branch: string }) {
   const configuredPhases = applyChecklistConfig(cardStoreWorkflow, config);
   const manualPhases = applyManualOverrides(configuredPhases, config.manual);
 
+  // แฟ้มคู่มือ (แบบเดียวกับแฟ้มงานที่มอบหมาย) — กดแฟ้มเพื่อเปิดดูรายละเอียดทีละเรื่อง.
+  // ลิงก์เดิม /training#<id> จาก checklist ยังเปิดแฟ้มนั้นให้ตรงเรื่องเหมือนเดิม
+  const folderGroups = [
+    {
+      title: "งานประจำวัน",
+      items: manualPhases.map((phase, phaseIndex) => ({
+        id: phase.id,
+        code: `WI-${String(phaseIndex + 1).padStart(2, "0")}`,
+        title: phase.title,
+        time: phase.timeLabel
+      }))
+    },
+    {
+      title: "งานประจำสัปดาห์ / เดือน",
+      items: [
+        { id: weeklyStockSleevePhase.id, code: "WI-W1", title: weeklyStockSleevePhase.title, time: weeklyStockSleevePhase.timeLabel },
+        { id: monthlyStockSinglePhase.id, code: "WI-M1", title: monthlyStockSinglePhase.title, time: monthlyStockSinglePhase.timeLabel }
+      ]
+    },
+    {
+      title: "การจัดร้าน",
+      items: [{ id: "product-display", code: "WI-D1", title: "คู่มือการจัดเรียงสินค้า (Planogram)", time: "ทุกครั้งที่เติมของหรือของเข้าใหม่" }]
+    },
+    {
+      title: "กิจกรรมประจำสัปดาห์",
+      items: weeklyEvents.map((event) => ({ id: event.id, code: "Weekly event", title: event.name, time: event.timeWindow }))
+    }
+  ].filter((group) => group.items.length);
+
+  const [openId, setOpenId] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const scrollOnOpen = useRef(false);
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const id = decodeURIComponent(window.location.hash.slice(1));
+      scrollOnOpen.current = Boolean(id);
+      setOpenId(id || null);
+    };
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, []);
+
+  useEffect(() => {
+    if (openId && scrollOnOpen.current) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollOnOpen.current = false;
+  }, [openId]);
+
+  const openFolder = (id: string | null) => {
+    scrollOnOpen.current = Boolean(id);
+    setOpenId(id);
+    window.history.replaceState(null, "", id ? `#${id}` : window.location.pathname + window.location.search);
+  };
+
+  const openItem = folderGroups.flatMap((group) => group.items).find((item) => item.id === openId);
+
   return (
     <main className="page">
       <Link href="/" className="back-link">← กลับ Dashboard</Link>
@@ -162,12 +220,48 @@ export function TrainingView({ branch }: { branch: string }) {
         </div>
       </section>
 
-      <div className="wi-manual-list">
+      <div className="ti-file wi-file">
+        {folderGroups.map((group) => (
+          <section key={group.title} className="wi-folder-group">
+            <h3 className="ti-section__title">
+              {group.title} <span>{group.items.length}</span>
+            </h3>
+            <div className="ti-folders" role="tablist" aria-label={`แฟ้มคู่มือ${group.title}`}>
+              {group.items.map((item) => {
+                const on = item.id === openId;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    aria-controls={item.id}
+                    className={on ? "ti-folder is-on" : "ti-folder"}
+                    onClick={() => openFolder(on ? null : item.id)}
+                  >
+                    {on ? <FolderOpen size={18} aria-hidden /> : <Folder size={18} aria-hidden />}
+                    <span className="ti-folder__name">{item.title}</span>
+                    <span className="wi-folder__meta">{item.code} · {item.time}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+        {!openItem ? <p className="ti-empty">กดแฟ้มด้านบนเพื่อเปิดดูรายละเอียดคู่มือแต่ละเรื่อง</p> : null}
+      </div>
+
+      <div ref={detailRef} className="wi-manual-list wi-file-detail">
+        {openItem ? (
+          <button type="button" className="ti-toggle" onClick={() => openFolder(null)}>
+            <ArrowLeft size={16} aria-hidden /> ปิดแฟ้ม {openItem.code} · กลับไปเลือกแฟ้มอื่น
+          </button>
+        ) : null}
         {manualPhases.map((phase, phaseIndex) => {
           // fall back to an empty entry so adding a new phase can never 500 this page
           const media = manualMedia[phase.id] || { evidence: [] };
           return (
-          <article key={phase.id} id={phase.id} className={`training-card wi-manual phase-${phase.category}`}>
+          <article key={phase.id} id={phase.id} hidden={openId !== phase.id} className={`training-card wi-manual phase-${phase.category}`}>
             <div className="workflow-card-head">
               <span className="phase-icon">{phase.icon}</span>
               <div>
@@ -270,6 +364,7 @@ export function TrainingView({ branch }: { branch: string }) {
 
         <article
           id={weeklyStockSleevePhase.id}
+          hidden={openId !== weeklyStockSleevePhase.id}
           className={`training-card wi-manual phase-${weeklyStockSleevePhase.category}`}
         >
           <div className="workflow-card-head">
@@ -329,6 +424,7 @@ export function TrainingView({ branch }: { branch: string }) {
 
         <article
           id={monthlyStockSinglePhase.id}
+          hidden={openId !== monthlyStockSinglePhase.id}
           className={`training-card wi-manual phase-${monthlyStockSinglePhase.category}`}
         >
           <div className="workflow-card-head">
@@ -386,7 +482,7 @@ export function TrainingView({ branch }: { branch: string }) {
           </div>
         </article>
 
-        <article id="product-display" className="training-card wi-manual phase-stock">
+        <article id="product-display" hidden={openId !== "product-display"} className="training-card wi-manual phase-stock">
           <div className="workflow-card-head">
             <span className="phase-icon">PG</span>
             <div>
@@ -453,7 +549,7 @@ export function TrainingView({ branch }: { branch: string }) {
         </article>
 
         {weeklyEvents.map((event) => (
-          <article key={event.id} id={event.id} className="training-card wi-manual phase-event">
+          <article key={event.id} id={event.id} hidden={openId !== event.id} className="training-card wi-manual phase-event">
             <div className="workflow-card-head">
               <span className="phase-icon">EV</span>
               <div>

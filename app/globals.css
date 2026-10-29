@@ -8267,6 +8267,15 @@ p.ab-help{padding-left:0}
 .ti-folder__counts .is-red { color: var(--ti-red); }
 .ti-folder__counts .is-amber { color: var(--ti-amber); }
 
+/* คู่มืองาน (/training) ใช้แฟ้มแบบเดียวกับแฟ้มงาน — เปิดทีละเรื่อง */
+.wi-file { margin: 1.25rem 0 1.5rem; }
+.wi-folder-group { display: grid; gap: 0.6rem; }
+.wi-folder-group .ti-folders { grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); }
+.wi-folder-group .ti-folder { align-content: start; }
+.wi-folder__meta { font-size: 0.8rem; color: var(--ti-soft); }
+.wi-file-detail { scroll-margin-top: 18px; }
+.wi-manual[hidden] { display: none; }
+
 .ti-section { display: grid; gap: 0; }
 .ti-section__title { padding-bottom: 0.5rem; }
 .ti-section__title { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1rem; }
