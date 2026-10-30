@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 import { requireUser } from "../../../../lib/auth.ts";
 import { isOwner } from "../../../../lib/owner.ts";
 import { getStockLossReport, type StockLossReport } from "../../../../lib/stock-loss-server.ts";
+import { branchConfigs } from "../../../../lib/store-config.ts";
 
 // ของหาย น้ำ/ขนม — เจ้าของเลือกช่วงวันที่เอง ระบบคำนวณจากผลนับ + ยอดขายจริง (มูลค่าเงิน เห็นเฉพาะเจ้าของ)
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams?: Promise<{ from?: string; to?: string }> };
+type PageProps = { searchParams?: Promise<{ from?: string; to?: string; branch?: string }> };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -56,6 +57,13 @@ export default async function StockLossPage({ searchParams }: PageProps) {
   // StoreHub transactions ดึงทีละ 7 วัน — จำกัดช่วงไว้ไม่เกิน 3 เดือนกันหน้าโหลดนาน
   if (Date.parse(to) - Date.parse(from) > 92 * DAY_MS) from = shiftDate(to, -92);
 
+  // สาขาที่มี StoreHub store เท่านั้น (ผลนับ + ยอดขายต้องมาจากสโตร์เดียวกัน)
+  const branches = branchConfigs.filter((item) => item.storeHubStoreId);
+  const branch = branches.find((item) => item.key === params.branch) ?? branches[0];
+  const branchName = branch.key === "senafest" ? "เสนาเฟสท์" : "บางแค";
+  const rangeHref = (rangeFrom: string, rangeTo: string, branchKey = branch.key) =>
+    `/admin/stock-loss?from=${rangeFrom}&to=${rangeTo}&branch=${branchKey}`;
+
   const fromMs = Date.parse(`${from}T00:00:00+07:00`);
   const toMs = Date.parse(`${to}T23:59:59+07:00`);
   const days = Math.round((toMs - fromMs) / DAY_MS);
@@ -63,7 +71,7 @@ export default async function StockLossPage({ searchParams }: PageProps) {
   let report: StockLossReport | null = null;
   let error = "";
   try {
-    report = await getStockLossReport(fromMs, toMs);
+    report = await getStockLossReport(fromMs, toMs, branch.key);
   } catch (err) {
     error = err instanceof Error ? err.message : "โหลดข้อมูลไม่ได้";
   }
@@ -80,12 +88,29 @@ export default async function StockLossPage({ searchParams }: PageProps) {
       <section className="board-hero">
         <div>
           <p className="eyebrow">ของหาย · เฉพาะเจ้าของ</p>
-          <h2>น้ำ/ขนม บางแค</h2>
+          <h2>น้ำ/ขนม {branchName}</h2>
           <p>หาย = นับต้นช่วง + รับเข้า − นับปลายช่วง − ขายจริง · ไม่นับมาม่า · มูลค่าตามราคาขายจริงรวม VAT</p>
         </div>
       </section>
 
+      <nav className="stock-loss-tabs" aria-label="สาขา">
+        {branches.map((item) => {
+          const active = item.key === branch.key;
+          return (
+            <Link
+              key={item.key}
+              href={rangeHref(from, to, item.key)}
+              className={active ? "is-active" : undefined}
+              aria-current={active ? "page" : undefined}
+            >
+              {item.key === "senafest" ? "เสนาเฟสท์" : "บางแค"}
+            </Link>
+          );
+        })}
+      </nav>
+
       <form className="stock-loss-range" method="get">
+        <input type="hidden" name="branch" value={branch.key} />
         <label>
           <span>ตั้งแต่</span>
           <input type="date" name="from" defaultValue={from} max={today} />
@@ -102,7 +127,7 @@ export default async function StockLossPage({ searchParams }: PageProps) {
           return (
             <Link
               key={preset.label}
-              href={`/admin/stock-loss?from=${preset.range[0]}&to=${preset.range[1]}`}
+              href={rangeHref(preset.range[0], preset.range[1])}
               className={active ? "is-active" : undefined}
               aria-current={active ? "page" : undefined}
             >
