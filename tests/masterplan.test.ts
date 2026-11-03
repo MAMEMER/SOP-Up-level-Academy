@@ -15,6 +15,9 @@ import {
   groupByMission,
   idFromCode,
   isOverdue,
+  loadLevel,
+  suggestAssignee,
+  teamLoad,
   nextCodeNumber,
   normalizeMissions,
   ownerFromHint,
@@ -302,5 +305,34 @@ describe("task import", () => {
     assert.equal(isOverdue({ due: "2026-10-01", status: "เสร็จ" }, "2026-10-27"), false);
     assert.equal(isOverdue({ due: "2026-10-27", status: "กำลังทำ" }, "2026-10-27"), false);
     assert.equal(isOverdue({ due: null, status: "กำลังทำ" }, "2026-10-27"), false);
+  });
+});
+
+describe("teamLoad", () => {
+  const today = "2026-11-03";
+  const tasks = [
+    { owner: "champ", status: "ยังไม่เริ่ม", due: "2026-11-01" },
+    { owner: "champ", status: "กำลังทำ", due: null },
+    { owner: "champ", status: "เสร็จ", due: "2026-10-01" },
+    { owner: "name", status: "พัก", due: "2026-10-01" },
+    { owner: null, status: "ยังไม่เริ่ม", due: "2026-10-31" },
+    { owner: null, status: "ยังไม่เริ่ม", due: null }
+  ] as const;
+  it("counts open work per member and leaves done/paused out", () => {
+    const load = teamLoad(tasks as never, ["champ", "name", "muk"], today);
+    assert.deepEqual(load.members[0], { key: "champ", open: 2, doing: 1, overdue: 1, level: "free" });
+    assert.equal(load.members[1].open, 0);
+    assert.equal(load.unowned, 2);
+    assert.equal(load.unownedOverdue, 1);
+  });
+  it("suggests the least loaded member, overdue as tie-break", () => {
+    const load = teamLoad(tasks as never, ["champ", "name", "muk"], today);
+    assert.equal(suggestAssignee(load.members), "name");
+    assert.equal(suggestAssignee([]), null);
+  });
+  it("bands load levels", () => {
+    assert.equal(loadLevel(3), "free");
+    assert.equal(loadLevel(4), "mid");
+    assert.equal(loadLevel(8), "full");
   });
 });
