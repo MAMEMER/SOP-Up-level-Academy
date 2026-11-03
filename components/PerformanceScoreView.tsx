@@ -456,6 +456,14 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             ))}
           </div>
         </form>
+        {isOwnerView && basePath === "/admin/performance-score" ? (
+          <form className="performance-export-form" action="/admin/performance-score/export" method="get">
+            <label htmlFor="exportMonth">ดาวน์โหลด CSV รายเดือน</label>
+            <input id="exportMonth" name="month" type="month" defaultValue={activePeriod.startDate.slice(0, 7)} />
+            <button type="submit" name="type" value="summary">ดาวน์โหลด CSV</button>
+            <button type="submit" name="type" value="detail">ดาวน์โหลดแบบละเอียด</button>
+          </form>
+        ) : null}
       </section>
 
       <section className="performance-summary-grid" aria-label="Performance summary">
