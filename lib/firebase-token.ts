@@ -24,6 +24,9 @@ export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoog
     const email = typeof payload.email === "string" ? payload.email : undefined;
     const uid = (typeof payload.user_id === "string" ? payload.user_id : undefined) || (payload.sub as string | undefined);
     if (!email || !uid) return null;
+    // The Firebase project allows email/password sign-up, so an unverified token could
+    // claim an allow-listed staff email that has no account yet. Google sign-in is verified.
+    if (payload.email_verified !== true) return null;
     return { email, uid };
   } catch {
     return null;

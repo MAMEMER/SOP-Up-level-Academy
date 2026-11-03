@@ -242,6 +242,7 @@ function safeRedirectTo(value: FormDataEntryValue | null) {
 type InputStatus =
   | "service-saved"
   | "service-error"
+  | "service-denied"
   | "adjust-saved"
   | "adjust-removed"
   | "adjust-error"
@@ -291,6 +292,10 @@ function assignedStatus(value: string) {
 async function saveComplaintServiceAction(formData: FormData) {
   "use server";
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
+  // A complaint lowers the staffer's KPI (and pay) — admin only, never in view-as.
+  // Server actions are callable by anyone holding the action id, so guard here.
+  const user = await requireUser();
+  if (user.role !== "admin" || user.isImpersonating) redirect(withInputStatus(redirectTo, "service-denied"));
   let inputStatus: "service-saved" | "service-error" = "service-saved";
   try {
     await saveCustomerServiceRecord({
@@ -383,6 +388,8 @@ async function deleteScoreAdjustmentAction(formData: FormData) {
 async function saveAssignedWorkAction(formData: FormData) {
   "use server";
   const redirectTo = safeRedirectTo(formData.get("redirectTo"));
+  const user = await requireUser();
+  if (user.role !== "admin" || user.isImpersonating) redirect(withInputStatus(redirectTo, "service-denied"));
   const title = stringValue(formData, "assignedTitle");
   const employeeNames = resolveAssignEmployees(formData);
   // Same task → one record per selected person, sharing a groupId (ticket S3JjyiwLxyHLpPn6uOyX).
@@ -526,6 +533,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             <h3>บันทึกปัญหาบริการรายวัน</h3>
           </div>
           {inputStatus === "service-saved" ? <p className="input-status success">บันทึกหัวข้อปัญหารายวันแล้ว</p> : null}
+          {inputStatus === "service-denied" ? <p className="input-status warning">บันทึกได้เฉพาะแอดมิน และต้องไม่อยู่ในโหมดดูแทนพนักงาน</p> : null}
           {inputStatus === "service-error" ? <p className="input-status warning">บันทึกไม่สำเร็จ แต่หน้าไม่ค้างแล้ว กรุณาตรวจสิทธิ์ storage ของ production</p> : null}
           <form action={saveComplaintServiceAction} className="performance-input-form">
             <input type="hidden" name="redirectTo" value={redirectTo} />

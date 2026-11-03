@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verifySession } from "../../../../lib/session-jwt.ts";
-import { sopUserForEmail } from "../../../../lib/sop-users.ts";
-import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
+import { isCronOrAdmin } from "../../../../lib/cron-auth.ts";
 import { hasAdminCredentials } from "../../../../lib/firebase-admin.ts";
 import { sendOwnerParcelAlerts } from "../../../../lib/parcel-orders-server.ts";
 
@@ -12,13 +9,7 @@ import { sendOwnerParcelAlerts } from "../../../../lib/parcel-orders-server.ts";
 export const dynamic = "force-dynamic";
 
 async function isAllowed(request: Request): Promise<boolean> {
-  const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
-  const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
-  if (!cookie) return false;
-  const session = await verifySession(cookie);
-  const user = session ? sopUserForEmail(session.email) : undefined;
-  return user?.role === "admin";
+  return isCronOrAdmin(request);
 }
 
 export async function GET(request: Request) {

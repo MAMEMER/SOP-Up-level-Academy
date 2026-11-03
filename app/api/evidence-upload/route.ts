@@ -37,7 +37,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "missing_file" }, { status: 400 });
   }
   const kind = KINDS[String(form?.get("kind") ?? "evidence")] ?? KINDS.evidence;
-  const isImage = file.type.startsWith("image/");
+  // Allow-list, not "image/*": an SVG (scriptable) or arbitrary type would be stored
+  // under a public, never-expiring download URL. HEIC/HEIF = iPhone camera photos.
+  const isImage = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"].includes(file.type);
   const isPdf = file.type === "application/pdf";
   if (!isImage && !(kind.allowPdf && isPdf)) {
     return NextResponse.json({ error: kind.allowPdf ? "not_allowed_type" : "not_an_image" }, { status: 400 });

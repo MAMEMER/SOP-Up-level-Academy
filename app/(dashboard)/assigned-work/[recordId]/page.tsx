@@ -48,6 +48,8 @@ function canAccessAssignedWork(recordEmployeeName: string, user: Awaited<ReturnT
 async function submitAssignedWorkAction(formData: FormData) {
   "use server";
   const user = await requireUser();
+  // View-as is read-only (INVARIANTS §5): an owner previewing a staffer must not submit for them.
+  if (user.isImpersonating) notFound();
   const recordId = stringValue(formData, "recordId");
   const store = await fetchPerformanceDailyStore();
   const record = assignedWorkRecordById(store.assignedWorkRecords, recordId);

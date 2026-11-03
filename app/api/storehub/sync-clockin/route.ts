@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verifySession } from "../../../../lib/session-jwt.ts";
-import { sopUserForEmail } from "../../../../lib/sop-users.ts";
-import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
+import { isCronOrAdmin } from "../../../../lib/cron-auth.ts";
 import { fetchEmployeeNames, fetchTimesheets, hasStoreHubCreds, toBangkok } from "../../../../lib/storehub-api.ts";
 import { branchFor, resolveEmployeeCode } from "../../../../lib/employee-directory.ts";
 import { onePerStaffDay } from "../../../../lib/planner-kpi.ts";
@@ -19,16 +16,7 @@ const SYNC_ONLY_FIELDS = new Set(["branch", "month", "workDate", "staffCode", "c
 // ACTUAL row + attendance KPI then show real clock-in. Admin-gated; also callable by a
 // Vercel cron with the CRON_SECRET.
 async function isAllowed(request: Request): Promise<boolean> {
-  const url = new URL(request.url);
-  const secret = process.env.CRON_SECRET;
-  if (secret && url.searchParams.get("key") === secret) return true;
-  // Vercel Cron sends this header automatically when CRON_SECRET is set.
-  if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
-  const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
-  if (!cookie) return false;
-  const session = await verifySession(cookie);
-  const user = session ? sopUserForEmail(session.email) : undefined;
-  return user?.role === "admin";
+  return isCronOrAdmin(request);
 }
 
 function monthRange(month: string): { fromIso: string; toIso: string } {
