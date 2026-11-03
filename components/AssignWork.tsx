@@ -14,7 +14,7 @@ import {
 import { assignmentStatusClass, assignmentStatusLabel } from "../lib/assignment-view.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
 import { isTeamSelected, toggleTeamSelection, type TeamOption } from "../lib/team-options.ts";
-import { CircleCheck, MapPin, NotebookPen, UserRound } from "lucide-react";
+import { CircleCheck, Clock, MapPin, NotebookPen, UserRound } from "lucide-react";
 
 type StaffOption = { code: string; displayName: string; employmentType: "full_time" | "part_time" };
 
@@ -332,7 +332,7 @@ export function AssignWork({
                     <strong>{row.title}</strong>
                     <em>
                       <UserRound className="ui-inline-icon" size={14} aria-hidden="true" /> {displayNameFor(row.staffCode)}
-                      {row.dueTime ? ` · ⏰ ภายใน ${row.dueTime}` : ""}
+                      {row.dueTime ? <> · <Clock className="ui-inline-icon" size={14} aria-hidden="true" /> ภายใน {row.dueTime}</> : null}
                     </em>
                     {row.detail ? <em><NotebookPen className="ui-inline-icon" size={14} aria-hidden="true" /> {row.detail}</em> : null}
                     {row.location ? <em><MapPin className="ui-inline-icon" size={14} aria-hidden="true" /> ที่ไหน: {row.location}</em> : null}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, Folder, FolderOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { LinkifiedText } from "./LinkifiedText.tsx";
 import { cardStoreWorkflow } from "../lib/card-store-workflow.ts";
 import { fetchChecklistConfig } from "../lib/daily-checklist-store.ts";
 import { applyChecklistConfig, emptyChecklistConfig, type ChecklistConfig } from "../lib/daily-checklist.ts";
@@ -356,7 +357,7 @@ export function TrainingView({ branch }: { branch: string }) {
                           <strong>{sectionIndex + 1}. {section.title}</strong>
                           <ol>
                             {section.tasks.map((task) => (
-                              <li key={task}>{task}</li>
+                              <li key={task}><LinkifiedText text={task} /></li>
                             ))}
                           </ol>
                         </div>
@@ -568,7 +569,7 @@ export function TrainingView({ branch }: { branch: string }) {
                     <strong>{sectionIndex + 1}. {section.title}</strong>
                     <ol>
                       {section.tasks.map((task) => (
-                        <li key={task}>{task}</li>
+                        <li key={task}><LinkifiedText text={task} /></li>
                       ))}
                     </ol>
                   </div>
@@ -634,7 +635,7 @@ export function TrainingView({ branch }: { branch: string }) {
                     <strong>{sectionIndex + 1}. {section.title}</strong>
                     <ol>
                       {section.tasks.map((task) => (
-                        <li key={task}>{task}</li>
+                        <li key={task}><LinkifiedText text={task} /></li>
                       ))}
                     </ol>
                   </div>

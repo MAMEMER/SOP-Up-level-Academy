@@ -80,7 +80,7 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
 
   return (
     <main className="page">
-      <Link href="/" className="back-link">กลับ Dashboard</Link>
+      <Link href="/" className="back-link">← กลับ Dashboard</Link>
       <section className="board-hero">
         <div>
           <p className="eyebrow">Assigned work</p>

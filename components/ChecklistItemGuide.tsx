@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkifiedText } from "./LinkifiedText.tsx";
 import { linkLabel, type ItemLink } from "../lib/checklist-links.ts";
 
 // Staff-facing render of the owner's per-item รายละเอียด (note) + ปุ่มลิงก์ (links).
@@ -12,7 +13,7 @@ export function ChecklistItemGuide({ note, links }: { note?: string; links?: Ite
   if (!hasNote && shownLinks.length === 0) return null;
   return (
     <div className="item-guide">
-      {hasNote ? <p className="item-guide-note">{note}</p> : null}
+      {hasNote ? <p className="item-guide-note"><LinkifiedText text={note || ""} /></p> : null}
       {shownLinks.length ? (
         <div className="item-guide-links">
           {shownLinks.map((link, index) => (

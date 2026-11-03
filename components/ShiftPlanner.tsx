@@ -40,7 +40,7 @@ import {
   type EventDoc,
   type PlanDoc
 } from "../lib/shift-schedule-store.ts";
-import { Save, TriangleAlert, Zap } from "lucide-react";
+import { Save, Timer, TriangleAlert, Zap } from "lucide-react";
 
 type StaffEntry = {
   code: string;
@@ -681,7 +681,7 @@ export function ShiftPlanner({
         <div className="shift-planner__bar-right">
           <p className="shift-planner__hint">กะ1 = เปิดร้าน · กะ2 = ปิดร้าน · ทำงาน 9 ชม.</p>
           <button type="button" className="shift-planner__auto-btn" onClick={() => setShowTimes((v) => !v)}>
-            ⏱ ตั้งเวลากะ
+            <Timer className="ui-inline-icon" size={14} aria-hidden="true" /> ตั้งเวลากะ
           </button>
           <button type="button" className="shift-planner__auto-btn" onClick={() => setShowAuto((v) => !v)}>
             <Zap className="ui-inline-icon" size={14} aria-hidden="true" /> จัดกะอัตโนมัติ

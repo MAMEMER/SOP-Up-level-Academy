@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UsersRound } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { fetchChecklistKpiInput } from "../lib/checklist-kpi.ts";
@@ -647,7 +648,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               groupAssignedRecords(assignedRecordsForDay).map((group) =>
                 group.groupId ? (
                   <span key={group.groupId}>
-                    👥 {group.title}: {group.members.map((m) => displayNameFor(m.employeeName)).join(", ")} / {group.status}
+                    <UsersRound className="ui-inline-icon" size={14} aria-hidden="true" /> {group.title}: {group.members.map((m) => displayNameFor(m.employeeName)).join(", ")} / {group.status}
                   </span>
                 ) : (
                   <span key={group.members[0].id}>
@@ -731,6 +732,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                         คะแนนจริง {cat.score}/{cat.maxScore}
                       </span>
                     </div>
+                    <div className="performance-table-scroll">
                     <table>
                       <thead>
                         <tr>
@@ -783,6 +785,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                         ) : null}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 ))}
               </div>

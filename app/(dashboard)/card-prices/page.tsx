@@ -42,7 +42,7 @@ export default async function CardPricesPage() {
 
   return (
     <main className="page">
-      <Link href="/" className="back-link">← กลับหน้าหลัก</Link>
+      <Link href="/" className="back-link">← กลับ Dashboard</Link>
       <section className="board-hero">
         <div>
           <p className="eyebrow">ตลาดการ์ด · กลุ่ม FB</p>

@@ -36,6 +36,8 @@ const PAGE = 60;
 const QUERY_KEY = "sop-orders-query";
 
 const baht = (n: number | null) => (n == null ? "" : `${n.toLocaleString("th-TH", { maximumFractionDigits: 2 })}฿`);
+// Sheet cells sometimes carry emoji the staff typed (e.g. "รับแล้ว ✅"); the UI shows plain text.
+const withoutEmoji = (text: string) => text.replace(/[\p{Extended_Pictographic}\u{FE0F}]/gu, "").replace(/\s{2,}/g, " ").trim();
 const phoneText = (p: string) => (p.length === 10 ? `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}` : p);
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: "Asia/Bangkok" }) : "");
 
@@ -247,8 +249,8 @@ export function CustomerOrdersBoard({ initialFilter = "todo", initialQuery = "" 
             </div>
 
             {o.due ? <p className="parcel-order__note">เก็บเงินส่วนที่เหลือ {baht(o.due)} ก่อนส่งของ</p> : null}
-            {o.pay !== "paid" && o.payText !== PAY_LABEL[o.pay] ? <p className="parcel-order__meta">สถานะจ่าย: {o.payText}</p> : null}
-            {o.handText !== HAND_LABEL[o.hand] ? <p className="parcel-order__status">{o.handText}</p> : null}
+            {o.pay !== "paid" && o.payText !== PAY_LABEL[o.pay] ? <p className="parcel-order__meta">สถานะจ่าย: {withoutEmoji(o.payText)}</p> : null}
+            {o.handText !== HAND_LABEL[o.hand] ? <p className="parcel-order__status">{withoutEmoji(o.handText)}</p> : null}
             {o.address ? <p className="parcel-order__meta">ที่อยู่: {o.address}</p> : null}
             {o.note ? <p className="parcel-order__meta">หมายเหตุ: {o.note}</p> : null}
             {o.meta?.photos?.length ? (
