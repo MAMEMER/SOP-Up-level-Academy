@@ -603,6 +603,41 @@ export function isOverdue(task: Pick<MpTask, "due" | "status">, today: string): 
   return Boolean(task.due) && task.status !== "เสร็จ" && task.status !== "พัก" && (task.due as string) < today;
 }
 
+export type LoadLevel = "free" | "mid" | "full";
+export type MemberLoad = { key: string; open: number; doing: number; overdue: number; level: LoadLevel };
+
+/** Open = not เสร็จ and not พัก. 0–3 รับเพิ่มได้ · 4–7 พอดีมือ · 8+ เต็มมือ. */
+export function loadLevel(open: number): LoadLevel {
+  return open <= 3 ? "free" : open <= 7 ? "mid" : "full";
+}
+
+/** Per-person workload, in member order, plus the open tasks nobody has picked up yet. */
+export function teamLoad(
+  tasks: Pick<MpTask, "owner" | "status" | "due">[],
+  memberKeys: readonly string[],
+  today: string
+): { members: MemberLoad[]; unowned: number; unownedOverdue: number } {
+  const open = tasks.filter((t) => t.status !== "เสร็จ" && t.status !== "พัก");
+  const members = memberKeys.map((key) => {
+    const mine = open.filter((t) => t.owner === key);
+    return {
+      key,
+      open: mine.length,
+      doing: mine.filter((t) => t.status === "กำลังทำ").length,
+      overdue: mine.filter((t) => isOverdue(t, today)).length,
+      level: loadLevel(mine.length)
+    };
+  });
+  const unowned = open.filter((t) => !t.owner || !memberKeys.includes(t.owner));
+  return { members, unowned: unowned.length, unownedOverdue: unowned.filter((t) => isOverdue(t, today)).length };
+}
+
+/** Who should take the next task: fewest open, then fewest overdue, then member order. */
+export function suggestAssignee(members: MemberLoad[]): string | null {
+  if (members.length === 0) return null;
+  return [...members].sort((a, b) => a.open - b.open || a.overdue - b.overdue)[0].key;
+}
+
 export type TaskImportRow = { code: string; title: string; detail: string; missions: Mission[]; due: string | null; owner: string | null; source: string };
 
 const OWNER_HINTS: Record<string, MasterplanMemberKey> = {

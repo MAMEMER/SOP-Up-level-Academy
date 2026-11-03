@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Hand, Pencil, Plus } from "lucide-react";
+import { Hand, Lightbulb, Pencil, Plus } from "lucide-react";
 import { MASTERPLAN_MEMBERS, memberName } from "../../lib/masterplan-access.ts";
 import { mpApi, useLocalDraft } from "../../lib/masterplan-client.ts";
-import { MISSIONS, TASK_STATUSES, isOverdue, validateTaskDraft, type Mission, type MpTask, type TaskDraft, type TaskStatus } from "../../lib/masterplan.ts";
+import { MISSIONS, TASK_STATUSES, isOverdue, suggestAssignee, teamLoad, validateTaskDraft, type Mission, type MpTask, type TaskDraft, type TaskStatus } from "../../lib/masterplan.ts";
 
 // งาน — grouped by status (stacked on mobile, columns on wide screens). Filters stay in
 // localStorage so the view comes back the way it was left.
@@ -34,8 +34,58 @@ export function TaskBoard({ tasks, me, today }: { tasks: MpTask[]; me: string; t
     return true;
   });
 
+  const load = teamLoad(tasks, memberKeys, today);
+  const next = suggestAssignee(load.members);
+  const pick = (owner: string) => set("owner", filters.owner === owner ? "" : owner);
+  const LEVEL_TEXT = { free: "รับเพิ่มได้", mid: "พอดีมือ", full: "เต็มมือ" } as const;
+
   return (
     <>
+      <section className="mp-load" aria-label="งานในมือแต่ละคน">
+        {load.members.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            className={`mp-load__item is-${m.level}${filters.owner === m.key ? " is-active" : ""}`}
+            onClick={() => pick(m.key)}
+            aria-pressed={filters.owner === m.key}
+          >
+            <span className="mp-load__name">
+              {memberName(m.key)}
+              {m.key === me ? " (ฉัน)" : ""}
+            </span>
+            <span className="mp-load__num">{m.open}</span>
+            <span className="mp-load__bar" aria-hidden="true">
+              <i style={{ width: `${Math.min(m.open, 10) * 10}%` }} />
+            </span>
+            <span className="mp-load__level">{LEVEL_TEXT[m.level]}</span>
+            <span className="mp-load__meta">
+              กำลังทำ {m.doing}
+              {m.overdue ? <span className="mp-overdue"> · เลยกำหนด {m.overdue}</span> : null}
+            </span>
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`mp-load__item is-pool${filters.owner === "none" ? " is-active" : ""}`}
+          onClick={() => pick("none")}
+          aria-pressed={filters.owner === "none"}
+        >
+          <span className="mp-load__name">ยังไม่มีคนหยิบ</span>
+          <span className="mp-load__num">{load.unowned}</span>
+          <span className="mp-load__meta">
+            {load.unownedOverdue ? <span className="mp-overdue">เลยกำหนด {load.unownedOverdue}</span> : "ไม่มีงานเลยกำหนด"}
+          </span>
+        </button>
+      </section>
+      {next ? (
+        <p className="mp-load__hint">
+          <Lightbulb size={16} aria-hidden="true" />
+          <span>
+            งานใหม่ให้ <b>{memberName(next)}</b> ก่อน ตอนนี้ถืองานน้อยสุด ({load.members.find((m) => m.key === next)?.open ?? 0} งาน) · แตะชื่อเพื่อดูงานของคนนั้น
+          </span>
+        </p>
+      ) : null}
       <div className="mp-toolbar">
         <label className="mp-field mp-field--inline">
           <span>คนทำ</span>
