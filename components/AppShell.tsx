@@ -42,7 +42,7 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
       <GrandOpeningBanner />
       <aside className="sidebar">
         <Link href={user.role === "admin" ? "/admin" : "/"} className="brand">
-          <img className="brand-logo-image" src="/up-level-academy-logo.png" alt="UP LEVEL Academy" />
+          <img className="brand-logo-image" src="/up-level-academy-logo-128.webp" alt="UP LEVEL Academy" width={44} height={44} />
           <div>
             <strong>SOP Up Level</strong>
             <small>คู่มืองาน + KPI พนักงาน</small>

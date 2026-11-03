@@ -104,7 +104,7 @@ export default function LoginPage() {
     <main className="page auth-page">
       <section className="auth-shell">
         <div className="auth-brand">
-          <img src="/up-level-academy-logo.png" alt="Up Level Academy" />
+          <img src="/up-level-academy-logo-512.webp" alt="Up Level Academy" width={220} height={220} fetchPriority="high" />
           <div>
             <span>UPMAN Operations</span>
             <h1>Up Level Academy</h1>

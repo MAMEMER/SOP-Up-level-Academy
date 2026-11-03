@@ -1433,7 +1433,7 @@ body {
   margin: 0;
   color: #17202a;
   background: #eef6f0;
-  font-family: "Mitr", "Noto Sans Thai", Arial, sans-serif;
+  font-family: var(--font-mitr, "Mitr"), var(--font-noto-sans-thai, "Noto Sans Thai"), Arial, sans-serif;
 }
 
 button,
@@ -4329,7 +4329,7 @@ a {
   --color-mint: #B8E6C1;
   --color-ink: #2D3142;
   --color-ink-soft: #5C5D7A;
-  --guild-font: 'Mitr', 'Noto Sans Thai', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --guild-font: var(--font-mitr, 'Mitr'), var(--font-noto-sans-thai, 'Noto Sans Thai'), system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 body {
@@ -9424,3 +9424,16 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .mh-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--color-ink); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 .mh-btn.is-ghost { background: transparent; color: var(--color-ink); border: 1px solid rgba(45, 49, 66, 0.2); }
 .mh-btn:disabled { opacity: 0.6; cursor: progress; }
+
+/* ── Route loading skeleton + error (app/(dashboard)/loading.tsx, error.tsx) ── */
+.sop-skeleton { display: block; border-radius: 10px; background: linear-gradient(90deg, rgba(255,199,142,0.18) 0%, rgba(255,199,142,0.38) 50%, rgba(255,199,142,0.18) 100%); background-size: 200% 100%; animation: sop-skeleton-shimmer 1.4s ease-in-out infinite; }
+.sop-skeleton--eyebrow { width: 90px; height: 12px; margin-bottom: 12px; }
+.sop-skeleton--title { width: min(320px, 70%); height: 32px; margin-bottom: 12px; }
+.sop-skeleton--line { width: min(480px, 90%); height: 14px; }
+.sop-skeleton--block { width: 100%; height: 96px; border-radius: 18px; }
+.sop-skeleton--block.is-short { width: 60%; height: 64px; }
+.sop-skeleton-stack { display: grid; gap: 16px; margin-top: 8px; }
+.sop-loading-label { margin: 8px 0 0; font-size: 13px; color: var(--color-ink-soft); }
+.sop-error-digest { font-size: 12px !important; color: var(--color-ink-soft); }
+@keyframes sop-skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sop-skeleton { animation: none; } }
