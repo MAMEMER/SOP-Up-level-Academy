@@ -6,8 +6,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { OPEN_BUG_EVENT } from "./SupportFab.tsx";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase-client.ts";
 import { Bug, CircleCheck, Lightbulb } from "lucide-react";
 
 type TicketType = "bug" | "suggestion";
@@ -98,6 +96,12 @@ export function BugReportFab() {
     const finalTitle = (title.trim() || description.trim().split("\n")[0] || "แจ้งปัญหา").slice(0, 200);
     setStatus("submitting");
     try {
+      // Firebase is loaded only when a report is actually sent — keeps the SDK out of
+      // the bundle every page downloads.
+      const [{ addDoc, collection, serverTimestamp }, { db }] = await Promise.all([
+        import("firebase/firestore"),
+        import("../lib/firebase-client.ts")
+      ]);
       await addDoc(collection(db, "tickets"), {
         type,
         title: finalTitle,

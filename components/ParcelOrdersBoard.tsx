@@ -48,6 +48,7 @@ function who(by?: string): string {
 }
 import { ParcelOrderForm } from "./ParcelOrderForm.tsx";
 import { ParcelReceiveForm } from "./ParcelReceiveForm.tsx";
+import { startVisiblePolling } from "../lib/visible-polling.ts";
 
 const REFRESH_MS = 60_000;
 
@@ -97,8 +98,7 @@ export function ParcelOrdersBoard({
 
   useEffect(() => {
     void reload();
-    const timer = setInterval(() => void reload(), REFRESH_MS);
-    return () => clearInterval(timer);
+    return startVisiblePolling(() => void reload(), REFRESH_MS);
   }, [reload]);
 
   async function run(key: string, action: () => Promise<unknown>) {

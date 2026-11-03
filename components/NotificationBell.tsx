@@ -10,6 +10,7 @@ import {
   unreadCount,
   type StaffNotification
 } from "../lib/staff-notifications.ts";
+import { startVisiblePolling } from "../lib/visible-polling.ts";
 
 /** รีเฟรชเองทุก 2 นาที — งานใหม่/คำติชมจะโผล่โดยไม่ต้องกดรีโหลดหน้า */
 const REFRESH_MS = 120_000;
@@ -37,8 +38,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     void load();
-    const timer = setInterval(() => void load(), REFRESH_MS);
-    return () => clearInterval(timer);
+    return startVisiblePolling(() => void load(), REFRESH_MS);
   }, [load]);
 
   async function toggle() {

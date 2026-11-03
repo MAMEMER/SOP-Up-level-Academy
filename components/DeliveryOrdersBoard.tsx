@@ -18,6 +18,7 @@ import {
 import type { ShiftCode } from "../lib/shift-schedule.ts";
 import { claimDelivery, fetchDeliveryFeed, handoffDelivery, shipDelivery } from "../lib/delivery-tasks-store.ts";
 import { displayNameFor } from "../lib/employee-directory.ts";
+import { startVisiblePolling } from "../lib/visible-polling.ts";
 
 const REFRESH_MS = 60_000;
 
@@ -72,8 +73,7 @@ export function DeliveryOrdersBoard({
   useEffect(() => {
     if (hasServerData.current) hasServerData.current = false;
     else void reload();
-    const timer = setInterval(() => void reload(), REFRESH_MS);
-    return () => clearInterval(timer);
+    return startVisiblePolling(() => void reload(), REFRESH_MS);
   }, [reload]);
 
   async function run(id: string, action: () => Promise<void>) {

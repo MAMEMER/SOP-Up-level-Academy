@@ -30,17 +30,43 @@ import { teamRecordName } from "../../lib/store-config.ts";
 export default async function HomePage() {
   const user = await requireUser();
   const workDate = formatWorkDate();
-  const dailyStore = await fetchPerformanceDailyStore();
   const employeeCode = employeeCodeForEmail(user.email);
   const staffCode = resolveEmployeeByEmail(user.email);
-  const branch = await workBranchFor(staffCode, workDate);
+  // สองอย่างนี้ไม่พึ่งกัน — ยิงพร้อมกัน
+  const [dailyStore, branch] = await Promise.all([fetchPerformanceDailyStore(), workBranchFor(staffCode, workDate)]);
+
+  // งานส่งของ: ออเดอร์ที่จ่ายเงินแล้วบนเว็บกิลด์ เด้งเข้ากะที่รับผิดชอบเอง
+  // (ก่อน 15:00 = กะปัจจุบัน · ตั้งแต่ 15:00 = กะปัจจุบัน + กะถัดไป)
+  // ออเดอร์ออนไลน์เป็นงานของสาขาส่งของสาขาเดียว (DELIVERY_BRANCH) — คนที่เข้ากะสาขาอื่นวันนี้ไม่เห็นบอร์ดนี้
+  const handlesDelivery = branch === DELIVERY_BRANCH;
+  const shiftPromise = staffCode ? fetchShiftForStaff(branch, workDate, staffCode) : Promise.resolve(null);
+  // syncDeliveryTasks เขียนใบงานใหม่ลง Firestore — ไม่ await ตรงนี้ ให้หน้าแสดงก่อน
+  // แล้วบอร์ดส่งของ + ตัวเลขในกล่องสรุปค่อยตามมา (Suspense / promise)
+  const deliveryTasksPromise: Promise<DeliveryTask[]> = handlesDelivery
+    ? Promise.all([syncDeliveryTasks().catch(() => [] as DeliveryTask[]), shiftPromise.catch(() => null)]).then(
+        ([deliveryAll, shiftToday]) =>
+          sortDeliveryTasks(
+            deliveryAll.filter((task) =>
+              deliveryTaskVisibleTo(task, {
+                isAdmin: user.role === "admin",
+                staffCode: staffCode ?? null,
+                shiftToday,
+                today: workDate
+              })
+            ),
+            workDate
+          )
+      )
+    : Promise.resolve([]);
+
   // หน้าแรกเป็นของ "คนที่เข้าระบบอยู่" เท่านั้น — แอดมินก็เห็นแค่งานของตัวเอง
   // (ภาพรวมทั้งร้านอยู่ที่ /admin/ops) ไม่งั้นงานของตัวเองจมอยู่ในลิสต์ของทุกคน
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
     (record) => Boolean(employeeCode && (record.employeeName === employeeCode || record.employeeName === teamRecordName(branch)))
   );
   // งานที่มอบหมายจาก 2 ส่วน: เจ้าของร้านมอบหมาย (work_assignments) + ส่งต่อจากกะปิดร้าน (work_handoffs)
-  const assignedWorkFeed = assignedWorkFeedForViewer(await fetchAssignedWorkFeed(branch, workDate), {
+  const [rawAssignedWorkFeed, shiftToday] = await Promise.all([fetchAssignedWorkFeed(branch, workDate), shiftPromise]);
+  const assignedWorkFeed = assignedWorkFeedForViewer(rawAssignedWorkFeed, {
     isAdmin: false,
     employeeCode
   });
@@ -50,25 +76,10 @@ export default async function HomePage() {
   // (ชุด activeDays เดียวกับที่ปฏิทินกิจกรรม /admin/calendar ใช้ → เชื่อมกันเสมอ)
   const weeklyEventIds = branch === "bangkae" ? weeklyEventsActiveOn(workDate).map((event) => event.id) : [];
 
-  // งานส่งของ: ออเดอร์ที่จ่ายเงินแล้วบนเว็บกิลด์ เด้งเข้ากะที่รับผิดชอบเอง
-  // (ก่อน 15:00 = กะปัจจุบัน · ตั้งแต่ 15:00 = กะปัจจุบัน + กะถัดไป)
-  // ออเดอร์ออนไลน์เป็นงานของสาขาส่งของสาขาเดียว (DELIVERY_BRANCH) — คนที่เข้ากะสาขาอื่นวันนี้ไม่เห็นบอร์ดนี้
-  const handlesDelivery = branch === DELIVERY_BRANCH;
-  const [deliveryAll, shiftToday] = await Promise.all([
-    handlesDelivery ? syncDeliveryTasks().catch(() => [] as DeliveryTask[]) : Promise.resolve([] as DeliveryTask[]),
-    staffCode ? fetchShiftForStaff(branch, workDate, staffCode) : Promise.resolve(null)
-  ]);
-  const deliveryTasks = sortDeliveryTasks(
-    deliveryAll.filter((task) =>
-      deliveryTaskVisibleTo(task, {
-        isAdmin: user.role === "admin",
-        staffCode: staffCode ?? null,
-        shiftToday,
-        today: workDate
-      })
-    ),
-    workDate
-  );
+  // คนที่ไม่ได้ดูแลงานส่งของ = 0 ทันที · คนที่ดูแล = ตัวเลขตามมาเมื่อ sync เสร็จ
+  const deliveryRemaining: number | Promise<number> = handlesDelivery
+    ? deliveryTasksPromise.then((tasks) => tasks.filter((task) => deliveryTaskState(task, workDate) !== "done").length)
+    : 0;
 
   return (
     <main className="page">
@@ -102,7 +113,7 @@ export default async function HomePage() {
         shift={shiftToday === "s1" || shiftToday === "s2" ? shiftToday : null}
         staffCode={staffCode ?? null}
         assignedRemaining={assignedWorkFeed.filter((item) => item.statusClass !== "workflow-status-green").length}
-        deliveryRemaining={deliveryTasks.filter((task) => deliveryTaskState(task, workDate) !== "done").length}
+        deliveryRemaining={deliveryRemaining}
       />
 
       {/* ออเดอร์ลูกค้าทุกช่องทาง + "ทำอะไร บันทึกที่ไหน" — จุดเริ่มเมื่อหาไม่เจอว่าต้องไปหน้าไหน */}
@@ -181,15 +192,35 @@ export default async function HomePage() {
       {handlesDelivery ? (
         <>
           <div id="delivery" />
-          <DeliveryOrdersBoard
-            branch={branch}
-            initialTasks={deliveryTasks}
-            initialToday={workDate}
-            initialShift={shiftToday}
-            canAct={!user.isImpersonating}
-          />
+          <Suspense fallback={null}>
+            <DeliveryBoardSection
+              branch={branch}
+              tasksPromise={deliveryTasksPromise}
+              workDate={workDate}
+              shiftToday={shiftToday}
+              canAct={!user.isImpersonating}
+            />
+          </Suspense>
         </>
       ) : null}
     </main>
   );
+}
+
+/** บอร์ดส่งของ — รอผล sync ใบงาน (มีการเขียน Firestore) แยกจากส่วนอื่นของหน้า */
+async function DeliveryBoardSection({
+  branch,
+  tasksPromise,
+  workDate,
+  shiftToday,
+  canAct
+}: {
+  branch: string;
+  tasksPromise: Promise<DeliveryTask[]>;
+  workDate: string;
+  shiftToday: Awaited<ReturnType<typeof fetchShiftForStaff>>;
+  canAct: boolean;
+}) {
+  const tasks = await tasksPromise;
+  return <DeliveryOrdersBoard branch={branch} initialTasks={tasks} initialToday={workDate} initialShift={shiftToday} canAct={canAct} />;
 }
