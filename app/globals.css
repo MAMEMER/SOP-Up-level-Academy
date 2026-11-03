@@ -113,6 +113,41 @@
   border: 1px solid #111827;
 }
 
+.performance-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.performance-table-toolbar > span {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-ink-soft, #475569);
+}
+
+.performance-csv-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  padding: 0 16px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.performance-csv-button:hover {
+  background: #111827;
+  color: #fff;
+}
+
 .performance-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -190,6 +190,67 @@ const DETAIL_HEADERS = [
   "หมายเหตุหรือหลักฐาน"
 ];
 
+// --- Selected-round export (client-side download button on the page) ----------------------
+// One row per employee, carrying exactly what the on-screen table shows for the active
+// date range: name, total score, the five category scores, and a one-cell deduction summary.
+// No salary / incentive figures, so it is safe for every admin (not owner-gated) and never
+// leaks phone numbers or addresses. Pure + testable like the rest of this module.
+
+// Matches the on-screen category grid order and labels (categoryLabels in PerformanceScoreView).
+// `camel` indexes row.categories; `snake` matches DeductionRecord.category.
+const SELECTED_ROUND_CATEGORIES: Array<{
+  camel: "attendance" | "stock" | "checklist" | "customerService" | "assignedWork";
+  snake: ScoreCategoryKey;
+  label: string;
+}> = [
+  { camel: "attendance", snake: "attendance", label: "เข้างาน" },
+  { camel: "stock", snake: "stock", label: "Stock" },
+  { camel: "checklist", snake: "checklist", label: "Checklist" },
+  { camel: "customerService", snake: "customer_service", label: "บริการลูกค้า" },
+  { camel: "assignedWork", snake: "assigned_work", label: "งานที่มอบหมาย" }
+];
+
+const SELECTED_ROUND_HEADERS = [
+  "พนักงาน",
+  "คะแนนรวม",
+  ...SELECTED_ROUND_CATEGORIES.map((category) => category.label),
+  "รายการปรับคะแนน"
+];
+
+/**
+ * The category score the page draws: start from the category ceiling and walk down by every
+ * deduction in that category (a credit is a negative deduction, so it walks back up). This is
+ * the uncapped ledger value the grid renders (buildCategoryLedgers), not the engine's upper-
+ * capped categories[x].score — identical except when owner credits exceed the ceiling, where
+ * we deliberately match what the owner sees on screen.
+ */
+function selectedRoundCategoryScore(
+  row: EmployeePerformanceScore,
+  camel: "attendance" | "stock" | "checklist" | "customerService" | "assignedWork",
+  snake: ScoreCategoryKey
+): number {
+  const maxScore = row.categories[camel].maxScore;
+  const points = row.deductions
+    .filter((deduction) => deduction.category === snake)
+    .reduce((sum, deduction) => sum + deduction.points, 0);
+  return Math.round((maxScore - points) * 100) / 100;
+}
+
+/**
+ * One row per employee for the currently selected date range, mirroring the on-screen table.
+ * Used by the client-side "ดาวน์โหลด CSV" button — read-only, no server round-trip, no money
+ * columns. Employees with no shifts this round show a blank total (the page shows "—").
+ */
+export function buildSelectedRoundCsv(rows: EmployeePerformanceScore[]): string {
+  const body = rows.map((row) => [
+    displayNameFor(row.employeeName),
+    row.hasData ? row.totalScore : "",
+    ...SELECTED_ROUND_CATEGORIES.map((category) => selectedRoundCategoryScore(row, category.camel, category.snake)),
+    deductionSummaryCell(row)
+  ]);
+  return toCsv([SELECTED_ROUND_HEADERS, ...body]);
+}
+
 export type CsvBuildContext = {
   /** the month the export is for, "YYYY-MM" */
   month: string;
