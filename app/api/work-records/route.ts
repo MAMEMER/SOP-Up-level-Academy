@@ -68,8 +68,11 @@ export async function GET(request: Request) {
     const to = params.get("to");
     if (!from || !to) return NextResponse.json({ error: "missing_range" }, { status: 400 });
 
-    const records = await listRecordsInRange(await ownerKeyFor(employeeEmail, params.get("owner")), from, to);
-    return NextResponse.json({ records, storageReady: true });
+    const ownerKey = await ownerKeyFor(employeeEmail, params.get("owner"));
+    const records = await listRecordsInRange(ownerKey, from, to);
+    // ownerKey lets the client key its unsaved-ticks backup per person, so a shared shop
+    // device never replays one staffer's pending ticks into another's record.
+    return NextResponse.json({ records, storageReady: true, ownerKey });
   } catch (error) {
     return NextResponse.json({ error: "read_failed", detail: String(error) }, { status: 500 });
   }

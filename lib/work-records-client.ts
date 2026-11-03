@@ -9,10 +9,12 @@ import type { WorkRecordDoc, WorkRecordOwner, WorkRecordScope } from "./work-rec
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error" | "read-only";
 
-async function readRecords(params: URLSearchParams): Promise<{ records: WorkRecordDoc[]; storageReady: boolean }> {
+async function readRecords(
+  params: URLSearchParams
+): Promise<{ records: WorkRecordDoc[]; storageReady: boolean; ownerKey?: string }> {
   const res = await fetch(`/api/work-records?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) return { records: [], storageReady: false };
-  return (await res.json()) as { records: WorkRecordDoc[]; storageReady: boolean };
+  return (await res.json()) as { records: WorkRecordDoc[]; storageReady: boolean; ownerKey?: string };
 }
 
 export async function fetchWorkRecordRange(
@@ -36,14 +38,63 @@ export async function saveWorkRecord(
   scope: WorkRecordScope,
   scopeKey: string,
   data: Record<string, unknown>,
-  owner: WorkRecordOwner = "me"
-) {
+  owner: WorkRecordOwner = "me",
+  options: { keepalive?: boolean } = {}
+): Promise<{ updatedAt?: string }> {
+  const body = JSON.stringify({ scope, scopeKey, owner, data });
   const res = await fetch("/api/work-records", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scope, scopeKey, owner, data })
+    body,
+    // keepalive lets a save started on pagehide / navigation finish after the page is gone
+    // (browsers cap in-flight keepalive bodies at 64KB, so only small payloads use it)
+    keepalive: Boolean(options.keepalive) && new TextEncoder().encode(body).length < 60_000
   });
   if (!res.ok) throw new Error(`save failed: ${res.status}`);
+  return ((await res.json().catch(() => ({}))) as { updatedAt?: string }) ?? {};
+}
+
+// ── Unsaved-changes backup ────────────────────────────────────────────────────────────
+// Ticks that haven't reached the server yet are mirrored to localStorage, keyed by the
+// record's owner + scope window, so closing the tab / losing signal / a crash doesn't drop
+// them. Each backup remembers the server version (`baseUpdatedAt`) it was built on; it is
+// replayed only if the server still holds exactly that version — if anything newer was
+// saved (another phone, or this save landed but the reply was lost) the backup is dropped
+// and the server copy wins.
+
+type PendingBackup = { data: Record<string, unknown>; baseUpdatedAt: string | null; savedAt: number };
+
+const PENDING_PREFIX = "sop:work-record-pending:v1";
+
+function pendingStorageKey(ownerKey: string, scope: WorkRecordScope, scopeKey: string) {
+  return `${PENDING_PREFIX}:${ownerKey}:${scope}:${scopeKey}`;
+}
+
+function readPendingBackup(key: string): PendingBackup | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingBackup;
+    return parsed && typeof parsed.data === "object" && parsed.data ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingBackup(key: string, backup: PendingBackup) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(backup));
+  } catch {
+    // storage full / disabled — the in-memory retry still runs
+  }
+}
+
+function clearPendingBackup(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
 }
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -89,19 +140,46 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
   // the previous/empty payload instead of the just-submitted one — the submit reached the
   // server only via the 700ms debounce, and a refresh before it fired reverted "ส่งแล้ว".
   const dataRef = useRef<T>(emptyRef.current);
+  // localStorage key for this window's unsaved backup (null until the owner is known) and
+  // the server version the current data is based on.
+  const backupKey = useRef<string | null>(null);
+  const serverUpdatedAt = useRef<string | null>(null);
+  const flushRef = useRef<(options?: { keepalive?: boolean }) => Promise<boolean>>(async () => true);
 
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
+    backupKey.current = null;
     fetchWorkRecordRange(scope, fromScopeKey || scopeKey, toScopeKey || scopeKey, { owner })
       .then((result) => {
         if (cancelled) return;
         setHistory(result.records);
         const current = result.records.find((record) => record.scopeKey === scopeKey);
-        const loadedData = (current?.data as T) ?? emptyRef.current;
+        let loadedData = (current?.data as T) ?? emptyRef.current;
+        serverUpdatedAt.current = current?.updatedAt ?? null;
+
+        let replay = false;
+        if (!readOnly && result.storageReady && result.ownerKey) {
+          const key = pendingStorageKey(result.ownerKey, scope, scopeKey);
+          backupKey.current = key;
+          const backup = readPendingBackup(key);
+          if (backup) {
+            if (backup.baseUpdatedAt === serverUpdatedAt.current && !pending.current) {
+              // never acknowledged and the server hasn't moved since → re-send it
+              loadedData = backup.data as T;
+              pending.current = loadedData;
+              replay = true;
+            } else if (backup.baseUpdatedAt !== serverUpdatedAt.current) {
+              // server has a newer version → it wins, the stale backup is dropped
+              clearPendingBackup(key);
+            }
+          }
+        }
+
         dataRef.current = loadedData;
         setData(loadedData);
         setLoaded(true);
+        if (replay) void flushRef.current();
       })
       .catch(() => {
         if (!cancelled) setLoaded(true);
@@ -109,28 +187,41 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
     return () => {
       cancelled = true;
     };
-  }, [scope, scopeKey, fromScopeKey, toScopeKey, owner]);
+  }, [scope, scopeKey, fromScopeKey, toScopeKey, owner, readOnly]);
 
   /**
    * บันทึกสิ่งที่ค้างอยู่ทันที คืน true เมื่อถึง server จริง. ลองใหม่อัตโนมัติเมื่อเน็ตสะดุด
    * และไม่ทิ้ง payload จนกว่าจะสำเร็จ — ผู้เรียกจึงเชื่อผลลัพธ์ได้ (ปุ่มส่งงานใช้ค่านี้
    * ตัดสินว่าจะบอกน้องว่า "ส่งแล้ว" หรือ "ยังไม่ถึงระบบ")
    */
-  const flush = useCallback(async (): Promise<boolean> => {
+  const flush = useCallback(async (options: { keepalive?: boolean } = {}): Promise<boolean> => {
     if (readOnly) return true;
     if (!pending.current) return true;
+    if (timer.current) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    const key = backupKey.current;
     setStatus("saving");
     for (let attempt = 0; ; attempt += 1) {
       const payload = pending.current;
       if (!payload) return true;
       try {
-        await saveWorkRecord(scope, scopeKey, payload, owner);
+        const result = await saveWorkRecord(scope, scopeKey, payload, owner, { keepalive: options.keepalive && attempt === 0 });
+        if (result.updatedAt) serverUpdatedAt.current = result.updatedAt;
         // มีการติ๊กใหม่ระหว่างกำลังส่ง → เก็บ payload ใหม่ไว้ให้รอบถัดไป
-        if (pending.current === payload) pending.current = null;
+        if (pending.current === payload) {
+          pending.current = null;
+          if (key) clearPendingBackup(key);
+        } else if (key && pending.current) {
+          // the newer ticks are now based on the version we just saved
+          writePendingBackup(key, { data: pending.current, baseUpdatedAt: serverUpdatedAt.current, savedAt: Date.now() });
+        }
         setStatus("saved");
         return true;
       } catch {
         if (attempt >= SAVE_RETRY_DELAYS_MS.length) {
+          // the backup stays in localStorage → replayed on the next load
           setStatus("error");
           return false;
         }
@@ -138,6 +229,10 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
       }
     }
   }, [scope, scopeKey, owner, readOnly]);
+
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
 
   const update = useCallback(
     (updater: (previous: T) => T) => {
@@ -150,24 +245,39 @@ export function useWorkRecordWindow<T extends Record<string, unknown>>(options: 
       setData(next);
       if (readOnly) return;
       pending.current = next;
+      if (backupKey.current) {
+        writePendingBackup(backupKey.current, { data: next, baseUpdatedAt: serverUpdatedAt.current, savedAt: Date.now() });
+      }
       if (timer.current) window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => {
+        timer.current = null;
         void flush();
       }, SAVE_DEBOUNCE_MS);
     },
     [flush, readOnly]
   );
 
-  // Don't lose the last few hundred ms of ticks when the tab is closed / backgrounded.
+  // Don't lose the last few hundred ms of ticks when the tab is closed / backgrounded, or
+  // when the staffer navigates to another page before the debounce fires: save right away
+  // instead of cancelling (the localStorage backup covers the case where even that fails).
   useEffect(() => {
     if (readOnly) return;
+    function flushNow() {
+      if (pending.current) void flush({ keepalive: true });
+    }
     function onHide() {
-      if (document.visibilityState === "hidden" && pending.current) void flush();
+      if (document.visibilityState === "hidden") flushNow();
     }
     document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flushNow);
     return () => {
       document.removeEventListener("visibilitychange", onHide);
-      if (timer.current) window.clearTimeout(timer.current);
+      window.removeEventListener("pagehide", flushNow);
+      if (timer.current) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+        flushNow();
+      }
     };
   }, [flush, readOnly]);
 
