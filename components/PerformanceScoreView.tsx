@@ -20,6 +20,8 @@ import {
   saveCustomerServiceRecord
 } from "../lib/performance-service-records.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
+import { PerformanceCsvButton } from "./PerformanceCsvButton.tsx";
+import { buildSelectedRoundCsv } from "../lib/performance-score-csv.ts";
 import { requireUser } from "../lib/auth.ts";
 import { isOwner } from "../lib/owner.ts";
 import { deleteScoreAdjustment, saveScoreAdjustment } from "../lib/score-adjustment-store.ts";
@@ -435,6 +437,11 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const customRules = dailyStore.kpiRules?.customRules || [];
   const serviceRecordsForDay = customerServiceRecordsForDate(dailyStore.serviceRecords, entryDate);
   const assignedRecordsForDay = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, entryDate);
+  // Read-only CSV of the on-screen table for the selected round. Built here from the same
+  // rows the table renders and handed to a client button that downloads it in the browser —
+  // no server round-trip, no money columns, no phone/address.
+  const selectedRoundCsv = buildSelectedRoundCsv(rows);
+  const selectedRoundCsvFilename = `performance-score_${activePeriod.startDate}_${activePeriod.endDate}.csv`;
 
   return (
     <main className="page performance-score-page">
@@ -674,6 +681,10 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
       {adjustStatusMessage ? <p className={`input-status ${adjustStatusMessage.tone}`}>{adjustStatusMessage.text}</p> : null}
 
       <section className="performance-score-table">
+        <div className="performance-table-toolbar">
+          <span>คะแนนรอบ {activePeriod.startDate} ถึง {activePeriod.endDate}</span>
+          <PerformanceCsvButton csv={selectedRoundCsv} filename={selectedRoundCsvFilename} />
+        </div>
         <div className="performance-table-head">
           <span>พนักงาน</span>
           <span>คะแนนรวม</span>

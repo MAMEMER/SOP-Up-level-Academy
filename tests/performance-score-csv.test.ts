@@ -4,6 +4,7 @@ import { calculateEmployeePerformanceScore } from "../lib/performance-score.ts";
 import {
   attendanceCounts,
   buildDetailCsv,
+  buildSelectedRoundCsv,
   buildSummaryCsv,
   describeDeduction,
   extractDate
@@ -81,6 +82,45 @@ describe("performance score CSV", () => {
     assert.ok(lines[1].includes(String(row.totalScore)));
     // วันทำงาน column present
     assert.ok(lines[1].includes(",2,"));
+  });
+
+  it("selected-round CSV mirrors the on-screen table: BOM, 8 columns, scores, no money", () => {
+    const row = sampleRow();
+    const csv = buildSelectedRoundCsv([row]);
+    assert.ok(csv.startsWith("﻿"), "starts with UTF-8 BOM");
+    const lines = csv.trim().split("\r\n");
+    assert.equal(lines.length, 2);
+    // header: พนักงาน, คะแนนรวม, 5 categories, รายการปรับคะแนน
+    assert.deepEqual(lines[0].split(",").slice(0, 7), [
+      "พนักงาน",
+      "คะแนนรวม",
+      "เข้างาน",
+      "Stock",
+      "Checklist",
+      "บริการลูกค้า",
+      "งานที่มอบหมาย"
+    ]);
+    assert.ok(lines[0].endsWith("รายการปรับคะแนน"));
+    // data row carries the name and the total score the page shows
+    const cells = lines[1].split(",");
+    assert.equal(cells[0], "Boom");
+    assert.equal(Number(cells[1]), row.totalScore);
+    // attendance category score matches the on-screen ledger (ceiling minus its deductions)
+    const attendancePoints = row.deductions
+      .filter((deduction) => deduction.category === "attendance")
+      .reduce((sum, deduction) => sum + deduction.points, 0);
+    assert.equal(Number(cells[2]), Math.round((row.categories.attendance.maxScore - attendancePoints) * 100) / 100);
+    // no salary / incentive figures leaked into the sheet
+    assert.ok(!csv.includes("หักเงิน"));
+    assert.ok(!csv.includes("อินเซนทีฟ"));
+  });
+
+  it("selected-round CSV leaves the total blank for an employee with no shifts this round", () => {
+    const row = sampleRow();
+    const noData = { ...row, hasData: false };
+    const csv = buildSelectedRoundCsv([noData]);
+    const cells = csv.trim().split("\r\n")[1].split(",");
+    assert.equal(cells[1], "");
   });
 
   it("detail CSV points reconcile with the points the person lost in the summary", () => {
