@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { isCronOrAdmin } from "../../../../lib/cron-auth.ts";
 import { FieldValue } from "firebase-admin/firestore";
-import { verifySession } from "../../../../lib/session-jwt.ts";
-import { sopUserForEmail } from "../../../../lib/sop-users.ts";
-import { SOP_SESSION_COOKIE } from "../../../../lib/auth-session.ts";
 import { hasStoreHubCreds } from "../../../../lib/storehub-api.ts";
 import { adminDb, hasAdminCredentials } from "../../../../lib/firebase-admin.ts";
 import { branchConfigs } from "../../../../lib/store-config.ts";
@@ -55,16 +52,7 @@ async function sh<T>(path: string): Promise<T> {
 }
 
 async function isAllowed(request: Request): Promise<boolean> {
-  const url = new URL(request.url);
-  const secret = process.env.CRON_SECRET;
-  if (secret && url.searchParams.get("key") === secret) return true;
-  // Vercel Cron sends this header automatically when CRON_SECRET is set.
-  if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
-  const cookie = (await cookies()).get(SOP_SESSION_COOKIE)?.value;
-  if (!cookie) return false;
-  const session = await verifySession(cookie);
-  const user = session ? sopUserForEmail(session.email) : undefined;
-  return user?.role === "admin";
+  return isCronOrAdmin(request);
 }
 
 export async function GET(request: Request) {
