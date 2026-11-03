@@ -15,7 +15,7 @@ import {
   submitAssignment,
   type WorkAssignment
 } from "../lib/work-assignments-store.ts";
-import { CircleCheck, MapPin } from "lucide-react";
+import { CircleCheck, Clock, Hand, MapPin, NotebookPen, UserRound } from "lucide-react";
 
 function nowIso() {
   return new Date().toISOString();
@@ -235,18 +235,18 @@ export function AssignmentDetail({
       </section>
 
       <p className="assignment-detail__responsibility">
-        🙋 งานนี้เป็น<strong>ความรับผิดชอบของ {displayNameFor(record.staffCode)}</strong> — ทำให้เสร็จตามกำหนด แล้วส่งงานพร้อมหลักฐาน
+        <Hand className="ui-inline-icon" size={14} aria-hidden="true" /> งานนี้เป็น<strong>ความรับผิดชอบของ {displayNameFor(record.staffCode)}</strong> — ทำให้เสร็จตามกำหนด แล้วส่งงานพร้อมหลักฐาน
       </p>
 
       <section className="assignment-detail__brief soft-card">
         <p className="assign-work__label">สรุปงานที่ต้องทำ</p>
         <dl className="assignment-detail__spec">
           <div>
-            <dt>👤 หน้าที่ใคร</dt>
+            <dt><UserRound className="ui-inline-icon" size={14} aria-hidden="true" /> หน้าที่ใคร</dt>
             <dd>{displayNameFor(record.staffCode)}</dd>
           </div>
           <div>
-            <dt>📝 ต้องทำอะไร</dt>
+            <dt><NotebookPen className="ui-inline-icon" size={14} aria-hidden="true" /> ต้องทำอะไร</dt>
             <dd>
               <strong>{record.title}</strong>
               {record.detail ? <span style={{ whiteSpace: "pre-wrap" }}>{"\n"}{record.detail}</span> : null}
@@ -265,7 +265,7 @@ export function AssignmentDetail({
             </div>
           ) : null}
           <div>
-            <dt>⏰ เสร็จเมื่อไหร่</dt>
+            <dt><Clock className="ui-inline-icon" size={14} aria-hidden="true" /> เสร็จเมื่อไหร่</dt>
             <dd>{record.workDate}{record.dueTime ? ` ภายใน ${record.dueTime} น.` : ""}</dd>
           </div>
         </dl>

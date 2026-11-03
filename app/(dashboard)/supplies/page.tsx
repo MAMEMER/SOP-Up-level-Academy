@@ -94,7 +94,7 @@ export default async function SuppliesPage() {
   return (
     <main className="page">
       <Link href="/" className="back-link">
-        ← กลับหน้าหลัก
+        ← กลับ Dashboard
       </Link>
       <section className="board-hero">
         <div>

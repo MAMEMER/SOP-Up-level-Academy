@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+// Grand Opening ran 17–18 Oct 2026. The site-wide banner stops after the last day
+// (end of 18 Oct, Bangkok time) so it no longer eats the top of every page.
+export const GRAND_OPENING_BANNER_END = Date.parse("2026-10-18T23:59:59+07:00");
+export function grandOpeningBannerActive(now: number = Date.now()) {
+  return now <= GRAND_OPENING_BANNER_END;
+}
+
 export const openingCategories = ["หน้าบ้าน/สถานที่", "หลังบ้าน/ของรางวัล", "ระบบ", "ทีมงาน"] as const;
 export const openingDays = ["17", "18", "ทั้งสองวัน"] as const;
 const quantity = z.number().finite().min(0).max(1000000).nullable();

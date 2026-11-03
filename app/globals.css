@@ -7537,11 +7537,19 @@ main .page > section, main > section { margin-top: 16px !important; }
 }
 
 /* [6] inputs under 16px → iOS Safari zooms the page on focus.
-   The admin shift-planner grid is excluded: its cells are 40px wide by design. */
+   The shift-planner grid gets 16px too (10.5px made iPhone zoom on every cell tap); its
+   cells widen instead and the grid keeps scrolling inside .shift-planner__scroll. */
 @media (max-width: 860px), (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
   select, textarea { font-size: 16px !important; }
-  .shift-planner input, .shift-planner select { font-size: 11px !important; }
+  .shift-planner .shift-planner__grid .shift-planner__day,
+  .shift-planner .shift-planner__grid .shift-planner__cell,
+  .shift-planner .shift-planner__grid .shift-planner__event-cell { min-width: 96px; }
+  /* the "ตามจริง" select sits beside a 24px swap button */
+  .shift-planner .shift-planner__grid .shift-planner__cell { min-width: 124px; }
+  .shift-planner .shift-planner__grid .shift-planner__cell select,
+  .shift-planner .shift-planner__grid .shift-planner__actual-sel,
+  .shift-planner .shift-planner__grid .shift-planner__event-cell input { width: 90px; min-height: 36px; }
 }
 
 /* [8] micro text on staff phones: shift times 10px, event notes 9px, supply meta 11px */
@@ -8770,6 +8778,8 @@ p.ab-help{padding-left:0}
 .go-checklist .go-filters { top: 104px; }
 .go-checklist .go-item-panel { scroll-margin-top: 280px; }
 .go-category-toggle > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Phones: banner scrolls away with the page instead of pinning ~100px of the screen. */
+@media (max-width: 759px) { .opening-announcement { position: static; } }
 @media (min-width: 760px) { .opening-announcement strong { flex: 1; } .go-checklist .go-filters { top: 72px; } .go-checklist .go-item-panel { scroll-margin-top: 200px; } }
 
 .app-shell > .opening-announcement { max-width: 1120px; margin: 0 auto; }
@@ -9437,3 +9447,60 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .sop-error-digest { font-size: 12px !important; color: var(--color-ink-soft); }
 @keyframes sop-skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .sop-skeleton { animation: none; } }
+
+/* ======================================================================
+   Mobile UI fixes (2026-11) — overflow, tap targets, FAB clearance
+   ====================================================================== */
+
+/* Raw URLs in step/guide text: render as a short "เปิดลิงก์" button (LinkifiedText);
+   any other long unbroken string still wraps instead of running past its box. */
+.wi-step-section li, .item-guide-note, .item-guide, .tick-row, .tick-group { overflow-wrap: anywhere; min-width: 0; }
+.inline-open-link {
+  display: inline-flex; align-items: center; gap: 4px; vertical-align: middle;
+  min-height: 32px; padding: 2px 10px; margin: 2px 0; border-radius: 999px;
+  border: 1px solid rgba(29, 78, 216, 0.22); background: rgba(239, 246, 255, 0.8);
+  color: #1d4ed8; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.inline-open-link:hover { background: rgba(219, 234, 254, 0.9); }
+
+/* /admin/staff: grid children and fields may shrink below their content (a long <option>
+   label was pushing the page to 691px at 390). */
+.staff-form__grid { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+.staff-form__grid > * { min-width: 0; }
+.staff-form__grid input:not([type="checkbox"]), .staff-form__grid select { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.staff-form__grid small { overflow-wrap: anywhere; }
+
+/* /admin/performance-score: only the ledger table scrolls sideways, never the page. */
+.performance-score-row > *, .performance-detail, .performance-ledger, .performance-ledger-cat { min-width: 0; }
+.performance-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.performance-leave-list span { max-width: 100%; overflow-wrap: anywhere; }
+
+@media (max-width: 759px) {
+  /* Keep the last row of every page clear of the floating help button
+     (44px button + 16px offset + breathing room + home indicator). */
+  .app-shell .workspace,
+  .app-shell.is-impersonating .workspace { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+
+  .staff-form__grid { grid-template-columns: 1fr; }
+  .staff-form__delete { min-height: 44px; padding: 0 4px; display: inline-flex; align-items: center; }
+
+  .performance-period-shortcuts a { min-height: 44px; }
+
+  /* Inline text links on the home parcel card were 20px tall. */
+  .parcel-board__hint a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 4px; vertical-align: middle; }
+
+  .admin-dir__search input { align-self: stretch; min-height: 44px !important; }
+  .admin-dir__search button { width: 44px; height: 44px; }
+
+  .hero-actions .btn-soft { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding-inline: 18px; }
+
+  .delivery-board__filter, .parcel-board__receive, .parcel-board__new { min-height: 44px; }
+  .inline-open-link { min-height: 44px; }
+  .assign-work__empty a { display: inline-flex; align-items: center; min-height: 44px; }
+
+  .performance-period-form input, .performance-period-form select,
+  .performance-input-form input, .performance-input-form select,
+  .performance-adjust-form input, .performance-adjust-form select { min-height: 44px; }
+
+  .shift-planner__auto-btn, .shift-planner__density button { min-height: 44px; min-width: 44px; }
+}

@@ -70,3 +70,10 @@ test("quantity +/- clamps bounds and activity feed labels all collaboration acti
   }
   assert.equal(openingRelativeTime("2026-10-14T00:00:00Z", Date.parse("2026-10-14T00:02:00Z")), "2 นาทีที่แล้ว");
 });
+
+test("Grand Opening banner hides after 18 Oct 2026 (Bangkok)", async () => {
+  const { grandOpeningBannerActive } = await import("../lib/grand-opening-checklist.ts");
+  assert.equal(grandOpeningBannerActive(Date.parse("2026-10-18T23:00:00+07:00")), true);
+  assert.equal(grandOpeningBannerActive(Date.parse("2026-10-19T00:00:00+07:00")), false);
+  assert.equal(grandOpeningBannerActive(Date.parse("2026-11-03T12:00:00+07:00")), false);
+});
