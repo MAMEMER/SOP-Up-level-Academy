@@ -130,6 +130,49 @@ const productDisplaySteps = [
   }
 ];
 
+// POS layout ของการ์ดเดี่ยวใน StoreHub (หน้าตา POS) — คู่มืออ้างอิง ไม่ผูก checklist/KPI
+const singleCardLayoutPlans = [
+  { src: "/training/pos-single-card-layout.jpg", alt: "แผนผังหน้า POS การ์ดเดี่ยว 3 แท็บ · PKM เดี่ยว · PKM ชุดเก่า · Lorcana เดี่ยว" }
+];
+
+const singleCardLayoutSteps = [
+  {
+    title: "หลักการวางช่อง",
+    tasks: [
+      "1 ช่อง = 1 ชุด (สินค้าหลักของชุด) กดแล้ว POS เด้งรายชื่อการ์ดในชุดให้เลือก สต็อกตัดรายใบเอง",
+      "ห้ามลากการ์ดทีละใบลงหน้า POS — การ์ดมีหลายพันใบ ให้เลือกผ่านช่องชุดหรือช่องค้นหาแทน",
+      "หน้าละ 5 คอลัมน์ ไม่เกิน 5 แถวต่อแท็บ เรียงชุดใหม่ไว้ก่อนเสมอ",
+      "ช่อง Single card แบบกดรวม วางไว้มุมล่างขวาสุดของแท็บเท่านั้น"
+    ]
+  },
+  {
+    title: "แท็บ PKM เดี่ยว",
+    tasks: [
+      "แถว 1 เทรนเนอร์: ซัพพอร์ต · ไอเทม · Tool · สเตเดียม · Ace Spec",
+      "แถว 2: พลังงาน แล้วต่อด้วยชุด MA จากใหม่ไปเก่า (MA5 → MA1)",
+      "ถัดไป: ชุด SV จากใหม่ไปเก่า (SV11s → SV4a)",
+      "มุมล่างขวา: Single card Pokemon"
+    ]
+  },
+  {
+    title: "แท็บ PKM ชุดเก่า และ Lorcana เดี่ยว",
+    tasks: [
+      "PKM ชุดเก่า: SV4K · SV4M · SV3a · SV2a · SV2P · SV2D · SV1a · SV1S · SV1V",
+      "Lorcana เดี่ยว: ชุดใหม่ไปเก่า S14 → S1 · มุมล่างขวา Single card Lorcana"
+    ]
+  },
+  {
+    title: "เมื่อมีชุดใหม่",
+    tasks: [
+      "ค้นใน StoreHub ก่อนว่ามีสินค้าหลักของชุดแล้วหรือยัง ถ้ายังไม่มีให้สร้างก่อน (กันสร้างซ้ำ)",
+      "เปิด BackOffice → ตั้งค่า → หน้าตา POS → เลือกสาขา → เลือกแท็บ",
+      "ลากสินค้าหลักของชุดจากรายการด้านซ้ายมาวางเป็นช่องแรกของกลุ่ม แล้วเลื่อนชุดอื่นถอยไป",
+      "ชุดที่ล้นแท็บ PKM เดี่ยว ให้ย้ายไปแท็บ PKM ชุดเก่า",
+      "ใส่รูปซองหรือโลโก้ชุดให้สินค้าหลักใน BackOffice เพื่อให้ช่องบนจอดูง่าย"
+    ]
+  }
+];
+
 export function TrainingView({ branch }: { branch: string }) {
   // The manual text is owner-editable at /admin/manual-config; the code below is the
   // fallback that ships with the app. Fetched client-side, same as the checklist config.
@@ -173,7 +216,10 @@ export function TrainingView({ branch }: { branch: string }) {
     },
     {
       title: "การจัดร้าน",
-      items: [{ id: "product-display", code: "WI-D1", title: "คู่มือการจัดเรียงสินค้า (Planogram)", time: "ทุกครั้งที่เติมของหรือของเข้าใหม่" }]
+      items: [
+        { id: "product-display", code: "WI-D1", title: "คู่มือการจัดเรียงสินค้า (Planogram)", time: "ทุกครั้งที่เติมของหรือของเข้าใหม่" },
+        { id: "single-card-layout", code: "WI-D2", title: "คู่มือการจัดการ lay out Single card", time: "ทุกครั้งที่มีชุดใหม่ หรือแก้หน้า POS" }
+      ]
     },
     {
       title: "กิจกรรมประจำสัปดาห์",
@@ -543,6 +589,71 @@ export function TrainingView({ branch }: { branch: string }) {
               <div>
                 <h4>สิ่งที่ต้องระวัง</h4>
                 <p>ห้ามวางลังสต็อกที่มีสติกเกอร์ขนส่งไว้หน้าร้าน ห้ามแปะป้ายกระดาษบนกล่องลัง ให้ใส่กรอบอะคริลิกเสมอ</p>
+              </div>
+            </section>
+          </div>
+        </article>
+
+        <article id="single-card-layout" hidden={openId !== "single-card-layout"} className="training-card wi-manual phase-stock">
+          <div className="workflow-card-head">
+            <span className="phase-icon">SC</span>
+            <div>
+              <p className="eyebrow">WI-D2 · ทุกครั้งที่มีชุดใหม่ หรือแก้หน้า POS</p>
+              <h3>คู่มือการจัดการ lay out Single card</h3>
+            </div>
+          </div>
+
+          <div className="wi-plan-gallery">
+            {singleCardLayoutPlans.map((plan) => (
+              <figure key={plan.src} className="wi-figure wi-plan">
+                <a className="wi-image-link" href={plan.src} target="_blank" rel="noreferrer">
+                  <img src={plan.src} alt={plan.alt} loading="lazy" />
+                </a>
+                <figcaption>{plan.alt} · กดดูรูปตัวอย่างเต็ม</figcaption>
+              </figure>
+            ))}
+          </div>
+
+          <div className="wi-content">
+            <section className="wi-summary-grid">
+              <div>
+                <h4>วัตถุประสงค์</h4>
+                <p>จัดหน้า POS การ์ดเดี่ยวให้พนักงานลงการ์ดได้ทีละใบอย่างรวดเร็ว และสต็อกการ์ดเดี่ยวในระบบตัดตรงกับของจริง</p>
+              </div>
+              <div>
+                <h4>ขอบเขต / เวลา</h4>
+                <p>StoreHub BackOffice · ตั้งค่า → หน้าตา POS · ทุกครั้งที่มีชุดใหม่ สร้างสินค้าหลักชุดใหม่ หรือย้ายชุดเก่าออกจากหน้าแรก</p>
+              </div>
+            </section>
+
+            <section>
+              <h4>ขั้นตอนการปฏิบัติงาน</h4>
+              <div className="wi-step-list">
+                {singleCardLayoutSteps.map((section, sectionIndex) => (
+                  <div key={section.title} className="wi-step-section">
+                    <strong>{sectionIndex + 1}. {section.title}</strong>
+                    <ol>
+                      {section.tasks.map((task) => (
+                        <li key={task}>{task}</li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="wi-summary-grid">
+              <div>
+                <h4>จุดตรวจหลังจัดเสร็จ</h4>
+                <ul>
+                  <li>ทุกชุดที่มีการ์ดในสต็อกมีช่องบนหน้า POS และไม่มีชุดซ้ำ</li>
+                  <li>ลองกดช่องชุดที่เครื่อง POS แล้วเห็นรายชื่อการ์ดเด้งขึ้นมา</li>
+                  <li>ช่อง Single card แบบกดรวมอยู่มุมล่างขวาสุดของแท็บ</li>
+                </ul>
+              </div>
+              <div>
+                <h4>สิ่งที่ต้องระวัง</h4>
+                <p>ห้ามวางช่อง Single card แบบกดรวมเป็นช่องหลัก เพราะขายแล้วสต็อกการ์ดใบนั้นไม่ลด · บางแคยังนับการ์ดเทรนเนอร์แยกตามชุด จนกว่าจะนับสต็อกบางแคใหม่</p>
               </div>
             </section>
           </div>
