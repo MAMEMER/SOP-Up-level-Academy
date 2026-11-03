@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import type { Role } from "./permissions.ts";
@@ -43,22 +44,26 @@ function toCurrentUser(uid: string, sopUser: SopUser, actual: SopUser): CurrentU
 // session cookie (jose HS256). Here we verify that session and map the email to a role
 // via the SOP allow-list (sop-users.ts). When no SESSION_SECRET is configured (local
 // dev), fall back to a preview admin so the app runs with `npm run dev` and no login.
-export async function requireUser(): Promise<CurrentUser> {
-  // pulls the /admin/staff list into sopUsers + employeeDirectory before anything reads them
-  await ensureStaffLoaded();
+// Wrapped in React cache() so the layout + page (+ nested server components) of one
+// request share a single lookup instead of each re-reading cookies and the staff list.
+export const requireUser = cache(async (): Promise<CurrentUser> => {
   const jar = await cookies();
 
-  const actual: SopUser | undefined = hasSessionSecret()
-    ? await (async () => {
-        const cookie = jar.get(SOP_SESSION_COOKIE)?.value;
-        if (!cookie) redirect("/login");
-        const session = await verifySession(cookie);
-        if (!session) redirect("/login");
-        const sopUser = sopUserForEmail(session.email);
-        if (!sopUser) redirect("/login?denied=1");
-        return sopUser;
-      })()
-    : sopUserForEmail("champ.championest@gmail.com");
+  let actual: SopUser | undefined;
+  if (hasSessionSecret()) {
+    // Cookie + signature first — a logged-out request never touches Firestore.
+    const cookie = jar.get(SOP_SESSION_COOKIE)?.value;
+    if (!cookie) redirect("/login");
+    const session = await verifySession(cookie);
+    if (!session) redirect("/login");
+    // pulls the /admin/staff list into sopUsers + employeeDirectory before anything reads them
+    await ensureStaffLoaded();
+    actual = sopUserForEmail(session.email);
+    if (!actual) redirect("/login?denied=1");
+  } else {
+    await ensureStaffLoaded();
+    actual = sopUserForEmail("champ.championest@gmail.com");
+  }
 
   if (!actual) redirect("/login?denied=1");
 
@@ -72,7 +77,7 @@ export async function requireUser(): Promise<CurrentUser> {
   }
 
   return toCurrentUser(uid, actual, actual);
-}
+});
 
 /** The signed-in account, ignoring any impersonation — for audit fields and view-as guards. */
 export async function requireActualUser(): Promise<SopUser> {

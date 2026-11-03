@@ -45,14 +45,33 @@ export function TodaySummary({
   staffCode: string | null;
   /** งานที่เจ้าของมอบหมาย + งานส่งต่อ ที่ยังไม่ปิด (นับฝั่ง server แล้ว) */
   assignedRemaining: number;
-  /** ออเดอร์ส่งของที่ยังไม่ส่ง */
-  deliveryRemaining: number;
+  /** ออเดอร์ส่งของที่ยังไม่ส่ง — เป็น promise ได้ (server ยัง sync ใบงานอยู่ ระหว่างนั้นแสดง "…") */
+  deliveryRemaining: number | Promise<number>;
 }) {
   const { records } = useWorkflowRecords();
   const { phases: shiftPhases, offDay } = useShiftPhases(phases, staffCode, branch, workDate);
 
   const [tasks, setTasks] = useState<{ remaining: number; total: number } | null>(null);
   const [projectsDue, setProjectsDue] = useState<number | null>(null);
+  const [deliveryCount, setDeliveryCount] = useState<number | null>(
+    typeof deliveryRemaining === "number" ? deliveryRemaining : null
+  );
+
+  useEffect(() => {
+    if (typeof deliveryRemaining === "number") {
+      setDeliveryCount(deliveryRemaining);
+      return;
+    }
+    let alive = true;
+    setDeliveryCount(null);
+    deliveryRemaining.then(
+      (count) => alive && setDeliveryCount(count),
+      () => alive && setDeliveryCount(0)
+    );
+    return () => {
+      alive = false;
+    };
+  }, [deliveryRemaining]);
 
   useEffect(() => {
     let alive = true;
@@ -136,7 +155,7 @@ export function TodaySummary({
       label: "ออเดอร์ที่ต้องส่งวันนี้",
       href: "#delivery",
       icon: PackageCheck,
-      remaining: deliveryRemaining,
+      remaining: deliveryCount,
       doneText: "ส่งครบแล้ว"
     }
   ];
