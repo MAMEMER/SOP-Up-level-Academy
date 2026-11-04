@@ -85,6 +85,7 @@ export const adminSections: SiteSection[] = [
     links: [
       { href: "/admin/performance-score", label: "คะแนนพนักงาน", detail: "KPI 5 หมวด · incentive · เหตุผลที่หักรายวัน", keywords: "kpi เงินเดือน" },
       { href: "/admin/stock-check", label: "ลงผลนับ Stock", detail: "ผลนับของวันนั้น ตรง / ไม่ตรง / ไม่ได้นับ (มีผลกับคะแนน)", keywords: "สต็อก" },
+      { href: "/admin/skill-review", label: "ประเมิน skill รายสัปดาห์ (ทดสอบ)", detail: "ลงผล 15 ตัวชี้วัดทุกวันจันทร์ · วันทำงาน · ข้อเสนอขึ้น/ลดระดับ (ไม่ผูก KPI)", keywords: "skill ทักษะ career path ระดับ ประเมิน" },
       { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach", keywords: "audit" },
       { href: "/admin/payroll", label: "เงินเดือนพนักงาน", detail: "ประจำ / พาร์ทไทม์ · หักตามคะแนน · OT · ปรับบวก-ลบพร้อมเหตุผล", ownerOnly: true, keywords: "payroll เงินเดือน ค่าแรง ot โอที" },
       { href: "/admin/man-hours", label: "ภาระงานพนักงาน (man-hour)", detail: "แต่ละงานใช้กี่นาที · ทำครบแล้วว่างไหม หนักไหม รายคน/รายวัน", ownerOnly: true, keywords: "man hour ชั่วโมงงาน เวลาว่าง งานหนัก workload" },
