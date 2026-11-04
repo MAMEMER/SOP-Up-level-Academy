@@ -30,6 +30,9 @@ import type { DeductionRecord, ScoreCategoryKey } from "../lib/performance-score
 import { fetchAttendanceSource } from "../lib/planner-kpi.ts";
 import { displayNameFor, employeeDirectory } from "../lib/employee-directory.ts";
 import { fetchPerformanceDailyStore } from "../lib/performance-daily-store.ts";
+import { fetchSkillLevels } from "../lib/skill-review-store.ts";
+import { buildSkillStatus } from "../lib/skill-status.ts";
+import { StaffSkillStatus } from "./StaffSkillStatus.tsx";
 
 type PageProps = {
   searchParams?: Promise<{ period?: string; startDate?: string; endDate?: string; source?: string; inputStatus?: string }>;
@@ -422,6 +425,12 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
       ? getPerformanceScoreRowsForRange(activePeriod, dailyStore, attendance, checklistKpi.submittedDays, checklistKpi.lateSubmissions)
       : getPerformanceScoreRows(activePeriod.id, dailyStore, attendance, checklistKpi.submittedDays, checklistKpi.lateSubmissions);
   const summary = getPerformanceSummary(rows);
+  // ระดับ skill ที่ยืนยันแล้ว (อ่านอย่างเดียว ไม่เข้าคะแนน) — โหลดไม่ได้ก็แสดงเป็นยังไม่ได้ประเมิน หน้าไม่พัง
+  const skillStatusByStaff = new Map(
+    await Promise.all(
+      rows.map(async (row) => [row.employeeName, buildSkillStatus(await fetchSkillLevels(row.employeeName).catch(() => undefined))] as const)
+    )
+  );
   const activeSourceDetail = getPerformanceSourceDetail(params.source || "");
   const redirectTo = `${basePath}?startDate=${activePeriod.startDate}&endDate=${activePeriod.endDate}${params.source ? `&source=${params.source}` : ""}`;
   const inputStatus = params.inputStatus;
@@ -694,6 +703,7 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
         </div>
         {rows.map((row) => {
           const ledgers = buildCategoryLedgers(row);
+          const skill = skillStatusByStaff.get(row.employeeName);
           return (
           <article key={row.employeeName} className="performance-score-row">
             <div>
@@ -729,6 +739,15 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                 ลาป่วย {row.leaveSummary.sickUsed}/{row.leaveSummary.sickAllowance} · ลากิจ {row.leaveSummary.personalUsed}/{row.leaveSummary.personalAllowance}
               </small>
             </div>
+            {skill ? (
+              <details className="performance-detail performance-skill-detail">
+                <summary>
+                  สเตตัส Hard / Soft skill
+                  {skill.hasData ? ` · Hard ${skill.hard.average.toFixed(1)} · Soft ${skill.soft.average.toFixed(1)}` : " · ยังไม่ได้ประเมิน"}
+                </summary>
+                <StaffSkillStatus staffCode={row.employeeName} status={skill} />
+              </details>
+            ) : null}
             <details className="performance-detail">
               <summary>ดู score ledger รายหมวด (คะแนนจริงตามรายการ)</summary>
               {row.leaveSummary.records.length ? (

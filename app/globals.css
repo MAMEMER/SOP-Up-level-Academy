@@ -9819,3 +9819,43 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
   .skill-review__choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .skill-review__note { flex-direction: column; align-items: stretch; }
 }
+
+/* สเตตัส Hard / Soft skill ในหน้า performance-score */
+.skill-status { --skill-hard: #2F80ED; --skill-hard-ink: #1F63C4; --skill-soft: #E8742A; --skill-soft-ink: #B85614; margin-top: 12px; font-family: var(--guild-font); color: var(--color-ink, #2d3142); }
+.skill-status__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.skill-status__group { min-width: 0; padding: 4px 20px 8px; }
+.skill-status__group + .skill-status__group { border-left: 1px solid #ece4d6; }
+.skill-status__group--hard { --tone: var(--skill-hard); --tone-ink: var(--skill-hard-ink); }
+.skill-status__group--soft { --tone: var(--skill-soft); --tone-ink: var(--skill-soft-ink); }
+.skill-status__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.skill-status__head h4 { margin: 0; font-size: 22px; font-weight: 700; color: var(--tone-ink); }
+.skill-status__head h4 small { font-size: 14px; font-weight: 400; color: var(--color-ink-soft, #5c5d7a); margin-left: 4px; }
+.skill-status__avg { font-size: 14px; color: var(--color-ink-soft, #5c5d7a); }
+.skill-status__avg strong { font-size: 22px; color: var(--color-ink, #2d3142); }
+.skill-status__radar { display: block; width: 100%; max-width: 440px; height: auto; margin: 4px auto 8px; }
+.skill-status__ring { fill: rgba(255, 255, 255, 0.85); stroke: #cfd5e3; stroke-width: 1; }
+.skill-status__ring:last-of-type { fill: #fbfaf7; }
+.skill-status__axis { stroke: #dfe3ec; stroke-width: 1; }
+.skill-status__tick { font-size: 10px; fill: #8a8ba3; }
+.skill-status__area { fill: var(--tone); fill-opacity: 0.16; stroke: var(--tone); stroke-width: 2.5; stroke-linejoin: round; }
+.skill-status__dot { fill: var(--tone); stroke: #fff; stroke-width: 2; }
+.skill-status__label { font-size: 13px; font-weight: 600; fill: var(--color-ink, #2d3142); font-family: var(--guild-font); }
+.skill-status__bars { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.skill-status__bars li { display: grid; grid-template-columns: 22px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 6px; align-items: end; }
+.skill-status__level { grid-row: 1 / 3; font-size: 20px; line-height: 1; align-self: end; color: var(--color-ink, #2d3142); }
+.skill-status__name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.skill-status__meter { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; margin-top: 4px; }
+.skill-status__meter i { height: 8px; border-radius: 3px; background: #e6eaf2; }
+.skill-status__meter i.is-on { background: var(--tone); }
+.skill-status__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 14px 0 0; padding-top: 10px; border-top: 1px solid #ece4d6; font-size: 13px; color: var(--color-ink-soft, #5c5d7a); }
+.skill-status__legend strong { color: var(--color-ink, #2d3142); }
+.skill-status__empty { margin: 0 0 8px; font-size: 14px; color: var(--color-ink-soft, #5c5d7a); }
+.skill-status__empty a { color: var(--color-orange-deep, #B85614); font-weight: 600; }
+@media (max-width: 760px) {
+  .skill-status__grid { grid-template-columns: 1fr; }
+  .skill-status__group { padding: 4px 0 12px; }
+  .skill-status__group + .skill-status__group { border-left: 0; border-top: 1px solid #ece4d6; padding-top: 16px; }
+  .skill-status__bars { grid-template-columns: 1fr; gap: 10px; }
+  .skill-status__label { font-size: 15px; }
+  .skill-status__radar { overflow: visible; }
+}
