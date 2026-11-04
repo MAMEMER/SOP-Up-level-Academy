@@ -9259,6 +9259,50 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .tb-ping__note { font-size: 12.5px; color: var(--color-ink-soft); }
 .mp-root .tb-ping textarea { width: 100%; min-height: 60px; font: inherit; font-size: 16px; padding: 10px 12px; border: 1px solid var(--mp-line-strong); border-radius: 12px; background: #fff; color: var(--color-ink); resize: vertical; }
 
+/* ---- บอร์ดทีม · ปฏิทินรายเดือน ---- */
+.tc { display: grid; gap: 10px; }
+.tc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mp-root .tc-nav { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--mp-line-strong); border-radius: 12px; background: transparent; color: var(--color-ink); cursor: pointer; box-shadow: none; padding: 0; }
+.tc-month { margin: 0 4px; font-size: 19px; min-width: 9em; text-align: center; }
+.tc-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 1px solid var(--mp-line-strong); border-radius: 12px; font-size: 14px; cursor: pointer; }
+.tc-toggle input { width: 18px; height: 18px; accent-color: var(--mp-blue); }
+.tc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--color-ink-soft); }
+.tc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--mp-line-strong); border-radius: 14px; overflow: hidden; background: #fff; }
+.tc-wd { padding: 6px 0; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--color-ink-soft); background: var(--mp-paper); border-bottom: 1px solid var(--mp-line-strong); }
+.mp-root .tc-cell { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-height: 56px; min-width: 0; padding: 5px 4px 6px; border: 0; border-right: 1px solid var(--mp-line); border-bottom: 1px solid var(--mp-line); background: #fff; color: var(--color-ink); font: inherit; text-align: left; cursor: pointer; box-shadow: none; border-radius: 0; }
+.mp-root .tc-cell:nth-child(7n) { border-right: 0; }
+.mp-root .tc-cell.is-weekend { background: #fbf8f4; }
+.mp-root .tc-cell.is-out { background: transparent; color: var(--color-ink-soft); opacity: 0.55; }
+.mp-root .tc-cell.is-selected { box-shadow: inset 0 0 0 2px var(--mp-blue); }
+.mp-root .tc-cell:focus-visible { outline: 2px solid var(--mp-blue); outline-offset: -2px; }
+.tc-num { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; align-self: flex-start; min-width: 24px; height: 24px; display: grid; place-items: center; border-radius: 999px; }
+.tc-cell.is-today .tc-num { background: var(--mp-blue); color: #fff; }
+.tc-dots { display: flex; gap: 3px; padding-left: 4px; min-height: 7px; }
+.tc-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--mp-line-strong); flex: none; }
+.tc-dot.is-start { background: var(--mp-blue); }
+.tc-dot.is-due { background: var(--mp-amber); }
+.tc-dot.is-due.is-late { background: var(--mp-red); }
+.tc-dot.is-shop { background: #a39a8f; }
+.tc-items { display: none; }
+.tc-chip { display: block; font-size: 11.5px; line-height: 1.35; padding: 1px 5px; border-radius: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-chip.is-start { background: var(--mp-blue-soft); color: var(--mp-blue); }
+.tc-chip.is-due { background: var(--mp-amber-soft); color: var(--mp-amber); font-weight: 600; }
+.tc-chip.is-due.is-late { background: var(--mp-red-soft); color: var(--mp-red); }
+.tc-chip.is-shop { background: #f1ede8; color: #6b6259; }
+.tc-chip.is-special { background: #efe4ff; color: #6a3fb5; font-weight: 600; }
+.tc-more { font-size: 11.5px; color: var(--color-ink-soft); padding-left: 5px; }
+@media (min-width: 760px) {
+  .mp-root .tc-cell { min-height: 104px; }
+  .tc-dots { display: none; }
+  .tc-items { display: grid; gap: 2px; }
+}
+.tc-day { display: grid; gap: 8px; padding-top: 6px; }
+.tc-day__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.tc-day__head h3 { margin: 0; font-size: 17px; }
+.tc-day__btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.tb-ev.is-shop { color: #6b6259; background: #faf7f3; }
+.tb-ev.is-special { color: #6a3fb5; }
+
 /* ---- home ---- */
 .mp-today { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); border-top: 1px solid var(--mp-line); }
 @media (min-width: 760px) { .mp-today { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
