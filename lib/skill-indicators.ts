@@ -225,6 +225,9 @@ export function skillIndicatorById(id: string): SkillIndicator | undefined {
   return skillIndicators.find((indicator) => indicator.id === id);
 }
 
+/** ทุกคนเริ่มที่ระดับนี้เท่ากันทุกตัวชี้วัด (ตัวที่ยังไม่เคยตั้งระดับ = ระดับนี้) และไม่ลดต่ำกว่านี้ */
+export const SKILL_START_LEVEL = 1;
+
 /** Hard skill ขึ้นได้ถึงระดับ 4, Soft skill สูงสุดระดับ 3 */
 export function maxLevelFor(indicator: SkillIndicator): number {
   return indicator.group === "hard" ? 4 : 3;
