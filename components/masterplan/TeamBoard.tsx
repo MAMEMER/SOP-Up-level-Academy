@@ -6,7 +6,6 @@ import {
   BellRing,
   CalendarDays,
   Check,
-  Flag,
   KanbanSquare,
   Pencil,
   Play,
@@ -16,10 +15,11 @@ import {
   X,
 } from "lucide-react";
 import { MASTERPLAN_MEMBERS, memberName } from "../../lib/masterplan-access.ts";
+import type { BoardEvent } from "../../lib/activity-board.ts";
+import { TeamCalendar } from "./TeamCalendar.tsx";
 import { mpApi, useLocalDraft } from "../../lib/masterplan-client.ts";
 import {
   COLUMN_LABEL,
-  agenda,
   isPlanned,
   personLoad,
   shiftDate,
@@ -67,7 +67,6 @@ const LANE_LABEL: Record<Lane, string> = {
   planned: "วางแผนไว้",
   ...COLUMN_LABEL,
 };
-const TH_DAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 
 function shortDate(ymd: string): string {
   const [, m, d] = ymd.split("-").map(Number);
@@ -83,10 +82,12 @@ type Toast = { message: string; undo?: () => Promise<void> };
 
 export function TeamBoard({
   initialCards,
+  shopEvents,
   me,
   today,
 }: {
   initialCards: BoardCard[];
+  shopEvents: BoardEvent[];
   me: string;
   today: string;
 }) {
@@ -331,12 +332,23 @@ export function TeamBoard({
           className="tb-view"
           onClick={() => setView("calendar")}
         >
-          <CalendarDays size={16} aria-hidden="true" /> ปฏิทิน 4 สัปดาห์
+          <CalendarDays size={16} aria-hidden="true" /> ปฏิทิน
         </button>
       </div>
 
       {view === "calendar" ? (
-        <Agenda cards={shown} today={today} me={me} />
+        <TeamCalendar
+          cards={shown}
+          shopEvents={shopEvents}
+          today={today}
+          me={me}
+          onPick={(date, field) => {
+            setDraft({ ...draft, [field]: date, ...(field === "start" && draft.due && draft.due < date ? { due: "" } : {}) });
+            const input = document.getElementById("tb-new-title");
+            input?.scrollIntoView({ behavior: "smooth", block: "center" });
+            input?.focus({ preventScroll: true });
+          }}
+        />
       ) : null}
 
       {view === "board" ? (
@@ -742,74 +754,6 @@ function maxDate(a: string, b: string): string {
   return a > b ? a : b;
 }
 
-function Agenda({
-  cards,
-  today,
-  me,
-}: {
-  cards: BoardCard[];
-  today: string;
-  me: string;
-}) {
-  const days = agenda(cards, today);
-  if (days.length === 0)
-    return (
-      <p className="tb-empty">
-        4 สัปดาห์ข้างหน้ายังไม่มีงานที่ลงวันเริ่มหรือวันส่งไว้
-      </p>
-    );
-  return (
-    <ol className="tb-agenda">
-      {days.map(({ date, items }) => {
-        const d = new Date(`${date}T00:00:00Z`);
-        const rel =
-          date === today
-            ? "วันนี้"
-            : date === shiftDate(today, 1)
-              ? "พรุ่งนี้"
-              : "";
-        return (
-          <li
-            key={date}
-            className={`tb-day${date === today ? " is-today" : ""}`}
-          >
-            <div className="tb-day__date">
-              <span>{TH_DAYS[d.getUTCDay()]}</span>
-              <b>{d.getUTCDate()}</b>
-              <span>{TH_MONTHS[d.getUTCMonth()]}</span>
-              {rel ? <em>{rel}</em> : null}
-            </div>
-            <ul className="tb-day__items">
-              {items.map(({ kind, card }) => (
-                <li
-                  key={kind + card.id}
-                  className={`tb-ev is-${kind}${card.owner === me ? " is-mine" : ""}`}
-                >
-                  {kind === "start" ? (
-                    <Play size={14} aria-hidden="true" />
-                  ) : (
-                    <Flag size={14} aria-hidden="true" />
-                  )}
-                  <span className="tb-ev__kind">
-                    {kind === "start"
-                      ? "เริ่มหยิบ"
-                      : card.due < today
-                        ? "เลยกำหนด"
-                        : "ส่ง"}
-                  </span>
-                  <span className="tb-ev__title">{card.title}</span>
-                  <span className={`tb-owner${card.owner ? "" : " is-none"}`}>
-                    {card.owner ? memberName(card.owner) : "ยังไม่มีคนรับ"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
 
 function PingForm({
   card,
