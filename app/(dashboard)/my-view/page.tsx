@@ -16,6 +16,9 @@ import { cardStoreWorkflow } from "../../../lib/card-store-workflow.ts";
 import { resolveStaffViewSelection } from "../../../lib/staff-view.ts";
 import { StaffDocsBanner } from "../../../components/StaffDocsBanner.tsx";
 import { StaffScoreCard } from "../../../components/StaffScoreCard.tsx";
+import { StaffSkillStatus } from "../../../components/StaffSkillStatus.tsx";
+import { fetchSkillLevels } from "../../../lib/skill-review-store.ts";
+import { buildSkillStatus } from "../../../lib/skill-status.ts";
 import { MyShiftToday } from "../../../components/MyShiftToday.tsx";
 import { MyAssignedWork } from "../../../components/MyAssignedWork.tsx";
 import { TaskInbox } from "../../../components/TaskInbox.tsx";
@@ -81,6 +84,8 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
   const rows = getPerformanceScoreRows(period.id, dailyStore, attendance, checklistKpi.submittedDays, checklistKpi.lateSubmissions);
   const row = rows.find((item) => item.employeeName === selectedCode);
+  // สเตตัส skill ของตัวเอง (อ่านอย่างเดียว ไม่เข้าคะแนน) — โหลดไม่ได้ = ระดับเริ่มต้น
+  const skillStatus = buildSkillStatus(await fetchSkillLevels(selectedCode).catch(() => undefined));
 
   const assignedWorkRecords = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, workDate).filter(
     (record) => record.employeeName === selectedCode || record.employeeName === teamRecordName(branch)
@@ -135,6 +140,10 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
       {/* คะแนน = ข้อมูลสรุป ไม่ใช่งานที่ต้องทำ — อยู่ล่างสุดตามใบงาน */}
       {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
+      <section className="staff-score staff-skill-status" aria-label="สเตตัส skill ของฉัน">
+        <p className="eyebrow">สเตตัส skill ของฉัน</p>
+        <StaffSkillStatus staffCode={selectedCode} status={skillStatus} showReviewLink={false} />
+      </section>
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
       <DashboardTaskSections

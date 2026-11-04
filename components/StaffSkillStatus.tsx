@@ -91,12 +91,27 @@ function SkillGroupPanel({ group }: { group: SkillStatusGroup }) {
   );
 }
 
-export function StaffSkillStatus({ staffCode, status }: { staffCode: string; status: ReturnType<typeof buildSkillStatus> }) {
+export function StaffSkillStatus({
+  staffCode,
+  status,
+  showReviewLink = true
+}: {
+  staffCode: string;
+  status: ReturnType<typeof buildSkillStatus>;
+  /** ลิงก์ไปหน้าประเมิน = แอดมินเท่านั้น; หน้าพนักงานปิดไว้ */
+  showReviewLink?: boolean;
+}) {
   return (
     <div className="skill-status">
       {status.hasData ? null : (
         <p className="skill-status__empty">
-          ยังไม่ได้ประเมิน ทุกตัวชี้วัดอยู่ที่ระดับเริ่มต้น 1 — <Link href={`/admin/skill-review?staff=${encodeURIComponent(staffCode)}`}>ไปประเมิน skill</Link>
+          ยังไม่ได้ประเมิน ทุกตัวชี้วัดอยู่ที่ระดับเริ่มต้น 1
+          {showReviewLink ? (
+            <>
+              {" — "}
+              <Link href={`/admin/skill-review?staff=${encodeURIComponent(staffCode)}`}>ไปประเมิน skill</Link>
+            </>
+          ) : null}
         </p>
       )}
       <div className="skill-status__grid">
