@@ -9774,7 +9774,48 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .skill-review__levels button { grid-column: 1 / -1; }
 .skill-review__levels select,
 .skill-review__levels input { min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(45, 49, 66, 0.15); font: inherit; font-size: 16px; background: #fff; }
+.skill-review__tabs { margin: 14px 0 6px; }
+.skill-review__tabs a { touch-action: manipulation; }
+/* แท็บคู่มือประเมิน */
+.skill-guide__jump { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 6px 0 4px; padding-bottom: 2px; }
+.skill-guide__jump::-webkit-scrollbar { display: none; }
+.skill-guide__jump a { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.7); color: var(--color-ink-soft); font-size: 13.5px; text-decoration: none; touch-action: manipulation; }
+.skill-guide [id^="guide-"] { scroll-margin-top: 16px; }
+.skill-guide__steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 20px; counter-reset: guide-step; }
+.skill-guide__steps li { display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.5; padding-top: 8px; border-top: 2px solid #e2c27a; }
+.skill-guide__steps strong { font-size: 15.5px; }
+.skill-guide__steps span { color: var(--color-ink-soft); }
+.skill-guide__rows { margin: 16px 0 0; }
+.skill-guide__rows > div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 4px 16px; padding: 10px 0; border-bottom: 1px solid rgba(45, 49, 66, 0.1); font-size: 14px; line-height: 1.55; }
+.skill-guide__rows dt { font-weight: 600; }
+.skill-guide__rows dd { margin: 0; }
+.skill-guide__result { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 13.5px; }
+.skill-guide__result.is-next { background: #ddf3e4; color: #17663a; }
+.skill-guide__result.is-hold { background: #e5eefb; color: #2459a8; }
+.skill-guide__result.is-below { background: #fde3e3; color: #b42318; }
+.skill-guide__result.is-na { background: #eeeeee; color: #374151; }
+.skill-guide__badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 6px; font-size: 13px; font-weight: 600; background: #dbe8fb; color: #1b4f9c; }
+.skill-guide__badge.is-l2 { background: #a9c8f5; color: #123d7a; }
+.skill-guide__badge.is-l3 { background: #2f80ed; color: #fff; }
+.skill-guide__badge.is-l4 { background: #1b4f9c; color: #fff; }
+.skill-guide__group.is-soft .skill-guide__badge.is-l2 { background: #f8cfae; color: #7a3208; }
+.skill-guide__group.is-soft .skill-guide__badge.is-l3 { background: #e0701f; color: #fff; }
+.skill-guide__muted { color: var(--color-ink-soft); }
+.skill-guide__note { margin: 14px 0 0; padding: 10px 14px; border-left: 3px solid #e2c27a; background: #fff6e6; border-radius: 0 10px 10px 0; font-size: 14px; line-height: 1.55; }
+.skill-guide__sub { margin: 20px 0 6px; font-size: 16px; }
+.skill-guide__list { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6; }
+.skill-guide__list li + li { margin-top: 4px; }
+.skill-guide__promote { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 24px; margin-top: 8px; }
+.skill-guide__promote > div { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 2px solid #2f80ed; }
+.skill-guide__group.is-hard .eyebrow { color: #2f6fd1; }
+.skill-guide__group.is-soft .eyebrow { color: #c2560f; }
+.skill-guide__indicators { list-style: none; margin: 0; padding: 0; }
+.skill-guide__indicators li { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; border-bottom: 1px solid rgba(45, 49, 66, 0.1); }
+.skill-guide__indicators strong { font-size: 15.5px; }
+.skill-guide__indicators p { margin: 0; display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.55; }
+.skill-guide__indicators p .skill-guide__badge { flex: none; margin-top: 1px; }
 @media (max-width: 520px) {
+  .skill-guide__rows > div { grid-template-columns: minmax(0, 1fr); }
   .skill-review__choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .skill-review__note { flex-direction: column; align-items: stretch; }
 }
