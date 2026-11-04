@@ -4,131 +4,150 @@ import {
   addDays,
   evaluateSkill,
   mondayOf,
+  periodStartOf,
+  periodWorkDays,
   reviewDeadline,
-  reviewWeekFor,
-  weekWorkDays,
+  reviewPeriodFor,
   type SkillWeekEntry,
   type SkillWeekResult
 } from "../lib/skill-progress.ts";
 import { confirmSkillResult, mergeSkillReview, setSkillLevel, skillEntriesFor } from "../lib/skill-reviews.ts";
 import { skillIndicators } from "../lib/skill-indicators.ts";
 
-const START = "2026-09-07"; // วันจันทร์
+const START = "2026-08-31"; // วันเริ่มรอบ (ตรงกับ PERIOD_ANCHOR 2026-10-26 ย้อนไป 4 รอบ)
 
-/** ผลต่อเนื่องรายสัปดาห์ เริ่มจาก START */
-function weeks(results: SkillWeekResult[], extra: Partial<SkillWeekEntry> = {}): SkillWeekEntry[] {
-  return results.map((result, index) => ({ weekStart: addDays(START, index * 7), result, ...extra }));
+/** ผลต่อเนื่องรายรอบ (ทุก 2 สัปดาห์) เริ่มจาก START */
+function rounds(results: SkillWeekResult[], extra: Partial<SkillWeekEntry> = {}): SkillWeekEntry[] {
+  return results.map((result, index) => ({ weekStart: addDays(START, index * 14), result, ...extra }));
 }
 
-function lastWeek(entries: SkillWeekEntry[]) {
+function lastRound(entries: SkillWeekEntry[]) {
   return entries[entries.length - 1].weekStart;
 }
 
 const base = { highRisk: false, maxLevel: 4 };
 
-describe("week helpers", () => {
-  it("finds the Monday of any day and the week to review", () => {
-    assert.equal(mondayOf("2026-11-04"), "2026-11-02"); // พุธ → จันทร์
-    assert.equal(mondayOf("2026-11-08"), "2026-11-02"); // อาทิตย์ → จันทร์ก่อนหน้า
-    assert.equal(mondayOf("2026-11-02"), "2026-11-02");
-    assert.equal(reviewWeekFor("2026-11-02"), "2026-10-26");
+describe("period helpers (ประเมินทุก 2 สัปดาห์)", () => {
+  it("finds the Monday, the start of the 2-week round, and the round to review", () => {
+    assert.equal(mondayOf("2026-11-04"), "2026-11-02");
+    assert.equal(periodStartOf("2026-10-26"), "2026-10-26");
+    assert.equal(periodStartOf("2026-11-04"), "2026-10-26"); // สัปดาห์ที่ 2 ของรอบ
+    assert.equal(periodStartOf("2026-11-08"), "2026-10-26"); // อาทิตย์สุดท้ายของรอบ
+    assert.equal(periodStartOf("2026-11-09"), "2026-11-09");
+    assert.equal(periodStartOf("2026-10-25"), "2026-10-12");
+    assert.equal(reviewPeriodFor("2026-11-09"), "2026-10-26");
+    assert.equal(reviewPeriodFor("2026-11-17"), "2026-10-26");
   });
 
-  it("deadline is the Wednesday after the reviewed week (within 3 days of Monday)", () => {
-    assert.equal(reviewDeadline("2026-10-26"), "2026-11-04");
+  it("deadline is the Wednesday after the 2-week round (within 3 days of Monday)", () => {
+    assert.equal(reviewDeadline("2026-10-26"), "2026-11-11");
   });
 
-  it("counts work days as rostered ∩ clocked in, within the week only", () => {
+  it("counts work days as rostered ∩ clocked in, across both weeks of the round only", () => {
     const schedules = [
       { employeeName: "ICE", workDate: "2026-10-26" },
-      { employeeName: "ICE", workDate: "2026-10-27" },
-      { employeeName: "ICE", workDate: "2026-11-02" }, // สัปดาห์ถัดไป
+      { employeeName: "ICE", workDate: "2026-11-03" }, // สัปดาห์ที่ 2 ของรอบ
+      { employeeName: "ICE", workDate: "2026-11-09" }, // รอบถัดไป
       { employeeName: "Leo", workDate: "2026-10-26" }
     ];
-    const clock = [{ employeeName: "ICE", workDate: "2026-10-26" }, { employeeName: "ICE", workDate: "2026-11-02" }];
-    assert.deepEqual(weekWorkDays("2026-10-26", "ICE", schedules, clock), { planned: 2, worked: 1 });
+    const clock = [
+      { employeeName: "ICE", workDate: "2026-10-26" },
+      { employeeName: "ICE", workDate: "2026-11-03" },
+      { employeeName: "ICE", workDate: "2026-11-09" }
+    ];
+    assert.deepEqual(periodWorkDays("2026-10-26", "ICE", schedules, clock), { planned: 2, worked: 2 });
   });
 });
 
 describe("evaluateSkill — ขึ้นระดับ", () => {
-  it("level 1 → 2 needs 4 'next' within the last 6 weeks", () => {
-    const three = weeks(["next", "hold", "next", "next"]);
-    assert.equal(evaluateSkill({ ...base, entries: three, level: 1, asOf: lastWeek(three) }).suggestion.kind, "none");
-    const four = weeks(["next", "hold", "next", "next", "hold", "next"]);
-    const result = evaluateSkill({ ...base, entries: four, level: 1, asOf: lastWeek(four) });
+  it("level 1 → 2 needs 2 'next' rounds within the last 3 rounds (6 weeks)", () => {
+    const one = rounds(["next", "hold"]);
+    assert.equal(evaluateSkill({ ...base, entries: one, level: 1, asOf: lastRound(one) }).suggestion.kind, "none");
+    const two = rounds(["next", "hold", "next"]);
+    const result = evaluateSkill({ ...base, entries: two, level: 1, asOf: lastRound(two) });
     assert.equal(result.suggestion.kind, "promote");
-    assert.equal(result.have, 4);
-  });
-
-  it("weeks older than the 6-week window do not count", () => {
-    const entries = weeks(["next", "next", "hold", "hold", "hold", "hold", "next", "next"]);
-    assert.equal(evaluateSkill({ ...base, entries, level: 1, asOf: lastWeek(entries) }).suggestion.kind, "none");
-  });
-
-  it("high-risk needs 4 consecutive confirmed weeks; 'na' does not break the run", () => {
-    const risky = { highRisk: true, maxLevel: 4 };
-    const unconfirmed = weeks(["next", "next", "next", "next"]);
-    assert.equal(evaluateSkill({ ...risky, entries: unconfirmed, level: 1, asOf: lastWeek(unconfirmed) }).suggestion.kind, "none");
-
-    const withGap = weeks(["next", "na", "next", "next", "next"], { confirmed: true });
-    assert.equal(evaluateSkill({ ...risky, entries: withGap, level: 1, asOf: lastWeek(withGap) }).suggestion.kind, "promote");
-
-    const broken = weeks(["next", "next", "hold", "next", "next"], { confirmed: true });
-    const result = evaluateSkill({ ...risky, entries: broken, level: 1, asOf: lastWeek(broken) });
-    assert.equal(result.suggestion.kind, "none");
     assert.equal(result.have, 2);
   });
 
-  it("only weeks since the current level started are counted", () => {
-    const entries = weeks(["next", "next", "next", "next", "hold"]);
-    const since = addDays(START, 7 * 3);
-    assert.equal(evaluateSkill({ ...base, entries, level: 1, levelSince: since, asOf: lastWeek(entries) }).suggestion.kind, "none");
+  it("rounds older than the 3-round window do not count", () => {
+    const entries = rounds(["next", "hold", "hold", "next"]);
+    assert.equal(evaluateSkill({ ...base, entries, level: 1, asOf: lastRound(entries) }).suggestion.kind, "none");
   });
 
-  it("level 2 → 3 needs 8 of 10, ≥ 4 weeks at level, and no serious error in 8 weeks", () => {
-    const eight = weeks(["next", "next", "hold", "next", "next", "next", "next", "hold", "next", "next"]);
-    assert.equal(evaluateSkill({ ...base, entries: eight, level: 2, levelSince: START, asOf: lastWeek(eight) }).suggestion.kind, "promote");
+  it("high-risk needs 2 consecutive confirmed rounds; 'na' does not break the run", () => {
+    const risky = { highRisk: true, maxLevel: 4 };
+    const unconfirmed = rounds(["next", "next"]);
+    assert.equal(evaluateSkill({ ...risky, entries: unconfirmed, level: 1, asOf: lastRound(unconfirmed) }).suggestion.kind, "none");
 
-    const serious = eight.map((entry, index) => (index === 3 ? { ...entry, serious: true } : entry));
-    assert.equal(evaluateSkill({ ...base, entries: serious, level: 2, levelSince: START, asOf: lastWeek(serious) }).suggestion.kind, "none");
+    const withGap = rounds(["next", "na", "next"], { confirmed: true });
+    assert.equal(evaluateSkill({ ...risky, entries: withGap, level: 1, asOf: lastRound(withGap) }).suggestion.kind, "promote");
+
+    const broken = rounds(["next", "next", "hold", "next"], { confirmed: true });
+    const result = evaluateSkill({ ...risky, entries: broken, level: 1, asOf: lastRound(broken) });
+    assert.equal(result.suggestion.kind, "none");
+    assert.equal(result.have, 1);
+  });
+
+  it("only rounds since the current level started are counted", () => {
+    const entries = rounds(["next", "next", "hold"]);
+    const since = addDays(START, 14 * 2 + 3); // กลางรอบที่ 3
+    assert.equal(evaluateSkill({ ...base, entries, level: 1, levelSince: since, asOf: lastRound(entries) }).suggestion.kind, "none");
+  });
+
+  it("level 2 → 3 needs 4 of 5 rounds, ≥ 2 rounds at level, and no serious error in 4 rounds", () => {
+    const four = rounds(["next", "next", "hold", "next", "next"]);
+    assert.equal(evaluateSkill({ ...base, entries: four, level: 2, levelSince: START, asOf: lastRound(four) }).suggestion.kind, "promote");
+
+    const serious = four.map((entry, index) => (index === 3 ? { ...entry, serious: true } : entry));
+    assert.equal(evaluateSkill({ ...base, entries: serious, level: 2, levelSince: START, asOf: lastRound(serious) }).suggestion.kind, "none");
+  });
+
+  it("level 3 → 4 needs 6 rounds (12 weeks) at level 3", () => {
+    const five = rounds(["hold", "hold", "hold", "hold", "hold"]);
+    assert.equal(evaluateSkill({ ...base, entries: five, level: 3, levelSince: START, asOf: lastRound(five) }).suggestion.kind, "none");
+    const six = rounds(["hold", "hold", "hold", "hold", "hold", "hold"]);
+    assert.equal(evaluateSkill({ ...base, entries: six, level: 3, levelSince: START, asOf: lastRound(six) }).suggestion.kind, "promote");
   });
 
   it("soft skills stop at level 3", () => {
-    const entries = weeks(["next"]);
-    const result = evaluateSkill({ entries, level: 3, highRisk: false, maxLevel: 3, asOf: lastWeek(entries) });
+    const entries = rounds(["next"]);
+    const result = evaluateSkill({ entries, level: 3, highRisk: false, maxLevel: 3, asOf: lastRound(entries) });
     assert.equal(result.target, null);
   });
 });
 
 describe("evaluateSkill — ลด / ทบทวน / ระงับ", () => {
-  it("2 consecutive 'below' → demote (na in between still consecutive)", () => {
-    const entries = weeks(["hold", "below", "na", "below"]);
-    assert.equal(evaluateSkill({ ...base, entries, level: 2, asOf: lastWeek(entries) }).suggestion.kind, "demote");
+  it("2 consecutive 'below' rounds → demote (na in between still consecutive)", () => {
+    const entries = rounds(["hold", "below", "na", "below"]);
+    assert.equal(evaluateSkill({ ...base, entries, level: 2, asOf: lastRound(entries) }).suggestion.kind, "demote");
   });
 
-  it("3 'below' within 6 weeks → demote", () => {
-    const entries = weeks(["below", "hold", "below", "hold", "below", "hold"]);
-    assert.equal(evaluateSkill({ ...base, entries, level: 2, asOf: lastWeek(entries) }).suggestion.kind, "demote");
+  it("2 'below' within the last 3 rounds → demote; 1 does not", () => {
+    const entries = rounds(["below", "hold", "below"]);
+    assert.equal(evaluateSkill({ ...base, entries, level: 2, asOf: lastRound(entries) }).suggestion.kind, "demote");
+    const once = rounds(["below", "hold", "hold", "below"]);
+    assert.equal(evaluateSkill({ ...base, entries: once, level: 2, asOf: lastRound(once) }).suggestion.kind, "none");
   });
 
-  it("more than 4 weeks of 'na' → needs review", () => {
-    const entries = weeks(["hold", "na", "na", "na", "na", "na"]);
-    assert.equal(evaluateSkill({ ...base, entries, level: 2, asOf: lastWeek(entries) }).suggestion.kind, "review");
-    const four = weeks(["hold", "na", "na", "na", "na"]);
-    assert.equal(evaluateSkill({ ...base, entries: four, level: 2, asOf: lastWeek(four) }).suggestion.kind, "none");
+  it("more than 2 rounds (4 weeks) of 'na' → needs review", () => {
+    const entries = rounds(["hold", "na", "na", "na"]);
+    assert.equal(evaluateSkill({ ...base, entries, level: 2, asOf: lastRound(entries) }).suggestion.kind, "review");
+    const two = rounds(["hold", "na", "na"]);
+    assert.equal(evaluateSkill({ ...base, entries: two, level: 2, asOf: lastRound(two) }).suggestion.kind, "none");
   });
 
-  it("a serious error this week → suspend, ahead of everything else", () => {
-    const entries = weeks(["next", "next", "next", "next"]);
-    entries[3] = { ...entries[3], serious: true };
-    assert.equal(evaluateSkill({ ...base, entries, level: 1, asOf: lastWeek(entries) }).suggestion.kind, "suspend");
+  it("a serious error this round → suspend, ahead of everything else", () => {
+    const entries = rounds(["next", "next"]);
+    entries[1] = { ...entries[1], serious: true };
+    assert.equal(evaluateSkill({ ...base, entries, level: 1, asOf: lastRound(entries) }).suggestion.kind, "suspend");
   });
 
   it("level 0 is never demoted", () => {
-    const entries = weeks(["below", "below"]);
-    assert.notEqual(evaluateSkill({ ...base, entries, level: 0, asOf: lastWeek(entries) }).suggestion.kind, "demote");
+    const entries = rounds(["below", "below"]);
+    assert.notEqual(evaluateSkill({ ...base, entries, level: 0, asOf: lastRound(entries) }).suggestion.kind, "demote");
   });
 });
+
 
 describe("skill review records", () => {
   const at = "2026-11-02T03:00:00.000Z";

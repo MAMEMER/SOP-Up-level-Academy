@@ -9,11 +9,11 @@ import { fetchAttendanceSource } from "../../../../lib/planner-kpi.ts";
 import { careerStages, maxLevelFor, skillIndicators, type SkillIndicator } from "../../../../lib/skill-indicators.ts";
 import {
   evaluateSkill,
-  mondayOf,
+  periodStartOf,
   reviewDeadline,
-  reviewWeekFor,
+  reviewPeriodFor,
   skillResultOptions,
-  weekWorkDays,
+  periodWorkDays,
   addDays
 } from "../../../../lib/skill-progress.ts";
 import {
@@ -34,7 +34,7 @@ import {
 } from "../../../../lib/skill-review-store.ts";
 import { SkillReviewGuide } from "../../../../components/SkillReviewGuide.tsx";
 
-// หน้าทดสอบระบบประเมิน skill รายสัปดาห์ — เห็นเฉพาะแอดมิน. แยกจาก KPI/เงินเดือนทั้งหมด:
+// หน้าทดสอบระบบประเมิน skill ทุก 2 สัปดาห์ — เห็นเฉพาะแอดมิน. `week` ใน URL/ข้อมูล = วันจันทร์แรกของรอบ. แยกจาก KPI/เงินเดือนทั้งหมด:
 // ไม่มีอะไรในหน้านี้ส่งผลกับคะแนน performance-score.
 
 type PageProps = {
@@ -92,7 +92,7 @@ async function saveReviewAction(formData: FormData) {
   const week = stringValue(formData, "week");
   const staff = stringValue(formData, "staff");
   const user = await requireWriter(week, staff);
-  if (!isDateValue(week) || mondayOf(week) !== week || !knownStaff(staff)) back(week, staff, "error");
+  if (!isDateValue(week) || periodStartOf(week) !== week || !knownStaff(staff)) back(week, staff, "error");
 
   const rows: SkillResultInput[] = [];
   for (const indicator of skillIndicators) {
@@ -110,7 +110,7 @@ async function saveReviewAction(formData: FormData) {
 
   try {
     const attendance = await fetchAttendanceSource().catch(() => null);
-    const workDays = attendance ? weekWorkDays(week, staff, attendance.schedules, attendance.clockEvents) : undefined;
+    const workDays = attendance ? periodWorkDays(week, staff, attendance.schedules, attendance.clockEvents) : undefined;
     const existing = (await fetchSkillReviewsForWeek(week)).find((record) => record.staffCode === staff);
     const record = mergeSkillReview(existing, {
       weekStart: week,
@@ -186,7 +186,7 @@ async function setLevelsAction(formData: FormData) {
 }
 
 const statusMessages: Record<string, { tone: "success" | "warning"; text: string }> = {
-  saved: { tone: "success", text: "บันทึกผลสัปดาห์นี้แล้ว" },
+  saved: { tone: "success", text: "บันทึกผลรอบนี้แล้ว" },
   confirmed: { tone: "success", text: "ยืนยันผลตัวเสี่ยงสูงแล้ว" },
   levels_saved: { tone: "success", text: "บันทึกระดับแล้ว (เก็บประวัติไว้ทุกครั้ง)" },
   denied: { tone: "warning", text: "ไม่มีสิทธิ์แก้ไข (ต้องเป็นแอดมิน และไม่ได้อยู่ในโหมดดูแทนพนักงาน)" },
@@ -218,7 +218,7 @@ function targetCriteria(indicator: SkillIndicator, target: number | null) {
   if (target === 1) {
     return indicator.group === "hard"
       ? "ระดับ 1: ทำได้เมื่อมีผู้ถือระดับ 3 อยู่ด้วย · เรียนครบ + สอบความรู้ผ่าน ≥ 80%"
-      : "ระดับ 1: ผู้ประเมินเห็นพฤติกรรมระดับ 1 อย่างน้อย 1 สัปดาห์";
+      : "ระดับ 1: ผู้ประเมินเห็นพฤติกรรมระดับ 1 อย่างน้อย 1 รอบ";
   }
   if (target === 2) return `ระดับ 2: ${indicator.criteria.l2}`;
   if (target === 3) return `ระดับ 3: ${indicator.criteria.l3}`;
@@ -239,7 +239,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
           <div>
             <p className="eyebrow">คู่มือพัฒนาพนักงาน</p>
             <h2>วิธีเพิ่มระดับ skill และวิธีประเมิน</h2>
-            <p>ใช้คู่กับภาพ &quot;เส้นทางเลื่อนขั้น 4 ขั้น&quot; · Hard skill 7 ตัวชี้วัด · Soft skill 8 ตัวชี้วัด · ประเมินภาพรวมทุกสัปดาห์</p>
+            <p>ใช้คู่กับภาพ &quot;เส้นทางเลื่อนขั้น 4 ขั้น&quot; · Hard skill 7 ตัวชี้วัด · Soft skill 8 ตัวชี้วัด · ประเมินภาพรวมทุก 2 สัปดาห์</p>
           </div>
         </section>
         <SkillReviewTabs
@@ -253,7 +253,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
   }
 
   const today = formatWorkDate();
-  const week = isDateValue(params.week) ? mondayOf(params.week) : reviewWeekFor(today);
+  const week = isDateValue(params.week) ? periodStartOf(params.week) : reviewPeriodFor(today);
   const staff = params.staff && knownStaff(params.staff) ? params.staff : "";
   const status = params.status ? statusMessages[params.status] : undefined;
   const deadline = reviewDeadline(week);
@@ -267,7 +267,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
   const staffRows = employeeDirectory
     .map((entry) => {
       const days = attendance
-        ? weekWorkDays(week, entry.code, attendance.schedules, attendance.clockEvents)
+        ? periodWorkDays(week, entry.code, attendance.schedules, attendance.clockEvents)
         : { planned: 0, worked: 0 };
       const review = weekReviews.find((record) => record.staffCode === entry.code);
       return { code: entry.code, name: entry.displayName, days, filled: review ? Object.keys(review.results).length : 0 };
@@ -302,15 +302,15 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
       <section className="board-hero">
         <div>
           <p className="eyebrow">ทดสอบระบบ · เห็นเฉพาะแอดมิน</p>
-          <h2>ประเมิน skill รายสัปดาห์</h2>
+          <h2>ประเมิน skill ทุก 2 สัปดาห์</h2>
           <p>
-            ประเมินทุกวันจันทร์ ลงผลภายใน 3 วัน · 15 ตัวชี้วัด (Hard 7 · Soft 8) ตามคู่มือประเมิน skill
+            ประเมินวันจันทร์หลังจบรอบ 2 สัปดาห์ ลงผลภายใน 3 วัน · 15 ตัวชี้วัด (Hard 7 · Soft 8) ตามคู่มือประเมิน skill
             หน้านี้ <strong>ไม่ผูกกับ KPI หรือเงินเดือน</strong> ระบบแค่เสนอขึ้น/ลดระดับ แอดมินเป็นคนยืนยัน
           </p>
         </div>
         <form className="owner-ops__date">
           <label>
-            สัปดาห์ที่ประเมิน (เลือกวันไหนก็ได้ในสัปดาห์)
+            รอบที่ประเมิน (เลือกวันไหนก็ได้ในรอบ)
             <input type="date" name="week" defaultValue={week} />
           </label>
           {staff ? <input type="hidden" name="staff" value={staff} /> : null}
@@ -321,7 +321,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
       <SkillReviewTabs tab="review" week={week} staff={staff} />
 
       <p className={`skill-review__week${late ? " is-late" : ""}`}>
-        สัปดาห์ {thaiDate(week)} – {thaiDate(addDays(week, 6))} · ลงผลภายใน {thaiDate(deadline)}
+        รอบ {thaiDate(week)} – {thaiDate(addDays(week, 13))} · ลงผลภายใน {thaiDate(deadline)}
         {late ? " · เลยกำหนดลงผลแล้ว" : ""}
       </p>
 
@@ -330,7 +330,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
       <section className="owner-ops__panel">
         <div className="section-heading">
           <p className="eyebrow">เลือกพนักงาน</p>
-          <h3>ใครเข้ากะสัปดาห์นี้</h3>
+          <h3>ใครเข้ากะรอบนี้</h3>
         </div>
         {!attendance ? <p className="owner-ops__empty">อ่านตารางกะไม่ได้ — จำนวนวันทำงานจะขึ้นเป็น 0</p> : null}
         <ul className="skill-review__staff">
@@ -354,11 +354,11 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
         <>
           <section className="owner-ops__panel" id="staff">
             <div className="section-heading">
-              <p className="eyebrow">สัปดาห์ {thaiDate(week)}</p>
+              <p className="eyebrow">รอบ {thaiDate(week)} – {thaiDate(addDays(week, 13))}</p>
               <h3>{selected.name}</h3>
             </div>
             <p className="skill-review__days">
-              วันทำงานสัปดาห์นี้: มาจริง <strong>{selected.days.worked}</strong> วัน จากที่มีกะ {selected.days.planned} วัน
+              วันทำงานรอบนี้ (2 สัปดาห์): มาจริง <strong>{selected.days.worked}</strong> วัน จากที่มีกะ {selected.days.planned} วัน
               · ใช้ประกอบการพิจารณา ไม่เปลี่ยนเกณฑ์
             </p>
 
@@ -451,7 +451,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
                 </fieldset>
               ))}
               <div className="skill-review__submit">
-                <button type="submit">บันทึกผลสัปดาห์นี้</button>
+                <button type="submit">บันทึกผลรอบนี้</button>
               </div>
             </form>
           </section>
@@ -508,7 +508,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
             <section className="owner-ops__panel">
               <div className="section-heading">
                 <p className="eyebrow">ย้อนหลัง</p>
-                <h3>ผลรายสัปดาห์ของ {displayNameFor(staff)}</h3>
+                <h3>ผลแต่ละรอบของ {displayNameFor(staff)}</h3>
               </div>
               <ul className="owner-ops__list">
                 {[...history]
@@ -522,7 +522,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
                     return (
                       <li key={record.id}>
                         <Link href={`/admin/skill-review?week=${record.weekStart}&staff=${encodeURIComponent(staff)}#staff`}>
-                          <strong>สัปดาห์ {thaiDate(record.weekStart)}</strong>
+                          <strong>รอบ {thaiDate(record.weekStart)} – {thaiDate(addDays(record.weekStart, 13))}</strong>
                         </Link>
                         <small>
                           ผ่านระดับถัดไป {counts.next || 0} · คงระดับ {counts.hold || 0} · ต่ำกว่าระดับ {counts.below || 0} · ไม่ได้ทำ{" "}

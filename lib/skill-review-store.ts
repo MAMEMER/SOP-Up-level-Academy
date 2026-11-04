@@ -9,7 +9,7 @@ import {
   type SkillReviewRecord
 } from "./skill-reviews.ts";
 
-// ผลประเมิน skill รายสัปดาห์ (ทดสอบ) — เขียนด้วย service account เหมือน checklist audits:
+// ผลประเมิน skill ทุก 2 สัปดาห์ (ทดสอบ) — weekStart = วันจันทร์แรกของรอบ — เขียนด้วย service account เหมือน checklist audits:
 // firestore.rules ที่ใช้ร่วมกับกิลด์ไม่ได้เปิดคอลเลกชันนี้ และไม่ควรเขียนได้ด้วย public key.
 // ไม่ผูก KPI / เงินเดือน. Local dev ไม่มี credentials → ใช้ไฟล์ JSON (ห้ามบน Vercel).
 
@@ -37,7 +37,7 @@ async function writeLocalStore(store: LocalStore) {
   await writeFile(LOCAL_STORE, JSON.stringify(store, null, 2), "utf8");
 }
 
-/** ผลประเมินทุกสัปดาห์ของคนหนึ่ง */
+/** ผลประเมินทุกรอบของคนหนึ่ง */
 export async function fetchSkillReviewsForStaff(staffCode: string): Promise<SkillReviewRecord[]> {
   const mode = storageMode();
   if (mode === "firestore") {
@@ -48,7 +48,7 @@ export async function fetchSkillReviewsForStaff(staffCode: string): Promise<Skil
   return [];
 }
 
-/** ผลประเมินของทุกคนในสัปดาห์หนึ่ง */
+/** ผลประเมินของทุกคนในรอบหนึ่ง (weekStart = วันเริ่มรอบ) */
 export async function fetchSkillReviewsForWeek(weekStart: string): Promise<SkillReviewRecord[]> {
   const mode = storageMode();
   if (mode === "firestore") {

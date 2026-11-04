@@ -1,34 +1,41 @@
-// กติกานับสัปดาห์ของระบบประเมิน skill (คู่มือประเมิน skill รายสัปดาห์ หน้า 1–2). pure ล้วน.
+// กติกานับรอบของระบบประเมิน skill (คู่มือประเมิน skill หน้า 1–2). pure ล้วน.
+// ประเมินทุก 2 สัปดาห์ (เนม 4 พ.ย. 2569): 1 รอบ = จันทร์–อาทิตย์ 2 สัปดาห์ เริ่มนับจาก PERIOD_ANCHOR.
+// ระยะเวลาในคู่มือเดิม (เช่น 4 ใน 6 สัปดาห์) แปลงเป็นรอบโดยคงจำนวนสัปดาห์รวมเท่าเดิม.
 //
 // ระบบนี้แค่ "เสนอ" ขึ้น/ลดระดับ — เปลี่ยนระดับจริงเมื่อแอดมินกดยืนยันเท่านั้น และไม่แตะ
 // KPI / เงินเดือนใดๆ.
 
-/** ผลรายสัปดาห์ของตัวชี้วัดหนึ่งตัว */
+/** ผลของรอบ (2 สัปดาห์) ของตัวชี้วัดหนึ่งตัว */
 export type SkillWeekResult = "next" | "hold" | "below" | "na";
 
 export const skillResultOptions: Array<{ value: SkillWeekResult; label: string; hint: string }> = [
-  { value: "next", label: "ผ่านระดับถัดไป", hint: "นับ 1 สัปดาห์" },
+  { value: "next", label: "ผ่านระดับถัดไป", hint: "นับ 1 รอบ" },
   { value: "hold", label: "คงระดับ", hint: "ไม่นับ ไม่หัก" },
-  { value: "below", label: "ต่ำกว่าระดับ", hint: "2 สัปดาห์ติด = เสนอลดระดับ" },
-  { value: "na", label: "ไม่ได้ทำ", hint: "ไม่นับ ไม่ทำให้สัปดาห์ติดกันขาด" }
+  { value: "below", label: "ต่ำกว่าระดับ", hint: "2 รอบติด = เสนอลดระดับ" },
+  { value: "na", label: "ไม่ได้ทำ", hint: "ไม่นับ ไม่ทำให้รอบติดกันขาด" }
 ];
 
 export function isSkillWeekResult(value: string): value is SkillWeekResult {
   return value === "next" || value === "hold" || value === "below" || value === "na";
 }
 
-/** ตัวเลขทุกตัวของกติกา อยู่ที่เดียว */
+/** 1 รอบประเมิน = 14 วัน */
+export const PERIOD_DAYS = 14;
+/** วันจันทร์แรกของรอบที่ 1 — รอบถัดไปเริ่มทุก 14 วันจากวันนี้ */
+export const PERIOD_ANCHOR = "2026-10-26";
+
+/** ตัวเลขทุกตัวของกติกา อยู่ที่เดียว (หน่วย = รอบ, 1 รอบ = 2 สัปดาห์) */
 export const SKILL_RULES = {
-  l2: { need: 4, windowWeeks: 6 },
-  l3: { need: 8, windowWeeks: 10, minWeeksAtLevel: 4, cleanWeeks: 8 },
-  l4: { minWeeksAtLevel: 12 },
-  demote: { consecutiveBelow: 2, belowInWindow: 3, windowWeeks: 6 },
-  review: { naWeeks: 4 },
+  l2: { need: 2, windowPeriods: 3 },
+  l3: { need: 4, windowPeriods: 5, minPeriodsAtLevel: 2, cleanPeriods: 4 },
+  l4: { minPeriodsAtLevel: 6 },
+  demote: { consecutiveBelow: 2, belowInWindow: 2, windowPeriods: 3 },
+  review: { naPeriods: 2 },
   reviewDeadlineDays: 3
 } as const;
 
 export type SkillWeekEntry = {
-  /** วันจันทร์ของสัปดาห์ที่ถูกประเมิน */
+  /** วันจันทร์แรกของรอบที่ถูกประเมิน */
   weekStart: string;
   result: SkillWeekResult;
   serious?: boolean;
@@ -48,7 +55,7 @@ export type SkillProgress = {
   target: number | null;
   have: number;
   need: number;
-  /** อธิบายความคืบหน้า เช่น "ผ่าน 3/4 สัปดาห์ ใน 6 สัปดาห์ล่าสุด" */
+  /** อธิบายความคืบหน้า เช่น "ผ่าน 1/2 รอบ ใน 3 รอบล่าสุด" */
   text: string;
   suggestion: SkillSuggestion;
 };
@@ -69,33 +76,41 @@ export function mondayOf(date: string): string {
   return addDays(date, day === 0 ? -6 : 1 - day);
 }
 
-/** สัปดาห์ที่ต้องประเมินเมื่อเปิดหน้าในวันนี้ = สัปดาห์ที่แล้ว */
-export function reviewWeekFor(today: string): string {
-  return addDays(mondayOf(today), -7);
+/** จำนวนรอบจาก `from` ถึง `to` (ทั้งคู่เป็นวันเริ่มรอบ) */
+function periodsBetween(from: string, to: string): number {
+  return Math.round((toUtc(to) - toUtc(from)) / (PERIOD_DAYS * DAY_MS));
 }
 
-/** ประเมินทุกวันจันทร์ ลงผลภายใน 3 วัน → วันพุธหลังสัปดาห์ที่ถูกประเมิน */
-export function reviewDeadline(weekStart: string): string {
-  return addDays(weekStart, 7 + SKILL_RULES.reviewDeadlineDays - 1);
+/** วันเริ่มรอบ (จันทร์) ของรอบที่ `date` อยู่ */
+export function periodStartOf(date: string): string {
+  const monday = mondayOf(date);
+  const weeks = Math.round((toUtc(monday) - toUtc(PERIOD_ANCHOR)) / (7 * DAY_MS));
+  return ((weeks % 2) + 2) % 2 === 0 ? monday : addDays(monday, -7);
 }
 
-export function weekDates(weekStart: string): string[] {
-  return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+/** รอบที่ต้องประเมินเมื่อเปิดหน้าในวันนี้ = รอบที่จบไปล่าสุด */
+export function reviewPeriodFor(today: string): string {
+  return addDays(periodStartOf(today), -PERIOD_DAYS);
 }
 
-function weeksBetween(from: string, to: string): number {
-  return Math.round((toUtc(to) - toUtc(from)) / (7 * DAY_MS));
+/** ประเมินวันจันทร์หลังจบรอบ ลงผลภายใน 3 วัน → วันพุธหลังรอบที่ถูกประเมิน */
+export function reviewDeadline(periodStart: string): string {
+  return addDays(periodStart, PERIOD_DAYS + SKILL_RULES.reviewDeadlineDays - 1);
 }
 
-/** entries ที่อยู่ใน `windowWeeks` สัปดาห์ล่าสุด นับถึง asOf (รวม asOf) */
-function inWindow(entries: SkillWeekEntry[], asOf: string, windowWeeks: number): SkillWeekEntry[] {
+export function periodDates(periodStart: string): string[] {
+  return Array.from({ length: PERIOD_DAYS }, (_, index) => addDays(periodStart, index));
+}
+
+/** entries ที่อยู่ใน `windowPeriods` รอบล่าสุด นับถึง asOf (รวม asOf) */
+function inWindow(entries: SkillWeekEntry[], asOf: string, windowPeriods: number): SkillWeekEntry[] {
   return entries.filter((entry) => {
-    const back = weeksBetween(entry.weekStart, asOf);
-    return back >= 0 && back < windowWeeks;
+    const back = periodsBetween(entry.weekStart, asOf);
+    return back >= 0 && back < windowPeriods;
   });
 }
 
-/** สัปดาห์ติดกันจากล่าสุดย้อนหลัง — "ไม่ได้ทำ" ข้ามได้ ไม่ทำให้ขาด */
+/** รอบติดกันจากล่าสุดย้อนหลัง — "ไม่ได้ทำ" ข้ามได้ ไม่ทำให้ขาด */
 function trailingRun(entries: SkillWeekEntry[], predicate: (entry: SkillWeekEntry) => boolean): number {
   let run = 0;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
@@ -119,11 +134,11 @@ function trailingNa(entries: SkillWeekEntry[]): number {
 export type EvaluateSkillInput = {
   entries: SkillWeekEntry[];
   level: number;
-  /** วันที่ได้ระดับปัจจุบัน (YYYY-MM-DD) — นับเฉพาะสัปดาห์ตั้งแต่วันนี้ */
+  /** วันที่ได้ระดับปัจจุบัน (YYYY-MM-DD) — นับเฉพาะรอบตั้งแต่วันนี้ */
   levelSince?: string;
   highRisk: boolean;
   maxLevel: number;
-  /** สัปดาห์อ้างอิง (วันจันทร์) — ปกติคือสัปดาห์ที่กำลังดู */
+  /** รอบอ้างอิง (วันเริ่มรอบ) — ปกติคือรอบที่กำลังดู */
   asOf: string;
 };
 
@@ -132,7 +147,7 @@ export function evaluateSkill(input: EvaluateSkillInput): SkillProgress {
   const all = [...input.entries]
     .filter((entry) => entry.weekStart <= asOf)
     .sort((left, right) => left.weekStart.localeCompare(right.weekStart));
-  const sinceWeek = input.levelSince ? mondayOf(input.levelSince) : undefined;
+  const sinceWeek = input.levelSince ? periodStartOf(input.levelSince) : undefined;
   const atLevel = sinceWeek ? all.filter((entry) => entry.weekStart >= sinceWeek) : all;
   const counts = (entry: SkillWeekEntry) => entry.result === "next" && (!highRisk || Boolean(entry.confirmed));
 
@@ -143,13 +158,13 @@ export function evaluateSkill(input: EvaluateSkillInput): SkillProgress {
     suggestion = { kind: "suspend", text: "ผิดพลาดร้ายแรง/จงใจ → เสนอระงับ + คุยกระบวนการวินัย" };
   } else if (level > 0) {
     const belowRun = trailingRun(atLevel, (entry) => entry.result === "below");
-    const belowCount = inWindow(atLevel, asOf, SKILL_RULES.demote.windowWeeks).filter((entry) => entry.result === "below").length;
+    const belowCount = inWindow(atLevel, asOf, SKILL_RULES.demote.windowPeriods).filter((entry) => entry.result === "below").length;
     if (belowRun >= SKILL_RULES.demote.consecutiveBelow) {
-      suggestion = { kind: "demote", text: `ต่ำกว่าระดับ ${belowRun} สัปดาห์ติด → เสนอลดเหลือระดับ ${level - 1}` };
+      suggestion = { kind: "demote", text: `ต่ำกว่าระดับ ${belowRun} รอบติด → เสนอลดเหลือระดับ ${level - 1}` };
     } else if (belowCount >= SKILL_RULES.demote.belowInWindow) {
-      suggestion = { kind: "demote", text: `ต่ำกว่าระดับ ${belowCount} ครั้งใน ${SKILL_RULES.demote.windowWeeks} สัปดาห์ → เสนอลดเหลือระดับ ${level - 1}` };
-    } else if (trailingNa(all) > SKILL_RULES.review.naWeeks) {
-      suggestion = { kind: "review", text: `ไม่ได้ทำเกิน ${SKILL_RULES.review.naWeeks} สัปดาห์ → ต้องทบทวน (ทำได้เมื่อมีคนตรวจ)` };
+      suggestion = { kind: "demote", text: `ต่ำกว่าระดับ ${belowCount} ครั้งใน ${SKILL_RULES.demote.windowPeriods} รอบล่าสุด → เสนอลดเหลือระดับ ${level - 1}` };
+    } else if (trailingNa(all) > SKILL_RULES.review.naPeriods) {
+      suggestion = { kind: "review", text: `ไม่ได้ทำเกิน ${SKILL_RULES.review.naPeriods} รอบ → ต้องทบทวน (ทำได้เมื่อมีคนตรวจ)` };
     }
   }
 
@@ -158,7 +173,7 @@ export function evaluateSkill(input: EvaluateSkillInput): SkillProgress {
     return { target, have: 0, need: 0, text: "ถึงระดับสูงสุดแล้ว", suggestion };
   }
 
-  const weeksAtLevel = sinceWeek ? weeksBetween(sinceWeek, asOf) + 1 : atLevel.length;
+  const periodsAtLevel = sinceWeek ? periodsBetween(sinceWeek, asOf) + 1 : atLevel.length;
   const riskNote = highRisk ? " (ต้องยืนยัน 2 คน)" : "";
   let have = 0;
   let need = 0;
@@ -169,34 +184,34 @@ export function evaluateSkill(input: EvaluateSkillInput): SkillProgress {
   if (target === 1) {
     need = 1;
     have = Math.min(1, atLevel.filter(counts).length);
-    text = `ผ่าน ${have}/1 สัปดาห์`;
+    text = `ผ่าน ${have}/1 รอบ`;
     ready = have >= need;
     readyNote = " · Hard skill ต้องเรียนครบและสอบผ่าน ≥ 80% ก่อนยืนยัน";
   } else if (target === 2) {
     need = SKILL_RULES.l2.need;
     if (highRisk) {
       have = Math.min(need, trailingRun(atLevel, counts));
-      text = `ผ่านติดกัน ${have}/${need} สัปดาห์${riskNote}`;
+      text = `ผ่านติดกัน ${have}/${need} รอบ${riskNote}`;
     } else {
-      have = inWindow(atLevel, asOf, SKILL_RULES.l2.windowWeeks).filter(counts).length;
-      text = `ผ่าน ${Math.min(have, need)}/${need} สัปดาห์ ใน ${SKILL_RULES.l2.windowWeeks} สัปดาห์ล่าสุด`;
+      have = inWindow(atLevel, asOf, SKILL_RULES.l2.windowPeriods).filter(counts).length;
+      text = `ผ่าน ${Math.min(have, need)}/${need} รอบ ใน ${SKILL_RULES.l2.windowPeriods} รอบล่าสุด`;
     }
     ready = have >= need;
   } else if (target === 3) {
     need = SKILL_RULES.l3.need;
-    have = inWindow(atLevel, asOf, SKILL_RULES.l3.windowWeeks).filter(counts).length;
-    const serious = inWindow(all, asOf, SKILL_RULES.l3.cleanWeeks).some((entry) => entry.serious);
-    const heldLongEnough = weeksAtLevel >= SKILL_RULES.l3.minWeeksAtLevel;
-    text = `ผ่าน ${Math.min(have, need)}/${need} สัปดาห์ ใน ${SKILL_RULES.l3.windowWeeks} สัปดาห์ล่าสุด${riskNote}`;
-    if (!heldLongEnough) text += ` · ถือระดับ 2 มา ${weeksAtLevel}/${SKILL_RULES.l3.minWeeksAtLevel} สัปดาห์`;
-    if (serious) text += ` · มีผิดพลาดร้ายแรงใน ${SKILL_RULES.l3.cleanWeeks} สัปดาห์ล่าสุด`;
+    have = inWindow(atLevel, asOf, SKILL_RULES.l3.windowPeriods).filter(counts).length;
+    const serious = inWindow(all, asOf, SKILL_RULES.l3.cleanPeriods).some((entry) => entry.serious);
+    const heldLongEnough = periodsAtLevel >= SKILL_RULES.l3.minPeriodsAtLevel;
+    text = `ผ่าน ${Math.min(have, need)}/${need} รอบ ใน ${SKILL_RULES.l3.windowPeriods} รอบล่าสุด${riskNote}`;
+    if (!heldLongEnough) text += ` · ถือระดับ 2 มา ${periodsAtLevel}/${SKILL_RULES.l3.minPeriodsAtLevel} รอบ`;
+    if (serious) text += ` · มีผิดพลาดร้ายแรงใน ${SKILL_RULES.l3.cleanPeriods} รอบล่าสุด`;
     ready = have >= need && heldLongEnough && !serious;
     readyNote = " · ต้องคุยประเมินเชิงลึก 1 ครั้งก่อนยืนยัน";
   } else {
-    need = SKILL_RULES.l4.minWeeksAtLevel;
-    have = Math.min(weeksAtLevel, need);
-    text = `ถือระดับ 3 มา ${have}/${need} สัปดาห์`;
-    ready = weeksAtLevel >= need;
+    need = SKILL_RULES.l4.minPeriodsAtLevel;
+    have = Math.min(periodsAtLevel, need);
+    text = `ถือระดับ 3 มา ${have}/${need} รอบ`;
+    ready = periodsAtLevel >= need;
     readyNote = " · ต้องทำโครงการปรับปรุง 1 ชิ้น ผู้บริหาร 2 คนอนุมัติ";
   }
 
@@ -206,14 +221,14 @@ export function evaluateSkill(input: EvaluateSkillInput): SkillProgress {
   return { target, have: Math.min(have, need), need, text, suggestion };
 }
 
-/** วันทำงานในสัปดาห์: วันที่มีกะ และวันที่มีกะ + ตอกบัตรจริง (นิยามเดียวกับ KPI) */
-export function weekWorkDays(
-  weekStart: string,
+/** วันทำงานในรอบ (2 สัปดาห์): วันที่มีกะ และวันที่มีกะ + ตอกบัตรจริง (นิยามเดียวกับ KPI) */
+export function periodWorkDays(
+  periodStart: string,
   staffCode: string,
   schedules: Array<{ employeeName: string; workDate: string }>,
   clockEvents: Array<{ employeeName: string; workDate: string }>
 ): { planned: number; worked: number } {
-  const days = new Set(weekDates(weekStart));
+  const days = new Set(periodDates(periodStart));
   const planned = new Set(
     schedules.filter((s) => s.employeeName === staffCode && days.has(s.workDate)).map((s) => s.workDate)
   );

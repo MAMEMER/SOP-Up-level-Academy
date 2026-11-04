@@ -1,4 +1,4 @@
-// รูปข้อมูลผลประเมิน skill รายสัปดาห์ + ระดับของพนักงาน. pure ล้วน (เทสต์ได้) —
+// รูปข้อมูลผลประเมิน skill ทุก 2 สัปดาห์ (weekStart = วันจันทร์แรกของรอบ) + ระดับของพนักงาน. pure ล้วน (เทสต์ได้) —
 // การอ่าน/เขียนจริงอยู่ที่ lib/skill-review-store.ts.
 //
 // แยกจาก KPI ทั้งหมด: ไม่มีฟิลด์คะแนน ไม่มีเงิน และไม่มีอะไรถูกส่งเข้า performance-score.
@@ -134,7 +134,7 @@ export function confirmSkillResult(
   };
 }
 
-/** ประวัติรายสัปดาห์ของตัวชี้วัดหนึ่งตัว สำหรับ evaluateSkill */
+/** ประวัติรายรอบของตัวชี้วัดหนึ่งตัว สำหรับ evaluateSkill */
 export function skillEntriesFor(records: SkillReviewRecord[], staffCode: string, indicatorId: string): SkillWeekEntry[] {
   return records
     .filter((record) => record.staffCode === staffCode && record.results[indicatorId])
