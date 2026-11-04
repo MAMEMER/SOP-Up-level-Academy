@@ -14,6 +14,7 @@ export function MpNav({ memberKey, memberName }: { memberKey: string; memberName
   useEffect(() => setOpen(false), [pathname]);
 
   const items = [
+    { href: "/masterplan/board", label: "บอร์ดทีม", match: ["/masterplan/board"] },
     { href: "/masterplan/plan", label: "ฉบับกลาง", match: ["/masterplan/plan", "/masterplan/docs"] },
     { href: `/masterplan/scratch/${memberKey}`, label: "กระดาษทด", match: ["/masterplan/scratch"] },
     { href: "/masterplan/proposals", label: "ข้อเสนอ", match: ["/masterplan/proposals"] },
