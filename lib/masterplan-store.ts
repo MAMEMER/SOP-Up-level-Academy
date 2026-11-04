@@ -28,7 +28,7 @@ import { KPI_COLLECTION, kpiId, isKpiCode, sortKpis, type MpKpi } from "./master
 //   unavailable                  → on Vercel without credentials (a serverless disk is
 //                                  wiped on cold start, so "saving" there would lose data)
 
-export type MpCollection = "mp_board" | "mp_docs" | "mp_scratch" | "mp_proposals" | "mp_tasks" | "mp_meetings" | "mp_changelog" | "mp_meta" | "mp_tokens" | "mp_kpis";
+export type MpCollection = "mp_board" | "mp_board_pings" | "mp_docs" | "mp_scratch" | "mp_proposals" | "mp_tasks" | "mp_meetings" | "mp_changelog" | "mp_meta" | "mp_tokens" | "mp_kpis";
 
 const LOCAL_STORE = join(process.cwd(), ".data", "masterplan.json");
 const runningOnVercel = Boolean(process.env.VERCEL);
