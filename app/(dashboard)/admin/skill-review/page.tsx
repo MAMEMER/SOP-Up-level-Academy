@@ -32,13 +32,36 @@ import {
   saveSkillLevels,
   saveSkillReview
 } from "../../../../lib/skill-review-store.ts";
+import { SkillReviewGuide } from "../../../../components/SkillReviewGuide.tsx";
 
 // หน้าทดสอบระบบประเมิน skill รายสัปดาห์ — เห็นเฉพาะแอดมิน. แยกจาก KPI/เงินเดือนทั้งหมด:
 // ไม่มีอะไรในหน้านี้ส่งผลกับคะแนน performance-score.
 
 type PageProps = {
-  searchParams?: Promise<{ week?: string; staff?: string; status?: string }>;
+  searchParams?: Promise<{ week?: string; staff?: string; status?: string; tab?: string }>;
 };
+
+function SkillReviewTabs({ tab, week, staff }: { tab: "review" | "guide"; week?: string; staff?: string }) {
+  const params = new URLSearchParams();
+  if (week) params.set("week", week);
+  if (staff) params.set("staff", staff);
+  const reviewHref = params.size ? `/admin/skill-review?${params.toString()}` : "/admin/skill-review";
+  params.set("tab", "guide");
+  return (
+    <nav className="stock-loss-tabs skill-review__tabs" aria-label="แท็บประเมิน skill">
+      <Link href={reviewHref} className={tab === "review" ? "is-active" : undefined} aria-current={tab === "review" ? "page" : undefined}>
+        ลงผลประเมิน
+      </Link>
+      <Link
+        href={`/admin/skill-review?${params.toString()}`}
+        className={tab === "guide" ? "is-active" : undefined}
+        aria-current={tab === "guide" ? "page" : undefined}
+      >
+        คู่มือประเมิน
+      </Link>
+    </nav>
+  );
+}
 
 function isDateValue(value: string | undefined): value is string {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
@@ -207,6 +230,28 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
   if (user.role !== "admin") redirect("/");
 
   const params = searchParams ? await searchParams : {};
+
+  if (params.tab === "guide") {
+    return (
+      <main className="page skill-review">
+        <Link href="/" className="back-link">← กลับ Dashboard</Link>
+        <section className="board-hero">
+          <div>
+            <p className="eyebrow">คู่มือพัฒนาพนักงาน</p>
+            <h2>วิธีเพิ่มระดับ skill และวิธีประเมิน</h2>
+            <p>ใช้คู่กับภาพ &quot;เส้นทางเลื่อนขั้น 4 ขั้น&quot; · Hard skill 7 ตัวชี้วัด · Soft skill 8 ตัวชี้วัด · ประเมินภาพรวมทุกสัปดาห์</p>
+          </div>
+        </section>
+        <SkillReviewTabs
+          tab="guide"
+          week={isDateValue(params.week) ? params.week : undefined}
+          staff={params.staff && knownStaff(params.staff) ? params.staff : undefined}
+        />
+        <SkillReviewGuide />
+      </main>
+    );
+  }
+
   const today = formatWorkDate();
   const week = isDateValue(params.week) ? mondayOf(params.week) : reviewWeekFor(today);
   const staff = params.staff && knownStaff(params.staff) ? params.staff : "";
@@ -272,6 +317,8 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
           <button type="submit">ดู</button>
         </form>
       </section>
+
+      <SkillReviewTabs tab="review" week={week} staff={staff} />
 
       <p className={`skill-review__week${late ? " is-late" : ""}`}>
         สัปดาห์ {thaiDate(week)} – {thaiDate(addDays(week, 6))} · ลงผลภายใน {thaiDate(deadline)}
