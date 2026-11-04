@@ -6,7 +6,7 @@ import { displayNameFor, employeeDirectory } from "../../../../lib/employee-dire
 import { sopUserForEmail } from "../../../../lib/sop-users.ts";
 import { formatWorkDate } from "../../../../lib/workflow-records.ts";
 import { fetchAttendanceSource } from "../../../../lib/planner-kpi.ts";
-import { careerStages, maxLevelFor, skillIndicators, type SkillIndicator } from "../../../../lib/skill-indicators.ts";
+import { careerStages, maxLevelFor, SKILL_START_LEVEL, skillIndicators, type SkillIndicator } from "../../../../lib/skill-indicators.ts";
 import {
   evaluateSkill,
   mondayOf,
@@ -282,7 +282,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
 
   const rows = skillIndicators.map((indicator) => {
     const state = levels?.levels[indicator.id];
-    const level = state?.level ?? 0;
+    const level = Math.max(SKILL_START_LEVEL, state?.level ?? SKILL_START_LEVEL);
     const progress = evaluateSkill({
       entries: skillEntriesFor(history, staff, indicator.id),
       level,
@@ -471,7 +471,7 @@ export default async function AdminSkillReviewPage({ searchParams }: PageProps) 
                 <label key={row.indicator.id}>
                   <span>{row.indicator.name}</span>
                   <select name={`lv_${row.indicator.id}`} defaultValue={String(row.level)}>
-                    {Array.from({ length: maxLevelFor(row.indicator) + 1 }, (_, level) => (
+                    {Array.from({ length: maxLevelFor(row.indicator) - SKILL_START_LEVEL + 1 }, (_, index) => SKILL_START_LEVEL + index).map((level) => (
                       <option key={level} value={level}>
                         ระดับ {level}
                       </option>

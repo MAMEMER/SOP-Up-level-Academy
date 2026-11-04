@@ -124,9 +124,9 @@ describe("evaluateSkill — ลด / ทบทวน / ระงับ", () => {
     assert.equal(evaluateSkill({ ...base, entries, level: 1, asOf: lastWeek(entries) }).suggestion.kind, "suspend");
   });
 
-  it("level 0 is never demoted", () => {
-    const entries = weeks(["below", "below"]);
-    assert.notEqual(evaluateSkill({ ...base, entries, level: 0, asOf: lastWeek(entries) }).suggestion.kind, "demote");
+  it("start level 1 is never demoted", () => {
+    const entries = weeks(["below", "below", "below"]);
+    assert.notEqual(evaluateSkill({ ...base, entries, level: 1, asOf: lastWeek(entries) }).suggestion.kind, "demote");
   });
 });
 
@@ -182,7 +182,10 @@ describe("skill review records", () => {
     assert.equal(same, null);
     const down = setSkillLevel(first!, { staffCode: "ICE", indicatorId: "service", level: 2, date: "2026-11-09", reason: "ต่ำกว่าระดับ 2 สัปดาห์", by: "a", at });
     assert.equal(down?.history.length, 2);
-    assert.deepEqual(down?.history.map((h) => [h.from, h.to]), [[0, 3], [3, 2]]);
+    assert.deepEqual(down?.history.map((h) => [h.from, h.to]), [[1, 3], [3, 2]]); // ยังไม่เคยตั้ง = เริ่มที่ระดับ 1
+    // ตั้งต่ำกว่า 1 ไม่ได้ และตั้ง 1 ให้คนที่ยังไม่เคยตั้ง = ไม่เปลี่ยน
+    assert.equal(setSkillLevel(undefined, { staffCode: "ICE", indicatorId: "stock", level: 1, date: "2026-11-02", reason: "x", by: "a", at }), null);
+    assert.equal(setSkillLevel(down!, { staffCode: "ICE", indicatorId: "service", level: 0, date: "2026-11-10", reason: "x", by: "a", at })?.levels.service.level, 1);
   });
 
   it("has the 15 indicators from the Career Path (7 hard + 8 soft)", () => {
