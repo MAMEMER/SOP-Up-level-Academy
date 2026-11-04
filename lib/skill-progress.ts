@@ -3,6 +3,8 @@
 // ระบบนี้แค่ "เสนอ" ขึ้น/ลดระดับ — เปลี่ยนระดับจริงเมื่อแอดมินกดยืนยันเท่านั้น และไม่แตะ
 // KPI / เงินเดือนใดๆ.
 
+import { SKILL_START_LEVEL } from "./skill-indicators.ts";
+
 /** ผลรายสัปดาห์ของตัวชี้วัดหนึ่งตัว */
 export type SkillWeekResult = "next" | "hold" | "below" | "na";
 
@@ -141,7 +143,8 @@ export function evaluateSkill(input: EvaluateSkillInput): SkillProgress {
   let suggestion: SkillSuggestion = { kind: "none", text: "" };
   if (level > 0 && latest && latest.weekStart === asOf && latest.serious) {
     suggestion = { kind: "suspend", text: "ผิดพลาดร้ายแรง/จงใจ → เสนอระงับ + คุยกระบวนการวินัย" };
-  } else if (level > 0) {
+  } else if (level > SKILL_START_LEVEL) {
+    // ไม่ลดต่ำกว่าระดับเริ่มต้น
     const belowRun = trailingRun(atLevel, (entry) => entry.result === "below");
     const belowCount = inWindow(atLevel, asOf, SKILL_RULES.demote.windowWeeks).filter((entry) => entry.result === "below").length;
     if (belowRun >= SKILL_RULES.demote.consecutiveBelow) {

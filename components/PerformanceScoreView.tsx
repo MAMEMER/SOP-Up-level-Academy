@@ -743,7 +743,8 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               <details className="performance-detail performance-skill-detail">
                 <summary>
                   สเตตัส Hard / Soft skill
-                  {skill.hasData ? ` · Hard ${skill.hard.average.toFixed(1)} · Soft ${skill.soft.average.toFixed(1)}` : " · ยังไม่ได้ประเมิน"}
+                  {` · Hard ${skill.hard.average.toFixed(1)} · Soft ${skill.soft.average.toFixed(1)}`}
+                  {skill.hasData ? "" : " (ยังไม่ได้ประเมิน)"}
                 </summary>
                 <StaffSkillStatus staffCode={row.employeeName} status={skill} />
               </details>
