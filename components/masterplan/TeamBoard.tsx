@@ -221,7 +221,7 @@ export function TeamBoard({
           <button
             key={p.key}
             type="button"
-            className={`tb-person is-${p.level}${filter === p.key ? " is-active" : ""}`}
+            className={`tb-person who-${p.key} is-${p.level}${filter === p.key ? " is-active" : ""}`}
             aria-pressed={filter === p.key}
             onClick={() => setFilter(filter === p.key ? "" : p.key)}
           >
@@ -400,7 +400,7 @@ export function TeamBoard({
                     ) : (
                       <li
                         key={card.id}
-                        className={`tb-card${card.owner === me ? " is-mine" : ""}`}
+                        className={`tb-card who-${card.owner || "none"}${card.owner === me ? " is-mine" : ""}`}
                       >
                         <p className="tb-card__title">{card.title}</p>
                         {card.note ? (
@@ -546,7 +546,7 @@ function OwnerChips({
         <button
           key={m.key}
           type="button"
-          className="tb-chip"
+          className={`tb-chip who-${m.key}`}
           aria-pressed={value === m.key}
           onClick={() => onChange(m.key)}
         >

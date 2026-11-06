@@ -114,7 +114,7 @@ export function TeamCalendar({
             .filter(Boolean)
             .join(" ");
           const items = [
-            ...tasks.map((t) => ({ key: t.kind + t.card.id, cls: `is-${t.kind}${late && t.kind === "due" ? " is-late" : ""}`, text: t.card.title, who: t.card.owner })),
+            ...tasks.map((t) => ({ key: t.kind + t.card.id, cls: `is-${t.kind}${late && t.kind === "due" ? " is-late" : ""}`, text: t.card.title, who: t.card.owner || "none" })),
             ...shop.map((s) => ({ key: s.key, cls: s.special ? "is-shop is-special" : "is-shop", text: `${s.time} ${s.title}`, who: "" }))
           ];
           return (
@@ -127,7 +127,7 @@ export function TeamCalendar({
               </span>
               <span className="tc-items">
                 {items.slice(0, 3).map((it) => (
-                  <span key={it.key} className={`tc-chip ${it.cls}`}>
+                  <span key={it.key} className={`tc-chip ${it.cls}${it.who ? ` who-${it.who}` : ""}`}>
                     {it.text}
                   </span>
                 ))}
@@ -153,7 +153,7 @@ export function TeamCalendar({
         {selTasks.length === 0 && selShop.length === 0 ? <p className="tb-empty">วันนี้ว่าง ไม่มีงานหรืออีเวนต์</p> : null}
         <ul className="tb-day__items">
           {selTasks.map(({ kind, card }) => (
-            <li key={kind + card.id} className={`tb-ev is-${kind}${card.owner === me ? " is-mine" : ""}`}>
+            <li key={kind + card.id} className={`tb-ev is-${kind} who-${card.owner || "none"}${card.owner === me ? " is-mine" : ""}`}>
               {kind === "start" ? <Play size={14} aria-hidden="true" /> : <Flag size={14} aria-hidden="true" />}
               <span className="tb-ev__kind">{kind === "start" ? "เริ่มหยิบ" : selected < today ? "เลยกำหนด" : "ส่ง"}</span>
               <span className="tb-ev__title">{card.title}</span>

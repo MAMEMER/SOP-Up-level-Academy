@@ -9303,6 +9303,23 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .tb-ev.is-shop { color: #6b6259; background: #faf7f3; }
 .tb-ev.is-special { color: #6a3fb5; }
 
+/* บอร์ดทีม: สีประจำคน — card stripe, owner pill, person tile, calendar chip */
+.who-champ { --who: #e8590c; --who-soft: #ffe8d9; }
+.who-top { --who: #2b8a3e; --who-soft: #e2f4e6; }
+.who-name { --who: #7048e8; --who-soft: #ede8fd; }
+.who-muk { --who: #c2255c; --who-soft: #fce4ee; }
+.who-none { --who: var(--mp-line-strong); --who-soft: transparent; }
+.tb-card[class*="who-"], .tb-col.is-doing .tb-card[class*="who-"] { border-left: 5px solid var(--who); }
+.tb-card[class*="who-"] .tb-owner:not(.is-none), .tb-ev[class*="who-"] .tb-owner:not(.is-none) { background: var(--who-soft); color: var(--who); }
+.tb-card.is-mine[class*="who-"] .tb-owner:not(.is-none) { background: var(--who); color: #fff; }
+.tb-ev[class*="who-"] { border-left: 4px solid var(--who); }
+.mp-root .tb-person[class*="who-"] { border-top: 5px solid var(--who); }
+.mp-root .tb-person[class*="who-"] .tb-person__name { color: var(--who); }
+.mp-root .tb-person[class*="who-"].is-active { border-color: var(--who); box-shadow: 0 0 0 2px var(--who-soft); border-top-width: 5px; }
+.mp-root .tb-chip[class*="who-"]::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--who); margin-right: 6px; vertical-align: 0; }
+.mp-root .tb-chip[class*="who-"][aria-pressed="true"] { border-color: var(--who); background: var(--who-soft); color: var(--who); }
+.tc-chip[class*="who-"]:not(.who-none) { border-left: 3px solid var(--who); }
+
 /* ---- home ---- */
 .mp-today { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); border-top: 1px solid var(--mp-line); }
 @media (min-width: 760px) { .mp-today { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
