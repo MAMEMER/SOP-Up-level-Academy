@@ -32,7 +32,7 @@ describe("skill status", () => {
   });
 });
 
-test("หน้าคะแนนไม่ได้สเตตัส skill เมื่อปิดระบบ skill ไว้", async () => {
+it("หน้าคะแนนไม่ได้สเตตัส skill เมื่อปิดระบบ skill ไว้", async () => {
   const { SKILL_REVIEW_ENABLED } = await import("../lib/feature-flags.ts");
   const { buildSkillStatus } = await import("../lib/skill-status.ts");
   assert.equal(buildSkillStatus(undefined) === undefined, !SKILL_REVIEW_ENABLED);
