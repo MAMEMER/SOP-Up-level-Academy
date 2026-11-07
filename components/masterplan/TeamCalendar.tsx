@@ -1,14 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Flag, Play, Store } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Flag, MapPin, Play, Store } from "lucide-react";
 import { memberName } from "../../lib/masterplan-access.ts";
-import { useLocalDraft } from "../../lib/masterplan-client.ts";
+import { mpApi, useLocalDraft } from "../../lib/masterplan-client.ts";
+import {
+  PRESENCE_BRANCHES,
+  PRESENCE_MEMBERS,
+  branchLabel,
+  isPresenceMember,
+  presenceByDate,
+  presenceId,
+  type OwnerPresence,
+  type PresenceBranch
+} from "../../lib/owner-presence.ts";
 import { BOARD_BRANCHES, GAMES, addMonths, monthGrid, type BoardEvent } from "../../lib/activity-board.ts";
 import type { BoardCard } from "../../lib/team-board.ts";
 
 // ปฏิทินรายเดือน (จันทร์–อาทิตย์) ของบอร์ดทีม: วันเริ่มหยิบ / วันส่งของงาน + อีเวนต์ร้านจาก
 // ตารางกิจกรรมกลาง (/admin/activities) ที่กดซ่อนได้ เพื่อดูว่าควรวางงานวันไหน.
+// + Owner เข้าสาขา: จุดสีประจำคน (แชมป์ เหลือง · เนม เขียว · มุก ม่วง) แยกตามสาขา แต่ละคนลงของตัวเองรายวัน.
 
 const TH_MONTHS_FULL = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const WEEKDAYS = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."];
@@ -19,12 +30,14 @@ type ShopMark = { key: string; time: string; title: string; branch: string; spec
 
 export function TeamCalendar({
   cards,
+  initialPresence,
   shopEvents,
   today,
   me,
   onPick
 }: {
   cards: BoardCard[];
+  initialPresence: OwnerPresence[];
   shopEvents: BoardEvent[];
   today: string;
   me: string;
@@ -34,7 +47,43 @@ export function TeamCalendar({
   const [selected, setSelected] = useState(today);
   const [showShop, setShowShop] = useLocalDraft<boolean>("tb-cal-shop", true);
 
+  const [presence, setPresence] = useState<OwnerPresence[]>(initialPresence);
+  const [presenceError, setPresenceError] = useState<string | null>(null);
+  const canMark = isPresenceMember(me);
+
   const days = useMemo(() => monthGrid(shopEvents, month), [shopEvents, month]);
+  const presenceMap = useMemo(() => presenceByDate(presence), [presence]);
+
+  const reloadPresence = useCallback(async () => {
+    const res = await mpApi<{ presence: OwnerPresence[] }>("presence", "GET");
+    if (res.ok) setPresence(res.data.presence);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") void reloadPresence();
+    }, 20_000);
+    const onFocus = () => void reloadPresence();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [reloadPresence]);
+
+  async function setMine(date: string, branch: PresenceBranch | "") {
+    if (!isPresenceMember(me)) return;
+    const before = presence;
+    const id = presenceId(date, me);
+    const rest = presence.filter((p) => p.id !== id);
+    setPresence(branch ? [...rest, { id, date, member: me, branch, updatedAt: new Date().toISOString() }] : rest);
+    setPresenceError(null);
+    const res = await mpApi("presence", "PUT", { date, branch });
+    if (!res.ok) {
+      setPresence(before);
+      setPresenceError(res.error);
+    }
+  }
 
   const tasksByDate = useMemo(() => {
     const map = new Map<string, TaskMark[]>();
@@ -58,6 +107,8 @@ export function TeamCalendar({
   const sel = days.find((d) => d.date === selected);
   const selTasks = tasksByDate.get(selected) ?? [];
   const selShop = sel ? shopOn(sel) : [];
+  const selPresence = presenceMap.get(selected) ?? [];
+  const myBranch = selPresence.find((p) => p.member === me)?.branch ?? "";
   const [y, m] = month.split("-").map(Number);
 
   return (
@@ -92,6 +143,13 @@ export function TeamCalendar({
 
       <div className="tc-legend" aria-hidden="true">
         <span className="tc-dot is-start" /> เริ่มหยิบ <span className="tc-dot is-due" /> วันส่ง {showShop ? (<><span className="tc-dot is-shop" /> อีเวนต์ร้าน</>) : null}
+        <span className="tc-legend__gap" />
+        {PRESENCE_MEMBERS.map((k) => (
+          <span key={k} className="tc-legend__who">
+            <span className={`tc-pdot who-${k}`} /> {memberName(k)}
+          </span>
+        ))}
+        <span>เข้าสาขา (บค บางแค · สฟ เสนาเฟสท์)</span>
       </div>
 
       <div className="tc-grid" role="grid">
@@ -103,6 +161,7 @@ export function TeamCalendar({
         {days.map((day) => {
           const tasks = tasksByDate.get(day.date) ?? [];
           const shop = shopOn(day);
+          const here = presenceMap.get(day.date) ?? [];
           const late = tasks.some((t) => t.kind === "due" && day.date < today);
           const cls = [
             "tc-cell",
@@ -120,6 +179,20 @@ export function TeamCalendar({
           return (
             <button key={day.date} type="button" role="gridcell" className={cls} aria-pressed={day.date === selected} onClick={() => setSelected(day.date)}>
               <span className="tc-num">{Number(day.date.slice(8))}</span>
+              {here.length ? (
+                <span className="tc-at" aria-hidden="true">
+                  {PRESENCE_BRANCHES.filter((b) => here.some((p) => p.branch === b.key)).map((b) => (
+                    <span key={b.key} className="tc-at__row">
+                      <span className="tc-at__br">{b.short}</span>
+                      {here
+                        .filter((p) => p.branch === b.key)
+                        .map((p) => (
+                          <span key={p.member} className={`tc-pdot who-${p.member}`} />
+                        ))}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
               <span className="tc-dots" aria-hidden="true">
                 {tasks.some((t) => t.kind === "start") ? <span className="tc-dot is-start" /> : null}
                 {tasks.some((t) => t.kind === "due") ? <span className={`tc-dot is-due${late ? " is-late" : ""}`} /> : null}
@@ -149,6 +222,49 @@ export function TeamCalendar({
               <Flag size={15} aria-hidden="true" /> ลงงานส่งวันนี้
             </button>
           </div>
+        </div>
+        <div className="tc-presence" aria-label="Owner เข้าสาขา">
+          <ul className="tc-presence__list">
+            {PRESENCE_MEMBERS.map((k) => {
+              const mark = selPresence.find((p) => p.member === k);
+              return (
+                <li key={k} className={`tc-presence__who who-${k}${mark ? "" : " is-off"}`}>
+                  <span className={`tc-pdot who-${k}`} aria-hidden="true" />
+                  <span className="tc-presence__name">{memberName(k)}</span>
+                  <span className="tc-presence__br">{mark ? branchLabel(mark.branch) : "ไม่ได้ลง"}</span>
+                </li>
+              );
+            })}
+          </ul>
+          {canMark ? (
+            <div className="tc-presence__pick" role="group" aria-label="วันนี้ฉันเข้าสาขา">
+              <span className="tc-presence__label">
+                <MapPin size={15} aria-hidden="true" /> ฉันเข้า
+              </span>
+              {PRESENCE_BRANCHES.map((b) => (
+                <button
+                  key={b.key}
+                  type="button"
+                  className={`mp-btn tc-presence__btn who-${me}${myBranch === b.key ? " is-on" : ""}`}
+                  aria-pressed={myBranch === b.key}
+                  disabled={selected < today}
+                  onClick={() => void setMine(selected, b.key)}
+                >
+                  {b.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={`mp-btn mp-btn--quiet tc-presence__btn${myBranch ? "" : " is-on"}`}
+                aria-pressed={!myBranch}
+                disabled={selected < today}
+                onClick={() => void setMine(selected, "")}
+              >
+                ไม่เข้า
+              </button>
+            </div>
+          ) : null}
+          {presenceError ? <p className="tc-presence__error" role="alert">{presenceError}</p> : null}
         </div>
         {selTasks.length === 0 && selShop.length === 0 ? <p className="tb-empty">วันนี้ว่าง ไม่มีงานหรืออีเวนต์</p> : null}
         <ul className="tb-day__items">

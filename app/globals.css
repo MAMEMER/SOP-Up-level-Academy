@@ -9301,13 +9301,41 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
 .tc-day__head h3 { margin: 0; font-size: 17px; }
 .tc-day__btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .tb-ev.is-shop { color: #6b6259; background: #faf7f3; }
+/* Owner เข้าสาขา — จุดสีประจำคนในช่องวัน + แผงเลือกของวันที่เลือก */
+.tc-pdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--who-dot, var(--mp-line-strong)); box-shadow: 0 0 0 1.5px #fff; flex: none; }
+.tc-legend__gap { width: 6px; }
+.tc-legend__who { display: inline-flex; align-items: center; gap: 4px; }
+.tc-at { display: grid; gap: 2px; padding-left: 3px; }
+.tc-at__row { display: flex; flex-wrap: wrap; align-items: center; gap: 1px; min-width: 0; }
+.tc-at .tc-pdot { width: 8px; height: 8px; }
+.tc-at__br { font-size: 10px; line-height: 1; font-weight: 600; color: var(--color-ink-soft); margin-right: 1px; }
+.tc-presence { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--mp-line); border-bottom: 1px solid var(--mp-line); }
+.tc-presence__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.tc-presence__who { display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px; }
+.tc-presence__who .tc-pdot { width: 11px; height: 11px; }
+.tc-presence__name { font-weight: 600; color: var(--who); }
+.tc-presence__who.is-off .tc-pdot { opacity: 0.3; }
+.tc-presence__who.is-off .tc-presence__br { color: var(--color-ink-soft); }
+.tc-presence__pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tc-presence__label { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: var(--color-ink-soft); margin-right: 2px; }
+.mp-root .tc-presence__btn { min-height: 44px; touch-action: manipulation; }
+.mp-root .tc-presence__btn.is-on[class*="who-"] { background: var(--who-soft); border-color: var(--who); color: var(--who); font-weight: 600; }
+.mp-root .tc-presence__btn.is-on.mp-btn--quiet { border-color: var(--color-ink-soft); font-weight: 600; }
+.tc-presence__error { margin: 0; font-size: 13.5px; color: var(--mp-red); }
+@media (min-width: 760px) {
+  .tc-at { grid-auto-flow: column; justify-content: start; gap: 8px; }
+  .tc-at__row { gap: 2px; }
+  .tc-at .tc-pdot { width: 9px; height: 9px; }
+  .tc-at__br { font-size: 11px; }
+}
 .tb-ev.is-special { color: #6a3fb5; }
 
 /* บอร์ดทีม: สีประจำคน — card stripe, owner pill, person tile, calendar chip */
-.who-champ { --who: #e8590c; --who-soft: #ffe8d9; }
-.who-top { --who: #2b8a3e; --who-soft: #e2f4e6; }
-.who-name { --who: #7048e8; --who-soft: #ede8fd; }
-.who-muk { --who: #c2255c; --who-soft: #fce4ee; }
+/* แชมป์ เหลือง · เนม เขียว · มุก ม่วง (เนมกำหนด 7 พ.ย. 69) · ท้อป ฟ้า. --who-dot = จุดสีสด, --who = ตัวหนังสือ/แถบ (เข้มพอให้อ่านออก) */
+.who-champ { --who: #b07d00; --who-soft: #fff3bf; --who-dot: #fcc419; }
+.who-top { --who: #1971c2; --who-soft: #e3f0fc; --who-dot: #339af0; }
+.who-name { --who: #2b8a3e; --who-soft: #e2f4e6; --who-dot: #40c057; }
+.who-muk { --who: #7048e8; --who-soft: #ede8fd; --who-dot: #845ef7; }
 .who-none { --who: var(--mp-line-strong); --who-soft: transparent; }
 .tb-card[class*="who-"], .tb-col.is-doing .tb-card[class*="who-"] { border-left: 5px solid var(--who); }
 .tb-card[class*="who-"] .tb-owner:not(.is-none), .tb-ev[class*="who-"] .tb-owner:not(.is-none) { background: var(--who-soft); color: var(--who); }
