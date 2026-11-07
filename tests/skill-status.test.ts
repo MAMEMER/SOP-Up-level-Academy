@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildSkillStatus, radarPoint, radarPolygon } from "../lib/skill-status.ts";
+import { computeSkillStatus, radarPoint, radarPolygon } from "../lib/skill-status.ts";
 
 describe("skill status", () => {
   it("splits 7 hard / 8 soft and treats missing levels as 0", () => {
-    const status = buildSkillStatus(undefined);
+    const status = computeSkillStatus(undefined);
     assert.equal(status.hard.items.length, 7);
     assert.equal(status.soft.items.length, 8);
     assert.equal(status.hasData, false);
@@ -14,7 +14,7 @@ describe("skill status", () => {
   });
 
   it("averages confirmed levels and clamps to the group max", () => {
-    const status = buildSkillStatus({
+    const status = computeSkillStatus({
       staffCode: "Boom",
       levels: { cashier: { level: 3, since: "2026-10-01" }, weekly_event: { level: 2, since: "2026-10-01" }, service: { level: 9, since: "2026-10-01" } },
       history: [],
@@ -30,4 +30,10 @@ describe("skill status", () => {
     assert.deepEqual(radarPoint(0, 7, 100, 200, 200), { x: 200, y: 100 });
     assert.equal(radarPolygon([4, 0, 0, 0], 4, 100, 0, 0).split(" ")[0], "0,-100");
   });
+});
+
+test("หน้าคะแนนไม่ได้สเตตัส skill เมื่อปิดระบบ skill ไว้", async () => {
+  const { SKILL_REVIEW_ENABLED } = await import("../lib/feature-flags.ts");
+  const { buildSkillStatus } = await import("../lib/skill-status.ts");
+  assert.equal(buildSkillStatus(undefined) === undefined, !SKILL_REVIEW_ENABLED);
 });

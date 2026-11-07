@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { radarPoint, radarPolygon, skillLevelLabels, type SkillStatusGroup, buildSkillStatus } from "../lib/skill-status.ts";
+import { radarPoint, radarPolygon, skillLevelLabels, type SkillStatusGroup, type SkillStatus } from "../lib/skill-status.ts";
 
 // สเตตัส Hard / Soft skill ของพนักงานหนึ่งคน: กราฟเรดาร์ + แถบระดับรายตัวชี้วัด.
 // ระดับมาจากที่แอดมินยืนยันใน /admin/skill-review เท่านั้น.
@@ -91,7 +91,7 @@ function SkillGroupPanel({ group }: { group: SkillStatusGroup }) {
   );
 }
 
-export function StaffSkillStatus({ staffCode, status }: { staffCode: string; status: ReturnType<typeof buildSkillStatus> }) {
+export function StaffSkillStatus({ staffCode, status }: { staffCode: string; status: SkillStatus }) {
   return (
     <div className="skill-status">
       {status.hasData ? null : (

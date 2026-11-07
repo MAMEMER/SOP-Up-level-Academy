@@ -2,6 +2,7 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
+import { SKILL_REVIEW_ENABLED } from "./feature-flags.ts";
 import {
   SKILL_LEVELS_COLLECTION,
   SKILL_REVIEWS_COLLECTION,
@@ -71,6 +72,8 @@ export async function saveSkillReview(record: SkillReviewRecord): Promise<void> 
 }
 
 export async function fetchSkillLevels(staffCode: string): Promise<SkillLevelsRecord | undefined> {
+  // ปิดระบบ skill ไว้ → ไม่อ่าน Firestore (หน้าคะแนนพนักงานเรียกทุกแถว)
+  if (!SKILL_REVIEW_ENABLED) return undefined;
   const mode = storageMode();
   if (mode === "firestore") {
     const doc = await adminDb().collection(SKILL_LEVELS_COLLECTION).doc(staffCode).get();

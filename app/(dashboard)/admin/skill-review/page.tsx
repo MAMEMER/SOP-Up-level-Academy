@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { SKILL_REVIEW_ENABLED } from "../../../../lib/feature-flags.ts";
 import { requireUser } from "../../../../lib/auth.ts";
 import { displayNameFor, employeeDirectory } from "../../../../lib/employee-directory.ts";
 import { sopUserForEmail } from "../../../../lib/sop-users.ts";
@@ -78,6 +79,7 @@ function back(week: string, staff: string, status: string): never {
 }
 
 async function requireWriter(week: string, staff: string) {
+  if (!SKILL_REVIEW_ENABLED) notFound();
   const user = await requireUser();
   if (user.role !== "admin" || user.isImpersonating) back(week, staff, "denied");
   return user;
@@ -226,6 +228,7 @@ function targetCriteria(indicator: SkillIndicator, target: number | null) {
 }
 
 export default async function AdminSkillReviewPage({ searchParams }: PageProps) {
+  if (!SKILL_REVIEW_ENABLED) notFound();
   const user = await requireUser();
   if (user.role !== "admin") redirect("/");
 

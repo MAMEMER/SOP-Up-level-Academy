@@ -42,3 +42,9 @@ test("แอดมินทั่วไปไม่เห็นหน้าเ�
   assert.equal(ownerNav.tops[0].href, "/admin");
   assert.equal(ownerNav.groups.at(-1)?.key, "staff-pages");
 });
+
+test("หน้าประเมิน skill (เก็บเป็นร่าง) ไม่โชว์ในเมนูเมื่อปิดสวิตช์", async () => {
+  const { SKILL_REVIEW_ENABLED } = await import("../lib/feature-flags.ts");
+  const hrefs = adminSectionsFor({ owner: true, staffAdmin: true }).flatMap((s) => s.links.map((l) => l.href));
+  assert.equal(hrefs.includes("/admin/skill-review"), SKILL_REVIEW_ENABLED);
+});

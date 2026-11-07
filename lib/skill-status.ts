@@ -3,6 +3,7 @@
 
 import { maxLevelFor, skillIndicators, type SkillGroup } from "./skill-indicators.ts";
 import type { SkillLevelsRecord } from "./skill-reviews.ts";
+import { SKILL_REVIEW_ENABLED } from "./feature-flags.ts";
 
 export const skillLevelLabels: Array<{ level: number; label: string }> = [
   { level: 1, label: "ฝึกหัด" },
@@ -36,7 +37,17 @@ export type SkillStatusGroup = {
   rated: number;
 };
 
-export function buildSkillStatus(record: SkillLevelsRecord | undefined): { hard: SkillStatusGroup; soft: SkillStatusGroup; hasData: boolean } {
+export type SkillStatus = { hard: SkillStatusGroup; soft: SkillStatusGroup; hasData: boolean };
+
+/**
+ * สเตตัสที่แสดงในหน้าคะแนนพนักงาน — คืน undefined เมื่อระบบ skill ถูกปิดไว้ (SKILL_REVIEW_ENABLED)
+ * หน้าคะแนนจึงไม่แสดงส่วนนี้เลยโดยไม่ต้องแก้หน้านั้น.
+ */
+export function buildSkillStatus(record: SkillLevelsRecord | undefined): SkillStatus | undefined {
+  return SKILL_REVIEW_ENABLED ? computeSkillStatus(record) : undefined;
+}
+
+export function computeSkillStatus(record: SkillLevelsRecord | undefined): SkillStatus {
   const groupOf = (group: SkillGroup): SkillStatusGroup => {
     const indicators = skillIndicators.filter((indicator) => indicator.group === group);
     const items = indicators.map((indicator) => ({
