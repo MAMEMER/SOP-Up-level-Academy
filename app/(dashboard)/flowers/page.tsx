@@ -81,7 +81,7 @@ export default async function FlowersHistoryPage({ searchParams }: PageProps) {
       <section className="sdoc-section flower-history">
         <p className="eyebrow">{thaiMonthLabel(month)}{isCurrent ? " · ยังไม่ปิดรอบ" : " · ปิดรอบแล้ว"}</p>
         <div className="flower-target-stats">
-          {owner ? <div><small>ยอดขายที่นับเข้าเป้า</small><strong>{baht(data.salesBaht)}</strong></div> : null}
+          {owner ? <div><small>ยอดขายที่นับเข้าเป้า</small><strong>{baht(data.salesBaht)}</strong><small>หักกิจกรรม {baht(data.excludedEventBaht)} · พรีออเดอร์ {baht(data.excludedPreorderBaht)}</small></div> : null}
           <div>
             <small>เป้าต่อคน ({data.settings.minPercentOfSales}% ของยอดขายร้าน)</small>
             <strong>{data.targetPetals > 0 ? bloomLabel(data.targetPetals) : "—"}</strong>

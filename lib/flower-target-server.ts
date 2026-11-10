@@ -12,6 +12,7 @@ import {
   type FlowerTargetSettings,
   type LeaderRow
 } from "./flower-target.ts";
+import { countedTotal } from "./flower-exclusions.ts";
 
 // ตัวเลขเป้าดอกไม้ของเดือนเดียว — ใช้ร่วมกันทั้งหน้าตั้งค่าของเจ้าของ แถบเตือนพนักงาน และสวนดอกไม้
 // ให้ทุกจอเห็นเลขเดียวกัน ไม่ใช่คนละสูตร
@@ -32,8 +33,12 @@ export async function saveFlowerTarget(input: unknown, by: string): Promise<Flow
 export type FlowerMonth = {
   month: string;
   settings: FlowerTargetSettings;
-  /** ยอดขายทั้งร้านที่นับเข้าเป้า (บาท) */
+  /** ยอดขายทั้งร้านที่นับเข้าเป้า (บาท) — หักค่ากิจกรรม/พรีออเดอร์แล้ว */
   salesBaht: number;
+  /** ค่ากิจกรรมที่หักออกจากฐาน (บาท) */
+  excludedEventBaht: number;
+  /** พรีออเดอร์ที่หักออกจากฐาน (บาท) */
+  excludedPreorderBaht: number;
   /** กลีบที่บิลทั้งเดือนแจกได้ (10 ฿ = 1 กลีบ) */
   potentialPetals: number;
   /** เป้าต่อคน */
@@ -51,7 +56,7 @@ export async function getFlowerMonth(month: string = bangkokMonth()): Promise<Fl
   const settings = await getFlowerTarget();
   const roster = employeeDirectory.map((entry) => ({ code: entry.code, name: entry.displayName || entry.code }));
   if (!hasAdminCredentials()) {
-    return { month, settings, salesBaht: 0, potentialPetals: 0, targetPetals: 0, leaderboard: leaderboard(roster, new Map()) };
+    return { month, settings, salesBaht: 0, excludedEventBaht: 0, excludedPreorderBaht: 0, potentialPetals: 0, targetPetals: 0, leaderboard: leaderboard(roster, new Map()) };
   }
 
   // อ่านเฉพาะช่วงเดือนนั้น (เผื่อขอบ ±1 วันเพราะเก็บเป็น UTC แต่ตัดเดือนตามเวลาไทย) — แถบนี้ขึ้นทุกหน้าหลัก
@@ -61,13 +66,19 @@ export async function getFlowerMonth(month: string = bangkokMonth()): Promise<Fl
     adminDb().collection(FLOWER_GRANTS_COLLECTION).where("createdAt", ">=", from).where("createdAt", "<", to).get()
   ]);
 
+  // ฐานเป้าหักค่ากิจกรรม/พรีออเดอร์ (แท็กไว้บนบิลโดย /api/flowers/tag-bills) — กลีบคิดจากยอดที่เหลือ
   let salesBaht = 0;
+  let excludedEventBaht = 0;
+  let excludedPreorderBaht = 0;
   let potentialPetals = 0;
   for (const doc of billSnap.docs) {
-    const bill = doc.data() as { petals?: number; total?: number; transactionTime?: string };
+    const bill = doc.data() as { total?: number; transactionTime?: string; excludedEvent?: number; excludedPreorder?: number };
     if (!billCounts(String(bill.transactionTime || ""), month, settings.startDate)) continue;
-    potentialPetals += Number(bill.petals) || 0;
-    salesBaht += Number(bill.total) || 0;
+    const counted = countedTotal(bill);
+    potentialPetals += Math.floor(counted / 10);
+    salesBaht += counted;
+    excludedEventBaht += Number(bill.excludedEvent) || 0;
+    excludedPreorderBaht += Number(bill.excludedPreorder) || 0;
   }
 
   // ฝั่งอ่านเอาแค่รหัสพนักงาน/ชนิด/จำนวนกลีบ — ตัวตนผู้ให้ไม่ถูกแตะเลย
@@ -83,6 +94,8 @@ export async function getFlowerMonth(month: string = bangkokMonth()): Promise<Fl
     month,
     settings,
     salesBaht: Math.round(salesBaht),
+    excludedEventBaht: Math.round(excludedEventBaht),
+    excludedPreorderBaht: Math.round(excludedPreorderBaht),
     potentialPetals,
     targetPetals: targetPetalsPerPerson(potentialPetals, settings.minPercentOfSales),
     leaderboard: leaderboard(roster, net)
