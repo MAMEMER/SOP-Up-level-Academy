@@ -104,7 +104,7 @@ export function FlowerTargetForm({ initial }: { initial: FlowerMonth }) {
       <section className="sdoc-section">
         <p className="eyebrow">เดือนนี้ ({data.month})</p>
         <div className="flower-target-stats">
-          <div><small>ยอดขายที่นับเข้าเป้า</small><strong>{baht(data.salesBaht)}</strong></div>
+          <div><small>ยอดขายที่นับเข้าเป้า</small><strong>{baht(data.salesBaht)}</strong><small>หักกิจกรรม {baht(data.excludedEventBaht)} · พรีออเดอร์ {baht(data.excludedPreorderBaht)}</small></div>
           <div><small>เป้าต่อคน</small><strong>{bloomLabel(target)}</strong><small>{target} กลีบ = {baht(target * 10)}</small></div>
         </div>
 

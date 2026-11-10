@@ -26,6 +26,14 @@
     {
       "path": "/api/parcel-orders/alerts",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/flowers/tag-bills",
+      "schedule": "30 16 * * *"
+    },
+    {
+      "path": "/api/flowers/tag-bills",
+      "schedule": "0 23 * * *"
     }
   ]
 }
