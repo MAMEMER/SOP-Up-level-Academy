@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Folder, FolderOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, Download, FileText, Folder, FolderOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LinkifiedText } from "./LinkifiedText.tsx";
 import { cardStoreWorkflow } from "../lib/card-store-workflow.ts";
@@ -174,6 +174,23 @@ const singleCardLayoutSteps = [
   }
 ];
 
+// ใบงาน WI (A4 หนึ่งหน้า) ต่อแฟ้ม — แสดงในแท็บ "ใบงาน" ของแฟ้มนั้น. Weekly event ทุกเกมใช้แผ่นเดียวกัน
+const worksheetFor = (id: string): string | undefined => {
+  if (id.startsWith("weekly-event-")) return "/training/worksheets/weekly-event.jpg";
+  const known = [
+    "open-store",
+    "guild-chat-exp",
+    "daytime-work",
+    "stock-work",
+    "close-store",
+    "stock-sleeve-work",
+    "stock-single-card-work",
+    "product-display",
+    "single-card-layout"
+  ];
+  return known.includes(id) ? `/training/worksheets/${id}.jpg` : undefined;
+};
+
 export function TrainingView({ branch }: { branch: string }) {
   // The manual text is owner-editable at /admin/manual-config; the code below is the
   // fallback that ships with the app. Fetched client-side, same as the checklist config.
@@ -229,6 +246,7 @@ export function TrainingView({ branch }: { branch: string }) {
   ].filter((group) => group.items.length);
 
   const [openId, setOpenId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"manual" | "worksheet">("manual");
   const detailRef = useRef<HTMLDivElement>(null);
   const scrollOnOpen = useRef(false);
 
@@ -237,6 +255,7 @@ export function TrainingView({ branch }: { branch: string }) {
       const id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
       scrollOnOpen.current = Boolean(id);
       setOpenId(id || null);
+      setTab("manual");
     };
     syncFromHash();
     window.addEventListener("hashchange", syncFromHash);
@@ -251,10 +270,13 @@ export function TrainingView({ branch }: { branch: string }) {
   const openFolder = (id: string | null) => {
     scrollOnOpen.current = Boolean(id);
     setOpenId(id);
+    setTab("manual");
     window.history.replaceState(null, "", id ? `#${id}` : window.location.pathname + window.location.search);
   };
 
   const openItem = folderGroups.flatMap((group) => group.items).find((item) => item.id === openId);
+  const worksheetSrc = openItem ? worksheetFor(openItem.id) : undefined;
+  const showWorksheet = Boolean(worksheetSrc) && tab === "worksheet";
 
   return (
     <main className="page">
@@ -304,6 +326,45 @@ export function TrainingView({ branch }: { branch: string }) {
             <ArrowLeft size={16} aria-hidden /> ปิดแฟ้ม {openItem.code} · กลับไปเลือกแฟ้มอื่น
           </button>
         ) : null}
+
+        {openItem && worksheetSrc ? (
+          <div className="wi-tabs" role="tablist" aria-label="คู่มือหรือใบงาน">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!showWorksheet}
+              className={showWorksheet ? "wi-tab" : "wi-tab is-on"}
+              onClick={() => setTab("manual")}
+            >
+              <BookOpen size={16} aria-hidden /> คู่มือ
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showWorksheet}
+              className={showWorksheet ? "wi-tab is-on" : "wi-tab"}
+              onClick={() => setTab("worksheet")}
+            >
+              <FileText size={16} aria-hidden /> ใบงาน
+            </button>
+          </div>
+        ) : null}
+
+        {showWorksheet && openItem && worksheetSrc ? (
+          <section className="wi-worksheet" aria-label={`ใบงาน ${openItem.title}`}>
+            <a className="wi-image-link" href={worksheetSrc} target="_blank" rel="noreferrer">
+              <img src={worksheetSrc} alt={`ใบงาน ${openItem.title}`} width={990} height={1400} loading="lazy" />
+            </a>
+            <div className="wi-worksheet__actions">
+              <a className="wi-tab" href={worksheetSrc} download>
+                <Download size={16} aria-hidden /> ดาวน์โหลดใบงาน (A4)
+              </a>
+              <span>กดที่รูปเพื่อดูเต็มจอ หรือพิมพ์ใช้หน้าร้าน</span>
+            </div>
+          </section>
+        ) : null}
+
+        <div hidden={showWorksheet}>
         {manualPhases.map((phase, phaseIndex) => {
           // fall back to an empty entry so adding a new phase can never 500 this page
           const media = manualMedia[phase.id] || { evidence: [] };
@@ -722,6 +783,7 @@ export function TrainingView({ branch }: { branch: string }) {
             </div>
           </article>
         ))}
+        </div>
       </div>
     </main>
   );
