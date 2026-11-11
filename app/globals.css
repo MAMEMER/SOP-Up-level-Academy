@@ -8364,6 +8364,20 @@ p.ab-help{padding-left:0}
 .wi-file-detail { scroll-margin-top: 18px; }
 .wi-manual[hidden] { display: none; }
 
+/* แท็บ คู่มือ | ใบงาน ในแฟ้มที่เปิดอยู่ */
+.wi-tabs { display: flex; gap: 0.5rem; margin: 0.5rem 0 1rem; border-bottom: 1px solid #e6e0d4; }
+.wi-tab {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 44px; padding: 0 1rem;
+  background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px;
+  font: inherit; font-size: 1rem; color: var(--color-ink-soft, #5c5d7a); cursor: pointer;
+  text-decoration: none; touch-action: manipulation;
+}
+.wi-tab.is-on { color: var(--color-orange-deep, #b85614); border-bottom-color: var(--color-orange, #ff8c42); font-weight: 600; }
+.wi-worksheet { display: grid; gap: 0.75rem; max-width: 820px; }
+.wi-worksheet img { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 18px rgba(45, 49, 66, 0.12); }
+.wi-worksheet__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; font-size: 0.9rem; color: var(--color-ink-soft, #5c5d7a); }
+.wi-worksheet__actions .wi-tab { padding: 0; border: 0; color: var(--color-orange-deep, #b85614); font-weight: 600; }
+
 .ti-section { display: grid; gap: 0; }
 .ti-section__title { padding-bottom: 0.5rem; }
 .ti-section__title { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1rem; }
