@@ -52,6 +52,27 @@ function laterDate(a: string, b: string): string {
   return daysBetween(a, b) > 0 ? b : a;
 }
 
+/** การส่งงานสมบูรณ์ที่นับให้คนนี้ (งานกลุ่ม: ใครในทีมส่งก็นับ) — ตรรกะเดียวกับ submissionsFor ใน lib/task-inbox.ts */
+function submissionsFor(project: WorkProject, assignee: string) {
+  const group = projectMode(project) === "group";
+  return (project.submissions || []).filter((entry) => group || entry.by === assignee);
+}
+
+/**
+ * วันที่ส่งงานล่าสุดที่ "ยังไม่ถูกตรวจ" (ตรงกับ taskState "submitted" ใน lib/task-inbox.ts) — ถ้ามี
+ * แปลว่างานหายจากหน้าแจ้งเตือนไปรอเจ้าของตรวจแล้ว ผู้รับผิดชอบไม่มีทางอัปเดตความคืบหน้าต่อได้จนกว่า
+ * เจ้าของจะตรวจ จึงห้ามหักคะแนน "ไม่อัปเดต" ของวันหลังจากส่งงานแล้ว (เคยหักผิดทุกวันจนกว่าเจ้าของตรวจ).
+ */
+function pendingSubmissionDate(project: WorkProject, assignee: string): string | null {
+  const subs = submissionsFor(project, assignee).slice().sort((a, b) => a.at.localeCompare(b.at));
+  const sub = subs.slice(-1)[0];
+  if (!sub) return null;
+  const lastReview = reviewEntriesFor(project, assignee).slice(-1)[0];
+  if (!lastReview) return sub.date;
+  if (lastReview.outcome !== "needs_fix") return null; // ผ่านแล้ว — assigneePassDate คุมอยู่แล้ว
+  return sub.at > lastReview.confirmedAt ? sub.date : null; // ส่งไปแล้วแต่ยังไม่ถูกตรวจรอบใหม่
+}
+
 export type NoProgressOptions = {
   /** วันนี้ (YYYY-MM-DD, เวลาไทย) — วันนี้ยังไม่จบ จึงไม่คิด นับได้ถึง "เมื่อวาน" */
   today: string;
@@ -78,7 +99,10 @@ export type NoProgressOptions = {
  *  - หน้าต่างเวลา = [max(วันเริ่ม, startFrom) … min(กำหนดส่งของคนนั้น, เมื่อวาน)]
  *      · ยกเลิกกำหนดใหม่ถ้าถูกสั่งแก้ (effectiveDue ใน project-review)
  *      · ถ้าผ่านแล้ว ตัดหน้าต่างที่วันผ่าน — ผ่านแล้วไม่ต้องอัปเดตต่อ
+ *      · ถ้าส่งงานแล้วรอตรวจ (ยังไม่ถูกตีกลับ) ตัดที่วันส่ง — งานหายจากหน้าแจ้งเตือนแล้ว ไม่มีทาง
+ *        อัปเดตต่อได้จนกว่าเจ้าของจะตรวจ (เคยหักผิดทุกวันระหว่างรอตรวจ — ใบนี้แก้)
  *      · ถ้างานปิด (done) ตัดที่วันอัปเดตล่าสุด — ทำจบแล้วไม่ต้องอัปเดตต่อ
+ *  - การส่งงานสมบูรณ์ (submissions) ก็ถือเป็นการอัปเดตของวันนั้นด้วย ไม่ใช่แค่ progress รายวัน
  *  - งานกลุ่ม: ใครในทีมอัปเดตวันนั้นก็ถือว่าครบทั้งวัน (ตาม teamNeedsProgressToday)
  *  - งานเดี่ยว: เจ้าของงานต้องอัปเดตเอง คนอื่นลงแทนไม่นับ — งานที่ส่งต่อแล้ว (lib/project-handover.ts)
  *    หักเฉพาะ "คนที่ถือครองงานในวันนั้น" ไม่ใช่ทุกคนที่เคยมีชื่อ ไม่งั้นวันเดียวโดนหักสองหัว
@@ -99,7 +123,8 @@ export function projectNoProgressAdjustments(projects: WorkProject[], opts: NoPr
     if (isSingleDay(project)) continue;
 
     const isGroup = projectMode(project) === "group";
-    const teamDates = new Set((project.progress || []).map((entry) => entry.date));
+    // ส่งงานสมบูรณ์ก็ถือว่า "อัปเดตความคืบหน้า" ของวันนั้นแล้ว (ไม่ใช่แค่ progress รายวัน)
+    const teamDates = new Set([...(project.progress || []).map((entry) => entry.date), ...(project.submissions || []).map((entry) => entry.date)]);
     const lastProgressDate = (project.progress || []).reduce<string | null>(
       (max, entry) => (max === null || daysBetween(max, entry.date) > 0 ? entry.date : max),
       null
@@ -113,6 +138,9 @@ export function projectNoProgressAdjustments(projects: WorkProject[], opts: NoPr
       // ผ่านแล้ว → ตัดที่วันผ่าน
       const passDate = assigneePassDate(project, assignee);
       if (passDate) end = earlierDate(end, passDate);
+      // ส่งงานแล้วรอตรวจ (ยังไม่ถูกตีกลับ) → งานหายจากหน้าแจ้งเตือน ไม่มีทางอัปเดตต่อได้ ตัดที่วันส่ง
+      const pendingDate = pendingSubmissionDate(project, assignee);
+      if (pendingDate) end = earlierDate(end, pendingDate);
       // งานปิดแล้ว → ตัดที่วันอัปเดตล่าสุด (ทำจบแล้วไม่ต้องอัปเดตต่อ)
       if (project.status === "done" && lastProgressDate) end = earlierDate(end, lastProgressDate);
 
@@ -122,7 +150,10 @@ export function projectNoProgressAdjustments(projects: WorkProject[], opts: NoPr
 
       const personDatesForSingle = isGroup
         ? null
-        : new Set((project.progress || []).filter((entry) => entry.by === assignee).map((entry) => entry.date));
+        : new Set([
+            ...(project.progress || []).filter((entry) => entry.by === assignee).map((entry) => entry.date),
+            ...submissionsFor(project, assignee).map((entry) => entry.date)
+          ]);
 
       // safety: กันลูปหลุด (โปรเจกต์ยาวเกินจริง) — สอดคล้องกับ MAX_PROJECT_PROGRESS
       const maxDays = Math.min(span, 400);
