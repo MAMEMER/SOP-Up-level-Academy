@@ -9890,3 +9890,29 @@ html:has(.mp-root), html:has(.mp-root) body { background: #FFF9EE; }
   .skill-status__label { font-size: 15px; }
   .skill-status__radar { overflow: visible; }
 }
+
+/* KPI ใหม่: ประเมิน 360 (/peer-review, /admin/peer-review) + บันทึกความผิด (/mistakes, /admin/mistakes) */
+.peer-review__person > summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; list-style: none; font-size: 16px; touch-action: manipulation; }
+.peer-review__person > summary::-webkit-details-marker { display: none; }
+.peer-review__person[open] > summary { margin-bottom: 4px; }
+.peer-review__done { flex: none; font-size: 13px; padding: 2px 10px; border-radius: 999px; background: #ddf3e4; color: #17663a; }
+.peer-review__todo { color: #b42318; }
+span.peer-review__todo { font-weight: 600; }
+.peer-review__person summary .peer-review__todo { flex: none; font-size: 13px; padding: 2px 10px; border-radius: 999px; background: #fde3e3; }
+.peer-review__mine { list-style: none; margin: 8px 0 0; padding: 0; }
+.peer-review__mine li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(45, 49, 66, 0.1); font-size: 14.5px; }
+.peer-review__mine li span { min-width: 0; }
+.peer-review__mine li strong { flex: none; font-size: 16px; font-variant-numeric: tabular-nums; }
+.peer-review__table { display: flex; flex-direction: column; }
+.peer-review__tr { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; min-height: 44px; padding: 6px 8px; border-bottom: 1px solid rgba(45, 49, 66, 0.1); color: inherit; text-decoration: none; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.peer-review__tr span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peer-review__tr.is-head { min-height: 0; font-size: 12.5px; color: var(--color-ink-soft); }
+a.peer-review__tr:hover,
+.peer-review__tr.is-active { background: rgba(255, 255, 255, 0.75); border-radius: 10px; }
+.peer-review__given { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; font-size: 13.5px; }
+.peer-review__given em { display: block; color: var(--color-ink-soft); font-size: 12.5px; }
+.mistake-log__reason { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(45, 49, 66, 0.15); font: inherit; font-size: 16px; }
+.mistake-log__voided { opacity: 0.55; }
+.skill-review__inline button.mistake-log__delete { background: transparent; color: #b42318; border: 1px solid rgba(180, 35, 24, 0.35); }
+.mistake-log .skill-review__inline .mistake-log__reason { flex: 1 1 100%; }
+.mistake-log .skill-review__inline button { min-height: 44px; }
