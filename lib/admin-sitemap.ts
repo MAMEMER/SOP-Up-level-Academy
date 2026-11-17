@@ -81,7 +81,7 @@ export const adminSections: SiteSection[] = [
   {
     key: "score",
     label: "คะแนน & เงิน",
-    hint: "KPI หักเงิน ของหาย",
+    hint: "KPI เงินเดือน ของหาย",
     links: [
       { href: "/admin/performance-score", label: "คะแนนพนักงาน", detail: "KPI 5 หมวด · incentive · เหตุผลที่หักรายวัน", keywords: "kpi เงินเดือน" },
       { href: "/admin/stock-check", label: "ลงผลนับ Stock", detail: "ผลนับของวันนั้น ตรง / ไม่ตรง / ไม่ได้นับ (มีผลกับคะแนน)", keywords: "สต็อก" },
@@ -89,7 +89,7 @@ export const adminSections: SiteSection[] = [
       { href: "/admin/peer-review", label: "ผลประเมิน 360 (KPI ใหม่)", detail: "ค2 · คะแนนทีมเวิร์กรายเดือน ใครประเมินใคร ตัวอย่างที่เขียน", keywords: "360 ทีมเวิร์ก เพื่อนประเมิน peer kpi ใหม่" },
       { href: "/admin/skill-review", label: "ประเมิน skill รายสัปดาห์ (ทดสอบ)", detail: "ลงผล 15 ตัวชี้วัดทุกวันจันทร์ · วันทำงาน · ข้อเสนอขึ้น/ลดระดับ (ไม่ผูก KPI)", keywords: "skill ทักษะ career path ระดับ ประเมิน" },
       { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach", keywords: "audit" },
-      { href: "/admin/payroll", label: "เงินเดือนพนักงาน", detail: "ประจำ / พาร์ทไทม์ · หักตามคะแนน · OT · ปรับบวก-ลบพร้อมเหตุผล", ownerOnly: true, keywords: "payroll เงินเดือน ค่าแรง ot โอที" },
+      { href: "/admin/payroll", label: "เงินเดือนพนักงาน", detail: "ประจำ / พาร์ทไทม์ · OT · ปรับบวก-ลบพร้อมเหตุผล · เลิกหักตามคะแนนตั้งแต่ พ.ย. 2569", ownerOnly: true, keywords: "payroll เงินเดือน ค่าแรง ot โอที" },
       { href: "/admin/man-hours", label: "ภาระงานพนักงาน (man-hour)", detail: "แต่ละงานใช้กี่นาที · ทำครบแล้วว่างไหม หนักไหม รายคน/รายวัน", ownerOnly: true, keywords: "man hour ชั่วโมงงาน เวลาว่าง งานหนัก workload" },
       { href: "/admin/stock-loss", label: "ของหาย น้ำ/ขนม", detail: "มูลค่าของที่หายรายรอบ · จุดที่ควรตาม", ownerOnly: true, keywords: "สต็อกหาย loss" },
       { href: "/admin/line-bot", label: "ผู้ช่วยไลน์ (บอท)", detail: "บอทตอบอะไรไปบ้าง ตอบเร็วแค่ไหน · เตือนแล้วส่งทันไหม", ownerOnly: true, keywords: "line ไลน์ bot golden baby เตือน" },

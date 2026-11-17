@@ -103,3 +103,30 @@ test("360: coworkers share a branch+day, open periods, scoring and validation", 
   assert.equal(validatePeerReview({ ratings: { ...all2 }, examples: {} }), null);
   assert.match(validatePeerReview({ ratings: { q1: 2 }, examples: {} }) || "", /ยังไม่ได้ให้คะแนน/);
 });
+
+test("KPI salary deduction is abolished for periods ending on/after 2026-11-01", async () => {
+  const { salaryDeductionAbolished, calculateEmployeePerformanceScore } = await import("../lib/performance-score.ts");
+  assert.equal(salaryDeductionAbolished("2026-10-31"), false);
+  assert.equal(salaryDeductionAbolished("2026-11-15"), true);
+  assert.equal(salaryDeductionAbolished(undefined), false);
+  // Manual deductions push every category to 0 → total under 50: before the cutoff it docks pay, after it does not.
+  const cats = ["attendance", "stock", "checklist", "customer_service", "assigned_work"] as const;
+  const input = {
+    employeeName: "Boom",
+    employmentType: "full_time" as const,
+    daysWorked: 20,
+    now: Date.parse("2027-01-01T00:00:00+07:00"),
+    attendance: { schedules: [], clockEvents: [] },
+    stockCounts: [],
+    checklistEvents: [],
+    serviceEvents: [],
+    assignedWorks: [],
+    adjustments: cats.map((category) => ({ category, points: -20, reason: "test", workDate: "2026-10-10" }))
+  };
+  const before = calculateEmployeePerformanceScore({ ...input, periodEndDate: "2026-10-31" });
+  const after = calculateEmployeePerformanceScore({ ...input, periodEndDate: "2026-11-30" });
+  assert.ok(before.totalScore < 50);
+  assert.ok(before.salaryDeduction.amount > 0);
+  assert.equal(after.salaryDeduction.amount, 0);
+  assert.equal(before.totalScore, after.totalScore);
+});
