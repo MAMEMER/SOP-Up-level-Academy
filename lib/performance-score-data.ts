@@ -377,6 +377,7 @@ export function getPerformanceScoreRowsForRange(
     });
     return calculateEmployeePerformanceScore({
       employeeName,
+      periodEndDate: period.endDate,
       employmentType: employmentTypeFor(employeeName),
       daysWorked: employeePeriodSchedules.length,
       attendance: {

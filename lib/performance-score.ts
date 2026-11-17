@@ -145,6 +145,8 @@ export type SalaryDeduction = {
 
 export type EmployeePerformanceInput = {
   employeeName: string;
+  /** last day of the scored period — decides whether the KPI salary deduction still applies */
+  periodEndDate?: string;
   attendance: AttendanceInput;
   annualLeave?: {
     schedules: ShiftSchedule[];
@@ -529,6 +531,15 @@ export function getIncentiveTier(totalScore: number, rules: KpiRules = defaultKp
   return { label: tier.label, percent: tier.percent, requiresCoaching: tier.percent === 0 };
 }
 
+// Salary deduction by KPI was abolished by Champ on 2026-11-16 (new KPI system: a low score
+// means a warning / no incentive, never a pay cut). Any period that ends on or after this
+// date docks nothing; earlier periods keep their historical figure so past payroll still reads.
+export const SALARY_DEDUCTION_OFF_FROM = "2026-11-01";
+
+export function salaryDeductionAbolished(periodEndDate: string | undefined): boolean {
+  return Boolean(periodEndDate && periodEndDate >= SALARY_DEDUCTION_OFF_FROM);
+}
+
 // KPI 21 Jul 2026: below 50 total, salary is docked. Full time = whole points short × 500.
 // Part time = points-short percent of the month's earnings (daysWorked × dailyRate). Rounds up.
 export function calculateSalaryDeduction(
@@ -637,7 +648,14 @@ export function calculateEmployeePerformanceScore(input: EmployeePerformanceInpu
       ...categories.assignedWork.warnings
     ],
     leaveSummary: summarizeLeave(leaveRecords, rules),
-    salaryDeduction: calculateSalaryDeduction(totalScore, {
+    salaryDeduction: salaryDeductionAbolished(input.periodEndDate)
+      ? {
+          amount: 0,
+          employmentType: input.employmentType ?? "full_time",
+          pointsShort: 0,
+          basis: "ยกเลิกการหักเงินตาม KPI แล้ว (ตั้งแต่ พ.ย. 2569)"
+        }
+      : calculateSalaryDeduction(totalScore, {
       employmentType: input.employmentType,
       daysWorked: input.daysWorked,
       dailyRate: rules.salary.partTimeDailyRate,

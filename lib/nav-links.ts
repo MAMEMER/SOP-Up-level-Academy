@@ -29,7 +29,9 @@ export const staffGroups: NavGroup[] = [
       { href: "/my-tasks/file", label: "แฟ้มงาน" },
       { href: "/orders", label: "ออเดอร์ลูกค้า" },
       { href: "/parcels", label: "พัสดุการ์ด" },
-      { href: "/my-documents", label: "เอกสารของฉัน" }
+      { href: "/my-documents", label: "เอกสารของฉัน" },
+      { href: "/peer-review", label: "ประเมินเพื่อนร่วมกะ (360)" },
+      { href: "/mistakes", label: "บันทึกความผิดของฉัน" }
     ]
   },
   {
