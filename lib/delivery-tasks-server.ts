@@ -2,6 +2,7 @@ import "server-only";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { isWorkingAssignment, type ShiftAssignment, type ShiftCode } from "./shift-schedule.ts";
 import { allBranchKeys } from "./store-config.ts";
+import { effectiveShift, type RosterCell } from "./shift-duty.ts";
 import { branchFor } from "./employee-directory.ts";
 import {
   DELIVERY_BRANCH,
@@ -164,7 +165,11 @@ export async function fetchShiftPlacement(
     const updatedAt = data.updatedAt ?? "";
     if (!best || updatedAt > best.updatedAt) best = { shift: data.assignment, branch: order[index], updatedAt };
   }
-  return best ? { shift: best.shift, branch: best.branch } : null;
+  if (!best) return null;
+  // ก1/ก2 label → real duty from the whole branch-day roster (lib/shift-duty.ts)
+  const day = await adminDb().collection(SHIFTS).where("branch", "==", best.branch).where("workDate", "==", workDate).get();
+  const shift = effectiveShift(day.docs.map((doc) => doc.data() as RosterCell), staffCode) ?? best.shift;
+  return { shift, branch: best.branch };
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   type BranchShiftConfig
 } from "../../../lib/branch-shift-config.ts";
 import { allBranchKeys } from "../../../lib/store-config.ts";
+import { effectiveShift, type RosterCell } from "../../../lib/shift-duty.ts";
 
 // Server route for the shift planner collections (fix 1). Replaces the client Firestore
 // store (lib/shift-schedule-store.ts). Reads: any signed-in user (the staff dashboard
@@ -84,7 +85,13 @@ export async function GET(request: Request) {
         const staffCode = p.get("staffCode") || "";
         if (!workDate || !staffCode) return badRequest("missing_params");
         const snap = await db().collection(SHIFTS).doc(shiftDocId(branch, workDate, staffCode)).get();
-        return NextResponse.json({ plan: snap.exists ? snap.data() : null });
+        if (!snap.exists) return NextResponse.json({ plan: null });
+        const plan = snap.data() as { assignment?: string; branch?: string };
+        if (plan.assignment !== "s1" && plan.assignment !== "s2") return NextResponse.json({ plan });
+        // ก1/ก2 label → real duty from the whole branch-day roster (lib/shift-duty.ts)
+        const day = await db().collection(SHIFTS).where("branch", "==", plan.branch || branch).where("workDate", "==", workDate).get();
+        const duty = effectiveShift(day.docs.map((d) => d.data() as RosterCell), staffCode) ?? plan.assignment;
+        return NextResponse.json({ plan: { ...plan, assignment: duty, plannedAssignment: plan.assignment } });
       }
       case "dayEvent": {
         const workDate = p.get("workDate") || "";

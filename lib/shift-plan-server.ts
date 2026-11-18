@@ -1,6 +1,7 @@
 import "server-only";
 import { adminDb, hasAdminCredentials } from "./firebase-admin.ts";
 import { isWorkingAssignment, type ShiftAssignment, type ShiftCode } from "./shift-schedule.ts";
+import { effectiveShiftMap, type RosterCell } from "./shift-duty.ts";
 
 // Server-side reader for the shift PLAN (schedule_shifts). The planner UI writes these
 // docs via the client SDK (lib/shift-schedule-store.ts); the owner dashboard needs the
@@ -52,14 +53,8 @@ export async function fetchShiftAssignmentsForDate(
   // No plan cells at all for this day → no schedule to filter against.
   if (snapshot.empty) return null;
 
-  const shifts = new Map<string, ShiftCode>();
-  for (const doc of snapshot.docs) {
-    const data = doc.data() as { staffCode?: string; assignment?: ShiftAssignment };
-    if (data.staffCode && data.assignment && isWorkingAssignment(data.assignment)) {
-      shifts.set(data.staffCode, data.assignment);
-    }
-  }
-  return shifts;
+  // duty shift from the whole day's roster, not the raw ก1/ก2 label (lib/shift-duty.ts)
+  return effectiveShiftMap(snapshot.docs.map((doc) => doc.data() as RosterCell));
 }
 
 /**
