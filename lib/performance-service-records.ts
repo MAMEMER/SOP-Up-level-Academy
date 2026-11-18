@@ -8,6 +8,7 @@ import type { KpiRules } from "./kpi-rules.ts";
 
 const SERVICE_COLLECTION = "sop_service_records";
 const ASSIGNED_COLLECTION = "sop_assigned_records";
+const STANDARDS_COLLECTION = "sop_store_standards_records";
 
 export type CustomerServiceRecord = {
   id: string;
@@ -50,9 +51,30 @@ export type AssignedWorkRecord = {
 
 export type AssignedWorkRecordInput = Omit<AssignedWorkRecord, "id" | "recordedAt">;
 
+/**
+ * "มาตรฐานร้าน" — a manual quality score an admin keys in by hand (0-100), kept
+ * deliberately OUT of EmployeePerformanceScore.categories / totalScore so it never touches
+ * incentive % or salary deductions (ticket: หัวข้อ "มาตรฐานร้าน" เฉพาะหน้า
+ * /admin/performance-score — เนมเลือกให้แสดงแยกต่างหาก ไม่ผูกกับคะแนน 100 ที่ใช้คิดเงินเดือน).
+ */
+export type StoreStandardsRecord = {
+  id: string;
+  workDate: string;
+  employeeName: string;
+  score: number;
+  note: string;
+  /** URL or note pointing to proof (screenshot / chat link) */
+  evidence?: string;
+  recordedAt: string;
+};
+
+export type StoreStandardsRecordInput = Omit<StoreStandardsRecord, "id" | "recordedAt">;
+
 export type PerformanceDailyStore = {
   serviceRecords: CustomerServiceRecord[];
   assignedWorkRecords: AssignedWorkRecord[];
+  /** manual "มาตรฐานร้าน" score records — see StoreStandardsRecord above */
+  storeStandardsRecords?: StoreStandardsRecord[];
   /** owner-entered stock checks — the input for the Stock KPI category */
   stockCheckRecords: StockCheckRecord[];
   /** admin-entered checklist audits (สุ่มตรวจ) — the manual half of the Checklist category */
@@ -93,6 +115,20 @@ export function addAssignedWorkRecord(records: AssignedWorkRecord[], input: Assi
       imageEvidence: input.imageEvidence?.filter(Boolean),
       recordedAt,
       id: recordId("assigned", input, recordedAt)
+    }
+  ];
+}
+
+export function addStoreStandardsRecord(records: StoreStandardsRecord[], input: StoreStandardsRecordInput, recordedAt = new Date().toISOString()) {
+  return [
+    ...records,
+    {
+      ...input,
+      score: Math.min(100, Math.max(0, Math.round(input.score))),
+      note: input.note.trim(),
+      evidence: (input.evidence || "").trim() || undefined,
+      recordedAt,
+      id: recordId("standards", input, recordedAt)
     }
   ];
 }
@@ -139,6 +175,19 @@ export function assignedWorkRecordsForDate(records: AssignedWorkRecord[], workDa
 
 export function assignedWorkRecordById(records: AssignedWorkRecord[], id: string) {
   return records.find((record) => record.id === id) || null;
+}
+
+export function storeStandardsRecordsForDate(records: StoreStandardsRecord[], workDate: string) {
+  return records.filter((record) => record.workDate === workDate);
+}
+
+export function storeStandardsAveragesByEmployee(records: StoreStandardsRecord[]) {
+  const totals = new Map<string, { sum: number; count: number }>();
+  records.forEach((record) => {
+    const existing = totals.get(record.employeeName) || { sum: 0, count: 0 };
+    totals.set(record.employeeName, { sum: existing.sum + record.score, count: existing.count + 1 });
+  });
+  return new Map([...totals.entries()].map(([employeeName, { sum, count }]) => [employeeName, { average: Math.round(sum / count), count }]));
 }
 
 export function customerServiceRecordsToEvents(records: CustomerServiceRecord[]) {
@@ -207,11 +256,12 @@ export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStor
   // Stock checks are written with the service account, so they are fetched by the
   // server-only composer in lib/performance-daily-store.ts. Keeping that import out of
   // this module lets the record helpers here stay unit-testable.
-  const [serviceRecords, assignedWorkRecords] = await Promise.all([
+  const [serviceRecords, assignedWorkRecords, storeStandardsRecords] = await Promise.all([
     restListCollection<CustomerServiceRecord>(SERVICE_COLLECTION),
-    restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION)
+    restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION),
+    restListCollection<StoreStandardsRecord>(STANDARDS_COLLECTION)
   ]);
-  return { serviceRecords, assignedWorkRecords, stockCheckRecords: [], checklistAuditRecords: [], scoreAdjustments: [] };
+  return { serviceRecords, assignedWorkRecords, storeStandardsRecords, stockCheckRecords: [], checklistAuditRecords: [], scoreAdjustments: [] };
 }
 
 export async function saveCustomerServiceRecord(input: CustomerServiceRecordInput) {
@@ -238,6 +288,20 @@ export async function saveAssignedWorkRecord(input: AssignedWorkRecordInput) {
     employeeName: record.employeeName,
     title: record.title,
     status: record.status,
+    note: record.note,
+    evidence: record.evidence,
+    recordedAt: record.recordedAt
+  });
+  return record;
+}
+
+export async function saveStoreStandardsRecord(input: StoreStandardsRecordInput) {
+  const record = addStoreStandardsRecord([], input)[0];
+  await restUpsertDoc(STANDARDS_COLLECTION, record.id, {
+    id: record.id,
+    workDate: record.workDate,
+    employeeName: record.employeeName,
+    score: record.score,
     note: record.note,
     evidence: record.evidence,
     recordedAt: record.recordedAt

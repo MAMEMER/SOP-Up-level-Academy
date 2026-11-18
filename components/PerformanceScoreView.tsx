@@ -8,6 +8,7 @@ import {
   getPerformanceScoreRows,
   getPerformanceSummary,
   getPerformanceSourceDetail,
+  getStoreStandardsScoresForRange,
   performanceSourceStatuses,
   currentReviewPeriod,
   previousHalfMonthPeriod,
@@ -17,7 +18,9 @@ import {
   assignedWorkRecordsForDate,
   customerServiceRecordsForDate,
   saveAssignedWorkRecords,
-  saveCustomerServiceRecord
+  saveCustomerServiceRecord,
+  saveStoreStandardsRecord,
+  storeStandardsRecordsForDate
 } from "../lib/performance-service-records.ts";
 import { EvidenceImageInput } from "./EvidenceImageInput.tsx";
 import { PerformanceCsvButton } from "./PerformanceCsvButton.tsx";
@@ -249,6 +252,9 @@ type InputStatus =
   | "service-saved"
   | "service-error"
   | "service-denied"
+  | "standards-saved"
+  | "standards-error"
+  | "standards-denied"
   | "adjust-saved"
   | "adjust-removed"
   | "adjust-error"
@@ -318,6 +324,32 @@ async function saveComplaintServiceAction(formData: FormData) {
   }
   revalidatePath("/admin/performance-score");
   revalidatePath("/performance-score");
+  redirect(withInputStatus(redirectTo, inputStatus));
+}
+
+/**
+ * มาตรฐานร้าน — admin keys in a 0-100 score by hand. Visible only at
+ * /admin/performance-score (gated in the component below), and the score is NOT folded
+ * into EmployeePerformanceScore, so it never touches incentive % or salary deductions.
+ */
+async function saveStoreStandardsAction(formData: FormData) {
+  "use server";
+  const redirectTo = safeRedirectTo(formData.get("redirectTo"));
+  const user = await requireUser();
+  if (user.role !== "admin" || user.isImpersonating) redirect(withInputStatus(redirectTo, "standards-denied"));
+  let inputStatus: InputStatus = "standards-saved";
+  try {
+    await saveStoreStandardsRecord({
+      workDate: stringValue(formData, "standardsDate"),
+      employeeName: stringValue(formData, "employeeName"),
+      score: Number(stringValue(formData, "standardsScore") || "0"),
+      note: stringValue(formData, "standardsNote"),
+      evidence: stringValue(formData, "standardsEvidence")
+    });
+  } catch {
+    inputStatus = "standards-error";
+  }
+  revalidatePath("/admin/performance-score");
   redirect(withInputStatus(redirectTo, inputStatus));
 }
 
@@ -446,6 +478,10 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
   const customRules = dailyStore.kpiRules?.customRules || [];
   const serviceRecordsForDay = customerServiceRecordsForDate(dailyStore.serviceRecords, entryDate);
   const assignedRecordsForDay = assignedWorkRecordsForDate(dailyStore.assignedWorkRecords, entryDate);
+  // มาตรฐานร้าน แสดงเฉพาะหน้า admin — ไม่ใช่ว่ามันคิดหนักอะไร แค่เนมสั่งให้เฉพาะหน้านี้
+  const isAdminPage = basePath === "/admin/performance-score";
+  const standardsRecordsForDay = isAdminPage ? storeStandardsRecordsForDate(dailyStore.storeStandardsRecords || [], entryDate) : [];
+  const storeStandardsScores = isAdminPage ? getStoreStandardsScoresForRange(activePeriod, dailyStore) : [];
   // Read-only CSV of the on-screen table for the selected round. Built here from the same
   // rows the table renders and handed to a client button that downloads it in the browser —
   // no server round-trip, no money columns, no phone/address.
@@ -685,7 +721,74 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
             )}
           </div>
         </article>
+
+        {isAdminPage ? (
+          <article className="performance-input-panel">
+            <div>
+              <p className="eyebrow">มาตรฐานร้าน</p>
+              <h3>บันทึกคะแนนมาตรฐานร้านรายวัน</h3>
+              <p>คะแนนนี้แยกต่างหาก ไม่รวมกับคะแนนรวม 100 ที่ใช้คิด incentive/หักเงินเดือน</p>
+            </div>
+            {inputStatus === "standards-saved" ? <p className="input-status success">บันทึกคะแนนมาตรฐานร้านแล้ว</p> : null}
+            {inputStatus === "standards-denied" ? <p className="input-status warning">บันทึกได้เฉพาะแอดมิน และต้องไม่อยู่ในโหมดดูแทนพนักงาน</p> : null}
+            {inputStatus === "standards-error" ? <p className="input-status warning">บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง</p> : null}
+            <form action={saveStoreStandardsAction} className="performance-input-form">
+              <input type="hidden" name="redirectTo" value={redirectTo} />
+              <label>
+                วันที่
+                <input name="standardsDate" type="date" defaultValue={entryDate} />
+              </label>
+              <label>
+                พนักงาน
+                <select name="employeeName" defaultValue={staffOptions()[0]?.code}>
+                  {staffOptions().map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+                </select>
+              </label>
+              <label>
+                คะแนน (0-100)
+                <input name="standardsScore" type="number" min="0" max="100" defaultValue="100" />
+              </label>
+              <label className="wide">
+                หมายเหตุ
+                <input name="standardsNote" placeholder="เช่น ความสะอาดร้าน / การจัดเรียงสินค้า / มารยาทพนักงาน" />
+              </label>
+              <label className="wide">
+                หลักฐาน (รูป/ลิงก์)
+                <EvidenceImageInput name="standardsEvidence" />
+              </label>
+              <button type="submit">บันทึกคะแนนมาตรฐานร้าน</button>
+            </form>
+            <div className="performance-daily-records">
+              <strong>รายการวันที่ {entryDate}</strong>
+              {standardsRecordsForDay.length ? (
+                standardsRecordsForDay.map((record) => (
+                  <span key={record.id}>{displayNameFor(record.employeeName)}: {record.score}/100{record.note ? ` — ${record.note}` : ""}</span>
+                ))
+              ) : (
+                <span>ยังไม่มีคะแนนมาตรฐานร้านวันนี้</span>
+              )}
+            </div>
+          </article>
+        ) : null}
       </section>
+
+      {isAdminPage ? (
+        <section className="performance-standards-score-grid" aria-label="คะแนนมาตรฐานร้าน">
+          <h3>คะแนนมาตรฐานร้าน (แยกจากคะแนนรวม 100)</h3>
+          <div className="performance-table-head">
+            <span>พนักงาน</span>
+            <span>คะแนนเฉลี่ยในช่วงที่เลือก</span>
+            <span>จำนวนครั้งที่บันทึก</span>
+          </div>
+          {storeStandardsScores.map((item) => (
+            <article key={item.employeeName} className="performance-score-row">
+              <div><strong>{displayNameFor(item.employeeName)}</strong></div>
+              <div><strong>{item.average === null ? "ยังไม่มีข้อมูล" : `${item.average}/100`}</strong></div>
+              <div><strong>{item.count}</strong></div>
+            </article>
+          ))}
+        </section>
+      ) : null}
 
       {adjustStatusMessage ? <p className={`input-status ${adjustStatusMessage.tone}`}>{adjustStatusMessage.text}</p> : null}
 
