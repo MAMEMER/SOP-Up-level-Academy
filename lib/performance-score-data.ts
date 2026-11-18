@@ -12,6 +12,7 @@ import {
 import {
   assignedWorkRecordsToWorks,
   customerServiceRecordsToEvents,
+  storeStandardsAveragesByEmployee,
   type PerformanceDailyStore
 } from "./performance-service-records.ts";
 import { branchFor, employeeCodes, employmentTypeFor } from "./employee-directory.ts";
@@ -408,6 +409,20 @@ export function getPerformanceScoreRowsForRange(
       assignedWorks: assignedWorksFromRecords.filter((item) => item.employeeName === employeeName).map((item) => item.work)
     });
   });
+}
+
+/**
+ * "มาตรฐานร้าน" — manual score kept separate from EmployeePerformanceScore.totalScore
+ * (ไม่ผูกกับคะแนน 100 ที่ใช้คิด incentive/หักเงินเดือน ตามที่เนมเลือกไว้).
+ */
+export function getStoreStandardsScoresForRange(period: PerformanceReviewPeriod, dailyStore: PerformanceDailyStore) {
+  const recordsInPeriod = (dailyStore.storeStandardsRecords || []).filter((record) => inPeriod(record.workDate, period));
+  const averages = storeStandardsAveragesByEmployee(recordsInPeriod);
+  return employees.map((employeeName) => ({
+    employeeName,
+    average: averages.get(employeeName)?.average ?? null,
+    count: averages.get(employeeName)?.count ?? 0
+  }));
 }
 
 export function getPerformanceSummary(rows: EmployeePerformanceScore[]) {
