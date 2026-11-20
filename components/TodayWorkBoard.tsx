@@ -9,7 +9,7 @@
 // "ตกลงวันนี้ต้องทำอะไรบ้าง" without reading five grids.
 
 import { useEffect, useState } from "react";
-import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
+import { effectiveAssignedWorkDisplayStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
 import type { WorkflowPhase } from "../lib/card-store-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
@@ -137,8 +137,8 @@ export function TodayWorkBoard({
       href: `/assigned-work/${encodeURIComponent(record.id)}`,
       employeeName: record.employeeName,
       note: record.note,
-      status: effectiveAssignedWorkStatus(record),
-      showStatus: canManageAssignedWork || isAssignedWorkPastDeadline(record.workDate)
+      status: effectiveAssignedWorkDisplayStatus(record),
+      pastDeadline: isAssignedWorkPastDeadline(record.workDate)
     })),
     deliveryTasks: deliveryTasks
       .filter((task) => task.status !== "shipped")

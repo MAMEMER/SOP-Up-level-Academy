@@ -120,6 +120,11 @@ export type ServiceEvent = {
   source: DataSource;
 };
 
+// This is the SCORING-ONLY outcome, derived from the record's formal 3-value workflow
+// status (lib/assigned-work-status-labels.ts) plus submittedAt vs the submission deadline
+// — see assignedWorkScoringStatus in lib/assigned-work-status.ts. It is not what gets
+// persisted or shown in the UI; the persisted/visible status is only pending_review /
+// needs_revision / completed (+ the non-enum "not submitted yet" display case).
 export type AssignedWork = {
   title: string;
   status: "early_quality" | "on_time" | "needs_revision" | "late_one_day" | "not_finished";

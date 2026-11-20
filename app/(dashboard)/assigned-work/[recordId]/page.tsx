@@ -1,20 +1,24 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
-import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../../../../lib/assigned-work-status.ts";
+import { effectiveAssignedWorkDisplayStatus } from "../../../../lib/assigned-work-status.ts";
+import {
+  ASSIGNED_WORK_NOT_SUBMITTED_LABEL,
+  ASSIGNED_WORK_STATUSES,
+  ASSIGNED_WORK_STATUS_LABEL,
+  type AssignedWorkStatus
+} from "../../../../lib/assigned-work-status-labels.ts";
 import { requireUser } from "../../../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../../../lib/employee-directory.ts";
 import {
   assignedWorkRecordById,
   updateAssignedWorkRecordSubmission
 } from "../../../../lib/performance-service-records.ts";
-import type { AssignedWork } from "../../../../lib/performance-score.ts";
 import { fetchPerformanceDailyStore } from "../../../../lib/performance-daily-store.ts";
 import { isTeamRecordName } from "../../../../lib/store-config.ts";
 
-function assignedStatus(value: string): AssignedWork["status"] {
-  if (value === "early_quality" || value === "on_time" || value === "needs_revision" || value === "late_one_day" || value === "not_finished") return value;
-  return "on_time";
+function assignedStatus(value: string): AssignedWorkStatus | undefined {
+  return (ASSIGNED_WORK_STATUSES as readonly string[]).includes(value) ? (value as AssignedWorkStatus) : undefined;
 }
 
 function stringValue(formData: FormData, key: string) {
@@ -30,14 +34,6 @@ function imageEvidenceValues(formData: FormData) {
     })
     .filter(Boolean);
 }
-
-const assignedStatusText: Record<AssignedWork["status"], string> = {
-  early_quality: "เสร็จก่อนกำหนด พร้อมคุณภาพ",
-  on_time: "เสร็จตรงเวลา",
-  needs_revision: "เสร็จแล้ว แต่ต้องแก้ไข",
-  late_one_day: "ช้ากว่ากำหนดไม่เกิน 1 วัน",
-  not_finished: "ยังไม่เสร็จ / เกินกำหนด"
-};
 
 function canAccessAssignedWork(recordEmployeeName: string, user: Awaited<ReturnType<typeof requireUser>>) {
   if (user.role === "admin") return true;
@@ -56,6 +52,9 @@ async function submitAssignedWorkAction(formData: FormData) {
   if (!record || !canAccessAssignedWork(record.employeeName, user)) notFound();
 
   await updateAssignedWorkRecordSubmission(recordId, {
+    // Admin may explicitly pick a status (needs_revision / completed / back to pending_review)
+    // in this same action; otherwise ANY submission (employee or admin) resets to
+    // pending_review — see updateAssignedWorkRecords in performance-service-records.ts.
     status: user.role === "admin" ? assignedStatus(stringValue(formData, "assignedStatus")) : undefined,
     note: stringValue(formData, "assignedNote"),
     evidence: stringValue(formData, "assignedEvidence"),
@@ -75,8 +74,10 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
   const store = await fetchPerformanceDailyStore();
   const record = assignedWorkRecordById(store.assignedWorkRecords, decodeURIComponent(recordId));
   if (!record || !canAccessAssignedWork(record.employeeName, user)) notFound();
-  const effectiveStatus = effectiveAssignedWorkStatus(record);
-  const canShowStatus = user.role === "admin" || isAssignedWorkPastDeadline(record.workDate);
+  // Visible identically to employees and admins — no role/deadline gate on the status itself.
+  const displayStatus = effectiveAssignedWorkDisplayStatus(record);
+  const statusLabel =
+    displayStatus === "not_submitted" ? ASSIGNED_WORK_NOT_SUBMITTED_LABEL : ASSIGNED_WORK_STATUS_LABEL[displayStatus];
 
   return (
     <main className="page">
@@ -101,11 +102,9 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
               <label>
                 สถานะงาน
                 <select name="assignedStatus" defaultValue={record.status}>
-                  <option value="early_quality">เสร็จก่อนกำหนด พร้อมคุณภาพ</option>
-                  <option value="on_time">เสร็จตรงเวลา</option>
-                  <option value="needs_revision">เสร็จแล้ว แต่ต้องแก้ไข</option>
-                  <option value="late_one_day">ช้ากว่ากำหนดไม่เกิน 1 วัน</option>
-                  <option value="not_finished">ยังไม่เสร็จ / เกินกำหนด</option>
+                  <option value="pending_review">{ASSIGNED_WORK_STATUS_LABEL.pending_review} (ส่งกลับไปรอตรวจใหม่)</option>
+                  <option value="needs_revision">{ASSIGNED_WORK_STATUS_LABEL.needs_revision}</option>
+                  <option value="completed">{ASSIGNED_WORK_STATUS_LABEL.completed}</option>
                 </select>
               </label>
             ) : null}
@@ -150,7 +149,7 @@ export default async function AssignedWorkSubmitPage({ params }: { params: Promi
           </div>
           <div className="performance-daily-records">
             <strong>{record.title}</strong>
-            {canShowStatus ? <span>สถานะ: {assignedStatusText[effectiveStatus]}</span> : null}
+            <span>สถานะ: {statusLabel}</span>
             <span>รายละเอียด: {record.note || "-"}</span>
             <span>เลข Tracking: {record.trackingNumber || "-"}</span>
             <span>รูปหลักฐาน: {record.imageEvidence?.length ? record.imageEvidence.join(", ") : "-"}</span>

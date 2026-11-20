@@ -145,7 +145,6 @@ export default async function HomePage() {
               feed={assignedWorkFeed}
               weeklyEventIds={weeklyEventIds}
               workDate={workDate}
-              canSeeStatus={user.role === "admin"}
             />
           </article>
 

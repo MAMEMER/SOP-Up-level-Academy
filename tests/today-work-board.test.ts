@@ -33,7 +33,7 @@ describe("today work board", () => {
         { taskId: "monthly-event-booth", name: "ออกบูธ", href: "/monthly-tasks#monthly-event-booth", status: "not_started", monthLabel: "สิงหาคม 2026" }
       ],
       assignedRecords: [
-        { id: "r1", title: "แพ็คของส่ง", href: "/assigned-work/r1", employeeName: "ICE", status: "needs_revision", showStatus: true }
+        { id: "r1", title: "แพ็คของส่ง", href: "/assigned-work/r1", employeeName: "ICE", status: "needs_revision" }
       ],
       feedItems: [
         {
@@ -81,7 +81,7 @@ describe("today work board", () => {
     const { items } = buildTodayWorkBoard({
       dailyPhases: [phase("open-store", "white")],
       assignedRecords: [
-        { id: "r1", title: "โพสต์ขอบคุณ", href: "/assigned-work/r1", employeeName: "ICE", status: "needs_revision", showStatus: true }
+        { id: "r1", title: "โพสต์ขอบคุณ", href: "/assigned-work/r1", employeeName: "ICE", status: "needs_revision" }
       ]
     });
     assert.equal(items[0].kind, "assigned");
@@ -100,14 +100,24 @@ describe("today work board", () => {
     assert.equal(summary.overdue, 1);
   });
 
-  it("hides the verdict from staff until the deadline passes", () => {
+  it("shows the plain not-submitted placeholder before any submission, same for everyone", () => {
     const { items } = buildTodayWorkBoard({
       assignedRecords: [
-        { id: "r1", title: "แพ็คของ", href: "/assigned-work/r1", employeeName: "ICE", status: "not_finished", showStatus: false }
+        { id: "r1", title: "แพ็คของ", href: "/assigned-work/r1", employeeName: "ICE", status: "not_submitted" }
       ]
     });
-    assert.equal(items[0].statusText, "รอส่งงาน");
+    assert.equal(items[0].statusText, "ยังไม่ส่งงาน");
     assert.equal(items[0].statusClass, "workflow-status-white");
+  });
+
+  it("ranks an unsubmitted assigned record past its deadline as overdue, still without a status label", () => {
+    const { items } = buildTodayWorkBoard({
+      assignedRecords: [
+        { id: "r1", title: "แพ็คของ", href: "/assigned-work/r1", employeeName: "ICE", status: "not_submitted", pastDeadline: true }
+      ]
+    });
+    assert.equal(items[0].state, "overdue");
+    assert.equal(items[0].statusText, "ยังไม่ส่งงาน");
   });
 
   it("marks a finished weekly event done", () => {

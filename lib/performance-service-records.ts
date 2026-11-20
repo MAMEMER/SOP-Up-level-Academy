@@ -1,5 +1,6 @@
-import { effectiveAssignedWorkStatus } from "./assigned-work-status.ts";
-import type { AssignedWork, ServiceEvent } from "./performance-score.ts";
+import { assignedWorkScoringStatus, normalizeAssignedWorkStatus } from "./assigned-work-status.ts";
+import type { AssignedWorkStatus } from "./assigned-work-status-labels.ts";
+import type { ServiceEvent } from "./performance-score.ts";
 import { restListCollection, restUpsertDoc } from "./firestore-rest.ts";
 import type { StockCheckRecord } from "./stock-check-records.ts";
 import type { ChecklistAuditRecord } from "./checklist-audit-records.ts";
@@ -30,7 +31,7 @@ export type AssignedWorkRecord = {
   workDate: string;
   employeeName: string;
   title: string;
-  status: AssignedWork["status"];
+  status: AssignedWorkStatus;
   note: string;
   /** URL or note pointing to proof (screenshot / chat link) */
   evidence?: string;
@@ -109,6 +110,9 @@ export function addAssignedWorkRecord(records: AssignedWorkRecord[], input: Assi
     {
       ...input,
       title: input.title.trim(),
+      // New assignment, nothing submitted yet -> normalize to the neutral status. The UI
+      // shows "ยังไม่ส่งงาน" regardless of this value until submittedAt is set.
+      status: normalizeAssignedWorkStatus(input.status),
       note: input.note.trim(),
       evidence: (input.evidence || "").trim() || undefined,
       trackingNumber: (input.trackingNumber || "").trim() || undefined,
@@ -220,7 +224,7 @@ export function assignedWorkRecordsToWorks(
         : [record.employeeName];
       return employeeNames.map((employeeName) => ({
         employeeName,
-        work: { title: record.title, status: effectiveAssignedWorkStatus(record, now), source: "manual" as const }
+        work: { title: record.title, status: assignedWorkScoringStatus(record, now), source: "manual" as const }
       }));
     })
     .sort((left, right) => `${left.employeeName}:${left.work.title}`.localeCompare(`${right.employeeName}:${right.work.title}`));
@@ -229,15 +233,18 @@ export function assignedWorkRecordsToWorks(
 export function updateAssignedWorkRecords(
   records: AssignedWorkRecord[],
   id: string,
-  input: { status?: AssignedWork["status"]; note: string; evidence?: string; trackingNumber?: string; imageEvidence?: string[] },
+  input: { status?: AssignedWorkStatus; note: string; evidence?: string; trackingNumber?: string; imageEvidence?: string[] },
   recordedAt = new Date().toISOString()
 ): { records: AssignedWorkRecord[]; record: AssignedWorkRecord | null } {
   let updatedRecord: AssignedWorkRecord | null = null;
   const nextRecords = records.map((record) => {
     if (record.id !== id) return record;
+    // ANY submission (employee or admin) resets the status to pending_review, unless the
+    // admin explicitly chose a different status (needs_revision / completed) in this same
+    // action — so a resubmission after "needs_revision" always flips back to pending_review.
     updatedRecord = {
       ...record,
-      status: input.status || record.status,
+      status: input.status || "pending_review",
       note: input.note.trim(),
       evidence: (input.evidence || "").trim() || undefined,
       trackingNumber: (input.trackingNumber || "").trim() || undefined,
@@ -256,11 +263,17 @@ export async function fetchPerformanceDailyStore(): Promise<PerformanceDailyStor
   // Stock checks are written with the service account, so they are fetched by the
   // server-only composer in lib/performance-daily-store.ts. Keeping that import out of
   // this module lets the record helpers here stay unit-testable.
-  const [serviceRecords, assignedWorkRecords, storeStandardsRecords] = await Promise.all([
+  const [serviceRecords, rawAssignedWorkRecords, storeStandardsRecords] = await Promise.all([
     restListCollection<CustomerServiceRecord>(SERVICE_COLLECTION),
     restListCollection<AssignedWorkRecord>(ASSIGNED_COLLECTION),
     restListCollection<StoreStandardsRecord>(STANDARDS_COLLECTION)
   ]);
+  // Normalize any legacy/old status value (pre-3-status refactor) on read so stored
+  // records never break the new 3-value UI/scoring logic — see normalizeAssignedWorkStatus.
+  const assignedWorkRecords = rawAssignedWorkRecords.map((record) => ({
+    ...record,
+    status: normalizeAssignedWorkStatus(record.status)
+  }));
   return { serviceRecords, assignedWorkRecords, storeStandardsRecords, stockCheckRecords: [], checklistAuditRecords: [], scoreAdjustments: [] };
 }
 
@@ -338,7 +351,7 @@ export async function saveAssignedWorkRecords(
 
 export async function updateAssignedWorkRecordSubmission(
   id: string,
-  input: { status?: AssignedWork["status"]; note: string; evidence?: string; trackingNumber?: string; imageEvidence?: string[] },
+  input: { status?: AssignedWorkStatus; note: string; evidence?: string; trackingNumber?: string; imageEvidence?: string[] },
   recordedAt = new Date().toISOString()
 ) {
   const store = await fetchPerformanceDailyStore();
