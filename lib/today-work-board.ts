@@ -9,6 +9,14 @@
 // Pure (no Firestore / no DOM): the component maps each source into the small input
 // shapes below and this decides state, wording and order.
 
+import {
+  ASSIGNED_WORK_NOT_SUBMITTED_CLASS,
+  ASSIGNED_WORK_NOT_SUBMITTED_LABEL,
+  ASSIGNED_WORK_STATUS_CLASS,
+  ASSIGNED_WORK_STATUS_LABEL,
+  type AssignedWorkStatus
+} from "./assigned-work-status-labels.ts";
+
 export type TodayWorkKind = "daily" | "stock" | "weekly" | "monthly" | "assigned" | "handoff" | "delivery";
 
 /** overdue = ต้องทำแต่เลยเวลา · due = ต้องทำวันนี้ · upcoming = ยังไม่ถึงกำหนด · done = เสร็จแล้ว */
@@ -104,10 +112,10 @@ export type AssignedRecordInput = {
   href: string;
   employeeName: string;
   note?: string;
-  /** as returned by effectiveAssignedWorkStatus */
-  status: "early_quality" | "on_time" | "needs_revision" | "late_one_day" | "not_finished";
-  /** admins see the verdict immediately; staff only after the deadline */
-  showStatus: boolean;
+  /** as returned by effectiveAssignedWorkDisplayStatus — same for employees and admins */
+  status: AssignedWorkStatus | "not_submitted";
+  /** deadline has passed with nothing submitted — ranking only, never shown as a status label */
+  pastDeadline?: boolean;
 };
 
 /** ออเดอร์เว็บกิลด์ที่จ่ายเงินแล้วและยังต้องแพ็ค/ส่ง (see delivery-tasks.ts). */
@@ -132,20 +140,10 @@ export type FeedItemInput = {
   statusClass: string;
 };
 
-const assignedStateByStatus: Record<AssignedRecordInput["status"], TodayWorkState> = {
-  early_quality: "done",
-  on_time: "done",
+const assignedStateByStatus: Record<AssignedWorkStatus, TodayWorkState> = {
+  pending_review: "due",
   needs_revision: "due",
-  late_one_day: "due",
-  not_finished: "overdue"
-};
-
-const assignedStatusText: Record<AssignedRecordInput["status"], string> = {
-  early_quality: "เสร็จก่อนกำหนด",
-  on_time: "เสร็จตรงเวลา",
-  needs_revision: "ต้องแก้ไข",
-  late_one_day: "ช้าไม่เกิน 1 วัน",
-  not_finished: "ยังไม่เสร็จ"
+  completed: "done"
 };
 
 function dailyState(phase: DailyPhaseInput): TodayWorkState {
@@ -265,7 +263,19 @@ export function buildTodayWorkBoard(input: {
   }
 
   for (const record of input.assignedRecords ?? []) {
-    const state = assignedStateByStatus[record.status];
+    const status = record.status;
+    let state: TodayWorkState;
+    let itemStatusText: string;
+    let itemStatusClass: string;
+    if (status === "not_submitted") {
+      state = record.pastDeadline ? "overdue" : "due";
+      itemStatusText = ASSIGNED_WORK_NOT_SUBMITTED_LABEL;
+      itemStatusClass = record.pastDeadline ? stateClass.overdue : ASSIGNED_WORK_NOT_SUBMITTED_CLASS;
+    } else {
+      state = assignedStateByStatus[status];
+      itemStatusText = ASSIGNED_WORK_STATUS_LABEL[status];
+      itemStatusClass = ASSIGNED_WORK_STATUS_CLASS[status];
+    }
     items.push({
       id: `assigned-${record.id}`,
       kind: "assigned",
@@ -274,8 +284,8 @@ export function buildTodayWorkBoard(input: {
       detail: record.employeeName,
       href: record.href,
       state,
-      statusText: record.showStatus ? assignedStatusText[record.status] : "รอส่งงาน",
-      statusClass: record.showStatus ? stateClass[state] : stateClass.due
+      statusText: itemStatusText,
+      statusClass: itemStatusClass
     });
   }
 

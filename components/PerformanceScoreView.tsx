@@ -3,6 +3,8 @@ import { UsersRound } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { fetchChecklistKpiInput } from "../lib/checklist-kpi.ts";
+import { effectiveAssignedWorkDisplayStatus } from "../lib/assigned-work-status.ts";
+import { ASSIGNED_WORK_NOT_SUBMITTED_LABEL, ASSIGNED_WORK_STATUS_LABEL } from "../lib/assigned-work-status-labels.ts";
 import {
   getPerformanceScoreRowsForRange,
   getPerformanceScoreRows,
@@ -162,9 +164,17 @@ function staffOptions() {
 // Collapse records that share a groupId into one line so a task handed to several people
 // (ticket S3JjyiwLxyHLpPn6uOyX) reads as "งานเดียวกัน → คนนั้นคนนี้" instead of N scattered
 // rows. Ungrouped records (single-assignee / legacy team rows) each stay their own group.
-type AssignedRecordForDisplay = { id: string; employeeName: string; title: string; status: string; groupId?: string };
+type AssignedRecordForDisplay = {
+  id: string;
+  employeeName: string;
+  title: string;
+  status: string;
+  workDate: string;
+  submittedAt?: string;
+  groupId?: string;
+};
 function groupAssignedRecords<T extends AssignedRecordForDisplay>(records: T[]) {
-  const groups: { key: string; groupId?: string; title: string; status: string; members: T[] }[] = [];
+  const groups: { key: string; groupId?: string; title: string; members: T[] }[] = [];
   const byGroupId = new Map<string, number>();
   records.forEach((record) => {
     if (record.groupId) {
@@ -174,12 +184,18 @@ function groupAssignedRecords<T extends AssignedRecordForDisplay>(records: T[]) 
         return;
       }
       byGroupId.set(record.groupId, groups.length);
-      groups.push({ key: record.groupId, groupId: record.groupId, title: record.title, status: record.status, members: [record] });
+      groups.push({ key: record.groupId, groupId: record.groupId, title: record.title, members: [record] });
       return;
     }
-    groups.push({ key: record.id, title: record.title, status: record.status, members: [record] });
+    groups.push({ key: record.id, title: record.title, members: [record] });
   });
   return groups;
+}
+
+/** Status label for one assigned-work record — same wording shown to employees and admins. */
+function assignedRecordStatusLabel(record: AssignedRecordForDisplay): string {
+  const displayStatus = effectiveAssignedWorkDisplayStatus(record);
+  return displayStatus === "not_submitted" ? ASSIGNED_WORK_NOT_SUBMITTED_LABEL : ASSIGNED_WORK_STATUS_LABEL[displayStatus];
 }
 
 function resolvePeriod(params: { period?: string; startDate?: string; endDate?: string }): PerformanceReviewPeriod {
@@ -294,11 +310,6 @@ function serviceBucket(value: string) {
 function serviceSeverity(value: string) {
   if (value === "repeated" || value === "severe") return value;
   return "fixed_immediately";
-}
-
-function assignedStatus(value: string) {
-  if (value === "early_quality" || value === "on_time" || value === "needs_revision" || value === "late_one_day" || value === "not_finished") return value;
-  return "on_time";
 }
 
 async function saveComplaintServiceAction(formData: FormData) {
@@ -431,12 +442,14 @@ async function saveAssignedWorkAction(formData: FormData) {
   const title = stringValue(formData, "assignedTitle");
   const employeeNames = resolveAssignEmployees(formData);
   // Same task → one record per selected person, sharing a groupId (ticket S3JjyiwLxyHLpPn6uOyX).
+  // New assignments always start as pending_review — nothing has been submitted yet, so
+  // the dashboard shows "ยังไม่ส่งงาน" regardless until the assignee (or admin) submits.
   if (title && employeeNames.length > 0) {
     await saveAssignedWorkRecords({
       workDate: stringValue(formData, "assignedDate"),
       employeeNames,
       title,
-      status: assignedStatus(stringValue(formData, "assignedStatus")),
+      status: "pending_review",
       note: stringValue(formData, "assignedNote"),
       evidence: stringValue(formData, "assignedEvidence")
     });
@@ -678,16 +691,6 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
                 เลือกหลายคน = สร้างงานเดียวกันให้แต่ละคน (ให้คะแนนแยกรายคน แต่รู้ว่าเป็นงานเดียวกัน)
               </small>
             </fieldset>
-            <label>
-              สถานะ
-              <select name="assignedStatus" defaultValue="on_time">
-                <option value="early_quality">เสร็จก่อนกำหนด พร้อมคุณภาพ</option>
-                <option value="on_time">เสร็จตรงเวลา</option>
-                <option value="needs_revision">เสร็จแต่ต้องแก้ไข</option>
-                <option value="late_one_day">ช้ากว่ากำหนดไม่เกิน 1 วัน</option>
-                <option value="not_finished">ไม่เสร็จเกินกำหนด</option>
-              </select>
-            </label>
             <label className="wide">
               งาน
               <input name="assignedTitle" placeholder="เช่น เพิ่ม stock card Lorcana" />
@@ -708,11 +711,11 @@ export async function PerformanceScoreView({ searchParams, basePath = "/admin/pe
               groupAssignedRecords(assignedRecordsForDay).map((group) =>
                 group.groupId ? (
                   <span key={group.groupId}>
-                    <UsersRound className="ui-inline-icon" size={14} aria-hidden="true" /> {group.title}: {group.members.map((m) => displayNameFor(m.employeeName)).join(", ")} / {group.status}
+                    <UsersRound className="ui-inline-icon" size={14} aria-hidden="true" /> {group.title}: {group.members.map((m) => displayNameFor(m.employeeName)).join(", ")} / {assignedRecordStatusLabel(group.members[0])}
                   </span>
                 ) : (
                   <span key={group.members[0].id}>
-                    {displayNameFor(group.members[0].employeeName)}: {group.title} / {group.status}
+                    {displayNameFor(group.members[0].employeeName)}: {group.title} / {assignedRecordStatusLabel(group.members[0])}
                   </span>
                 )
               )

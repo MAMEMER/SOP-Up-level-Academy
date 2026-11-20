@@ -19,8 +19,8 @@ describe("dashboard task sections UI", () => {
     assert.equal(pageSource.includes("name=\"assignedEvidence\""), true);
     assert.equal(pageSource.includes("name=\"assignedTrackingNumber\""), true);
     assert.equal(pageSource.includes("name=\"assignedImages\" type=\"file\""), true);
-    assert.equal(pageSource.includes("effectiveAssignedWorkStatus"), true);
-    assert.equal(source.includes("effectiveAssignedWorkStatus"), true);
+    assert.equal(pageSource.includes("effectiveAssignedWorkDisplayStatus"), true);
+    assert.equal(source.includes("effectiveAssignedWorkDisplayStatus"), true);
     assert.equal(pageSource.includes("updateAssignedWorkRecordSubmission"), true);
   });
 

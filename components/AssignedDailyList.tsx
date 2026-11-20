@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
+import { effectiveAssignedWorkDisplayStatus } from "../lib/assigned-work-status.ts";
+import {
+  ASSIGNED_WORK_NOT_SUBMITTED_CLASS,
+  ASSIGNED_WORK_NOT_SUBMITTED_LABEL,
+  ASSIGNED_WORK_STATUS_CLASS,
+  ASSIGNED_WORK_STATUS_LABEL
+} from "../lib/assigned-work-status-labels.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
 import type { AssignedWorkFeedItem } from "../lib/assigned-work-feed.ts";
 import {
@@ -19,28 +25,11 @@ import { fetchWeeklyEventPayload, tickKey, weeklyEventPeriodKey } from "../lib/w
 // งานของทีมบางแค → ขึ้นเป็นการ์ดแรกสุดในหัวข้อ "งานที่มอบหมาย" ของวันนั้น กดแล้วไป checklist
 // ของเกมนั้นโดยตรง. เชื่อมกับปฏิทินกิจกรรม (/admin/calendar) ผ่าน activeDays ชุดเดียวกัน.
 
-const assignedStatusText: Record<AssignedWorkRecord["status"], string> = {
-  early_quality: "เสร็จก่อนกำหนด",
-  on_time: "เสร็จตรงเวลา",
-  needs_revision: "ต้องแก้ไข",
-  late_one_day: "ช้าไม่เกิน 1 วัน",
-  not_finished: "ยังไม่เสร็จ"
-};
-
-const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
-  early_quality: "workflow-status-green",
-  on_time: "workflow-status-green",
-  needs_revision: "workflow-status-orange",
-  late_one_day: "workflow-status-orange",
-  not_finished: "workflow-status-red"
-};
-
 export function AssignedDailyList({
   records = [],
   feed = [],
   weeklyEventIds = [],
   workDate,
-  canSeeStatus = false,
   emptyText = "วันนี้ยังไม่มีงานที่มอบหมายให้คุณ"
 }: {
   records?: AssignedWorkRecord[];
@@ -48,8 +37,6 @@ export function AssignedDailyList({
   /** งานกิจกรรมประจำสัปดาห์ที่ถึงกำหนดวันนี้ (id ของ weeklyEvents) — โชว์เป็นการ์ดแรกสุด */
   weeklyEventIds?: string[];
   workDate: string;
-  /** แอดมินเห็นสถานะได้ทันที · พนักงานเห็นหลังเลยกำหนดแล้วเท่านั้น */
-  canSeeStatus?: boolean;
   emptyText?: string;
 }) {
   const activeEvents = weeklyEventIds
@@ -108,19 +95,22 @@ export function AssignedDailyList({
         );
       })}
       {records.map((record, index) => {
-        const status = effectiveAssignedWorkStatus(record);
-        const showStatus = canSeeStatus || isAssignedWorkPastDeadline(record.workDate);
+        const displayStatus = effectiveAssignedWorkDisplayStatus(record);
+        const statusClass =
+          displayStatus === "not_submitted" ? ASSIGNED_WORK_NOT_SUBMITTED_CLASS : ASSIGNED_WORK_STATUS_CLASS[displayStatus];
+        const statusText =
+          displayStatus === "not_submitted" ? ASSIGNED_WORK_NOT_SUBMITTED_LABEL : ASSIGNED_WORK_STATUS_LABEL[displayStatus];
         return (
           <a
             key={record.id}
             href={`/assigned-work/${encodeURIComponent(record.id)}`}
-            className={`daily-phase-card ${showStatus ? assignedStatusClass[status] : "workflow-status-white"}`}
+            className={`daily-phase-card ${statusClass}`}
           >
             <span>{String(activeEvents.length + index + 1).padStart(2, "0")}</span>
             <div>
               <small>{record.employeeName} · {record.workDate}</small>
               <strong>{record.title}</strong>
-              <em>{showStatus ? assignedStatusText[status] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
+              <em>{statusText}{record.note ? ` · ${record.note}` : ""}</em>
               {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
             </div>
           </a>

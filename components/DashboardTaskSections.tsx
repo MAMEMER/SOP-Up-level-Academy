@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { effectiveAssignedWorkStatus, isAssignedWorkPastDeadline } from "../lib/assigned-work-status.ts";
+import { effectiveAssignedWorkDisplayStatus } from "../lib/assigned-work-status.ts";
+import {
+  ASSIGNED_WORK_NOT_SUBMITTED_CLASS,
+  ASSIGNED_WORK_NOT_SUBMITTED_LABEL,
+  ASSIGNED_WORK_STATUS_CLASS,
+  ASSIGNED_WORK_STATUS_LABEL
+} from "../lib/assigned-work-status-labels.ts";
 import { stockWorkSummaryCards, type WorkflowPhase } from "../lib/card-store-workflow.ts";
 import { weeklyStockTasks } from "../lib/weekly-stock-workflow.ts";
 import type { AssignedWorkRecord } from "../lib/performance-service-records.ts";
@@ -39,22 +45,6 @@ const statusText = {
   orange: "เกินเวลา",
   red: "เลยเวลา",
   purple: "ต่อเนื่อง 3 วัน"
-};
-
-const assignedStatusText: Record<AssignedWorkRecord["status"], string> = {
-  early_quality: "เสร็จก่อนกำหนด",
-  on_time: "เสร็จตรงเวลา",
-  needs_revision: "ต้องแก้ไข",
-  late_one_day: "ช้าไม่เกิน 1 วัน",
-  not_finished: "ยังไม่เสร็จ"
-};
-
-const assignedStatusClass: Record<AssignedWorkRecord["status"], string> = {
-  early_quality: "workflow-status-green",
-  on_time: "workflow-status-green",
-  needs_revision: "workflow-status-orange",
-  late_one_day: "workflow-status-orange",
-  not_finished: "workflow-status-red"
 };
 
 /** Stock card colour: ส่งแล้ว = เขียว · เลยกำหนด = ส้ม · ยังไม่ถึงกำหนด = เทา */
@@ -164,19 +154,22 @@ export function DashboardTaskSections({
           {assignedWorkRecords.length || assignedWorkFeed.length || activeWeeklyEvents.length || openPlannedTasks.length ? (
             <>
               {assignedWorkRecords.map((record, index) => {
-                const effectiveStatus = effectiveAssignedWorkStatus(record);
-                const canShowStatus = canManageAssignedWork || isAssignedWorkPastDeadline(record.workDate);
+                const displayStatus = effectiveAssignedWorkDisplayStatus(record);
+                const statusClass =
+                  displayStatus === "not_submitted" ? ASSIGNED_WORK_NOT_SUBMITTED_CLASS : ASSIGNED_WORK_STATUS_CLASS[displayStatus];
+                const statusText =
+                  displayStatus === "not_submitted" ? ASSIGNED_WORK_NOT_SUBMITTED_LABEL : ASSIGNED_WORK_STATUS_LABEL[displayStatus];
                 return (
                   <a
                     key={record.id}
                     href={`/assigned-work/${encodeURIComponent(record.id)}`}
-                    className={`daily-phase-card ${canShowStatus ? assignedStatusClass[effectiveStatus] : "workflow-status-white"}`}
+                    className={`daily-phase-card ${statusClass}`}
                   >
                     <span>{String(index + 1).padStart(2, "0")}</span>
                     <div>
                       <small>{record.employeeName} · {record.workDate}</small>
                       <strong>{record.title}</strong>
-                      <em>{canShowStatus ? assignedStatusText[effectiveStatus] : "รอส่งงาน"}{record.note ? ` · ${record.note}` : ""}</em>
+                      <em>{statusText}{record.note ? ` · ${record.note}` : ""}</em>
                       {record.trackingNumber ? <em>Tracking: {record.trackingNumber}</em> : null}
                       {record.imageEvidence?.length ? <em>รูปหลักฐาน: {record.imageEvidence.join(", ")}</em> : null}
                       {record.evidence ? <em>หลักฐาน: {record.evidence}</em> : null}

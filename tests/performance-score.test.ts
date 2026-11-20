@@ -14,7 +14,7 @@ import {
   getIncentiveTier,
   summarizeLeave
 } from "../lib/performance-score.ts";
-import { effectiveAssignedWorkStatus } from "../lib/assigned-work-status.ts";
+import { effectiveAssignedWorkDisplayStatus } from "../lib/assigned-work-status.ts";
 import {
   applyScheduleEditRows,
   getPerformanceScoreRows,
@@ -654,7 +654,7 @@ describe("performance score engine", () => {
         workDate: "2026-07-09",
         employeeName: "ICE",
         title: "เพิ่ม stock card Lorcana",
-        status: "not_finished",
+        status: "pending_review",
         note: "ยังไม่เสร็จ"
       })[0],
       addAssignedWorkRecord([], {
@@ -666,12 +666,18 @@ describe("performance score engine", () => {
       })[0]
     ];
 
-    const works = assignedWorkRecordsToWorks(assignedWorkRecordsForDate(records, "2026-07-09"));
+    // Nothing submitted yet (no submittedAt) and well before the deadline -> no deduction
+    // yet; the scoring derivation treats a still-pending record as "on_time" until finalized.
+    const works = assignedWorkRecordsToWorks(
+      assignedWorkRecordsForDate(records, "2026-07-09"),
+      undefined,
+      new Date("2026-07-09T10:00:00.000Z")
+    );
 
     assert.equal(assignedWorkRecordsForDate(records, "2026-07-09").length, 1);
     assert.equal(assignedWorkRecordsForDate(records, "2026-07-11").length, 0);
     assert.equal(works[0].employeeName, "ICE");
-    assert.equal(works[0].work.status, "not_finished");
+    assert.equal(works[0].work.status, "on_time");
   });
 
   it("assigns one shared task to several staff as linked per-person records (ticket S3Jjyiwx)", () => {
@@ -681,7 +687,7 @@ describe("performance score engine", () => {
         workDate: "2026-08-04",
         employeeNames: ["Boom", "Leo", "ICE"],
         title: "จัดบูธงาน event",
-        status: "on_time",
+        status: "pending_review",
         note: "ช่วยกันเซ็ตบูธ"
       },
       "2026-08-04T03:00:00.000Z"
@@ -709,7 +715,7 @@ describe("performance score engine", () => {
       workDate: "2026-08-04",
       employeeNames: ["Boom", "Boom"],
       title: "เติมสต๊อก",
-      status: "on_time",
+      status: "pending_review",
       note: ""
     });
     assert.equal(single.length, 1);
@@ -717,20 +723,20 @@ describe("performance score engine", () => {
     assert.equal(single[0].assigneeCount, undefined);
 
     // empty selection writes nothing
-    assert.equal(addAssignedWorkRecords([], { workDate: "2026-08-04", employeeNames: [], title: "x", status: "on_time", note: "" }).length, 0);
+    assert.equal(addAssignedWorkRecords([], { workDate: "2026-08-04", employeeNames: [], title: "x", status: "pending_review", note: "" }).length, 0);
   });
 
-  it("updates assigned work note, evidence, tracking number, and image names after submission", () => {
+  it("lets an admin explicitly set status on submission (same action)", () => {
     const records = addAssignedWorkRecord([], {
       workDate: "2026-07-23",
       employeeName: "Boom",
       title: "ส่งเสื้อให้ลูกค้า",
-      status: "not_finished",
+      status: "needs_revision",
       note: "รอส่ง"
     }, "2026-07-23T07:00:00.000Z");
 
     const updated = updateAssignedWorkRecords(records, records[0].id, {
-      status: "on_time",
+      status: "completed",
       note: "ส่งแล้ว",
       evidence: "ส่งรอบ 14:30",
       trackingNumber: "TH123",
@@ -739,7 +745,7 @@ describe("performance score engine", () => {
 
     assert.equal(updated.records.length, 1);
     assert.equal(updated.record?.id, records[0].id);
-    assert.equal(updated.record?.status, "on_time");
+    assert.equal(updated.record?.status, "completed");
     assert.equal(updated.record?.note, "ส่งแล้ว");
     assert.equal(updated.record?.evidence, "ส่งรอบ 14:30");
     assert.equal(updated.record?.trackingNumber, "TH123");
@@ -747,12 +753,12 @@ describe("performance score engine", () => {
     assert.equal(updated.record?.submittedAt, "2026-07-23T08:00:00.000Z");
   });
 
-  it("keeps assigned work status unchanged when staff submits evidence only", () => {
+  it("auto-resets status to pending_review on resubmission when no explicit status is chosen", () => {
     const records = addAssignedWorkRecord([], {
       workDate: "2026-07-23",
       employeeName: "Boom",
       title: "ส่งเสื้อให้ลูกค้า",
-      status: "not_finished",
+      status: "needs_revision",
       note: "รอส่ง"
     }, "2026-07-23T07:00:00.000Z");
 
@@ -761,21 +767,20 @@ describe("performance score engine", () => {
       trackingNumber: "TH123"
     }, "2026-07-23T08:00:00.000Z");
 
-    assert.equal(updated.record?.status, "not_finished");
+    assert.equal(updated.record?.status, "pending_review");
     assert.equal(updated.record?.trackingNumber, "TH123");
   });
 
-  it("treats unsubmitted assigned work as not finished after the workday deadline", () => {
+  it("hides the formal status until a submission exists, and derives the deadline-based deduction from timestamps", () => {
     const records = addAssignedWorkRecord([], {
       workDate: "2026-07-23",
       employeeName: "Boom",
       title: "ส่งเสื้อให้ลูกค้า",
-      status: "on_time",
+      status: "pending_review",
       note: "ต้องส่งภายในวันนี้"
     }, "2026-07-23T07:00:00.000Z");
 
-    assert.equal(effectiveAssignedWorkStatus(records[0], new Date("2026-07-23T16:59:00.000Z")), "on_time");
-    assert.equal(effectiveAssignedWorkStatus(records[0], new Date("2026-07-23T17:00:00.000Z")), "not_finished");
+    assert.equal(effectiveAssignedWorkDisplayStatus(records[0]), "not_submitted");
 
     const works = assignedWorkRecordsToWorks(records, undefined, new Date("2026-07-23T17:00:00.000Z"));
     const result = calculateAssignedWorkScore(works.map((item) => item.work));
@@ -790,7 +795,7 @@ describe("performance score engine", () => {
       workDate: "2026-07-09",
       employeeName: "ทีม บางแค",
       title: "จัด stock หน้าร้าน",
-      status: "not_finished",
+      status: "needs_revision",
       note: "งานทีมยังไม่เสร็จ"
     });
 
@@ -1096,7 +1101,10 @@ describe("performance score engine", () => {
     assert.equal(source.includes("name=\"severity\""), true);
     assert.equal(source.includes("Assigned work input"), true);
     assert.equal(source.includes("name=\"assignedDate\""), true);
-    assert.equal(source.includes("name=\"assignedStatus\""), true);
+    // New assignments always start pending_review (nothing submitted yet) — there is no
+    // status picker on creation; status only changes on review (see the assigned-work
+    // submission page) and on resubmission.
+    assert.equal(source.includes("name=\"assignedStatus\""), false);
     // Assigned-work picker is now multi-select (same task → several staff, ticket S3Jjyiwx):
     // checkboxes named "employeeName" plus a "whole team" convenience toggle.
     assert.equal(source.includes("ทั้งทีมบางแค"), true);
