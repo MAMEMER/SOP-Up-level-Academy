@@ -186,7 +186,8 @@ const worksheetFor = (id: string): string | undefined => {
     "stock-sleeve-work",
     "stock-single-card-work",
     "product-display",
-    "single-card-layout"
+    "single-card-layout",
+    "mc-script"
   ];
   return known.includes(id) ? `/training/worksheets/${id}.jpg` : undefined;
 };
@@ -241,7 +242,10 @@ export function TrainingView({ branch }: { branch: string }) {
     },
     {
       title: "กิจกรรมประจำสัปดาห์",
-      items: weeklyEvents.map((event) => ({ id: event.id, code: "Weekly event", title: event.name, time: event.timeWindow }))
+      items: [
+        ...weeklyEvents.map((event) => ({ id: event.id, code: "Weekly event", title: event.name, time: event.timeWindow })),
+        { id: "mc-script", code: "Weekly event", title: "สคริปต์พิธีกร", time: "ใช้ได้กับทุกกิจกรรม" }
+      ]
     }
   ].filter((group) => group.items.length);
 
@@ -783,6 +787,59 @@ export function TrainingView({ branch }: { branch: string }) {
             </div>
           </article>
         ))}
+
+        <article id="mc-script" hidden={openId !== "mc-script"} className="training-card wi-manual phase-event">
+          <div className="workflow-card-head">
+            <span className="phase-icon">EV</span>
+            <div>
+              <p className="eyebrow">Weekly event · ใช้ได้กับทุกกิจกรรม</p>
+              <h3>สคริปต์พิธีกร</h3>
+            </div>
+          </div>
+
+          <div className="wi-manual-body">
+            <div className="wi-content">
+              <section className="wi-summary-grid">
+                <div>
+                  <h4>วัตถุประสงค์</h4>
+                  <p>คำพูดต้นแบบสำหรับพิธีกรใช้คุมงาน Weekly event ตั้งแต่เรียกรวมตัว เปิดงาน แจ้งเตือนเวลา จนถึงประกาศผลและมอบรางวัล ใช้ได้กับทุกเกม</p>
+                </div>
+                <div>
+                  <h4>ขอบเขต / เวลา</h4>
+                  <p>ก่อนเริ่มแข่ง 15–30 นาที จนถึงจบการแข่งขันและมอบรางวัล</p>
+                </div>
+              </section>
+
+              <section>
+                <h4>5 ช่วงของสคริปต์</h4>
+                <ol className="wi-step-list">
+                  <li><strong>เรียกรวมตัว / รับสมัคร</strong> — ก่อนเริ่มแข่ง 15–30 นาที ย้ำค่าสมัครและจำนวนรอบ</li>
+                  <li><strong>เปิดงาน + แจ้งกติกา</strong> — ก่อน Round 1 แจ้งรูปแบบแข่ง เวลา Extra Turn และให้เรียกเจ้าหน้าที่ตัดสินกติกา</li>
+                  <li><strong>แจ้งเตือนเวลา</strong> — ระหว่างแข่งทุกรอบ เหลือ 10 นาทีสุดท้าย และตอนหมดเวลา</li>
+                  <li><strong>เริ่มรอบถัดไป</strong> — ทำซ้ำทุกรอบจนครบ N รอบ</li>
+                  <li><strong>ประกาศผล + มอบรางวัล</strong> — จบรอบสุดท้าย ประกาศอันดับ 1–3 แล้วเชิญรับของรางวัล</li>
+                </ol>
+              </section>
+
+              <section className="wi-summary-grid">
+                <div>
+                  <h4>หลักฐานที่ต้องแนบ</h4>
+                  <ul>
+                    <li>ไม่มี — เอกสารนี้เป็นสคริปต์อ้างอิงสำหรับพิธีกร ไม่ผูกกับ checklist</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4>สิ่งที่ต้องระวัง</h4>
+                  <p>ห้ามตัดสินกติกาหรือข้อโต้แย้งการ์ดเอง ให้เรียกเจ้าหน้าที่/หัวหน้าร้านมาตัดสินเสมอ · พูดชื่อ/โค้ดเนมผู้ชนะให้ตรงกับที่ลงทะเบียนไว้ · ถ้าชวนสมัครสมาชิกกิลด์ระหว่างงาน ห้ามใช้คำว่า "ฟรี" คู่กับ "สมาชิก"</p>
+                </div>
+              </section>
+
+              <section className="example-box">
+                <strong>ดูสคริปต์เต็มได้ที่แท็บ "ใบงาน" ด้านบน (ใบงาน A4 พร้อมพิมพ์)</strong>
+              </section>
+            </div>
+          </div>
+        </article>
         </div>
       </div>
     </main>
