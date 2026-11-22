@@ -17,9 +17,9 @@ export async function loadSalesOverview(period: string) {
   const [rows, snapshot, growthPct] = await Promise.all([salesForPeriod(period), adminDb().collection("schedule_shifts").get(), getGrowthPct(period)]);
   const shifts: Shift[] = snapshot.docs.map(doc => doc.data()).filter(d => d.assignment && isWorkingAssignment(d.assignment as ShiftAssignment) && d.staffCode && d.workDate && d.branch).map(d => ({ staffCode: String(d.staffCode), workDate: String(d.workDate), branch: String(d.branch) }));
   const result = salesTargets(shifts, rows, period, growthPct);
-  const sales: Record<string, number> = {}; let unnamed = 0;
-  for (const row of rows) if (row.workDate.startsWith(period)) { if (row.staffCode) sales[row.staffCode] = (sales[row.staffCode] || 0) + row.amount; else unnamed += row.amount; }
-  return { ...result, sales, unnamed, growthPct };
+  const sales: Record<string, number> = {}; let unnamed = 0, openPrice = 0, storeRevenue = 0;
+  for (const row of rows) if (row.workDate.startsWith(period)) { openPrice += row.openPrice || 0; storeRevenue += row.storeRevenue || 0; if (row.staffCode) sales[row.staffCode] = (sales[row.staffCode] || 0) + row.amount; else unnamed += row.amount; }
+  return { ...result, sales, unnamed, openPrice, storeRevenue, growthPct };
 }
 async function referralCounts(collection: string, period: string, staffCode: string, members: boolean): Promise<number | undefined> {
   const snapshot = await adminDb().collection(collection).where("referredByStaff", "==", staffCode).get();
@@ -55,5 +55,20 @@ async function fetchSales(period: string) {
   for (const employee of employees) { const code = emails.get(String(employee.email || "").toLowerCase()); if (employee.id && code && String(employee.firstName || "").trim().toLowerCase() !== "uplevel") cashiers[employee.id] = code; }
   const transactions: SaleTransaction[] = [];
   for (const store of Object.keys(stores)) for (let start = from; start < to; start += 5 * 86400000) { await delay(); const query = new URLSearchParams({ storeId: store, from: new Date(start).toISOString(), to: new Date(Math.min(start + 5 * 86400000, to)).toISOString() }); const result = await storeHubGet<SaleTransaction[]>(`/transactions?${query}`); if (!Array.isArray(result)) throw new Error("invalid_transactions"); transactions.push(...result); }
+  const known = new Set(products.map(product => product.id));
+  const missing = [...new Set(transactions.flatMap(t => (t.items || []).map(item => item.productId).filter((id): id is string => !!id && !known.has(id))))];
+  const productCache = adminDb().collection("sop_storehub_product_cache");
+  for (const id of missing) {
+    const ref = productCache.doc(id);
+    const cached = await ref.get();
+    let product = cached.exists ? cached.data() as SaleProduct : undefined;
+    if (!product) {
+      await delay();
+      product = await storeHubGet<SaleProduct>(`/products/${encodeURIComponent(id)}`);
+      if (!product || product.id !== id || (!product.name && !product.category)) throw new Error("invalid_product");
+      await ref.set({ id, name: product.name || "", category: product.category || "" });
+    }
+    products.push(product);
+  }
   return saleRows(transactions, products, cashiers, from, to, stores);
 }

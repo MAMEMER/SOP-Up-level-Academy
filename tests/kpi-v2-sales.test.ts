@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { saleRows, salesTargets } from "../lib/kpi-v2-sales.ts";
+import { classifySaleProduct, saleRows, salesTargets } from "../lib/kpi-v2-sales.ts";
 const from = Date.parse("2026-12-01T00:00:00Z"), to = Date.parse("2027-01-01T00:00:00Z");
 const sale = { refId: "1", employeeId: "x", storeId: "shop", transactionTime: "2026-12-05T00:00:00Z", transactionType: "Sale", total: 100, items: [{ productId: "a", total: 60 }, { productId: "b", total: 20 }, { productId: "c", total: 10 }, { productId: "d", total: 10 }] };
 const products = [{ id: "a", category: "Cards" }, { id: "b", category: "Event" }, { id: "c", category: "Pre order" }, { id: "d", name: "Pre release ticket" }];
@@ -30,4 +30,14 @@ test("monthly target adds the correct bucket for each scheduled shift", () => {
   const result = salesTargets(shifts, history, "2026-12", 10);
   assert.equal(result.buckets["senafest:weekend"].target, 1665 * 1.1);
   assert.ok(Math.abs(result.people.B.target! - (23 * 734 + 8 * 676) * 1.1) < 1e-8);
+});
+
+test("classifies missing event and preorder names and separates store revenue", () => {
+  for (const name of ["Grand tournamant(senafest)", "Event Lorcana", "Gym Pokemon", "Event RiftBound", "Pre release", "ค่าบริการบอร์ดเกม", "Road to championship"]) assert.equal(classifySaleProduct({ name }), "event");
+  for (const name of ["Monsnatch Pre order", "pre-order", "พรีสินค้า"]) assert.equal(classifySaleProduct({ name }), "preorder");
+  assert.equal(classifySaleProduct({ name: "สมัคร สมาชิก" }), "membership");
+  assert.equal(classifySaleProduct({ name: "ขายได้ทุกอย่าง" }), "open_price");
+  assert.equal(classifySaleProduct({ name: "Cards" }), "product");
+  const rows = saleRows([{ ...sale, total: 100, items: [{ productId: "a", total: 30 }, { productId: "b", total: 20 }, { productId: "c", total: 10 }, { productId: "m", total: 15 }, { productId: "o", total: 25 }] }], [...products, { id: "m", name: "สมัคร สมาชิก" }, { id: "o", name: "ขายได้ทุกอย่าง" }], {}, from, to, { shop: "bangkae" });
+  assert.equal(rows[0].amount, 30); assert.equal(rows[0].storeRevenue, 90); assert.equal(rows[0].openPrice, 25);
 });

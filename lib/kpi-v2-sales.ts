@@ -1,6 +1,14 @@
 export type SaleProduct = { id?: string; category?: string; name?: string };
 export type SaleTransaction = { refId?: string; employeeId?: string; storeId?: string; transactionTime?: string; transactionType?: string; isCancelled?: boolean; status?: string; total?: number; items?: { productId?: string; total?: number }[] };
-export type SaleRow = { staffCode?: string; branch: string; workDate: string; amount: number };
+export type SaleRow = { staffCode?: string; branch: string; workDate: string; amount: number; storeRevenue?: number; openPrice?: number };
+export function classifySaleProduct(product: SaleProduct): "preorder" | "event" | "membership" | "open_price" | "product" {
+  const name = product.name || "", category = (product.category || "").trim().toLowerCase();
+  if (category === "pre order" || /pre ?-?order|พรี/i.test(name)) return "preorder";
+  if (category === "event" || /pre release|event|tournam|gym|ค่าบริการบอร์ดเกม|road to/i.test(name)) return "event";
+  if (name.includes("สมัคร สมาชิก")) return "membership";
+  if (name.includes("ขายได้ทุกอย่าง")) return "open_price";
+  return "product";
+}
 export function saleRows(transactions: SaleTransaction[], products: SaleProduct[], cashiers: Record<string, string>, from: number, to: number, stores: Record<string, string>): SaleRow[] {
   const catalog = new Map(products.filter(p => p.id).map(p => [p.id!, p]));
   const seen = new Set<string>();
@@ -13,13 +21,16 @@ export function saleRows(transactions: SaleTransaction[], products: SaleProduct[
     if (seen.has(t.refId)) continue;
     seen.add(t.refId);
     if (!Array.isArray(t.items) || !Number.isFinite(t.total)) throw new Error("incomplete_sale");
-    let excluded = 0;
+    let excluded = 0, preorder = 0, openPrice = 0;
     for (const item of t.items) {
       const product = item.productId && catalog.get(item.productId);
       if (!product || !Number.isFinite(item.total)) throw new Error("unknown_product");
-      if (["pre order", "event"].includes(String(product.category || "").trim().toLowerCase()) || /pre release/i.test(product.name || "")) excluded += Math.max(0, item.total!);
+      const kind = classifySaleProduct(product), amount = Math.max(0, item.total!);
+      if (kind !== "product") excluded += amount;
+      if (kind === "preorder") preorder += amount;
+      if (kind === "open_price") openPrice += amount;
     }
-    rows.push({ staffCode: cashiers[String(t.employeeId || "")], branch: stores[t.storeId!], workDate: new Date(at + 7 * 3600000).toISOString().slice(0, 10), amount: Math.max(0, t.total! - excluded) });
+    rows.push({ staffCode: cashiers[String(t.employeeId || "")], branch: stores[t.storeId!], workDate: new Date(at + 7 * 3600000).toISOString().slice(0, 10), amount: Math.max(0, t.total! - excluded), storeRevenue: Math.max(0, t.total! - preorder), openPrice });
   }
   return rows;
 }
