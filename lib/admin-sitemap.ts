@@ -86,6 +86,8 @@ export const adminSections: SiteSection[] = [
       { href: "/admin/performance-score", label: "คะแนนพนักงาน", detail: "KPI 5 หมวด · incentive · เหตุผลที่หักรายวัน", keywords: "kpi เงินเดือน" },
       { href: "/admin/stock-check", label: "ลงผลนับ Stock", detail: "ผลนับของวันนั้น ตรง / ไม่ตรง / ไม่ได้นับ (มีผลกับคะแนน)", keywords: "สต็อก" },
       { href: "/admin/mistakes", label: "บันทึกความผิด SOP (KPI ใหม่)", detail: "ค1 · รหัสงาน ระดับ สาขา · นับ 3 เดือน · พนักงานโต้แย้งได้ 3 วัน (ยังไม่ผูกเงินเดือน)", keywords: "ค1 ความผิด หักคะแนน โต้แย้ง kpi ใหม่ mistake" },
+      { href: "/admin/teach-log", label: "สรุปการสอนเกม", detail: "สรุปการสอนเกมรายเดือน", ownerOnly: true, keywords: "สอนเกม teach" },
+      { href: "/admin/kpi-v2-targets", label: "เป้าหมาย KPI รายคน", detail: "ตั้งเป้ารายเดือน", ownerOnly: true, keywords: "kpi เป้าหมาย" },
       { href: "/admin/peer-review", label: "ผลประเมิน 360 (KPI ใหม่)", detail: "ค2 · คะแนนทีมเวิร์กรายเดือน ใครประเมินใคร ตัวอย่างที่เขียน", keywords: "360 ทีมเวิร์ก เพื่อนประเมิน peer kpi ใหม่" },
       { href: "/admin/skill-review", label: "ประเมิน skill รายสัปดาห์ (ทดสอบ)", detail: "ลงผล 15 ตัวชี้วัดทุกวันจันทร์ · วันทำงาน · ข้อเสนอขึ้น/ลดระดับ (ไม่ผูก KPI)", keywords: "skill ทักษะ career path ระดับ ประเมิน" },
       { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach", keywords: "audit" },
@@ -138,6 +140,7 @@ export const staffPagesSection: SiteSection = {
     { href: "/my-tasks/file", label: "แฟ้มงาน", detail: "งานของน้องแยกเดือน เขียว/แดง" },
     { href: "/training", label: "คู่มืองาน", detail: "คู่มือที่พนักงานอ่าน" },
     { href: "/flowers", label: "ดอกไม้", detail: "สวนดอกไม้ของทีม" },
+    { href: "/teach-log", label: "บันทึกสอนเกม", detail: "บันทึกการสอนลูกค้า" },
     { href: "/peer-review", label: "ประเมินเพื่อนร่วมกะ (360)", detail: "พนักงานประเมินเพื่อนที่ทำกะเดียวกันทุกเดือน 6 ข้อ" },
     { href: "/mistakes", label: "บันทึกความผิดของฉัน", detail: "พนักงานเห็นบันทึก ค1 ของตัวเอง + โต้แย้งใน 3 วัน" }
   ]
