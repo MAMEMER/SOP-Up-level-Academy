@@ -3,14 +3,13 @@ import { isVoided, type MistakeRecord } from "./mistake-log.ts";
 export type BigDealConfig = { minTotal: number; ratePct: number; capPerDeal: number };
 export type DealShare = { staffCode: string; percent: number };
 export type DealStatus = "logged" | "manager_checked" | "approved" | "paid" | "rejected";
-export const DEFAULT_BIG_DEAL_CONFIG: BigDealConfig = { minTotal: 10000, ratePct: 3, capPerDeal: 3000 };
 
 export function validateConfig(config: BigDealConfig): boolean {
   return Number.isFinite(config.minTotal) && config.minTotal >= 0 && Number.isFinite(config.ratePct) && config.ratePct >= 0 && config.ratePct <= 100 && Number.isSafeInteger(config.capPerDeal) && config.capPerDeal >= 0;
 }
 
 export function validateShares(shares: DealShare[]): boolean {
-  return shares.length > 0 && shares.every((s) => /^[A-Za-z0-9_-]{1,30}$/.test(s.staffCode) && Number.isInteger(s.percent) && s.percent > 0 && s.percent <= 100) && new Set(shares.map((s) => s.staffCode.toUpperCase())).size === shares.length && shares.reduce((sum, s) => sum + s.percent, 0) === 100;
+  return Array.isArray(shares) && shares.length > 0 && shares.every((s) => s && typeof s.staffCode === "string" && /^[A-Za-z0-9_-]{1,30}$/.test(s.staffCode) && Number.isInteger(s.percent) && s.percent > 0 && s.percent <= 100) && new Set(shares.map((s) => s.staffCode.toUpperCase())).size === shares.length && shares.reduce((sum, s) => sum + s.percent, 0) === 100;
 }
 
 export function hasIntentionalMistake(records: MistakeRecord[], staffCode: string, month: string): boolean {

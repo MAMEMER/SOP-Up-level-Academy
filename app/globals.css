@@ -9916,3 +9916,12 @@ a.peer-review__tr:hover,
 .skill-review__inline button.mistake-log__delete { background: transparent; color: #b42318; border: 1px solid rgba(180, 35, 24, 0.35); }
 .mistake-log .skill-review__inline .mistake-log__reason { flex: 1 1 100%; }
 .mistake-log .skill-review__inline button { min-height: 44px; }
+
+.big-deal-form { display: grid; gap: 1rem; max-width: 44rem; }
+.big-deal-form label { display: grid; gap: .35rem; }
+.big-deal-form input, .big-deal-form select, .big-deal-form textarea { font-size: 16px; min-height: 44px; min-width: 0; max-width: 100%; }
+.big-deal-form button, .owner-ops__date button { min-height: 44px; }
+.big-deal-form fieldset { border: 0; padding: 0; min-width: 0; }
+.big-deal-share { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0; }
+.big-deal-share select { flex: 1 1 10rem; }
+.big-deal-share input { width: 5rem; }

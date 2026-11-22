@@ -31,7 +31,8 @@ export const staffGroups: NavGroup[] = [
       { href: "/parcels", label: "พัสดุการ์ด" },
       { href: "/my-documents", label: "เอกสารของฉัน" },
       { href: "/peer-review", label: "ประเมินเพื่อนร่วมกะ (360)" },
-      { href: "/mistakes", label: "บันทึกความผิดของฉัน" }
+      { href: "/mistakes", label: "บันทึกความผิดของฉัน" },
+      { href: "/big-deal", label: "บันทึก Big Deal" }
     ]
   },
   {
