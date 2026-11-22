@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { personNumbers } from "../lib/kpi-v2-person-numbers.ts";
+import { personNumbers, SKILL_PART_ENABLED } from "../lib/kpi-v2-person-numbers.ts";
 import type { WorkProject } from "../lib/work-projects.ts";
 
 const base = { targets: {}, projects: [] };
@@ -28,10 +28,10 @@ test("hard skills use position requirements and omit missing documents", () => {
   const levels = Object.fromEntries(["cashier", "weekly_event", "stock", "checklist", "cleanliness", "assigned_work"].map(id => [id, { level: 4 }]));
   const all = personNumbers("A", "2026-12", { ...base, position: "temporary", skillLevels: levels });
   assert.deepEqual(all.skill, { met: 6, required: 6 });
-  assert.equal(all.advanced, 100);
+  assert.equal(all.advanced, SKILL_PART_ENABLED ? 100 : undefined);
   const partial = personNumbers("A", "2026-12", { ...base, position: "temporary", skillLevels: { cashier: { level: 4 }, weekly_event: { level: 4 }, stock: { level: 4 } } });
   assert.deepEqual(partial.skill, { met: 3, required: 6 });
-  assert.equal(partial.advanced, 50);
+  assert.equal(partial.advanced, SKILL_PART_ENABLED ? 50 : undefined);
   assert.equal(personNumbers("A", "2026-12", base).skill, undefined);
 });
 
