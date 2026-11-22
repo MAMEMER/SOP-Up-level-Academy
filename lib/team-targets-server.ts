@@ -1,7 +1,7 @@
 import "server-only";
 import { adminDb } from "./firebase-admin.ts";
 import { hasStoreHubCreds, storeHubGet } from "./storehub-api.ts";
-import { calculateActuals, monthWeeks, passedWeeks, group4Score, type OnlinePayment, type Product, type TeamTargets, type Transaction, type StoreNumbers } from "./team-targets.ts";
+import { calculateActuals, salesProgress, monthWeeks, passedWeeks, group4Score, type OnlinePayment, type Product, type TeamTargets, type Transaction, type StoreNumbers } from "./team-targets.ts";
 
 const COLLECTION = "sop_team_targets";
 let queue = Promise.resolve();
@@ -59,19 +59,29 @@ async function fetchTeamTargets(month: string) {
     db.collection("public_payments").where("status", "==", "verified").get(),
     products(), transactions(start, end)
   ]);
+  const known = new Set(catalog.map(p => p.id));
+  const missing = [...new Set(tx.flatMap(t => (t.items || []).map(i => i.productId).filter((id): id is string => Boolean(id) && !known.has(id))))];
+  const resolved = [...catalog];
+  for (const id of missing) {
+    const item = await limitedGet<Product>(`/products/${encodeURIComponent(id)}`);
+    if (!item || !item.id) throw new Error("StoreHub product missing");
+    resolved.push(item);
+  }
   const payments: OnlinePayment[] = paymentsSnap.docs.map(d => {
     const p = d.data();
     return { status: p.status, date: bangkokDate(p.manualPaidAt || p.verifiedAt || p.createdAt), amount: p.amount, eventType: p.eventType, source: p.source };
   });
   const targets = targetDoc.exists ? { ...targetDoc.data(), poolRevenuePct: targetDoc.data()?.poolRevenuePct ?? 10 } as TeamTargets : null;
-  const actuals = calculateActuals(month, tx, catalog, payments);
+  const actuals = calculateActuals(month, tx, resolved, payments);
   const passed = targets ? passedWeeks(weeks, actuals.entries, targets.eventTargets) : null;
   const revenue = Object.values(actuals.revenue).reduce((a, b) => a + b, 0);
   const configuredGames = targets ? Object.keys(targets.eventTargets).filter(g => targets.eventTargets[g as keyof typeof targets.eventTargets] > 0) : [];
   const eventWeeks = passed && configuredGames.length ? configuredGames.reduce((sum, g) => sum + passed[g as keyof typeof passed], 0) / configuredGames.length : 0;
   const group4 = targets ? group4Score(revenue, targets.revenueTarget, eventWeeks, configuredGames.length ? weeks.length : 0, targets.budgetTarget, targets.budgetActual ?? undefined) : undefined;
   const storeNumbers: StoreNumbers = group4 === undefined ? {} : { group4 };
-  return { month, weeks, targets, actuals, passed, storeNumbers };
+  const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+  const progress = salesProgress(month, today, tx, resolved, payments);
+  return { month, weeks, targets, actuals, passed, storeNumbers, progress };
 }
 const reportCache = new Map<string, { at: number; value: ReturnType<typeof fetchTeamTargets> }>();
 export function loadTeamTargets(month: string) {

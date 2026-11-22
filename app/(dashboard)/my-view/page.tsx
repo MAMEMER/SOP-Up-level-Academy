@@ -1,4 +1,4 @@
-import { TeamProgress } from "../../../components/TeamProgress.tsx";
+import { SalesProgress } from "../../../components/SalesProgress.tsx";
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
 import {
@@ -50,6 +50,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   if (!selectedCode) {
     return (
       <main className="page">
+        <SalesProgress compact />
         <section className="board-hero">
           <div>
             <p className="eyebrow">มุมมองพนักงาน</p>
@@ -92,6 +93,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
   return (
     <main className="page">
+      <SalesProgress compact />
       <section className="board-hero">
         <div>
           <p className="eyebrow">มุมมองพนักงาน</p>
@@ -123,7 +125,6 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       {/* งานที่ต้องลงมือตอนนี้มาก่อนทุกอย่างเสมอ — คะแนน/ประวัติเลื่อนลงไปอยู่ล่าง (ใบงาน YrTvFzXr) */}
       <TaskFocusBoard branch={branch} staffCode={selectedCode} today={workDate} />
 
-      <TeamProgress />
       <MyShiftToday staffCode={selectedCode} branch={branch} workDate={workDate} />
 
       <MyAssignedWork staffCode={selectedCode} branch={branch} workDate={workDate} />

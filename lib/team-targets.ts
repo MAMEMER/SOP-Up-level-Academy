@@ -3,6 +3,7 @@ export const GAMES = ["pokemon", "lorcana", "riftbound", "monsnatch"] as const;
 export type Game = typeof GAMES[number];
 export type TeamTargets = {
   revenueTarget: number;
+  targetBasis?: "store_ex_preorder" | "product_only";
   eventTargets: Record<Game, number>;
   budgetTarget: number;
   budgetActual?: number | null;
@@ -70,7 +71,7 @@ export function splitEligiblePool(pool: number, staff: Array<{ code: string; tot
 }
 
 export type Product = { id?: string; name?: string; category?: string };
-export type Transaction = { storeId?: string; transactionTime?: string; transactionType?: string; isCancelled?: boolean; total?: number; items?: Array<{ productId?: string; name?: string; quantity?: number; total?: number }> };
+export type Transaction = { storeId?: string; transactionTime?: string; transactionType?: string; status?: string; isCancelled?: boolean; total?: number; items?: Array<{ productId?: string; name?: string; quantity?: number; total?: number }> };
 export type OnlinePayment = { status?: string; date: string; amount?: number; eventType?: string; source?: string };
 export type TeamActuals = { revenue: { bangkae: number; senafest: number; online: number }; entries: WeeklyEntries };
 const BRANCHES: Record<string, "bangkae" | "senafest"> = { "6a268170c008ab000760e21a": "bangkae", "6aaa02f0a568500007542756": "senafest" };
@@ -87,7 +88,7 @@ export function calculateActuals(month: string, transactions: Transaction[], pro
   for (const tx of transactions) {
     const branch = BRANCHES[tx.storeId || ""];
     const ms = Date.parse(tx.transactionTime || "");
-    if (!branch || tx.isCancelled || !Number.isFinite(ms)) continue;
+    if (!branch || tx.isCancelled || String(tx.status || "").toLowerCase() === "cancelled" || !Number.isFinite(ms)) continue;
     const date = new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
     if (!date.startsWith(month)) continue;
     if (!Array.isArray(tx.items)) throw new Error("Missing StoreHub transaction items");
@@ -109,4 +110,50 @@ export function calculateActuals(month: string, transactions: Transaction[], pro
     add(payment.date, gameFor(`${payment.eventType || ""} ${payment.source || ""}`), 1);
   }
   return { revenue, entries };
+}
+
+export function classifySaleProduct(product: Product): "preorder" | "event" | "membership" | "open_price" | "product" {
+  const name = product.name || "", category = (product.category || "").trim().toLowerCase();
+  if (category === "pre order" || /pre ?-?order|พรี/i.test(name)) return "preorder";
+  if (category === "event" || /pre release|event|tournam|gym|ค่าบริการบอร์ดเกม|road to/i.test(name)) return "event";
+  if (name.includes("สมัคร สมาชิก")) return "membership";
+  if (name.includes("ขายได้ทุกอย่าง")) return "open_price";
+  return "product";
+}
+export function pace(amount: number, target: number, day: number, days: number) {
+  const remaining = Math.max(0, target - amount), remainingDays = Math.max(0, days - day);
+  return { percent: target > 0 ? amount / target * 100 : null, remaining, remainingDays, neededPerDay: remainingDays ? remaining / remainingDays : null, forecast: day > 0 ? amount / day * days : 0 };
+}
+export function salesProgress(month: string, today: string, transactions: Transaction[], products: Product[], payments: OnlinePayment[]) {
+  const catalog = new Map(products.map(p => [p.id, p]));
+  const branches = { bangkae: 0, senafest: 0, online: 0 };
+  const daily: Record<string, { product: number; event: number; store: number }> = {};
+  let product = 0, event = 0, store = 0;
+  const add = (date: string, branch: keyof typeof branches, p: number, e: number, total: number) => {
+    const row = daily[date] ||= { product: 0, event: 0, store: 0 };
+    row.product += p; row.event += e; row.store += total;
+    product += p; event += e; store += total; branches[branch] += total;
+  };
+  for (const tx of transactions) {
+    const branch = BRANCHES[tx.storeId || ""], ms = Date.parse(tx.transactionTime || "");
+    if (!branch || tx.isCancelled || String(tx.status || "").toLowerCase() === "cancelled" || !Number.isFinite(ms)) continue;
+    const date = new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
+    if (!date.startsWith(month) || date > today) continue;
+    if (!Array.isArray(tx.items) || !Number.isFinite(tx.total)) throw new Error("Incomplete transaction");
+    const sign = tx.transactionType === "Return" ? -1 : 1;
+    let excluded = 0, preorder = 0, events = 0;
+    for (const item of tx.items) {
+      const p = catalog.get(item.productId);
+      if (!p || !Number.isFinite(item.total)) throw new Error("Incomplete product data");
+      const kind = classifySaleProduct(p), amount = Math.max(0, item.total!);
+      if (kind !== "product") excluded += amount;
+      if (kind === "preorder") preorder += amount;
+      if (kind === "event") events += amount;
+    }
+    add(date, branch, sign * Math.max(0, tx.total! - excluded), sign * events, sign * Math.max(0, tx.total! - preorder));
+  }
+  for (const payment of payments) if (payment.status?.toLowerCase() === "verified" && payment.date.startsWith(month) && payment.date <= today) {
+    const amount = Number(payment.amount) || 0; add(payment.date, "online", 0, amount, amount);
+  }
+  return { product, event, store, branches, daily };
 }

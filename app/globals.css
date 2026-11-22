@@ -9923,3 +9923,20 @@ a.peer-review__tr:hover,
 .team-target-field input { width: 100%; min-height: 44px; font-size: 16px; }
 .team-target-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 .team-target-actions button, .team-target-section button { min-height: 44px; }
+
+.sales-progress { padding: 1.5rem 0; max-width: 900px; }
+.sales-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.sales-heading h2, .sales-progress h3 { margin: 0; }
+.sales-heading p, .sales-caption { color: var(--color-ink-2, #555); font-size: .9rem; }
+.sales-heading a { flex-shrink: 0; padding: .75rem 0; }
+.sales-hero { font-size: clamp(2rem, 8vw, 3.5rem); line-height: 1.2; font-weight: 600; margin: .25rem 0 1rem; overflow-wrap: anywhere; }
+.sales-hero span { font-size: 1rem; font-weight: 400; }
+.sales-totals { margin: 1rem 0 1.5rem; }
+.sales-totals p { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: .45rem 0; }
+.sales-target { border-top: 1px solid var(--color-rule-2, #ddd); border-bottom: 1px solid var(--color-rule-2, #ddd); padding: .8rem 0 1rem; }
+.sales-target p { margin: .3rem 0; }
+.sales-bar { height: .5rem; border-radius: 1rem; overflow: hidden; background: var(--color-paper-4, #e2e8ef); }
+.sales-bar > span { display: block; height: 100%; background: var(--color-orange); border-radius: inherit; }
+.sales-days { margin: 1rem 0; }
+.sales-day { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .35rem 0; }
+.sales-day strong { min-width: 5rem; text-align: right; }
