@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { listStaff } from "../../../lib/staff-store.ts";
+import { referralCount } from "../../../lib/referral-count-server.ts";
+import { ReferralQr } from "../../../components/ReferralQr.tsx";
 import { requireUser } from "../../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../../lib/employee-directory.ts";
 import { formatWorkDate } from "../../../lib/workflow-records.ts";
@@ -10,6 +13,8 @@ import { groupLabels, missingLabels } from "../../../lib/kpi-v2-score.ts";
 export const dynamic = "force-dynamic";
 export default async function MyKpi({ searchParams }: { searchParams?: Promise<{ period?: string }> }) {
   const user = await requireUser();
+  const staff = (await listStaff()).find(person => person.email === user.email.toLowerCase());
+  const referral = staff?.code ? await referralCount(staff.code).catch(() => null) : null;
   const params = await searchParams;
   const period = isPeriod(params?.period) ? params.period : formatWorkDate().slice(0, 7);
   const code = employeeCodeForEmail(user.email);
@@ -20,6 +25,7 @@ export default async function MyKpi({ searchParams }: { searchParams?: Promise<{
     <Link href="/my-view" className="back-link">← กลับหน้างานของฉัน</Link>
     <section className="board-hero"><div><p className="eyebrow">KPI รายเดือน</p><h2>คะแนนของฉัน</h2><p>คะแนนที่ยังไม่มีข้อมูลจะไม่นำมาคิดในคะแนนรวม</p></div>
       <form className="owner-ops__date"><label>เดือน<input type="month" name="period" defaultValue={period} /></label><button type="submit">ดู</button></form></section>
+    {staff?.code ? <ReferralQr code={staff.code} name={staff.name} count={referral} /> : <section className="owner-ops__panel"><p>ยังไม่มีรหัสพนักงาน ติดต่อแอดมิน</p></section>}
     {today && <section className="owner-ops__panel"><h3>เป้าวันนี้</h3>
       <p>เป้ายอดขายสินค้า {today.target === undefined ? "ยังไม่มีข้อมูล" : `${today.target.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท`} · ขายแล้ว {today.sales === undefined ? "ยังไม่มีข้อมูล" : `${today.sales.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท`}</p>
       <p>ชวนลูกค้ามาอีเวนต์ 1 คน และแสดงหน้าดอกไม้ทุกบิล</p></section>}
