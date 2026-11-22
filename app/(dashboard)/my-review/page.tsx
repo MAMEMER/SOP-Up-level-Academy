@@ -126,7 +126,7 @@ export default async function MyReviewPage({ searchParams }: PageProps) {
       <StaffFeedbackPanel staffCode={selectedCode} isAdmin={isOwner} readOnly={user.isImpersonating} />
 
       {!isOwner && period.startDate.slice(0, 7) >= "2026-12" ? (
-        {kpiV2Visible(user.role) && <section className="staff-empty"><p>ดูคะแนนรายเดือนได้ที่ <Link href="/my-kpi">คะแนน KPI ของฉัน</Link></p></section>}
+        kpiV2Visible(user.role) ? <section className="staff-empty"><p>ดูคะแนนรายเดือนได้ที่ <Link href="/my-kpi">คะแนน KPI ของฉัน</Link></p></section> : null
       ) : review ? (
         <SelfReviewBoard review={review} periodLabel={period.label} />
       ) : (
