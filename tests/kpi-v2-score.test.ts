@@ -20,7 +20,7 @@ test("missing scores are excluded and revenue parts are reported separately", ()
   const [row] = calculateKpiV2("2027-01", [{ ...person, numbers: { sales: 60 } }], [], []);
   assert.equal(score(row, "revenue"), 60);
   assert.deepEqual(row.missing, ["advanced", "team", "members", "events", "store"]);
-  assert.ok(Math.abs(row.total! - (100 * 25 + 60 * 35) / 60) < 1e-9);
+  assert.ok(Math.abs(row.total! - (100 * 10 + 60 * 40) / 50) < 1e-9);
   const [storeOnly] = calculateKpiV2("2027-01", [{ ...person, numbers: {} }], [], [], { store: 90 });
   assert.equal(score(storeOnly, "revenue"), 90);
   assert.ok(storeOnly.missing.includes("sales"));
