@@ -139,6 +139,7 @@ export const staffPagesSection: SiteSection = {
     { href: "/schedule", label: "ตารางกะ (พนักงาน)", detail: "ตารางกะแบบที่พนักงานเห็น" },
     { href: "/my-tasks", label: "แจ้งเตือนงาน", detail: "งานที่มอบหมายที่น้องยังไม่ได้ส่ง" },
     { href: "/my-tasks/file", label: "แฟ้มงาน", detail: "งานของน้องแยกเดือน เขียว/แดง" },
+    { href: "/work-guide", label: "คู่มืองานของฉัน", detail: "งานพื้นฐานและเกณฑ์สกิล" },
     { href: "/training", label: "คู่มืองาน", detail: "คู่มือที่พนักงานอ่าน" },
     { href: "/flowers", label: "ดอกไม้", detail: "สวนดอกไม้ของทีม" },
     { href: "/teach-log", label: "บันทึกสอนเกม", detail: "บันทึกการสอนลูกค้า" },

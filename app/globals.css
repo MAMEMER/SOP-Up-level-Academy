@@ -9933,3 +9933,15 @@ a.peer-review__tr:hover,
 .kpi-sales-table { overflow-x: auto; }
 .kpi-sales-table table { width: 100%; border-collapse: collapse; }
 .kpi-sales-table th, .kpi-sales-table td { padding: 0.65rem; text-align: left; border-bottom: 1px solid var(--color-border, #ddd); }
+
+.work-guide { font-size: 1rem; }
+.work-guide p, .work-guide li { line-height: 1.65; }
+.work-guide__group { border-bottom: 1px solid var(--color-border, #ddd); }
+.work-guide__group summary { cursor: pointer; padding: 14px 0; min-height: 44px; font-weight: 600; }
+.work-guide__group .peer-review__mine li { display: flex; justify-content: flex-start; gap: 1rem; }
+.work-guide__group .peer-review__mine li span:first-child { flex: 0 0 4.5rem; }
+.work-guide__levels > div, .work-guide__skills > article { padding: 1rem 0; border-bottom: 1px solid var(--color-border, #ddd); }
+.work-guide__levels h4, .work-guide__skills h4 { margin: 0; font-size: 1.1rem; }
+.work-guide__levels p, .work-guide__skills p { margin: .5rem 0 0; }
+.work-guide a { display: inline-block; padding: .65rem 0; }
+.work-guide p, .work-guide li, .work-guide summary, .work-guide a { font-size: 1rem; }

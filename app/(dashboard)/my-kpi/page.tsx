@@ -26,6 +26,7 @@ export default async function MyKpi({ searchParams }: { searchParams?: Promise<{
     <section className="board-hero"><div><p className="eyebrow">KPI รายเดือน</p><h2>คะแนนของฉัน</h2><p>คะแนนที่ยังไม่มีข้อมูลจะไม่นำมาคิดในคะแนนรวม</p></div>
       <form className="owner-ops__date"><label>เดือน<input type="month" name="period" defaultValue={period} /></label><button type="submit">ดู</button></form></section>
     {staff?.code ? <ReferralQr code={staff.code} name={staff.name} count={referral} /> : <section className="owner-ops__panel"><p>ยังไม่มีรหัสพนักงาน ติดต่อแอดมิน</p></section>}
+    <section className="owner-ops__panel"><Link href="/work-guide">อ่านงานพื้นฐานและสกิลทั้งหมด →</Link></section>
     {today && <section className="owner-ops__panel"><h3>เป้าวันนี้</h3>
       <p>เป้ายอดขายสินค้า {today.target === undefined ? "ยังไม่มีข้อมูล" : `${today.target.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท`} · ขายแล้ว {today.sales === undefined ? "ยังไม่มีข้อมูล" : `${today.sales.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท`}</p>
       <p>ชวนลูกค้ามาอีเวนต์ 1 คน และแสดงหน้าดอกไม้ทุกบิล</p></section>}
