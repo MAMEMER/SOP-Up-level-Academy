@@ -9916,3 +9916,20 @@ a.peer-review__tr:hover,
 .skill-review__inline button.mistake-log__delete { background: transparent; color: #b42318; border: 1px solid rgba(180, 35, 24, 0.35); }
 .mistake-log .skill-review__inline .mistake-log__reason { flex: 1 1 100%; }
 .mistake-log .skill-review__inline button { min-height: 44px; }
+
+/* KPI person inputs */
+.kpi-entry-form { display: grid; gap: 1rem; max-width: 42rem; }
+.kpi-entry-form label { display: grid; gap: .4rem; min-width: 0; }
+.kpi-entry-form input, .kpi-entry-form select, .kpi-entry-form textarea { width: 100%; min-width: 0; min-height: 44px; padding: .65rem .75rem; font: inherit; font-size: 16px; }
+.kpi-entry-form textarea { min-height: 6rem; resize: vertical; }
+.kpi-entry-form button { min-height: 44px; font: inherit; }
+.kpi-entry-form button[type="submit"] { width: 100%; }
+
+.kpi-entry-form button[type="submit"] { border: 0; border-radius: 12px; background: var(--color-ink); color: white; font-weight: 600; cursor: pointer; }
+.kpi-entry-form button.kpi-entry-reset { background: transparent; border: 1px solid currentColor; box-shadow: none; color: var(--color-ink); border-radius: 12px; cursor: pointer; }
+.kpi-person-page .owner-ops__date button { min-width: 44px; min-height: 44px; }
+.kpi-person-page button { min-height: 44px; }
+
+.kpi-sales-table { overflow-x: auto; }
+.kpi-sales-table table { width: 100%; border-collapse: collapse; }
+.kpi-sales-table th, .kpi-sales-table td { padding: 0.65rem; text-align: left; border-bottom: 1px solid var(--color-border, #ddd); }

@@ -11,7 +11,7 @@ export const groupLabels: Record<Group, string> = { basic: "งานพื้�
 export const missingLabels: Record<MissingPart, string> = { ...groupLabels, sales: "ยอดขายสินค้าของเรา", members: "สมาชิกที่เราชวน", events: "คนมาอีเวนต์ที่เราชวน", store: "ยอดขายทั้งร้าน" };
 export const positionLabels: Record<Position, string> = { temporary: "ชั่วคราว", regular: "ประจำ", branch_manager: "ผู้จัดการสาขา" };
 const groups: Group[] = ["basic", "advanced", "revenue", "team"];
-const weights: Record<Position, number[]> = { temporary: [40, 15, 30, 15], regular: [25, 25, 35, 15], branch_manager: [15, 20, 40, 25] };
+const weights: Record<Position, number[]> = { temporary: [40, 15, 30, 15], regular: [10, 35, 40, 15], branch_manager: [10, 10, 45, 35] };
 const valid = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 100;
 const average = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 
