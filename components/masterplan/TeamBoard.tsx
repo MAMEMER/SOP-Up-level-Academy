@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { MASTERPLAN_MEMBERS, memberName } from "../../lib/masterplan-access.ts";
 import type { BoardEvent } from "../../lib/activity-board.ts";
+import type { OwnerPresence } from "../../lib/owner-presence.ts";
 import { TeamCalendar } from "./TeamCalendar.tsx";
 import { mpApi, useLocalDraft } from "../../lib/masterplan-client.ts";
 import {
@@ -82,11 +83,13 @@ type Toast = { message: string; undo?: () => Promise<void> };
 
 export function TeamBoard({
   initialCards,
+  initialPresence,
   shopEvents,
   me,
   today,
 }: {
   initialCards: BoardCard[];
+  initialPresence: OwnerPresence[];
   shopEvents: BoardEvent[];
   me: string;
   today: string;
@@ -339,6 +342,7 @@ export function TeamBoard({
       {view === "calendar" ? (
         <TeamCalendar
           cards={shown}
+          initialPresence={initialPresence}
           shopEvents={shopEvents}
           today={today}
           me={me}
