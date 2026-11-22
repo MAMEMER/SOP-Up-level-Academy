@@ -23,3 +23,19 @@ test("revenue scores remain separate and skip missing targets", () => {
   assert.deepEqual(personNumbers("A", "2026-12", { ...base, productSales: 50, productTarget: 100, members: 1, eventCustomers: 0, targets: { memberTarget: 1, eventTarget: 1 } }), { sales: 50, members: 100, events: 0 });
   assert.deepEqual(personNumbers("A", "2026-12", { ...base, productSales: 50, productTarget: 100, members: 1, targets: { memberTarget: 1 } }), { sales: 50, members: 100 });
 });
+
+test("hard skills use position requirements and omit missing documents", () => {
+  const levels = Object.fromEntries(["cashier", "weekly_event", "stock", "checklist", "cleanliness", "assigned_work"].map(id => [id, { level: 4 }]));
+  const all = personNumbers("A", "2026-12", { ...base, position: "temporary", skillLevels: levels });
+  assert.deepEqual(all.skill, { met: 6, required: 6 });
+  assert.equal(all.advanced, 100);
+  const partial = personNumbers("A", "2026-12", { ...base, position: "temporary", skillLevels: { cashier: { level: 4 }, weekly_event: { level: 4 }, stock: { level: 4 } } });
+  assert.deepEqual(partial.skill, { met: 3, required: 6 });
+  assert.equal(partial.advanced, 50);
+  assert.equal(personNumbers("A", "2026-12", base).skill, undefined);
+});
+
+test("zero referrals count when targets exist but missing inputs or targets do not", () => {
+  assert.deepEqual(personNumbers("A", "2026-12", { ...base, members: 0, eventCustomers: 0, targets: { memberTarget: 1, eventTarget: 1 } }), { members: 0, events: 0 });
+  assert.deepEqual(personNumbers("A", "2026-12", { ...base, members: 0, eventCustomers: 0 }), {});
+});

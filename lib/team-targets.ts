@@ -51,12 +51,6 @@ export function incentivePool(revenue: number, targets: TeamTargets, passed: Rec
   const revenuePart = targets.revenueTarget > 0 ? Math.max(0, revenue - targets.revenueTarget) * (targets.poolRevenuePct ?? 10) / 100 : 0;
   return (targets.heroProducts || []).reduce((sum, hero, i) => sum + (hero.unitTarget > 0 && (heroUnits[i] || 0) >= hero.unitTarget ? hero.poolBonus : 0), 0) + revenuePart + GAMES.filter(g => targets.eventTargets[g] > 0 && passed[g] >= targets.passWeeks).length * targets.poolPerGame;
 }
-export function splitPool(pool: number, staff: Array<{ code: string; hours: number }>): Array<{ code: string; hours: number; amount: number }> {
-  const valid = staff.filter(s => Number.isFinite(s.hours) && s.hours > 0);
-  const total = valid.reduce((sum, s) => sum + s.hours, 0);
-  return valid.map(s => ({ ...s, amount: total ? pool * s.hours / total : 0 }));
-}
-
 /** A monthly share uses calendar days; unavailable days must be supplied from verified records. */
 export function splitEligiblePool(pool: number, staff: Array<{ code: string; total: number | null; incentiveEligible: boolean; availableDays: number }>, daysInMonth: number) {
   if (!Number.isFinite(pool) || pool < 0 || !Number.isInteger(daysInMonth) || daysInMonth < 28 || daysInMonth > 31) throw new Error("Invalid pool or month");

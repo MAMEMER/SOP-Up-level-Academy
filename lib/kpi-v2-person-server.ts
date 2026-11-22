@@ -36,22 +36,21 @@ async function referralCounts(collection: string, period: string, staffCode: str
   const snapshot = await adminDb().collection(collection).where("referredByStaff", "==", staffCode).get();
   const [year, month] = period.split("-").map(Number);
   const from = Date.UTC(year, month - 1, 1) - 7 * 3600000, to = Date.UTC(year, month, 1) - 7 * 3600000;
-  let present = false, count = 0;
+  let count = 0;
   for (const doc of snapshot.docs) {
     const data = doc.data();
     const raw = data.createdAt;
     const at = typeof raw === "string" ? Date.parse(raw) : raw?.toDate?.().getTime();
     if (!Number.isFinite(at) || at < from || at >= to) continue;
-    present = true;
     if (!members || (data.tier && data.status === "active") || data.isLegacyLinked) count++;
   }
-  return present ? count : undefined;
+  return count;
 }
-export async function loadPersonNumbers(staffCode: string, period: string): Promise<PersonNumbers> {
+export async function loadPersonNumbers(staffCode: string, period: string, position?: import("./kpi-v2-score.ts").Position): Promise<PersonNumbers> {
   if (!isPeriod(period) || !hasAdminCredentials()) throw new Error("person_numbers_unavailable");
-  const [targets, projects, logs, overview, members, eventCustomers] = await Promise.all([getPersonTargets(period), fetchAllWorkProjects(), getTeachLogs(period), loadSalesOverview(period).catch(() => undefined), referralCounts("users", period, staffCode, true).catch(() => undefined), referralCounts("event_signup_branches", period, staffCode, false).catch(() => undefined)]);
+  const [targets, projects, logs, overview, members, eventCustomers, skillDoc] = await Promise.all([getPersonTargets(period), fetchAllWorkProjects(), getTeachLogs(period), loadSalesOverview(period).catch(() => undefined), referralCounts("users", period, staffCode, true).catch(() => undefined), referralCounts("event_signup_branches", period, staffCode, false).catch(() => undefined), adminDb().collection("sop_skill_levels").doc(staffCode).get().catch(() => undefined)]);
   const target = targets[staffCode] || {};
-  return personNumbers(staffCode, period, { teachCount: logs.filter(log => log.staffCode === staffCode).length, productSales: overview ? overview.sales[staffCode] || 0 : undefined, productTarget: overview?.people[staffCode]?.target, members, eventCustomers, targets: target, projects });
+  return personNumbers(staffCode, period, { position, skillLevels: skillDoc?.exists ? (skillDoc.data()?.levels || {}) : undefined, teachCount: logs.filter(log => log.staffCode === staffCode).length, productSales: overview ? overview.sales[staffCode] || 0 : undefined, productTarget: overview?.people[staffCode]?.target, members, eventCustomers, targets: target, projects });
 }
 async function fetchSales(period: string) {
   const [year, month] = period.split("-").map(Number);
