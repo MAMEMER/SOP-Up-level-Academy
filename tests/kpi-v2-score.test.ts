@@ -4,7 +4,7 @@ import { calculateKpiV2 } from "../lib/kpi-v2-score.ts";
 import { peerReviewItems, type PeerReviewRecord } from "../lib/peer-review.ts";
 import type { MistakeRecord } from "../lib/mistake-log.ts";
 
-const person = { code: "A", branch: "one", position: "regular" as const, numbers: { advanced: 100, revenueOwn: 100 } };
+const person = { code: "A", branch: "one", position: "regular" as const, numbers: { advanced: 100, sales: 100 } };
 const review = (raterCode: string, period = "2027-01"): PeerReviewRecord => ({ id: raterCode, period, raterCode, rateeCode: "A", ratings: Object.fromEntries(peerReviewItems.map(i => [i.id, 4])), examples: {} } as PeerReviewRecord);
 const reviews = [review("X"), review("Y")];
 const score = (row: ReturnType<typeof calculateKpiV2>[number], group: string) => row.groups.find(g => g.group === group)!.score;
@@ -16,17 +16,17 @@ test("position weights sum to 100", () => {
   }
 });
 
-test("missing scores are excluded and revenue halves are reported separately", () => {
-  const [row] = calculateKpiV2("2027-01", [{ ...person, numbers: { revenueOwn: 60 } }], [], []);
+test("missing scores are excluded and revenue parts are reported separately", () => {
+  const [row] = calculateKpiV2("2027-01", [{ ...person, numbers: { sales: 60 } }], [], []);
   assert.equal(score(row, "revenue"), 60);
-  assert.deepEqual(row.missing, ["advanced", "team", "revenueStore"]);
+  assert.deepEqual(row.missing, ["advanced", "team", "members", "events", "store"]);
   assert.ok(Math.abs(row.total! - (100 * 25 + 60 * 35) / 60) < 1e-9);
   const [storeOnly] = calculateKpiV2("2027-01", [{ ...person, numbers: {} }], [], [], { store: 90 });
   assert.equal(score(storeOnly, "revenue"), 90);
-  assert.ok(storeOnly.missing.includes("revenueOwn"));
+  assert.ok(storeOnly.missing.includes("sales"));
   const [neither] = calculateKpiV2("2027-01", [{ ...person, numbers: {} }], [], []);
   assert.equal(score(neither, "revenue"), null);
-  assert.ok(neither.missing.includes("revenueOwn") && neither.missing.includes("revenueStore"));
+  assert.ok(neither.missing.includes("sales") && neither.missing.includes("store"));
 });
 
 test("store gate uses the relevant store half and caps only when necessary", () => {
@@ -56,8 +56,16 @@ test("basic averages both mistake groups and gates incentive", () => {
 
 test("trial months do not issue warnings", () => {
   const mistake = { staffCode: "A", taskCode: "1.1.1", level: "intentional", date: "2026-12-03", createdAt: "2026-12-03T00:00:00Z", id: "m" } as MistakeRecord;
-  const [row] = calculateKpiV2("2026-12", [{ ...person, numbers: { advanced: 0, revenueOwn: 0 } }], [mistake], [], { store: 0 });
+  const [row] = calculateKpiV2("2026-12", [{ ...person, numbers: { advanced: 0, sales: 0 } }], [mistake], [], { store: 0 });
   assert.equal(row.band, "เตือน");
   assert.equal(row.trial, true);
   assert.equal(row.warning, false);
+});
+
+test("revenue averages all available scores equally", () => {
+  const [row] = calculateKpiV2("2027-01", [{ ...person, numbers: { sales: 20, members: 40, events: 60 } }], [], [], { store: 80 });
+  assert.equal(score(row, "revenue"), 50);
+  const [manager] = calculateKpiV2("2027-01", [{ ...person, position: "branch_manager" }], [], [], { store: 50 });
+  assert.ok(manager.missing.includes("store"));
+  assert.equal(manager.capped, false);
 });
