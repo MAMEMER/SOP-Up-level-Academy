@@ -29,7 +29,7 @@ export async function deleteOwnTeachLog(id: string, code: string, today: string)
 export async function getPersonTargets(period: string): Promise<Record<string, PersonTargets>> {
   requireStorage();
   const snapshot = await targets().where("period", "==", period).get();
-  return Object.fromEntries(snapshot.docs.map((doc) => { const data = doc.data(); return [data.staffCode, { teachTarget: data.teachTarget, addonSalesTarget: data.addonSalesTarget, assignedOnTimeTarget: data.assignedOnTimeTarget }]; }));
+  return Object.fromEntries(snapshot.docs.map((doc) => { const data = doc.data(); return [data.staffCode, { teachTarget: data.teachTarget, memberTarget: data.memberTarget, eventTarget: data.eventTarget, assignedOnTimeTarget: data.assignedOnTimeTarget }]; }));
 }
 export async function savePersonTarget(period: string, staffCode: string, values: PersonTargets) {
   requireStorage();
@@ -43,4 +43,14 @@ export async function copyPersonTargetIfMissing(period: string, staffCode: strin
     const current = await transaction.get(ref);
     if (!current.exists) transaction.create(ref, { period, staffCode, ...values });
   });
+}
+
+export async function getGrowthPct(period: string): Promise<number> {
+  requireStorage();
+  const value = (await adminDb().collection("sop_kpi_growth").doc(period).get()).data()?.growthPct;
+  return typeof value === "number" && Number.isFinite(value) ? value : 10;
+}
+export async function saveGrowthPct(period: string, growthPct: number) {
+  requireStorage();
+  await adminDb().collection("sop_kpi_growth").doc(period).set({ growthPct });
 }

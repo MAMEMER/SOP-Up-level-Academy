@@ -9929,3 +9929,7 @@ a.peer-review__tr:hover,
 .kpi-entry-form button.kpi-entry-reset { background: transparent; border: 1px solid currentColor; box-shadow: none; color: var(--color-ink); border-radius: 12px; cursor: pointer; }
 .kpi-person-page .owner-ops__date button { min-width: 44px; min-height: 44px; }
 .kpi-person-page button { min-height: 44px; }
+
+.kpi-sales-table { overflow-x: auto; }
+.kpi-sales-table table { width: 100%; border-collapse: collapse; }
+.kpi-sales-table th, .kpi-sales-table td { padding: 0.65rem; text-align: left; border-bottom: 1px solid var(--color-border, #ddd); }
