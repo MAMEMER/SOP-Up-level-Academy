@@ -116,6 +116,16 @@ function StaffForm({
           </label>
 
           <label>
+            ตำแหน่ง KPI {record && !record.position ? "(ยังไม่ได้ระบุ ใช้ประจำชั่วคราว)" : ""}
+            <select name="position" defaultValue={record?.position || ""}>
+              <option value="">ยังไม่ได้ระบุ (ใช้ประจำ)</option>
+              <option value="temporary">ชั่วคราว</option>
+              <option value="regular">ประจำ</option>
+              <option value="branch_manager">ผู้จัดการสาขา</option>
+            </select>
+          </label>
+
+          <label>
             สาขา
             <select name="branch" defaultValue={record?.branch || branches[0]?.key}>
               {branches.map((branch) => (
