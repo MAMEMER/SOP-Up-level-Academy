@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "../../../lib/auth.ts";
 import { isOwner } from "../../../lib/owner.ts";
 import { GAMES, monthWeeks, type TeamTargets } from "../../../lib/team-targets.ts";
-import { loadTeamTargets, loadWorkedHours, saveTeamTargets, searchTeamProducts } from "../../../lib/team-targets-server.ts";
+import { loadTeamTargets, loadWorkedHours, saveTeamTargets, saveHeroConfig, searchTeamProducts } from "../../../lib/team-targets-server.ts";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 const owner = async () => { const user = await requireUser(); return isOwner(user.actualEmail) && !user.isImpersonating ? user : null; };
@@ -36,4 +36,12 @@ export async function POST(request: Request) {
     await saveTeamTargets(body.month, { heroProducts: t.heroProducts || [], targetBasis: "product_only", revenueTarget: t.revenueTarget, budgetTarget: t.budgetTarget, budgetActual: t.budgetActual ?? null, poolRevenuePct: t.poolRevenuePct, poolPerGame: t.poolPerGame, passWeeks: t.passWeeks, eventTargets: Object.fromEntries(GAMES.map(g => [g, t.eventTargets[g]])) as TeamTargets["eventTargets"] }, user.actualEmail);
     return json({ ok: true });
   } catch { return json({ error: "บันทึกไม่ได้ กรุณาลองใหม่" }, 400); }
+}
+
+export async function PUT(request: Request) {
+  const user = await owner();
+  if (!user) return json({ error: "forbidden" }, 403);
+  const config = await request.json().catch(() => undefined);
+  if (config !== null && (!config || typeof config.label !== "string" || !config.label.trim() || config.label.length > 200 || !Array.isArray(config.productIds) || !config.productIds.length || config.productIds.length > 100 || config.productIds.some((id: unknown) => typeof id !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) || (config.monthlyUnitTarget !== undefined && (!Number.isFinite(config.monthlyUnitTarget) || config.monthlyUnitTarget <= 0)))) return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
+  try { await saveHeroConfig(config === null ? null : { label: config.label.trim(), productIds: config.productIds, ...(config.monthlyUnitTarget !== undefined ? { monthlyUnitTarget: config.monthlyUnitTarget } : {}) }); return json({ ok: true }); } catch { return json({ error: "บันทึกไม่ได้" }, 503); }
 }

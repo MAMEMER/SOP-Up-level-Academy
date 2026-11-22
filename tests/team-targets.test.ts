@@ -75,3 +75,15 @@ test("hero product units exclude cancelled sales, respect Bangkok month and dedu
   assert.equal(incentivePool(0, targets, passed, [4]), 1000);
   assert.equal(incentivePool(0, targets, passed, [2]), 0);
 });
+
+test("hero product matches product IDs and nets returns without counting sleeves", async () => {
+  const { heroProductActuals } = await import("../lib/team-targets.ts");
+  const hero = { name: "Hero", productIds: ["hero-id"], unitTarget: 10, poolBonus: 0 };
+  const base = { storeId: "6a268170c008ab000760e21a", employeeId: "a", transactionTime: "2026-12-10T00:00:00Z" };
+  const rows = [
+    { ...base, items: [{ productId: "hero-id", name: "Hero", quantity: 20 }, { productId: "sleeves-id", name: "Dragonshield", quantity: 10 }] },
+    { ...base, transactionType: "Return", items: [{ productId: "hero-id", quantity: 10 }] },
+    { ...base, status: "cancelled", items: [{ productId: "hero-id", quantity: 10 }] }
+  ];
+  assert.deepEqual(heroProductActuals("2026-12", "2026-12-31", rows, [hero]), [{ units: 10, staff: { a: 10 } }]);
+});

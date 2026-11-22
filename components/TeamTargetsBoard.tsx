@@ -7,6 +7,9 @@ const empty = (): TeamTargets => ({ targetBasis: "product_only", revenueTarget: 
 type Report = { targets: TeamTargets | null; actuals: TeamActuals; weeks: string[]; passed: Record<Game, number> | null; hours: Array<{ code: string; hours: number }>; heroActuals: Array<{ units: number; staff: Record<string, number> }>; employeeNames: Record<string, string> };
 const money = (n: number) => n.toLocaleString("th-TH", { maximumFractionDigits: 2 });
 export function TeamTargetsBoard() {
+  const [heroLabel, setHeroLabel] = useState("");
+  const [heroIds, setHeroIds] = useState("");
+  const [heroTarget, setHeroTarget] = useState("");
   const [month, setMonth] = useState(() => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 7));
   const [form, setForm] = useState<TeamTargets>(empty);
   const [report, setReport] = useState<Report | null>(null);
@@ -23,6 +26,9 @@ export function TeamTargetsBoard() {
       if (!res.ok) throw new Error(data.error);
       if (copy) { updateCopy(data.targets || empty(), m); setMessage(data.targets ? "คัดลอกแล้ว กรุณากดบันทึก" : "เดือนก่อนยังไม่มีเป้า"); return; }
       setReport(data);
+      const heroDraft = localStorage.getItem("hero-product-draft");
+      const hero = heroDraft ? JSON.parse(heroDraft) : data.heroConfig;
+      setHeroLabel(hero?.label || ""); setHeroIds((hero?.productIds || []).join(", ")); setHeroTarget(hero?.monthlyUnitTarget ? String(hero.monthlyUnitTarget) : "");
       const savedSpend = localStorage.getItem(`team-targets-spend-${m}`);
       setSpend(savedSpend ?? (data.targets?.budgetActual != null ? String(data.targets.budgetActual) : ""));
       const draft = localStorage.getItem(`team-targets-draft-${m}`);
@@ -44,6 +50,12 @@ export function TeamTargetsBoard() {
       setMessage("บันทึกแล้ว");
     } catch { setMessage("บันทึกไม่ได้ กรุณาลองใหม่"); }
   }
+  useEffect(() => { if (!report) return; localStorage.setItem("hero-product-draft", JSON.stringify({ label: heroLabel, productIds: heroIds.split(",").map(x => x.trim()).filter(Boolean), monthlyUnitTarget: heroTarget })); }, [heroLabel, heroIds, heroTarget, report]);
+  async function saveHero() {
+    const productIds = heroIds.split(",").map(x => x.trim()).filter(Boolean);
+    const config = !heroLabel.trim() && !productIds.length ? null : { label: heroLabel, productIds, ...(heroTarget ? { monthlyUnitTarget: Number(heroTarget) } : {}) };
+    try { const res = await fetch("/api/team-targets", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }); if (!res.ok) throw new Error(); localStorage.removeItem("hero-product-draft"); setMessage("บันทึกสินค้าชูโรงแล้ว"); } catch { setMessage("บันทึกสินค้าชูโรงไม่ได้ กรุณาตรวจสอบข้อมูล"); }
+  }
   const revenue = report ? Object.values(report.actuals.revenue).reduce((a, b) => a + b, 0) : 0;
   const targets = report?.targets;
   const games = targets ? GAMES.filter(g => targets.eventTargets[g] > 0) : [];
@@ -60,6 +72,7 @@ export function TeamTargetsBoard() {
   return <>
     <Link href="/admin" className="back-link">← ศูนย์รวมงานจัดการ</Link>
     <section className="board-hero"><div><p className="eyebrow">เฉพาะเจ้าของ</p><h2>เป้าทีมและกองทุน</h2><p>ตั้งเป้ารายเดือนและดูความคืบหน้าทั้งสองสาขา</p></div></section>
+    <section className="sdoc-section team-target-section"><h3>สินค้าชูโรงสำหรับหน้าพนักงาน</h3><label className="team-target-field">ชื่อสินค้า<input value={heroLabel} onChange={e => setHeroLabel(e.target.value)} /></label><label className="team-target-field">รหัสสินค้า StoreHub (คั่นด้วยจุลภาค)<input value={heroIds} onChange={e => setHeroIds(e.target.value)} /></label><label className="team-target-field">เป้าจำนวนต่อเดือน (ไม่บังคับ)<input type="number" min="1" value={heroTarget} onChange={e => setHeroTarget(e.target.value)} /></label><button className="soft-button" type="button" onClick={() => void saveHero()}>บันทึกสินค้าชูโรง</button><button className="soft-button" type="button" onClick={() => { localStorage.removeItem("hero-product-draft"); void load(month, eligible); }}>รีเซ็ต</button></section>
     <section className="sdoc-section team-target-section"><label className="team-target-field">เดือน<input type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} /></label><p role="status">{message}</p>
       <h3>ตั้งเป้าของเดือน</h3><div className="team-target-grid">
         {numberField("เป้ายอดขายสินค้า (ไม่นับพรีและกิจกรรม) ต่อเดือน (บาท)", form.revenueTarget, n => update({ ...form, revenueTarget: n }))}

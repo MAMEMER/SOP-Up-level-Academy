@@ -178,13 +178,13 @@ export function salesProgress(month: string, today: string, transactions: Transa
   return { product, event, store, branches, daily };
 }
 
-export function heroProductActuals(month: string, today: string, transactions: Transaction[], heroes: HeroProduct[]) {
+export function heroProductActuals(month: string, today: string, transactions: Transaction[], heroes: Array<Pick<HeroProduct, "productIds">>) {
   return heroes.map(hero => {
     let units = 0;
     const staff: Record<string, number> = {};
     for (const tx of transactions) {
       const ms = Date.parse(tx.transactionTime || "");
-      if (tx.isCancelled || String(tx.status || "").toLowerCase() === "cancelled" || !Number.isFinite(ms)) continue;
+      if (!BRANCHES[tx.storeId || ""] || tx.isCancelled || String(tx.status || "").toLowerCase() === "cancelled" || !Number.isFinite(ms)) continue;
       const date = new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
       if (!date.startsWith(month) || date > today) continue;
       if (!Array.isArray(tx.items)) throw new Error("Missing StoreHub transaction items");

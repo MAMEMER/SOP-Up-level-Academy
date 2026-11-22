@@ -54,8 +54,9 @@ async function fetchTeamTargets(month: string) {
   const [year, m] = month.split("-").map(Number);
   const end = Date.UTC(year, m, 1) - 7 * 3600000;
   const db = adminDb();
-  const [targetDoc, paymentsSnap, ordersSnap, catalog, tx] = await Promise.all([
+  const [targetDoc, heroDoc, paymentsSnap, ordersSnap, catalog, tx] = await Promise.all([
     db.collection(COLLECTION).doc(month).get(),
+    db.collection("sop_config").doc("hero_product").get(),
     db.collection("public_payments").where("status", "==", "verified").get(),
     db.collection("shop-orders").select("status", "slipStatus", "confirmedAt", "manualPaidAt", "createdAt", "subtotal", "total", "items").get(),
     products(), transactions(start, end)
@@ -82,10 +83,13 @@ async function fetchTeamTargets(month: string) {
   const group4 = targets ? group4Score(revenue, targets.revenueTarget, eventWeeks, configuredGames.length ? weeks.length : 0, targets.budgetTarget, targets.budgetActual ?? undefined) : undefined;
   const storeNumbers: StoreNumbers = group4 === undefined ? {} : { group4 };
   const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+  const heroConfig = heroDoc.exists ? heroDoc.data() as { productIds: string[]; label: string; monthlyUnitTarget?: number } : null;
+  const configuredHero = heroConfig?.label && Array.isArray(heroConfig.productIds) && heroConfig.productIds.length ? heroConfig : null;
+  const currentHero = configuredHero ? heroProductActuals(month, today, tx, [{ productIds: configuredHero.productIds }])[0] : null;
   const heroActuals = heroProductActuals(month, today, tx, targets?.heroProducts || []);
-  const employeeNames = heroActuals.length ? await fetchEmployeeNames(limitedGet) : {};
+  const employeeNames = (heroActuals.length || currentHero) ? await fetchEmployeeNames(limitedGet) : {};
   const progress = salesProgress(month, today, tx, resolved, payments, orders);
-  return { month, weeks, targets, actuals, passed, storeNumbers, progress, heroActuals, employeeNames };
+  return { month, weeks, targets, actuals, passed, storeNumbers, progress, heroActuals, employeeNames, heroConfig: configuredHero, currentHero };
 }
 const reportCache = new Map<string, { at: number; value: ReturnType<typeof fetchTeamTargets> }>();
 export function loadTeamTargets(month: string) {
@@ -120,4 +124,10 @@ export async function searchTeamProducts(query: string) {
   const q = query.trim().toLocaleLowerCase();
   if (q.length < 2) return [];
   return (await products()).filter(p => p.id && p.name?.toLocaleLowerCase().includes(q)).slice(0, 40).map(p => ({ id: p.id!, name: p.name! }));
+}
+
+export async function saveHeroConfig(config: { label: string; productIds: string[]; monthlyUnitTarget?: number } | null) {
+  const ref = adminDb().collection("sop_config").doc("hero_product");
+  await ref.set(config || {});
+  reportCache.clear();
 }
