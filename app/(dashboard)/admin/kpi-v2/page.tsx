@@ -19,8 +19,9 @@ export default async function AdminKpi({ searchParams }: { searchParams?: Promis
     <section className="board-hero"><div><p className="eyebrow">KPI รายเดือน · เจ้าของ</p><h2>คะแนนพนักงาน</h2><p>{period < "2027-01" ? "รอบทดลอง ไม่นับเตือน" : "ผลคะแนนรายเดือน"} · หมวดที่ไม่มีข้อมูลจะไม่นำมาคิดคะแนนรวม</p></div>
       <form className="owner-ops__date"><label>เดือน<input type="month" name="period" defaultValue={period} /></label><button type="submit">ดู</button></form></section>
     {rows.map(row => <section className="owner-ops__panel" key={row.person.code}><h3>{row.name}</h3><p>{positionLabels[row.position]}{!row.person.position ? " · ยังไม่ได้ระบุตำแหน่ง (ใช้ประจำ)" : ""}</p>
-      <ul className="peer-review__mine">{row.groups.map(g => <li key={g.group}><span>{g.group} {groupLabels[g.group]} ({g.weight}%)</span><strong>{g.weight === 0 ? "ไม่นับ" : g.score === null ? "ไม่มีข้อมูล" : g.score.toFixed(1)}</strong></li>)}</ul>
+      <ul className="peer-review__mine">{row.groups.map(g => <li key={g.group}><span>{g.group} {groupLabels[g.group]} ({g.weight}%){g.group === "3" && <small> · ขายและการตลาดของทั้งทีม 10%</small>}</span><strong>{g.weight === 0 ? "ไม่นับ" : g.score === null ? "ไม่มีข้อมูล" : g.score.toFixed(1)}</strong></li>)}</ul>
       <p>คะแนนรวม {row.total === null ? "ไม่มีข้อมูล" : row.total.toFixed(1)} · {row.band || "ไม่มีข้อมูล"}{row.trial ? " · ทดลอง" : ""}</p>
+      {row.capped && <p>ติดเพดาน: ผลงานร้านยังไม่ถึง 90</p>}
       {row.missing.length > 0 && <p>ยังไม่มีข้อมูล: {row.missing.join(", ")}</p>}</section>)}
   </main>;
 }

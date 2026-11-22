@@ -6,10 +6,10 @@ export type PersonNumbers = { group12?: number; group22?: number };
 export type StoreNumbers = { group4?: number; byBranch?: Record<string, number> };
 export type KpiPerson = { code: string; branch: string; position?: Position; numbers?: PersonNumbers };
 export type Group = "1.1" | "2.1" | "1.2" | "2.2" | "3" | "4";
-export const groupLabels: Record<Group, string> = { "1.1": "หน้าร้านพื้นฐาน", "2.1": "หลังร้านพื้นฐาน", "1.2": "หน้าร้านขั้นสูง", "2.2": "หลังร้านขั้นสูง", "3": "ทีมเวิร์ก", "4": "Ownership" };
+export const groupLabels: Record<Group, string> = { "1.1": "หน้าร้าน พื้นฐาน", "2.1": "หลังร้าน พื้นฐาน", "1.2": "ขาย", "2.2": "การตลาด", "3": "ทีมเวิร์ก", "4": "ผลงานร้าน" };
 export const positionLabels: Record<Position, string> = { temporary: "ชั่วคราว", regular: "ประจำ", branch_manager: "ผู้จัดการสาขา" };
 const groups: Group[] = ["1.1", "2.1", "1.2", "2.2", "3", "4"];
-const weights: Record<Position, number[]> = { temporary: [30, 30, 10, 0, 15, 15], regular: [20, 20, 15, 15, 15, 15], branch_manager: [10, 10, 15, 15, 25, 25] };
+const weights: Record<Position, number[]> = { temporary: [25, 25, 20, 0, 15, 15], regular: [10, 10, 20, 15, 15, 30], branch_manager: [5, 5, 10, 15, 25, 40] };
 const valid = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 100;
 const average = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 
@@ -36,8 +36,10 @@ export function calculateKpiV2(period: string, people: KpiPerson[], mistakes: Mi
     const missing = applicable.filter(x => x.weight > 0 && x.score === null).map(x => x.group);
     const available = applicable.filter(x => x.weight > 0 && x.score !== null);
     const totalWeight = available.reduce((sum, x) => sum + x.weight, 0);
-    const total = totalWeight ? available.reduce((sum, x) => sum + x.score! * x.weight, 0) / totalWeight : null;
+    const rawTotal = totalWeight ? available.reduce((sum, x) => sum + x.score! * x.weight, 0) / totalWeight : null;
+    const capped = values[5] !== null && values[5] < 90 && rawTotal !== null && rawTotal > 89.9;
+    const total = capped ? 89.9 : rawTotal;
     const band = total === null ? null : total < 50 ? "เตือน" : total < 90 ? "ผ่าน" : "incentive";
-    return { person, position, groups: applicable, missing, total, band, trial: period < "2027-01", warning: period >= "2027-01" && band === "เตือน" };
+    return { person, position, groups: applicable, missing, total, capped, band, trial: period < "2027-01", warning: period >= "2027-01" && band === "เตือน" };
   });
 }

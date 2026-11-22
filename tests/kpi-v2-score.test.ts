@@ -10,7 +10,7 @@ const review = (raterCode: string): PeerReviewRecord => ({ id: raterCode, period
 test("weights, team average and branch scope", () => {
   const [a, b] = calculateKpiV2("2027-01", people, [], [review("X"), review("Y")], { group4: 50 });
   assert.ok(Math.abs(a.groups.find(g => g.group === "3")!.score! - 96) < 1e-9);
-  assert.ok(Math.abs(a.total! - 82.9) < 1e-8);
+  assert.ok(Math.abs(a.total! - 74.4) < 1e-8);
   assert.equal(b.groups.find(g => g.group === "2.2")?.weight, 0);
   assert.ok(b.missing.includes("3"));
   const manager = calculateKpiV2("2027-01", [{ ...people[0], position: "branch_manager" }, people[1]], [], [review("X"), review("Y")], { group4: 50 })[0];
@@ -39,4 +39,30 @@ test("team score works before advanced numbers exist", () => {
   const [row] = calculateKpiV2("2026-12", [{ code: "A", branch: "one", position: "temporary" }], [], [rev("X"), rev("Y")]);
   assert.ok(Math.abs(row.groups.find(g => g.group === "3")!.score! - 100) < 1e-9);
   assert.ok(!row.missing.includes("3"));
+});
+
+
+test("position weights add to 100", () => {
+  for (const position of ["temporary", "regular", "branch_manager"] as const) {
+    const [row] = calculateKpiV2("2027-01", [{ code: "A", branch: "one", position }], [], []);
+    assert.equal(row.groups.reduce((sum, group) => sum + group.weight, 0), 100);
+  }
+});
+
+test("store score caps the total only when it would exceed 89.9", () => {
+  const person = { code: "A", branch: "one", position: "regular" as const, numbers: { group12: 100, group22: 100 } };
+  const run = (group4?: number) => calculateKpiV2("2027-01", [person], [], [review("X"), review("Y")], { group4 })[0];
+  const capped = run(89.9);
+  assert.equal(capped.total, 89.9);
+  assert.equal(capped.capped, true);
+  assert.equal(capped.band, "ผ่าน");
+  const atTarget = run(90);
+  assert.equal(atTarget.capped, false);
+  assert.equal(atTarget.band, "incentive");
+  const missing = run();
+  assert.equal(missing.capped, false);
+  assert.equal(missing.total, 100);
+  assert.ok(missing.missing.includes("4"));
+  const belowCap = run(50);
+  assert.equal(belowCap.capped, false);
 });
