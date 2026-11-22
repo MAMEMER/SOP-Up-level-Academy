@@ -9940,3 +9940,25 @@ a.peer-review__tr:hover,
 .sales-days { margin: 1rem 0; }
 .sales-day { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .35rem 0; }
 .sales-day strong { min-width: 5rem; text-align: right; }
+
+.sell-tool { max-width: 760px; padding-bottom: 5rem; }
+.sell-tool h1 { margin-bottom: .4rem; }
+.sell-tool p { line-height: 1.6; }
+.sell-section { border-top: 1px solid var(--color-border, #ddd); padding: 1.5rem 0; }
+.sell-section h2 { font-size: 1.2rem; margin: 0 0 1rem; }
+.sell-tool label { display: block; margin: 1rem 0; }
+.sell-tool input:not([type=checkbox]), .sell-tool textarea, .sell-tool select { display: block; width: 100%; max-width: 100%; margin-top: .35rem; padding: .7rem; font: inherit; font-size: 16px; border: 1px solid #aaa; border-radius: 6px; background: white; }
+.sell-tool button, .sell-tool a { min-height: 44px; }
+.sell-tool button { cursor: pointer; padding: .6rem 1rem; font: inherit; }
+.sell-tool button:disabled { cursor: not-allowed; opacity: .6; }
+.sell-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.sell-results { list-style: none; padding: 0; }
+.sell-results li { border-bottom: 1px solid #ddd; padding: .5rem 0; overflow-wrap: anywhere; }
+.sell-results button { text-align: left; max-width: 100%; }
+.sell-photos { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+.sell-photos img { width: 96px; height: 96px; object-fit: cover; }
+.sell-checks { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.sell-checks label { margin: 0; display: flex; align-items: center; min-height: 44px; gap: .35rem; }
+.sell-home-link { display: inline-flex; align-items: center; min-height: 44px; margin: .5rem 0 1rem; }
+.sell-copy-bar { position: sticky; bottom: 1rem; z-index: 2; display: flex; justify-content: flex-start; pointer-events: none; }
+.sell-copy-bar button { pointer-events: auto; box-shadow: 0 3px 12px #0002; }

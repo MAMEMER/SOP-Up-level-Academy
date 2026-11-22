@@ -119,5 +119,5 @@ export async function loadWorkedHours(month: string, eligible: string[]) {
 export async function searchTeamProducts(query: string) {
   const q = query.trim().toLocaleLowerCase();
   if (q.length < 2) return [];
-  return (await products()).filter(p => p.id && p.name?.toLocaleLowerCase().includes(q)).slice(0, 40).map(p => ({ id: p.id!, name: p.name! }));
+  return (await products()).filter(p => p.id && p.name?.toLocaleLowerCase().includes(q)).slice(0, 40).map(p => ({ id: p.id!, name: p.name!, price: p.priceType === "Variable" || !p.unitPrice ? null : Math.round(p.unitPrice * 107) / 100 }));
 }
