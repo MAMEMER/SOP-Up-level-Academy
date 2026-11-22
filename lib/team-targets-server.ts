@@ -54,9 +54,10 @@ async function fetchTeamTargets(month: string) {
   const [year, m] = month.split("-").map(Number);
   const end = Date.UTC(year, m, 1) - 7 * 3600000;
   const db = adminDb();
-  const [targetDoc, paymentsSnap, catalog, tx] = await Promise.all([
+  const [targetDoc, paymentsSnap, ordersSnap, catalog, tx] = await Promise.all([
     db.collection(COLLECTION).doc(month).get(),
     db.collection("public_payments").where("status", "==", "verified").get(),
+    db.collection("shop-orders").select("status", "slipStatus", "confirmedAt", "manualPaidAt", "createdAt", "subtotal", "total", "items").get(),
     products(), transactions(start, end)
   ]);
   const known = new Set(catalog.map(p => p.id));
@@ -71,8 +72,9 @@ async function fetchTeamTargets(month: string) {
     const p = d.data();
     return { status: p.status, date: bangkokDate(p.manualPaidAt || p.verifiedAt || p.createdAt), amount: p.amount, eventType: p.eventType, source: p.source };
   });
+  const orders = ordersSnap.docs.map(d => { const o = d.data(); return { status: o.status, slipStatus: o.slipStatus, date: bangkokDate(o.confirmedAt || o.manualPaidAt || o.createdAt), total: o.subtotal ?? o.total, items: o.items }; });
   const targets = targetDoc.exists ? { ...targetDoc.data(), poolRevenuePct: targetDoc.data()?.poolRevenuePct ?? 10 } as TeamTargets : null;
-  const actuals = calculateActuals(month, tx, resolved, payments);
+  const actuals = calculateActuals(month, tx, resolved, payments, orders);
   const passed = targets ? passedWeeks(weeks, actuals.entries, targets.eventTargets) : null;
   const revenue = Object.values(actuals.revenue).reduce((a, b) => a + b, 0);
   const configuredGames = targets ? Object.keys(targets.eventTargets).filter(g => targets.eventTargets[g as keyof typeof targets.eventTargets] > 0) : [];
@@ -80,7 +82,7 @@ async function fetchTeamTargets(month: string) {
   const group4 = targets ? group4Score(revenue, targets.revenueTarget, eventWeeks, configuredGames.length ? weeks.length : 0, targets.budgetTarget, targets.budgetActual ?? undefined) : undefined;
   const storeNumbers: StoreNumbers = group4 === undefined ? {} : { group4 };
   const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
-  const progress = salesProgress(month, today, tx, resolved, payments);
+  const progress = salesProgress(month, today, tx, resolved, payments, orders);
   return { month, weeks, targets, actuals, passed, storeNumbers, progress };
 }
 const reportCache = new Map<string, { at: number; value: ReturnType<typeof fetchTeamTargets> }>();

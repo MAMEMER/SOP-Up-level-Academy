@@ -72,10 +72,11 @@ export function splitEligiblePool(pool: number, staff: Array<{ code: string; tot
 
 export type Product = { id?: string; name?: string; category?: string };
 export type Transaction = { storeId?: string; transactionTime?: string; transactionType?: string; status?: string; isCancelled?: boolean; total?: number; items?: Array<{ productId?: string; name?: string; quantity?: number; total?: number }> };
+export type OnlineOrder = { status?: string; slipStatus?: string; date: string; total?: number; items?: Array<{ name?: string; total?: number }> };
 export type OnlinePayment = { status?: string; date: string; amount?: number; eventType?: string; source?: string };
 export type TeamActuals = { revenue: { bangkae: number; senafest: number; online: number }; entries: WeeklyEntries };
 const BRANCHES: Record<string, "bangkae" | "senafest"> = { "6a268170c008ab000760e21a": "bangkae", "6aaa02f0a568500007542756": "senafest" };
-export function calculateActuals(month: string, transactions: Transaction[], products: Product[], payments: OnlinePayment[]): TeamActuals {
+export function calculateActuals(month: string, transactions: Transaction[], products: Product[], payments: OnlinePayment[], orders: OnlineOrder[] = []): TeamActuals {
   const revenue = { bangkae: 0, senafest: 0, online: 0 };
   const entries: WeeklyEntries = {};
   const productMap = new Map(products.map(p => [p.id, p]));
@@ -93,22 +94,24 @@ export function calculateActuals(month: string, transactions: Transaction[], pro
     if (!date.startsWith(month)) continue;
     if (!Array.isArray(tx.items)) throw new Error("Missing StoreHub transaction items");
     const sign = tx.transactionType === "Return" ? -1 : 1;
-    let preorder = 0;
+    let excluded = 0;
     for (const item of tx.items || []) {
       const p = productMap.get(item.productId);
       if (!p) throw new Error("Missing StoreHub product for transaction item");
       const category = (p?.category || "").trim().toLowerCase();
-      if (category === "pre order") preorder += Number(item.total) || 0;
+      if (!Number.isFinite(item.total)) throw new Error("Incomplete product data");
+      const kind = classifySaleProduct(p);
+      if (kind === "preorder" || kind === "event") excluded += item.total!;
       const name = item.name || p?.name || "";
       if (category === "event" || /pre\s*release/i.test(name)) add(date, gameFor(name), sign * (Number(item.quantity) || 0));
     }
-    revenue[branch] += sign * ((Number(tx.total) || 0) - preorder);
+    revenue[branch] += sign * ((Number(tx.total) || 0) - excluded);
   }
   for (const payment of payments) {
     if (payment.status?.toLowerCase() !== "verified" || !payment.date.startsWith(month)) continue;
-    revenue.online += Number(payment.amount) || 0;
     add(payment.date, gameFor(`${payment.eventType || ""} ${payment.source || ""}`), 1);
   }
+  revenue.online = onlineProductSales(month, orders);
   return { revenue, entries };
 }
 
@@ -120,11 +123,22 @@ export function classifySaleProduct(product: Product): "preorder" | "event" | "m
   if (name.includes("ขายได้ทุกอย่าง")) return "open_price";
   return "product";
 }
+export function onlineProductSales(month: string, orders: OnlineOrder[], today = `${month}-31`): number {
+  return orders.reduce((sum, order) => {
+    if (order.status === "rejected" || (order.status !== "confirmed" && order.slipStatus !== "paid") || !order.date.startsWith(month) || order.date > today) return sum;
+    if (!Number.isFinite(order.total)) throw new Error("Incomplete online order");
+    if (order.items?.some(item => ["preorder", "event"].includes(classifySaleProduct({ name: item.name })))) {
+      if (order.items.some(item => !Number.isFinite(item.total))) throw new Error("Incomplete online order items");
+      return sum + order.total! - order.items.filter(item => ["preorder", "event"].includes(classifySaleProduct({ name: item.name }))).reduce((n, item) => n + item.total!, 0);
+    }
+    return sum + order.total!;
+  }, 0);
+}
 export function pace(amount: number, target: number, day: number, days: number) {
   const remaining = Math.max(0, target - amount), remainingDays = Math.max(0, days - day);
   return { percent: target > 0 ? amount / target * 100 : null, remaining, remainingDays, neededPerDay: remainingDays ? remaining / remainingDays : null, forecast: day > 0 ? amount / day * days : 0 };
 }
-export function salesProgress(month: string, today: string, transactions: Transaction[], products: Product[], payments: OnlinePayment[]) {
+export function salesProgress(month: string, today: string, transactions: Transaction[], products: Product[], payments: OnlinePayment[], orders: OnlineOrder[] = []) {
   const catalog = new Map(products.map(p => [p.id, p]));
   const branches = { bangkae: 0, senafest: 0, online: 0 };
   const daily: Record<string, { product: number; event: number; store: number }> = {};
@@ -146,7 +160,7 @@ export function salesProgress(month: string, today: string, transactions: Transa
       const p = catalog.get(item.productId);
       if (!p || !Number.isFinite(item.total)) throw new Error("Incomplete product data");
       const kind = classifySaleProduct(p), amount = Math.max(0, item.total!);
-      if (kind !== "product") excluded += amount;
+      if (kind === "preorder" || kind === "event") excluded += amount;
       if (kind === "preorder") preorder += amount;
       if (kind === "event") events += amount;
     }
@@ -154,6 +168,10 @@ export function salesProgress(month: string, today: string, transactions: Transa
   }
   for (const payment of payments) if (payment.status?.toLowerCase() === "verified" && payment.date.startsWith(month) && payment.date <= today) {
     const amount = Number(payment.amount) || 0; add(payment.date, "online", 0, amount, amount);
+  }
+  for (const order of orders) {
+    const amount = onlineProductSales(month, [order], today);
+    if (amount) add(order.date, "online", amount, 0, amount);
   }
   return { product, event, store, branches, daily };
 }

@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const nums = [t.revenueTarget, t.budgetTarget, t.poolRevenuePct, t.poolPerGame, ...GAMES.map(g => t.eventTargets[g])];
     if ((t.budgetActual != null && (typeof t.budgetActual !== "number" || !Number.isFinite(t.budgetActual) || t.budgetActual < 0)) || nums.some(n => typeof n !== "number" || !Number.isFinite(n) || n < 0) || !Number.isInteger(t.passWeeks) || t.passWeeks < 1 || t.passWeeks > 6) return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
     if (t.targetBasis && !["store_ex_preorder", "product_only"].includes(t.targetBasis)) return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
-    await saveTeamTargets(body.month, { targetBasis: t.targetBasis || "store_ex_preorder", revenueTarget: t.revenueTarget, budgetTarget: t.budgetTarget, budgetActual: t.budgetActual ?? null, poolRevenuePct: t.poolRevenuePct, poolPerGame: t.poolPerGame, passWeeks: t.passWeeks, eventTargets: Object.fromEntries(GAMES.map(g => [g, t.eventTargets[g]])) as TeamTargets["eventTargets"] }, user.actualEmail);
+    await saveTeamTargets(body.month, { targetBasis: "product_only", revenueTarget: t.revenueTarget, budgetTarget: t.budgetTarget, budgetActual: t.budgetActual ?? null, poolRevenuePct: t.poolRevenuePct, poolPerGame: t.poolPerGame, passWeeks: t.passWeeks, eventTargets: Object.fromEntries(GAMES.map(g => [g, t.eventTargets[g]])) as TeamTargets["eventTargets"] }, user.actualEmail);
     return json({ ok: true });
   } catch { return json({ error: "บันทึกไม่ได้ กรุณาลองใหม่" }, 400); }
 }

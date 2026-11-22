@@ -44,10 +44,10 @@ test("passes configured targets, computes pool and distributes by hours", () => 
 
 test("counts sales, excludes preorders and cancelled bills, and adds verified online entries", async () => {
   const { calculateActuals } = await import("../lib/team-targets.ts");
-  const tx = { storeId: "6a268170c008ab000760e21a", transactionTime: "2026-11-01T17:30:00Z", total: 120, items: [{ productId: "pre", total: 20 }, { productId: "event", quantity: 2 }] };
+  const tx = { storeId: "6a268170c008ab000760e21a", transactionTime: "2026-11-01T17:30:00Z", total: 120, items: [{ productId: "pre", total: 20 }, { productId: "event", quantity: 2, total: 30 }] };
   const actual = calculateActuals("2026-11", [tx, { ...tx, isCancelled: true }], [{ id: "pre", category: "Pre order" }, { id: "event", name: "Pokémon Gym", category: "Event" }], [{ status: "verified", date: "2026-11-02", amount: 10, source: "gym" }]);
-  assert.equal(actual.revenue.bangkae, 100);
-  assert.equal(actual.revenue.online, 10);
+  assert.equal(actual.revenue.bangkae, 70);
+  assert.equal(actual.revenue.online, 0);
   assert.equal(actual.entries["2026-11-02"].pokemon, 3);
 });
 

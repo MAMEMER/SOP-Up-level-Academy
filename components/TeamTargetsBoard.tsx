@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { GAMES, group4Score, incentivePool, splitPool, type Game, type TeamActuals, type TeamTargets } from "../lib/team-targets.ts";
 const labels: Record<Game, string> = { pokemon: "Pokémon", lorcana: "Lorcana", riftbound: "Riftbound", monsnatch: "Monsnatch" };
-const empty = (): TeamTargets => ({ targetBasis: "store_ex_preorder", revenueTarget: 0, eventTargets: { pokemon: 0, lorcana: 0, riftbound: 0, monsnatch: 0 }, budgetTarget: 0, poolRevenuePct: 10, poolPerGame: 0, passWeeks: 3 });
+const empty = (): TeamTargets => ({ targetBasis: "product_only", revenueTarget: 0, eventTargets: { pokemon: 0, lorcana: 0, riftbound: 0, monsnatch: 0 }, budgetTarget: 0, poolRevenuePct: 10, poolPerGame: 0, passWeeks: 3 });
 type Report = { targets: TeamTargets | null; actuals: TeamActuals; weeks: string[]; passed: Record<Game, number> | null; hours: Array<{ code: string; hours: number }> };
 const money = (n: number) => n.toLocaleString("th-TH", { maximumFractionDigits: 2 });
 export function TeamTargetsBoard() {
@@ -55,8 +55,7 @@ export function TeamTargetsBoard() {
     <section className="board-hero"><div><p className="eyebrow">เฉพาะเจ้าของ</p><h2>เป้าทีมและกองทุน</h2><p>ตั้งเป้ารายเดือนและดูความคืบหน้าทั้งสองสาขา</p></div></section>
     <section className="sdoc-section team-target-section"><label className="team-target-field">เดือน<input type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} /></label><p role="status">{message}</p>
       <h3>ตั้งเป้าของเดือน</h3><div className="team-target-grid">
-        <label className="team-target-field">ยอดที่ใช้เทียบเป้า<select value={form.targetBasis || "store_ex_preorder"} onChange={e => update({ ...form, targetBasis: e.target.value as TeamTargets["targetBasis"] })}><option value="store_ex_preorder">รวมทั้งร้าน (ไม่นับพรี)</option><option value="product_only">ยอดขายสินค้า (ไม่นับพรีและกิจกรรม)</option></select></label>
-        {numberField("เป้ายอดขายต่อเดือน (บาท)", form.revenueTarget, n => update({ ...form, revenueTarget: n }))}
+        {numberField("เป้ายอดขายสินค้า (ไม่นับพรีและกิจกรรม) ต่อเดือน (บาท)", form.revenueTarget, n => update({ ...form, revenueTarget: n }))}
         {GAMES.map(g => <div key={g}>{numberField(`เป้า ${labels[g]} ต่อสัปดาห์ (คน)`, form.eventTargets[g], n => update({ ...form, eventTargets: { ...form.eventTargets, [g]: n } }))}</div>)}
         {numberField("เป้างบประมาณ (บาท)", form.budgetTarget, n => update({ ...form, budgetTarget: n }))}
         {numberField("สัดส่วนยอดขายที่เกินเป้าเข้ากองทุน (%)", form.poolRevenuePct, n => update({ ...form, poolRevenuePct: n }))}
