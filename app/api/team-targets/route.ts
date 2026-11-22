@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "../../../lib/auth.ts";
 import { isOwner } from "../../../lib/owner.ts";
 import { GAMES, monthWeeks, type TeamTargets } from "../../../lib/team-targets.ts";
-import { loadTeamTargets, loadWorkedHours, saveTeamTargets } from "../../../lib/team-targets-server.ts";
+import { loadTeamTargets, loadWorkedHours, saveTeamTargets, searchTeamProducts } from "../../../lib/team-targets-server.ts";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 const owner = async () => { const user = await requireUser(); return isOwner(user.actualEmail) && !user.isImpersonating ? user : null; };
@@ -10,6 +10,9 @@ export async function GET(request: Request) {
   const user = await owner();
   if (!user) return json({ error: "forbidden" }, 403);
   const params = new URL(request.url).searchParams;
+  if (params.has("products")) {
+    try { return json({ products: await searchTeamProducts(params.get("products") || "") }); } catch { return json({ error: "ค้นหาสินค้าไม่ได้" }, 503); }
+  }
   const month = params.get("month") || "";
   try {
     monthWeeks(month);
@@ -28,8 +31,9 @@ export async function POST(request: Request) {
     const t = body?.targets as TeamTargets;
     const nums = [t.revenueTarget, t.budgetTarget, t.poolRevenuePct, t.poolPerGame, ...GAMES.map(g => t.eventTargets[g])];
     if ((t.budgetActual != null && (typeof t.budgetActual !== "number" || !Number.isFinite(t.budgetActual) || t.budgetActual < 0)) || nums.some(n => typeof n !== "number" || !Number.isFinite(n) || n < 0) || !Number.isInteger(t.passWeeks) || t.passWeeks < 1 || t.passWeeks > 6) return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
+    if (t.heroProducts !== undefined && (!Array.isArray(t.heroProducts) || t.heroProducts.length > 50 || t.heroProducts.some(h => !h || typeof h.name !== "string" || !h.name.trim() || h.name.length > 200 || !Array.isArray(h.productIds) || !h.productIds.length || h.productIds.length > 100 || h.productIds.some(id => typeof id !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) || !Number.isFinite(h.unitTarget) || h.unitTarget <= 0 || !Number.isFinite(h.poolBonus) || h.poolBonus < 0))) return json({ error: "ข้อมูลสินค้าชูโรงไม่ถูกต้อง" }, 400);
     if (t.targetBasis && !["store_ex_preorder", "product_only"].includes(t.targetBasis)) return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
-    await saveTeamTargets(body.month, { targetBasis: "product_only", revenueTarget: t.revenueTarget, budgetTarget: t.budgetTarget, budgetActual: t.budgetActual ?? null, poolRevenuePct: t.poolRevenuePct, poolPerGame: t.poolPerGame, passWeeks: t.passWeeks, eventTargets: Object.fromEntries(GAMES.map(g => [g, t.eventTargets[g]])) as TeamTargets["eventTargets"] }, user.actualEmail);
+    await saveTeamTargets(body.month, { heroProducts: t.heroProducts || [], targetBasis: "product_only", revenueTarget: t.revenueTarget, budgetTarget: t.budgetTarget, budgetActual: t.budgetActual ?? null, poolRevenuePct: t.poolRevenuePct, poolPerGame: t.poolPerGame, passWeeks: t.passWeeks, eventTargets: Object.fromEntries(GAMES.map(g => [g, t.eventTargets[g]])) as TeamTargets["eventTargets"] }, user.actualEmail);
     return json({ ok: true });
   } catch { return json({ error: "บันทึกไม่ได้ กรุณาลองใหม่" }, 400); }
 }

@@ -1,7 +1,9 @@
 /** Pure calculations for monthly team targets. Dates are calendar dates in Bangkok. */
 export const GAMES = ["pokemon", "lorcana", "riftbound", "monsnatch"] as const;
 export type Game = typeof GAMES[number];
+export type HeroProduct = { name: string; productIds: string[]; unitTarget: number; poolBonus: number };
 export type TeamTargets = {
+  heroProducts?: HeroProduct[];
   revenueTarget: number;
   targetBasis?: "store_ex_preorder" | "product_only";
   eventTargets: Record<Game, number>;
@@ -45,9 +47,9 @@ export function group4Score(revenue: number, target: number, weeksPassed: number
   if (budgetTarget && budgetTarget > 0 && spend != null) scores.push(Math.max(0, Math.min(100, 100 - Math.max(0, spend - budgetTarget) / budgetTarget * 100)));
   return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : undefined;
 }
-export function incentivePool(revenue: number, targets: TeamTargets, passed: Record<Game, number>): number {
+export function incentivePool(revenue: number, targets: TeamTargets, passed: Record<Game, number>, heroUnits: number[] = []): number {
   const revenuePart = targets.revenueTarget > 0 ? Math.max(0, revenue - targets.revenueTarget) * (targets.poolRevenuePct ?? 10) / 100 : 0;
-  return revenuePart + GAMES.filter(g => targets.eventTargets[g] > 0 && passed[g] >= targets.passWeeks).length * targets.poolPerGame;
+  return (targets.heroProducts || []).reduce((sum, hero, i) => sum + (hero.unitTarget > 0 && (heroUnits[i] || 0) >= hero.unitTarget ? hero.poolBonus : 0), 0) + revenuePart + GAMES.filter(g => targets.eventTargets[g] > 0 && passed[g] >= targets.passWeeks).length * targets.poolPerGame;
 }
 export function splitPool(pool: number, staff: Array<{ code: string; hours: number }>): Array<{ code: string; hours: number; amount: number }> {
   const valid = staff.filter(s => Number.isFinite(s.hours) && s.hours > 0);
@@ -71,7 +73,7 @@ export function splitEligiblePool(pool: number, staff: Array<{ code: string; tot
 }
 
 export type Product = { id?: string; name?: string; category?: string };
-export type Transaction = { storeId?: string; transactionTime?: string; transactionType?: string; status?: string; isCancelled?: boolean; total?: number; items?: Array<{ productId?: string; name?: string; quantity?: number; total?: number }> };
+export type Transaction = { employeeId?: string; storeId?: string; transactionTime?: string; transactionType?: string; status?: string; isCancelled?: boolean; total?: number; items?: Array<{ productId?: string; name?: string; quantity?: number; total?: number }> };
 export type OnlineOrder = { status?: string; slipStatus?: string; date: string; total?: number; items?: Array<{ name?: string; total?: number }> };
 export type OnlinePayment = { status?: string; date: string; amount?: number; eventType?: string; source?: string };
 export type TeamActuals = { revenue: { bangkae: number; senafest: number; online: number }; entries: WeeklyEntries };
@@ -174,4 +176,27 @@ export function salesProgress(month: string, today: string, transactions: Transa
     if (amount) add(order.date, "online", amount, 0, amount);
   }
   return { product, event, store, branches, daily };
+}
+
+export function heroProductActuals(month: string, today: string, transactions: Transaction[], heroes: HeroProduct[]) {
+  return heroes.map(hero => {
+    let units = 0;
+    const staff: Record<string, number> = {};
+    for (const tx of transactions) {
+      const ms = Date.parse(tx.transactionTime || "");
+      if (tx.isCancelled || String(tx.status || "").toLowerCase() === "cancelled" || !Number.isFinite(ms)) continue;
+      const date = new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
+      if (!date.startsWith(month) || date > today) continue;
+      if (!Array.isArray(tx.items)) throw new Error("Missing StoreHub transaction items");
+      const sign = tx.transactionType === "Return" ? -1 : 1;
+      for (const item of tx.items) if (hero.productIds.includes(item.productId || "")) {
+        if (!Number.isFinite(item.quantity)) throw new Error("Missing StoreHub item quantity");
+        const quantity = sign * item.quantity!;
+        units += quantity;
+        const key = tx.employeeId || "unknown";
+        staff[key] = (staff[key] || 0) + quantity;
+      }
+    }
+    return { units, staff };
+  });
 }

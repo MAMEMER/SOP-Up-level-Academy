@@ -8,7 +8,7 @@ export async function SalesProgress({ compact = false }: { compact?: boolean }) 
   const month = today.slice(0, 7), day = Number(today.slice(8)), [year, m] = month.split("-").map(Number);
   const days = new Date(Date.UTC(year, m, 0)).getUTCDate();
   try {
-    const { targets, progress } = await loadTeamTargets(month);
+    const { targets, progress, heroActuals } = await loadTeamTargets(month);
     const label = "ยอดขายสินค้า";
     const amount = progress.product;
     const target = targets?.revenueTarget || 0, stats = pace(amount, target, day, days);
@@ -18,6 +18,7 @@ export async function SalesProgress({ compact = false }: { compact?: boolean }) 
       <p className="sales-caption">ยอดขายสินค้า (ไม่นับพรี ไม่นับกิจกรรม)</p><p className="sales-hero">{money(progress.product)} <span>บาท</span></p>
       <div className="sales-totals"><p>ค่ากิจกรรม <strong>{money(progress.event)} บาท</strong></p><p>รวมทั้งร้าน (ไม่นับพรี) <strong>{money(progress.store)} บาท</strong></p></div>
       <div className="sales-target"><p>เป้าเดือน {target ? `${money(target)} บาท` : "ยังไม่ตั้งเป้า"}</p><p>เทียบจาก {label} · {stats.percent == null ? "ยังไม่ตั้งเป้า" : `${money(stats.percent)}%`}</p>{target > 0 && <div className="sales-bar" role="progressbar" aria-label={`ความคืบหน้า ${label}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, stats.percent || 0))}><span style={{ width: `${Math.min(100, Math.max(0, stats.percent || 0))}%` }} /></div>}</div>
+      {(targets?.heroProducts || []).map((hero, i) => { const units = heroActuals[i]?.units || 0; const percent = Math.min(100, Math.max(0, units / hero.unitTarget * 100)); return <div className="sales-target" key={`${hero.name}-${i}`}><p>{hero.name} ขายแล้ว {money(units)} / {money(hero.unitTarget)} ชิ้น</p><div className="sales-bar" role="progressbar" aria-label={`ยอดขาย ${hero.name}`} aria-valuemin={0} aria-valuemax={hero.unitTarget} aria-valuenow={Math.min(hero.unitTarget, Math.max(0, units))}><span style={{ width: `${percent}%` }} /></div></div>; })}
       {!compact && <><div className="sales-totals"><p>เหลืออีก <strong>{target ? `${money(stats.remaining)} บาท` : "ยังไม่ตั้งเป้า"}</strong></p><p>ต้องได้วันละ <strong>{!target ? "ยังไม่ตั้งเป้า" : stats.neededPerDay === null ? "หมดเดือนแล้ว" : `${money(stats.neededPerDay)} บาท`}</strong></p><p>คาดการณ์สิ้นเดือน <strong>{money(stats.forecast)} บาท</strong></p><p>คำนวณจาก {label} เฉลี่ย {day} วัน × {days} วัน</p></div>
       <h3>แยกตามสาขา</h3><p className="sales-caption">รวมทั้งร้าน ไม่นับพรี</p><div className="sales-totals">{([["บางแค", progress.branches.bangkae], ["เสนาเฟสท์", progress.branches.senafest], ["ออนไลน์", progress.branches.online]] as const).map(([name, value]) => <p key={name}>{name}<strong>{money(value)} บาท</strong></p>)}</div>
       <h3>ยอดรายวัน</h3><p className="sales-caption">{label}</p><div className="sales-days">{Array.from({ length: day }, (_, i) => { const date = `${month}-${String(i + 1).padStart(2, "0")}`; const row = progress.daily[date]; const value = row ? row.product : 0; return <div className="sales-day" key={date}><span>{i + 1}</span><div className="sales-bar"><span style={{ width: `${Math.max(0, value) / max * 100}%` }} /></div><strong>{money(value)}</strong></div>; })}</div></>}

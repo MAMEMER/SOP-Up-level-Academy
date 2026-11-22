@@ -1,7 +1,7 @@
 import "server-only";
 import { adminDb } from "./firebase-admin.ts";
-import { hasStoreHubCreds, storeHubGet } from "./storehub-api.ts";
-import { calculateActuals, salesProgress, monthWeeks, passedWeeks, group4Score, type OnlinePayment, type Product, type TeamTargets, type Transaction, type StoreNumbers } from "./team-targets.ts";
+import { hasStoreHubCreds, storeHubGet, fetchEmployeeNames } from "./storehub-api.ts";
+import { calculateActuals, salesProgress, heroProductActuals, monthWeeks, passedWeeks, group4Score, type OnlinePayment, type Product, type TeamTargets, type Transaction, type StoreNumbers } from "./team-targets.ts";
 
 const COLLECTION = "sop_team_targets";
 let queue = Promise.resolve();
@@ -82,8 +82,10 @@ async function fetchTeamTargets(month: string) {
   const group4 = targets ? group4Score(revenue, targets.revenueTarget, eventWeeks, configuredGames.length ? weeks.length : 0, targets.budgetTarget, targets.budgetActual ?? undefined) : undefined;
   const storeNumbers: StoreNumbers = group4 === undefined ? {} : { group4 };
   const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+  const heroActuals = heroProductActuals(month, today, tx, targets?.heroProducts || []);
+  const employeeNames = heroActuals.length ? await fetchEmployeeNames(limitedGet) : {};
   const progress = salesProgress(month, today, tx, resolved, payments, orders);
-  return { month, weeks, targets, actuals, passed, storeNumbers, progress };
+  return { month, weeks, targets, actuals, passed, storeNumbers, progress, heroActuals, employeeNames };
 }
 const reportCache = new Map<string, { at: number; value: ReturnType<typeof fetchTeamTargets> }>();
 export function loadTeamTargets(month: string) {
@@ -112,4 +114,10 @@ export async function loadWorkedHours(month: string, eligible: string[]) {
   ]);
   const clocked = new Set(attendance.clockEvents.filter(x => x.workDate.startsWith(month)).map(x => `${x.employeeName}__${x.workDate}`));
   return eligible.map(code => ({ code, hours: [...days].filter(([key, day]) => key.startsWith(`${code}__`) && clocked.has(key) && day.hours != null && day.hours > 0 && day.hours <= MAX_PLAUSIBLE_HOURS).reduce((n, [, day]) => n + (day.hours || 0), 0) }));
+}
+
+export async function searchTeamProducts(query: string) {
+  const q = query.trim().toLocaleLowerCase();
+  if (q.length < 2) return [];
+  return (await products()).filter(p => p.id && p.name?.toLocaleLowerCase().includes(q)).slice(0, 40).map(p => ({ id: p.id!, name: p.name! }));
 }

@@ -56,3 +56,22 @@ test("rejects incomplete POS data instead of reporting understated revenue", asy
   const tx = { storeId: "6a268170c008ab000760e21a", transactionTime: "2026-11-02T00:00:00Z", total: 1, items: [{ productId: "missing", total: 1 }] };
   assert.throws(() => calculateActuals("2026-11", [tx], [], []));
 });
+
+test("hero product units exclude cancelled sales, respect Bangkok month and deduct returns", async () => {
+  const { heroProductActuals, incentivePool } = await import("../lib/team-targets.ts");
+  const hero = { name: "Shield", productIds: ["shield", "variant"], unitTarget: 3, poolBonus: 1000 };
+  const storeId = "6a268170c008ab000760e21a";
+  const tx = [
+    { storeId, employeeId: "a", transactionTime: "2026-10-31T17:00:00Z", items: [{ productId: "shield", quantity: 3 }] },
+    { storeId, employeeId: "b", transactionTime: "2026-11-10T00:00:00Z", items: [{ productId: "variant", quantity: 2 }] },
+    { storeId, employeeId: "a", transactionTime: "2026-11-11T00:00:00Z", transactionType: "Return", items: [{ productId: "shield", quantity: 1 }] },
+    { storeId, employeeId: "a", transactionTime: "2026-11-12T00:00:00Z", isCancelled: true, items: [{ productId: "shield", quantity: 100 }] },
+    { storeId, transactionTime: "2026-11-30T17:00:00Z", items: [{ productId: "shield", quantity: 100 }] }
+  ];
+  const actuals = heroProductActuals("2026-11", "2026-11-30", tx, [hero]);
+  assert.deepEqual(actuals, [{ units: 4, staff: { a: 2, b: 2 } }]);
+  const targets: TeamTargets = { revenueTarget: 0, eventTargets: { pokemon: 0, lorcana: 0, riftbound: 0, monsnatch: 0 }, budgetTarget: 0, poolRevenuePct: 10, poolPerGame: 0, passWeeks: 3, heroProducts: [hero] };
+  const passed = { pokemon: 0, lorcana: 0, riftbound: 0, monsnatch: 0 };
+  assert.equal(incentivePool(0, targets, passed, [4]), 1000);
+  assert.equal(incentivePool(0, targets, passed, [2]), 0);
+});
