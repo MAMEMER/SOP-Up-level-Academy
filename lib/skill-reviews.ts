@@ -4,7 +4,7 @@
 // แยกจาก KPI ทั้งหมด: ไม่มีฟิลด์คะแนน ไม่มีเงิน และไม่มีอะไรถูกส่งเข้า performance-score.
 
 import { isSkillWeekResult, type SkillWeekEntry, type SkillWeekResult } from "./skill-progress.ts";
-import { skillIndicatorById } from "./skill-indicators.ts";
+import { SKILL_START_LEVEL, skillIndicatorById } from "./skill-indicators.ts";
 
 export const SKILL_REVIEWS_COLLECTION = "sop_skill_reviews";
 export const SKILL_LEVELS_COLLECTION = "sop_skill_levels";
@@ -158,10 +158,10 @@ export function setSkillLevel(
   const indicator = skillIndicatorById(input.indicatorId);
   if (!indicator) return null;
   const max = indicator.group === "hard" ? 4 : 3;
-  const level = Math.max(0, Math.min(max, Math.round(input.level)));
+  const level = Math.max(SKILL_START_LEVEL, Math.min(max, Math.round(input.level)));
   const levels = { ...(existing?.levels || {}) };
-  const from = levels[input.indicatorId]?.level ?? 0;
-  if (from === level && levels[input.indicatorId]) return null;
+  const from = Math.max(SKILL_START_LEVEL, levels[input.indicatorId]?.level ?? SKILL_START_LEVEL);
+  if (from === level) return null;
   levels[input.indicatorId] = { level, since: input.date };
   return {
     staffCode: input.staffCode,

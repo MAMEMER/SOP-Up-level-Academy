@@ -3,12 +3,14 @@ import { describe, it } from "node:test";
 import { buildSkillStatus, radarPoint, radarPolygon } from "../lib/skill-status.ts";
 
 describe("skill status", () => {
-  it("splits 7 hard / 8 soft and treats missing levels as 0", () => {
+  it("splits 7 hard / 8 soft and starts everyone at level 1", () => {
     const status = buildSkillStatus(undefined);
     assert.equal(status.hard.items.length, 7);
     assert.equal(status.soft.items.length, 8);
     assert.equal(status.hasData, false);
-    assert.equal(status.hard.average, 0);
+    assert.equal(status.hard.average, 1);
+    assert.equal(status.soft.average, 1);
+    assert.ok([...status.hard.items, ...status.soft.items].every((item) => item.level === 1));
     assert.equal(status.hard.maxLevel, 4);
     assert.equal(status.soft.maxLevel, 3);
   });
@@ -21,9 +23,13 @@ describe("skill status", () => {
       updatedAt: "2026-11-04T00:00:00Z"
     });
     assert.equal(status.hasData, true);
-    assert.equal(status.hard.average, 0.7); // (3+2)/7
+    assert.equal(status.hard.average, 1.4); // (3+2+1×5)/7
     assert.equal(status.soft.items.find((item) => item.id === "service")?.level, 3);
-    assert.equal(status.hard.rated, 2);
+  });
+
+  it("never shows a level below the start level", () => {
+    const status = buildSkillStatus({ staffCode: "Boom", levels: { stock: { level: 0, since: "2026-10-01" } }, history: [], updatedAt: "" });
+    assert.equal(status.hard.items.find((item) => item.id === "stock")?.level, 1);
   });
 
   it("puts the first axis straight up", () => {

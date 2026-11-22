@@ -77,7 +77,7 @@ function SkillGroupPanel({ group }: { group: SkillStatusGroup }) {
       <ol className="skill-status__bars">
         {group.items.map((item) => (
           <li key={item.id}>
-            <strong className="skill-status__level">{item.level || "–"}</strong>
+            <strong className="skill-status__level">{item.level}</strong>
             <span className="skill-status__name">{item.name}</span>
             <span className="skill-status__meter" aria-label={`ระดับ ${item.level} จาก ${group.maxLevel}`}>
               {Array.from({ length: group.maxLevel }, (_, index) => (
@@ -91,12 +91,27 @@ function SkillGroupPanel({ group }: { group: SkillStatusGroup }) {
   );
 }
 
-export function StaffSkillStatus({ staffCode, status }: { staffCode: string; status: ReturnType<typeof buildSkillStatus> }) {
+export function StaffSkillStatus({
+  staffCode,
+  status,
+  showReviewLink = true
+}: {
+  staffCode: string;
+  status: ReturnType<typeof buildSkillStatus>;
+  /** ลิงก์ไปหน้าประเมิน = แอดมินเท่านั้น; หน้าพนักงานปิดไว้ */
+  showReviewLink?: boolean;
+}) {
   return (
     <div className="skill-status">
       {status.hasData ? null : (
         <p className="skill-status__empty">
-          ยังไม่มีระดับที่ยืนยันแล้ว — <Link href={`/admin/skill-review?staff=${encodeURIComponent(staffCode)}`}>ไปประเมิน skill</Link>
+          ยังไม่ได้ประเมิน ทุกตัวชี้วัดอยู่ที่ระดับเริ่มต้น 1
+          {showReviewLink ? (
+            <>
+              {" — "}
+              <Link href={`/admin/skill-review?staff=${encodeURIComponent(staffCode)}`}>ไปประเมิน skill</Link>
+            </>
+          ) : null}
         </p>
       )}
       <div className="skill-status__grid">
@@ -109,7 +124,7 @@ export function StaffSkillStatus({ staffCode, status }: { staffCode: string; sta
             <strong>{entry.level}</strong> {entry.label}
           </span>
         ))}
-        <span>· Soft skill สูงสุดระดับ 3 · ช่อง – = ยังไม่ได้ประเมิน</span>
+        <span>· ทุกคนเริ่มที่ระดับ 1 · Soft skill สูงสุดระดับ 3</span>
       </p>
     </div>
   );
