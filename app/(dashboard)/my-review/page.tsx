@@ -1,3 +1,4 @@
+import { kpiV2Visible } from "../../../lib/launch-gate.ts";
 import Link from "next/link";
 import { CoachingNotes } from "../../../components/CoachingNotes.tsx";
 import { SelfReviewBoard } from "../../../components/SelfReviewBoard.tsx";
@@ -125,7 +126,7 @@ export default async function MyReviewPage({ searchParams }: PageProps) {
       <StaffFeedbackPanel staffCode={selectedCode} isAdmin={isOwner} readOnly={user.isImpersonating} />
 
       {!isOwner && period.startDate.slice(0, 7) >= "2026-12" ? (
-        <section className="staff-empty"><p>ดูคะแนนรายเดือนได้ที่ <Link href="/my-kpi">คะแนน KPI ของฉัน</Link></p></section>
+        {kpiV2Visible(user.role) && <section className="staff-empty"><p>ดูคะแนนรายเดือนได้ที่ <Link href="/my-kpi">คะแนน KPI ของฉัน</Link></p></section>}
       ) : review ? (
         <SelfReviewBoard review={review} periodLabel={period.label} />
       ) : (

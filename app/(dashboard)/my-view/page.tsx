@@ -1,3 +1,4 @@
+import { kpiV2Visible } from "../../../lib/launch-gate.ts";
 import { SalesProgress } from "../../../components/SalesProgress.tsx";
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
@@ -37,6 +38,7 @@ type PageProps = {
 export default async function MyViewPage({ searchParams }: PageProps) {
   const user = await requireUser();
   const isOwner = user.role === "admin";
+  const showKpiV2 = kpiV2Visible(user.role);
   const selfCode = employeeCodeForEmail(user.email);
   const params = searchParams ? await searchParams : {};
 
@@ -50,7 +52,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   if (!selectedCode) {
     return (
       <main className="page">
-        <SalesProgress compact />
+        {showKpiV2 && <SalesProgress compact />}
         <section className="board-hero">
           <div>
             <p className="eyebrow">มุมมองพนักงาน</p>
@@ -93,7 +95,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
   return (
     <main className="page">
-      <SalesProgress compact />
+      {showKpiV2 && <SalesProgress compact />}
       <section className="board-hero">
         <div>
           <p className="eyebrow">มุมมองพนักงาน</p>

@@ -1,3 +1,5 @@
+import { kpiV2Visible } from "../../../lib/launch-gate.ts";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { KpiDraftForm } from "../../../components/KpiDraftForm.tsx";
 import { redirect } from "next/navigation";
@@ -35,7 +37,7 @@ async function remove(form: FormData) {
   redirect("/teach-log?status=deleted");
 }
 export default async function TeachLogPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const user = await requireUser();
+  const user = await requireUser(); if (!kpiV2Visible(user.role)) notFound();
   const code = employeeCodeForEmail(user.email);
   const today = formatWorkDate();
   const { status } = await searchParams;

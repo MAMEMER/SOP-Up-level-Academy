@@ -1,3 +1,5 @@
+import { kpiV2Visible } from "../../../lib/launch-gate.ts";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
 import { listStaff } from "../../../lib/staff-store.ts";
@@ -8,7 +10,7 @@ import { skillLevels } from "../../../components/SkillReviewGuide.tsx";
 export const dynamic = "force-dynamic";
 
 export default async function WorkGuidePage() {
-  const user = await requireUser();
+  const user = await requireUser(); if (!kpiV2Visible(user.role)) notFound();
   const staff = (await listStaff()).find((person) => person.email.toLowerCase() === user.email.toLowerCase());
   const stageByPosition: Record<string, CareerStage> = { temporary: "parttime", regular: "regular", branch_manager: "manager" };
   const stage = staff?.position ? stageByPosition[staff.position] : undefined;

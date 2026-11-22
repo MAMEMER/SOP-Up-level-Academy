@@ -1,3 +1,5 @@
+import { kpiV2Visible } from "../../../lib/launch-gate.ts";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
 import { employeeCodeForEmail } from "../../../lib/employee-directory.ts";
@@ -8,7 +10,7 @@ import DealForm from "./DealForm.tsx";
 export const dynamic = "force-dynamic";
 const labels = {logged:"บันทึกแล้ว",manager_checked:"ตรวจแล้ว",approved:"อนุมัติแล้ว",paid:"จ่ายแล้ว",rejected:"ไม่อนุมัติ"};
 export default async function Page({searchParams}:{searchParams:Promise<{status?:string}>}) {
- const user=await requireUser(); const code=employeeCodeForEmail(user.email) || ""; const today=formatWorkDate(); const params=await searchParams;
+ const user=await requireUser(); if (!kpiV2Visible(user.role)) notFound(); const code=employeeCodeForEmail(user.email) || ""; const today=formatWorkDate(); const params=await searchParams;
  const [staff,config,deals]=await Promise.all([listStaff(),getConfig().catch(()=>null),code?listDeals(today.slice(0,7),code).catch(()=>[]):[]]);
  const messages:Record<string,string>={saved:"บันทึกแล้ว",duplicate:"เลขใบเสร็จนี้ถูกบันทึกแล้ว",invalid:"กรุณาตรวจข้อมูลและสัดส่วนผู้ขาย",denied:"บัญชีนี้ไม่สามารถบันทึกได้",error:"บันทึกไม่สำเร็จ โปรดลองอีกครั้ง"};
  return <main className="page skill-review"><Link href="/" className="back-link">← กลับหน้าหลัก</Link><section className="board-hero"><div><p className="eyebrow">โบนัสการขาย</p><h2>บันทึก Big Deal</h2><p>บันทึกเลขรายการและสัดส่วนผู้ขาย เพื่อตรวจสอบโบนัส</p></div></section>

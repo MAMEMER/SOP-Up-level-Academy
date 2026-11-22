@@ -1,3 +1,5 @@
+import { kpiV2Visible } from "../../../lib/launch-gate.ts";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { listStaff } from "../../../lib/staff-store.ts";
 import { referralCount } from "../../../lib/referral-count-server.ts";
@@ -12,7 +14,7 @@ import { groupLabels, missingLabels } from "../../../lib/kpi-v2-score.ts";
 
 export const dynamic = "force-dynamic";
 export default async function MyKpi({ searchParams }: { searchParams?: Promise<{ period?: string }> }) {
-  const user = await requireUser();
+  const user = await requireUser(); if (!kpiV2Visible(user.role)) notFound();
   const staff = (await listStaff()).find(person => person.email === user.email.toLowerCase());
   const referral = staff?.code ? await referralCount(staff.code).catch(() => null) : null;
   const params = await searchParams;
