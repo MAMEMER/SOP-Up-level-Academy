@@ -84,6 +84,7 @@ export const adminSections: SiteSection[] = [
     label: "คะแนน & เงิน",
     hint: "KPI เงินเดือน ของหาย",
     links: [
+      { href: "/admin/big-deal", label: "ตรวจ Big Deal", detail: "ตรวจและอนุมัติโบนัสดีล" },
       { href: "/admin/performance-score", label: "คะแนนพนักงาน", detail: "KPI 5 หมวด · incentive · เหตุผลที่หักรายวัน", keywords: "kpi เงินเดือน" },
       { href: "/admin/stock-check", label: "ลงผลนับ Stock", detail: "ผลนับของวันนั้น ตรง / ไม่ตรง / ไม่ได้นับ (มีผลกับคะแนน)", keywords: "สต็อก" },
       { href: "/admin/mistakes", label: "บันทึกความผิด SOP (KPI ใหม่)", detail: "ค1 · รหัสงาน ระดับ สาขา · นับ 3 เดือน · พนักงานโต้แย้งได้ 3 วัน (ยังไม่ผูกเงินเดือน)", keywords: "ค1 ความผิด หักคะแนน โต้แย้ง kpi ใหม่ mistake" },
@@ -146,6 +147,7 @@ export const staffPagesSection: SiteSection = {
     { href: "/teach-log", label: "บันทึกสอนเกม", detail: "บันทึกการสอนลูกค้า" },
     { href: "/peer-review", label: "ประเมินเพื่อนร่วมกะ (360)", detail: "พนักงานประเมินเพื่อนที่ทำกะเดียวกันทุกเดือน 6 ข้อ" },
     { href: "/my-kpi", label: "คะแนน KPI ของฉัน", detail: "คะแนนรายเดือนและหมวดที่ยังไม่มีข้อมูล" },
+    { href: "/big-deal", label: "บันทึก Big Deal", detail: "บันทึกดีลและดูสถานะโบนัส" },
     { href: "/mistakes", label: "บันทึกความผิดของฉัน", detail: "พนักงานเห็นบันทึก ค1 ของตัวเอง + โต้แย้งใน 3 วัน" }
   ]
 };

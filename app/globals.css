@@ -9968,3 +9968,11 @@ a.peer-review__tr:hover,
 .sales-days { margin: 1rem 0; }
 .sales-day { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .35rem 0; }
 .sales-day strong { min-width: 5rem; text-align: right; }
+.big-deal-form { display: grid; gap: 1rem; max-width: 44rem; }
+.big-deal-form label { display: grid; gap: .35rem; }
+.big-deal-form input, .big-deal-form select, .big-deal-form textarea { font-size: 16px; min-height: 44px; min-width: 0; max-width: 100%; }
+.big-deal-form button, .owner-ops__date button { min-height: 44px; }
+.big-deal-form fieldset { border: 0; padding: 0; min-width: 0; }
+.big-deal-share { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0; }
+.big-deal-share select { flex: 1 1 10rem; }
+.big-deal-share input { width: 5rem; }
