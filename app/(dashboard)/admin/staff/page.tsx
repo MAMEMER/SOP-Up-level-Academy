@@ -46,6 +46,7 @@ async function saveStaffAction(formData: FormData) {
       code,
       displayName: stringValue(formData, "displayName"),
       employmentType: stringValue(formData, "employmentType") as StaffRecord["employmentType"],
+      position: stringValue(formData, "position") as StaffRecord["position"],
       branch: stringValue(formData, "branch"),
       aliases: stringValue(formData, "aliases").split(",").map((alias) => alias.trim()).filter(Boolean),
       active: formData.get("active") === "on"

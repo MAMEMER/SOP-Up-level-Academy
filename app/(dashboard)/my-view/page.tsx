@@ -134,7 +134,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       <TaskInbox branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} />
 
       {/* คะแนน = ข้อมูลสรุป ไม่ใช่งานที่ต้องทำ — อยู่ล่างสุดตามใบงาน */}
-      {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
+      {period.startDate.slice(0, 7) >= "2026-12" ? <p><Link href="/my-kpi">ดูคะแนน KPI ของฉัน</Link></p> : row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
       <DashboardTaskSections
