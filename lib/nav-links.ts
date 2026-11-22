@@ -45,6 +45,7 @@ export const staffGroups: NavGroup[] = [
       { href: "/supplies", label: "ของที่ต้องสั่ง" },
       { href: "/card-prices", label: "ราคากลางการ์ด" },
       { href: "/schedule", label: "ตารางกะ" },
+      { href: "/work-guide", label: "คู่มืองานของฉัน" },
       { href: "/training", label: "คู่มืองาน" }
     ]
   }
