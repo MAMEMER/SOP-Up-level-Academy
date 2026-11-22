@@ -32,7 +32,8 @@ export const staffGroups: NavGroup[] = [
       { href: "/my-documents", label: "เอกสารของฉัน" },
       { href: "/peer-review", label: "ประเมินเพื่อนร่วมกะ (360)" },
       { href: "/teach-log", label: "บันทึกสอนเกม" },
-      { href: "/mistakes", label: "บันทึกความผิดของฉัน" }
+      { href: "/mistakes", label: "บันทึกความผิดของฉัน" },
+      { href: "/my-kpi", label: "คะแนน KPI ของฉัน" }
     ]
   },
   {

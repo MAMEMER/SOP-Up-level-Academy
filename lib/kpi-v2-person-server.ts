@@ -5,7 +5,7 @@ import { isPeriod } from "./peer-review.ts";
 import { fetchAllWorkProjects } from "./work-projects-server-store.ts";
 import { getGrowthPct, getPersonTargets, getTeachLogs } from "./kpi-v2-person-store.ts";
 import { personNumbers, type PersonNumbers } from "./kpi-v2-person-numbers.ts";
-import { saleRows, salesTargets, type SaleProduct, type SaleTransaction, type Shift } from "./kpi-v2-sales.ts";
+import { saleRows, salesTargets, bucketKey, type SaleProduct, type SaleTransaction, type Shift } from "./kpi-v2-sales.ts";
 import { isWorkingAssignment, type ShiftAssignment } from "./shift-schedule.ts";
 const stores: Record<string, string> = { "6a268170c008ab000760e21a": "bangkae", "6aaa02f0a568500007542756": "senafest" };
 const delay = () => new Promise(resolve => setTimeout(resolve, 350));
@@ -19,7 +19,18 @@ export async function loadSalesOverview(period: string) {
   const result = salesTargets(shifts, rows, period, growthPct);
   const sales: Record<string, number> = {}; let unnamed = 0, openPrice = 0, storeRevenue = 0;
   for (const row of rows) if (row.workDate.startsWith(period)) { openPrice += row.openPrice || 0; storeRevenue += row.storeRevenue || 0; if (row.staffCode) sales[row.staffCode] = (sales[row.staffCode] || 0) + row.amount; else unnamed += row.amount; }
-  return { ...result, sales, unnamed, openPrice, storeRevenue, growthPct };
+  return { ...result, sales, unnamed, openPrice, storeRevenue, growthPct, shifts, rows };
+}
+export async function loadTodaySalesGoal(staffCode: string, date: string) {
+  if (!hasAdminCredentials()) throw new Error("schedule_unavailable");
+  const snapshot = await adminDb().collection("schedule_shifts").where("staffCode", "==", staffCode).where("workDate", "==", date).get();
+  const shift = snapshot.docs.map(doc => doc.data()).find(d => d.branch && d.assignment && isWorkingAssignment(d.assignment as ShiftAssignment));
+  if (!shift) return null;
+  const overview = await loadSalesOverview(date.slice(0, 7)).catch(() => undefined);
+  if (!overview) return { target: undefined, sales: undefined };
+  const target = overview.buckets[bucketKey(String(shift.branch), date)]?.target;
+  const sales = overview.rows.filter(r => r.staffCode === staffCode && r.workDate === date && r.branch === shift.branch).reduce((sum, r) => sum + r.amount, 0);
+  return { target, sales };
 }
 async function referralCounts(collection: string, period: string, staffCode: string, members: boolean): Promise<number | undefined> {
   const snapshot = await adminDb().collection(collection).where("referredByStaff", "==", staffCode).get();
