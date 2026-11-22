@@ -29,10 +29,15 @@ test("carries the whole pool when no staff qualify and preserves partial remaind
   assert.equal(partial.carriedOver, 150);
 });
 test("passes configured targets, computes pool and distributes by hours", () => {
-  const targets: TeamTargets = { revenueTarget: 1, eventTargets: { pokemon: 2, lorcana: 0, riftbound: 1, monsnatch: 2 }, budgetTarget: 100, poolPer10k: 10, poolPerGame: 5, passWeeks: 1 };
+  const targets: TeamTargets = { revenueTarget: 200000, eventTargets: { pokemon: 2, lorcana: 0, riftbound: 1, monsnatch: 2 }, budgetTarget: 100, poolRevenuePct: 10, poolPerGame: 1000, passWeeks: 1 };
   const passed = passedWeeks(["a", "b"], { a: { pokemon: 2, riftbound: 1 } }, targets.eventTargets);
   assert.deepEqual(passed, { pokemon: 1, lorcana: 0, riftbound: 1, monsnatch: 0 });
-  assert.equal(incentivePool(20002, targets, passed), 30);
+  assert.equal(incentivePool(250000, targets, passed), 7000);
+  assert.equal(incentivePool(200001, targets, passed), 2000.1);
+  assert.equal(incentivePool(190000, targets, passed), 2000);
+  assert.equal(incentivePool(250000, { ...targets, poolRevenuePct: 5 }, passed), 4500);
+  const shares = splitEligiblePool(incentivePool(250000, targets, passed), [{ code: "A", total: 90, incentiveEligible: true, availableDays: 30 }, { code: "B", total: 90, incentiveEligible: true, availableDays: 30 }], 30);
+  assert.deepEqual(shares.shares.map(s => s.amount), [3500, 3500]);
   assert.deepEqual(splitPool(30, [{ code: "A", hours: 1 }, { code: "B", hours: 2 }]).map(x => x.amount), [10, 20]);
   assert.equal(group4Score(100, 100, 1, 2, 100, 120), (100 + 50 + 80) / 3);
 });

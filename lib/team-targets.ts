@@ -6,7 +6,7 @@ export type TeamTargets = {
   eventTargets: Record<Game, number>;
   budgetTarget: number;
   budgetActual?: number | null;
-  poolPer10k: number;
+  poolRevenuePct: number;
   poolPerGame: number;
   passWeeks: number;
 };
@@ -45,7 +45,7 @@ export function group4Score(revenue: number, target: number, weeksPassed: number
   return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : undefined;
 }
 export function incentivePool(revenue: number, targets: TeamTargets, passed: Record<Game, number>): number {
-  const revenuePart = targets.revenueTarget > 0 ? Math.floor(Math.max(0, revenue - targets.revenueTarget) / 10000) * targets.poolPer10k : 0;
+  const revenuePart = targets.revenueTarget > 0 ? Math.max(0, revenue - targets.revenueTarget) * (targets.poolRevenuePct ?? 10) / 100 : 0;
   return revenuePart + GAMES.filter(g => targets.eventTargets[g] > 0 && passed[g] >= targets.passWeeks).length * targets.poolPerGame;
 }
 export function splitPool(pool: number, staff: Array<{ code: string; hours: number }>): Array<{ code: string; hours: number; amount: number }> {

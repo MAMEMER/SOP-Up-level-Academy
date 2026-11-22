@@ -63,7 +63,7 @@ async function fetchTeamTargets(month: string) {
     const p = d.data();
     return { status: p.status, date: bangkokDate(p.manualPaidAt || p.verifiedAt || p.createdAt), amount: p.amount, eventType: p.eventType, source: p.source };
   });
-  const targets = targetDoc.exists ? targetDoc.data() as TeamTargets : null;
+  const targets = targetDoc.exists ? { ...targetDoc.data(), poolRevenuePct: targetDoc.data()?.poolRevenuePct ?? 10 } as TeamTargets : null;
   const actuals = calculateActuals(month, tx, catalog, payments);
   const passed = targets ? passedWeeks(weeks, actuals.entries, targets.eventTargets) : null;
   const revenue = Object.values(actuals.revenue).reduce((a, b) => a + b, 0);

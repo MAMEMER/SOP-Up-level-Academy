@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { GAMES, group4Score, incentivePool, splitPool, type Game, type TeamActuals, type TeamTargets } from "../lib/team-targets.ts";
 const labels: Record<Game, string> = { pokemon: "Pokémon", lorcana: "Lorcana", riftbound: "Riftbound", monsnatch: "Monsnatch" };
-const empty = (): TeamTargets => ({ revenueTarget: 0, eventTargets: { pokemon: 0, lorcana: 0, riftbound: 0, monsnatch: 0 }, budgetTarget: 0, poolPer10k: 0, poolPerGame: 0, passWeeks: 3 });
+const empty = (): TeamTargets => ({ revenueTarget: 0, eventTargets: { pokemon: 0, lorcana: 0, riftbound: 0, monsnatch: 0 }, budgetTarget: 0, poolRevenuePct: 10, poolPerGame: 0, passWeeks: 3 });
 type Report = { targets: TeamTargets | null; actuals: TeamActuals; weeks: string[]; passed: Record<Game, number> | null; hours: Array<{ code: string; hours: number }> };
 const money = (n: number) => n.toLocaleString("th-TH", { maximumFractionDigits: 2 });
 export function TeamTargetsBoard() {
@@ -24,7 +24,7 @@ export function TeamTargetsBoard() {
       const savedSpend = localStorage.getItem(`team-targets-spend-${m}`);
       setSpend(savedSpend ?? (data.targets?.budgetActual != null ? String(data.targets.budgetActual) : ""));
       const draft = localStorage.getItem(`team-targets-draft-${m}`);
-      setForm(draft ? JSON.parse(draft) : data.targets || empty());
+      setForm({ ...empty(), ...(draft ? JSON.parse(draft) : data.targets || {}) });
       setMessage("");
     } catch { setMessage("โหลดข้อมูลไม่ได้ กรุณาลองใหม่"); }
   }, [month]);
@@ -58,7 +58,7 @@ export function TeamTargetsBoard() {
         {numberField("เป้ายอดขายต่อเดือน (บาท)", form.revenueTarget, n => update({ ...form, revenueTarget: n }))}
         {GAMES.map(g => <div key={g}>{numberField(`เป้า ${labels[g]} ต่อสัปดาห์ (คน)`, form.eventTargets[g], n => update({ ...form, eventTargets: { ...form.eventTargets, [g]: n } }))}</div>)}
         {numberField("เป้างบประมาณ (บาท)", form.budgetTarget, n => update({ ...form, budgetTarget: n }))}
-        {numberField("เพิ่มกองทุนต่อยอดเกิน 10,000 บาท", form.poolPer10k, n => update({ ...form, poolPer10k: n }))}
+        {numberField("สัดส่วนยอดขายที่เกินเป้าเข้ากองทุน (%)", form.poolRevenuePct, n => update({ ...form, poolRevenuePct: n }))}
         {numberField("เพิ่มกองทุนต่อเกมที่ผ่านเป้า", form.poolPerGame, n => update({ ...form, poolPerGame: n }))}
         {numberField("จำนวนสัปดาห์ที่ต้องผ่าน", form.passWeeks, n => update({ ...form, passWeeks: n }))}
       </div><div className="team-target-actions"><button className="green-button" onClick={save} disabled={!report}>บันทึกเป้า</button><button className="soft-button" onClick={() => void load(prev, "", true)}>คัดลอกจากเดือนก่อน</button><button className="soft-button" onClick={() => { localStorage.removeItem(`team-targets-draft-${month}`); setForm(report?.targets || empty()); setSpend(report?.targets?.budgetActual != null ? String(report.targets.budgetActual) : ""); setEligible(""); localStorage.removeItem(`team-targets-spend-${month}`); localStorage.removeItem(`team-targets-eligible-${month}`); }}>รีเซ็ต</button></div>
