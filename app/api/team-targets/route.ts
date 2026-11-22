@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { requireUser } from "../../../lib/auth.ts";
 import { isOwner } from "../../../lib/owner.ts";
 import { GAMES, monthWeeks, type TeamTargets } from "../../../lib/team-targets.ts";
-import { loadTeamTargets, loadWorkedHours, saveTeamTargets, searchTeamProducts } from "../../../lib/team-targets-server.ts";
+import { loadTeamTargets, saveTeamTargets, searchTeamProducts } from "../../../lib/team-targets-server.ts";
+import { monthlyKpiV2 } from "../../../lib/kpi-v2-data.ts";
+import { adminDb } from "../../../lib/firebase-admin.ts";
+import { onePerStaffDay } from "../../../lib/planner-kpi.ts";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 const owner = async () => { const user = await requireUser(); return isOwner(user.actualEmail) && !user.isImpersonating ? user : null; };
@@ -16,10 +19,18 @@ export async function GET(request: Request) {
   const month = params.get("month") || "";
   try {
     monthWeeks(month);
-    const report = await loadTeamTargets(month);
-    const eligible = [...new Set((params.get("eligible") || "").split(",").map(x => x.trim()).filter(x => /^[a-zA-Z0-9_-]{1,20}$/.test(x)))];
-    const hours = eligible.length ? await loadWorkedHours(month, eligible) : [];
-    return json({ ...report, hours });
+    const [report, rows, shifts, actuals] = await Promise.all([
+      loadTeamTargets(month), monthlyKpiV2(month),
+      adminDb().collection("schedule_shifts").where("workDate", ">=", `${month}-01`).where("workDate", "<=", `${month}-31`).get().catch(() => null),
+      adminDb().collection("schedule_actual").where("workDate", ">=", `${month}-01`).where("workDate", "<=", `${month}-31`).get().catch(() => null)
+    ]);
+    const days = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+    const leave = new Map<string, Set<string>>();
+    const addLeave = (code: string, date: string) => { if (!code || !date?.startsWith(month)) return; const dates = leave.get(code) || new Set<string>(); dates.add(date); leave.set(code, dates); };
+    for (const shift of onePerStaffDay((shifts?.docs || []).map(doc => doc.data()))) if (shift.assignment === "leave_personal" || shift.assignment === "leave_sick") addLeave(shift.staffCode!, shift.workDate!);
+    for (const doc of actuals?.docs || []) { const d = doc.data(); if (d.leaveType === "personal" || d.leaveType === "sick") addLeave(d.staffCode, d.workDate); }
+    const staff = rows.map(row => ({ code: row.person.code, name: row.name, total: row.total, incentiveEligible: row.incentiveEligible, availableDays: days - (leave.get(row.person.code)?.size || 0) }));
+    return json({ ...report, staff, daysInMonth: days });
   } catch { return json({ error: "อ่านข้อมูลไม่ได้ กรุณาตรวจสอบการเชื่อมต่อและลองใหม่" }, 503); }
 }
 export async function POST(request: Request) {

@@ -1,3 +1,4 @@
+import { SKILL_PART_ENABLED } from "../../../lib/kpi-v2-person-numbers.ts";
 import { kpiV2Visible } from "../../../lib/launch-gate.ts";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -34,6 +35,7 @@ export default async function MyKpi({ searchParams }: { searchParams?: Promise<{
       <p>ชวนลูกค้ามาอีเวนต์ 1 คน และแสดงหน้าดอกไม้ทุกบิล</p></section>}
     {row ? <section className="owner-ops__panel"><h3>{row.name} · {row.trial ? "ทดลอง" : "ผลคะแนน"}</h3>
       <ul className="peer-review__mine">{row.groups.filter(g => g.weight > 0).map(g => <li key={g.group}><span>{groupLabels[g.group]} ({g.weight}%)</span><strong>{g.score === null ? "ไม่มีข้อมูล" : g.score.toFixed(1)}</strong></li>)}</ul>
+      {SKILL_PART_ENABLED && row.person.numbers?.skill && <p>สกิลถึงระดับตามตำแหน่ง {row.person.numbers.skill.met} จาก {row.person.numbers.skill.required}</p>}
       <p>คะแนนรวม {row.total === null ? "ไม่มีข้อมูล" : row.total.toFixed(1)} · {row.trial && row.band === "เตือน" ? "ทดลอง" : row.band || "ไม่มีข้อมูล"}{row.trial ? " · ทดลอง ไม่นับเตือน" : ""}</p>
       {!row.incentiveEligible && <p>งานพื้นฐานต่ำกว่า 90 ไม่มีสิทธิ์ incentive</p>}
       {row.capped && <p>ติดเพดาน: ร้านยังไม่ถึง 90% ของเป้า</p>}

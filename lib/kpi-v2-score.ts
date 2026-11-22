@@ -2,7 +2,7 @@ import { monthlyGroupScores, type MistakeRecord } from "./mistake-log.ts";
 import { MIN_RATERS_TO_SHOW, scorePeerReviews, type PeerReviewRecord } from "./peer-review.ts";
 
 export type Position = "temporary" | "regular" | "branch_manager";
-export type PersonNumbers = { advanced?: number; sales?: number; members?: number; events?: number };
+export type PersonNumbers = { advanced?: number; sales?: number; members?: number; events?: number; skill?: { met: number; required: number } };
 export type StoreNumbers = { store?: number; byBranch?: Record<string, number> };
 export type KpiPerson = { code: string; branch: string; position?: Position; numbers?: PersonNumbers };
 export type Group = "basic" | "advanced" | "revenue" | "team";

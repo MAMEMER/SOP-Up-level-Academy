@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { gameFor, monthWeeks, weekKey, passedWeeks, incentivePool, splitPool, splitEligiblePool, group4Score, type TeamTargets } from "../lib/team-targets.ts";
+import { gameFor, monthWeeks, weekKey, passedWeeks, incentivePool, splitEligiblePool, group4Score, type TeamTargets } from "../lib/team-targets.ts";
 
 test("maps event names and Bangkok calendar weeks", () => {
   assert.equal(gameFor("Pokémon Pre release"), "pokemon");
@@ -38,7 +38,6 @@ test("passes configured targets, computes pool and distributes by hours", () => 
   assert.equal(incentivePool(250000, { ...targets, poolRevenuePct: 5 }, passed), 4500);
   const shares = splitEligiblePool(incentivePool(250000, targets, passed), [{ code: "A", total: 90, incentiveEligible: true, availableDays: 30 }, { code: "B", total: 90, incentiveEligible: true, availableDays: 30 }], 30);
   assert.deepEqual(shares.shares.map(s => s.amount), [3500, 3500]);
-  assert.deepEqual(splitPool(30, [{ code: "A", hours: 1 }, { code: "B", hours: 2 }]).map(x => x.amount), [10, 20]);
   assert.equal(group4Score(100, 100, 1, 2, 100, 120), (100 + 50 + 80) / 3);
 });
 
