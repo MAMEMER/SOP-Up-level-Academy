@@ -40,7 +40,24 @@ async function cdpUp() {
   }
 }
 
+// A visible Chrome squatting 9222 makes every `agent-browser open` pop a StoreHub window over Champ's work.
+// Close it (same profile, so login survives) and relaunch headless.
+async function closeVisibleChrome() {
+  try {
+    const info = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`)).json();
+    if (/HeadlessChrome/.test(info["User-Agent"] || "")) return;
+    const ws = new WebSocket(info.webSocketDebuggerUrl);
+    await new Promise((resolve) => {
+      ws.onopen = () => ws.send(JSON.stringify({ id: 1, method: "Browser.close" }));
+      ws.onclose = ws.onerror = resolve;
+      setTimeout(resolve, 5000);
+    });
+    for (let i = 0; i < 20 && (await cdpUp()); i++) await sleep(500);
+  } catch {}
+}
+
 async function ensureChrome() {
+  if (await cdpUp()) await closeVisibleChrome();
   if (await cdpUp()) return;
   // headless เสมอ — ห้ามเด้งหน้าต่างแย่งโฟกัสแชมป์
   spawn(CHROME, ["--headless=new", `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${PROFILE}`, "about:blank"], {
@@ -88,7 +105,7 @@ function pageScript(from, to, supplier) {
     const out = [];
     for (const row of list.aaData || []) {
       // ชื่อสโตร์อยู่ในคอลัมน์ใดคอลัมน์หนึ่งของแถว — เก็บคอลัมน์ที่มีชื่อสาขาไว้แยกผลนับเสนาฯ/บางแค
-      const storeName = row.slice(0, 6).map(String).find((cell) => /bang ?khae|bangkae|sena/i.test(cell)) || "";
+      const storeName = [0, 1, 2, 3, 4, 5].map((i) => String(row[i] ?? "")).find((cell) => /bang ?khae|bangkae|sena/i.test(cell)) || "";
       const entry = { id: row.DT_RowId, start: row[0], completed: row[1], supplier: row[4], status: row[5], storeName, items: [] };
       if (entry.supplier === ${JSON.stringify(supplier)} && /complete/i.test(entry.status)) {
         const body = new URLSearchParams({ sEcho: 1, iColumns: 7, iDisplayStart: 0, iDisplayLength: 5000, id: entry.id });
