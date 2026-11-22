@@ -54,6 +54,21 @@ export function splitPool(pool: number, staff: Array<{ code: string; hours: numb
   return valid.map(s => ({ ...s, amount: total ? pool * s.hours / total : 0 }));
 }
 
+/** A monthly share uses calendar days; unavailable days must be supplied from verified records. */
+export function splitEligiblePool(pool: number, staff: Array<{ code: string; total: number | null; incentiveEligible: boolean; availableDays: number }>, daysInMonth: number) {
+  if (!Number.isFinite(pool) || pool < 0 || !Number.isInteger(daysInMonth) || daysInMonth < 28 || daysInMonth > 31) throw new Error("Invalid pool or month");
+  if (new Set(staff.map(s => s.code)).size !== staff.length || staff.some(s => !Number.isInteger(s.availableDays) || s.availableDays < 0 || s.availableDays > daysInMonth)) throw new Error("Invalid staff availability");
+  const eligible = staff.filter(s => s.total !== null && Number.isFinite(s.total) && s.total >= 90 && s.incentiveEligible && s.availableDays > 0);
+  if (!eligible.length) return { shares: [], carriedOver: pool };
+  const base = pool / eligible.length;
+  const full = eligible.filter(s => s.availableDays === daysInMonth).length;
+  const remainder = eligible.reduce((sum, s) => sum + base * (1 - s.availableDays / daysInMonth), 0);
+  return {
+    shares: eligible.map(s => ({ code: s.code, availableDays: s.availableDays, amount: base * s.availableDays / daysInMonth + (s.availableDays === daysInMonth && full ? remainder / full : 0) })),
+    carriedOver: full ? 0 : remainder
+  };
+}
+
 export type Product = { id?: string; name?: string; category?: string };
 export type Transaction = { storeId?: string; transactionTime?: string; transactionType?: string; isCancelled?: boolean; total?: number; items?: Array<{ productId?: string; name?: string; quantity?: number; total?: number }> };
 export type OnlinePayment = { status?: string; date: string; amount?: number; eventType?: string; source?: string };

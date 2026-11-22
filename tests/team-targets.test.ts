@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { gameFor, monthWeeks, weekKey, passedWeeks, incentivePool, splitPool, group4Score, type TeamTargets } from "../lib/team-targets.ts";
+import { gameFor, monthWeeks, weekKey, passedWeeks, incentivePool, splitPool, splitEligiblePool, group4Score, type TeamTargets } from "../lib/team-targets.ts";
 
 test("maps event names and Bangkok calendar weeks", () => {
   assert.equal(gameFor("Pokémon Pre release"), "pokemon");
@@ -9,6 +9,24 @@ test("maps event names and Bangkok calendar weeks", () => {
   assert.equal(gameFor("other"), "other");
   assert.equal(weekKey("2026-11-01"), "2026-10-26");
   assert.equal(monthWeeks("2026-11").length, 6);
+});
+
+test("splits equally only among qualifying staff", () => {
+  const result = splitEligiblePool(300, [{ code: "A", total: 90, incentiveEligible: true, availableDays: 30 }, { code: "B", total: 99, incentiveEligible: true, availableDays: 30 }, { code: "C", total: 89.9, incentiveEligible: true, availableDays: 30 }, { code: "D", total: 100, incentiveEligible: false, availableDays: 30 }], 30);
+  assert.deepEqual(result.shares.map(s => s.amount), [150, 150]);
+  assert.equal(result.carriedOver, 0);
+});
+
+test("prorates partial months and redistributes remainder to full-month staff", () => {
+  const result = splitEligiblePool(300, [{ code: "A", total: 90, incentiveEligible: true, availableDays: 30 }, { code: "B", total: 90, incentiveEligible: true, availableDays: 30 }, { code: "C", total: 90, incentiveEligible: true, availableDays: 15 }], 30);
+  assert.deepEqual(result.shares.map(s => s.amount), [125, 125, 50]);
+});
+
+test("carries the whole pool when no staff qualify and preserves partial remainder", () => {
+  assert.equal(splitEligiblePool(300, [], 30).carriedOver, 300);
+  const partial = splitEligiblePool(300, [{ code: "A", total: 90, incentiveEligible: true, availableDays: 15 }], 30);
+  assert.equal(partial.shares[0].amount, 150);
+  assert.equal(partial.carriedOver, 150);
 });
 test("passes configured targets, computes pool and distributes by hours", () => {
   const targets: TeamTargets = { revenueTarget: 1, eventTargets: { pokemon: 2, lorcana: 0, riftbound: 1, monsnatch: 2 }, budgetTarget: 100, poolPer10k: 10, poolPerGame: 5, passWeeks: 1 };
