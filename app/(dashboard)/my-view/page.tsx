@@ -1,3 +1,4 @@
+import { TeamProgress } from "../../../components/TeamProgress.tsx";
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
 import {
@@ -122,6 +123,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       {/* งานที่ต้องลงมือตอนนี้มาก่อนทุกอย่างเสมอ — คะแนน/ประวัติเลื่อนลงไปอยู่ล่าง (ใบงาน YrTvFzXr) */}
       <TaskFocusBoard branch={branch} staffCode={selectedCode} today={workDate} />
 
+      <TeamProgress />
       <MyShiftToday staffCode={selectedCode} branch={branch} workDate={workDate} />
 
       <MyAssignedWork staffCode={selectedCode} branch={branch} workDate={workDate} />

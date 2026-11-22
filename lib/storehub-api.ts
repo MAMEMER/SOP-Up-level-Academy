@@ -33,8 +33,8 @@ type StoreHubEmployee = { id?: string; _id?: string; firstName?: string; lastNam
 type StoreHubTimesheet = { employeeId: string; storeId?: string; clockInTime?: string; clockOutTime?: string };
 
 /** Map of StoreHub employeeId → display name ("firstName lastName"). */
-export async function fetchEmployeeNames(): Promise<Record<string, string>> {
-  const list = await shFetch<StoreHubEmployee[]>("/employees");
+export async function fetchEmployeeNames(get: typeof storeHubGet = storeHubGet): Promise<Record<string, string>> {
+  const list = await get<StoreHubEmployee[]>("/employees");
   const map: Record<string, string> = {};
   for (const e of list) {
     const id = e.id || e._id;
@@ -45,8 +45,8 @@ export async function fetchEmployeeNames(): Promise<Record<string, string>> {
 }
 
 /** Timesheets clocked between from/to (ISO date strings, Bangkok range). */
-export async function fetchTimesheets(fromIso: string, toIso: string): Promise<StoreHubTimesheet[]> {
-  const list = await shFetch<StoreHubTimesheet[]>(`/timesheets?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`);
+export async function fetchTimesheets(fromIso: string, toIso: string, get: typeof storeHubGet = storeHubGet): Promise<StoreHubTimesheet[]> {
+  const list = await get<StoreHubTimesheet[]>(`/timesheets?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`);
   return Array.isArray(list) ? list : [];
 }
 
