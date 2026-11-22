@@ -9,12 +9,12 @@ const review = (raterCode: string): PeerReviewRecord => ({ id: raterCode, period
 
 test("weights, team average and branch scope", () => {
   const [a, b] = calculateKpiV2("2027-01", people, [], [review("X"), review("Y")], { group4: 50 });
-  assert.equal(a.groups.find(g => g.group === "3")?.score, 96);
+  assert.ok(Math.abs(a.groups.find(g => g.group === "3")!.score! - 96) < 1e-9);
   assert.ok(Math.abs(a.total! - 82.9) < 1e-8);
   assert.equal(b.groups.find(g => g.group === "2.2")?.weight, 0);
   assert.ok(b.missing.includes("3"));
   const manager = calculateKpiV2("2027-01", [{ ...people[0], position: "branch_manager" }, people[1]], [], [review("X"), review("Y")], { group4: 50 })[0];
-  assert.equal(manager.groups.find(g => g.group === "3")?.score, 97);
+  assert.ok(Math.abs(manager.groups.find(g => g.group === "3")!.score! - 97) < 1e-9);
 });
 
 test("missing data is excluded and trial warnings never count", () => {
@@ -32,4 +32,11 @@ test("mistake deductions reuse appeal handling and escalation", () => {
   const voided = { ...mistake, decision: { result: "voided" } } as MistakeRecord;
   assert.equal(calculateKpiV2("2027-01", people, [voided], [])[0].groups[0].score, 100);
   assert.equal(calculateKpiV2("2027-01", people, [], [review("X")])[0].groups[4].score, null);
+});
+
+test("team score works before advanced numbers exist", () => {
+  const rev = (r: string) => ({ ...review(r), period: "2026-12" });
+  const [row] = calculateKpiV2("2026-12", [{ code: "A", branch: "one", position: "temporary" }], [], [rev("X"), rev("Y")]);
+  assert.ok(Math.abs(row.groups.find(g => g.group === "3")!.score! - 100) < 1e-9);
+  assert.ok(!row.missing.includes("3"));
 });

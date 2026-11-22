@@ -25,8 +25,11 @@ export function calculateKpiV2(period: string, people: KpiPerson[], mistakes: Mi
     }));
     const peer = scorePeerReviews(reviews.filter(r => r.period === period), person.code);
     const teamParts = [peer.raters >= MIN_RATERS_TO_SHOW ? peer.score : null, basic, advanced];
-    // A partial team score would obscure which of its three components is missing.
-    const teamScore = teamParts.every(valid) ? teamParts[0]! * 0.6 + teamParts[1]! * 0.3 + teamParts[2]! * 0.1 : null;
+    // Own 360 is required; missing team parts are dropped and the remaining shares re-normalised.
+    const teamShares = [0.6, 0.3, 0.1];
+    const teamAvailable = teamParts.map((v, i) => ({ v, w: teamShares[i] })).filter(x => valid(x.v));
+    const teamWeight = teamAvailable.reduce((sum, x) => sum + x.w, 0);
+    const teamScore = valid(teamParts[0]) && teamWeight ? teamAvailable.reduce((sum, x) => sum + (x.v as number) * x.w, 0) / teamWeight : null;
     const ownBasic = basics.get(person.code)!;
     const values: (number | null)[] = [ownBasic[0].score, ownBasic[1].score, valid(person.numbers?.group12) ? person.numbers.group12 : null, valid(person.numbers?.group22) ? person.numbers.group22 : null, teamScore, valid(store.byBranch?.[person.branch]) ? store.byBranch![person.branch] : valid(store.group4) ? store.group4 : null];
     const applicable = groups.map((group, i) => ({ group, weight: weights[position][i], score: values[i] }));

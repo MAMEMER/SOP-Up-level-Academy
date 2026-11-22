@@ -116,7 +116,7 @@ function StaffForm({
           </label>
 
           <label>
-            ตำแหน่ง KPI {record && !record.position ? "(ยังไม่ได้ระบุ ใช้ประจำชั่วคราว)" : ""}
+            ตำแหน่ง KPI {record && !record.position ? "(ยังไม่ได้ระบุ ใช้ประจำ)" : ""}
             <select name="position" defaultValue={record?.position || ""}>
               <option value="">ยังไม่ได้ระบุ (ใช้ประจำ)</option>
               <option value="temporary">ชั่วคราว</option>
