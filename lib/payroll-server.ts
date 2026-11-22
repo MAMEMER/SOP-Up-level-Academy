@@ -5,7 +5,7 @@ import { resolveEmployeeCode } from "./employee-directory.ts";
 import { fetchPerformanceDailyStore } from "./performance-daily-store.ts";
 import { getPerformanceScoreRowsForRange } from "./performance-score-data.ts";
 import { fetchAttendanceSource } from "./planner-kpi.ts";
-import { fetchEmployeeNames, fetchTimesheets, hasStoreHubCreds, toBangkok } from "./storehub-api.ts";
+import { fetchEmployeeNames, fetchTimesheets, hasStoreHubCreds, storeHubGet, toBangkok } from "./storehub-api.ts";
 import { ensureStaffLoaded, listStaff } from "./staff-store.ts";
 import {
   computePayLine,
@@ -40,11 +40,11 @@ export type PayrollReport = {
 };
 
 /** ชั่วโมงทำงานต่อคนต่อวันจาก StoreHub (เข้า→ออก) — ใช้เสนอ OT เท่านั้น */
-async function hoursByStaffDay(period: PayPeriod): Promise<Map<string, WorkDay>> {
+export async function hoursByStaffDay(period: PayPeriod, get: typeof storeHubGet = storeHubGet): Promise<Map<string, WorkDay>> {
   const out = new Map<string, WorkDay>();
   const from = new Date(`${period.startDate}T00:00:00+07:00`).toISOString();
   const to = new Date(`${period.endDate}T23:59:59+07:00`).toISOString();
-  const [names, sheets] = await Promise.all([fetchEmployeeNames(), fetchTimesheets(from, to)]);
+  const [names, sheets] = await Promise.all([fetchEmployeeNames(get), fetchTimesheets(from, to, get)]);
   for (const ts of sheets) {
     if (!ts.clockInTime) continue;
     const name = names[ts.employeeId] || "";

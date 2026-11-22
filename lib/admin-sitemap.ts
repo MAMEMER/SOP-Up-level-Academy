@@ -34,6 +34,7 @@ export const adminSections: SiteSection[] = [
     label: "วันนี้",
     hint: "เปิดดูทุกวัน",
     links: [
+      { href: "/admin/team-targets", label: "เป้าทีมและกองทุน", detail: "ตั้งเป้ารายเดือนและดูความคืบหน้าทีม", ownerOnly: true },
       { href: "/admin/ops", label: "ดูงานรายคน", detail: "ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม แยกสาขา", keywords: "สรุปทั้งร้าน ops" },
       { href: "/admin/task-review", label: "ตรวจงานที่มอบหมาย", detail: "แยกสาขา · ทีม · พนักงาน → แฟ้มรายเดือน · คอมเมนต์ + ให้คะแนน", keywords: "แฟ้มงาน ตรวจ คะแนน" },
       { href: "/manager-review", label: "ตรวจงานที่ส่งมา", detail: "งานที่พนักงานกดส่งตรวจ พร้อมรูป/หลักฐาน", keywords: "รีวิว review" },
@@ -83,9 +84,13 @@ export const adminSections: SiteSection[] = [
     label: "คะแนน & เงิน",
     hint: "KPI เงินเดือน ของหาย",
     links: [
+      { href: "/admin/big-deal", label: "ตรวจ Big Deal", detail: "ตรวจและอนุมัติโบนัสดีล" },
       { href: "/admin/performance-score", label: "คะแนนพนักงาน", detail: "KPI 5 หมวด · incentive · เหตุผลที่หักรายวัน", keywords: "kpi เงินเดือน" },
       { href: "/admin/stock-check", label: "ลงผลนับ Stock", detail: "ผลนับของวันนั้น ตรง / ไม่ตรง / ไม่ได้นับ (มีผลกับคะแนน)", keywords: "สต็อก" },
       { href: "/admin/mistakes", label: "บันทึกความผิด SOP (KPI ใหม่)", detail: "ค1 · รหัสงาน ระดับ สาขา · นับ 3 เดือน · พนักงานโต้แย้งได้ 3 วัน (ยังไม่ผูกเงินเดือน)", keywords: "ค1 ความผิด หักคะแนน โต้แย้ง kpi ใหม่ mistake" },
+      { href: "/admin/teach-log", label: "สรุปการสอนเกม", detail: "สรุปการสอนเกมรายเดือน", ownerOnly: true, keywords: "สอนเกม teach" },
+      { href: "/admin/kpi-v2-targets", label: "เป้าหมาย KPI รายคน", detail: "ตั้งเป้ารายเดือน", ownerOnly: true, keywords: "kpi เป้าหมาย" },
+      { href: "/admin/kpi-v2", label: "คะแนน KPI รายเดือน", detail: "คะแนนรายหมวดและตำแหน่งพนักงาน", keywords: "kpi คะแนน รายเดือน" },
       { href: "/admin/peer-review", label: "ผลประเมิน 360 (KPI ใหม่)", detail: "ค2 · คะแนนทีมเวิร์กรายเดือน ใครประเมินใคร ตัวอย่างที่เขียน", keywords: "360 ทีมเวิร์ก เพื่อนประเมิน peer kpi ใหม่" },
       { href: "/admin/skill-review", label: "ประเมิน skill รายสัปดาห์ (ทดสอบ)", detail: "ลงผล 15 ตัวชี้วัดทุกวันจันทร์ · วันทำงาน · ข้อเสนอขึ้น/ลดระดับ (ไม่ผูก KPI)", keywords: "skill ทักษะ career path ระดับ ประเมิน" },
       { href: "/admin/checklist-audit", label: "สุ่มตรวจ Checklist", detail: "ติ๊กว่าทำแต่ไม่ได้ทำ — หัก 10 คะแนน + ธง coach", keywords: "audit" },
@@ -136,9 +141,13 @@ export const staffPagesSection: SiteSection = {
     { href: "/schedule", label: "ตารางกะ (พนักงาน)", detail: "ตารางกะแบบที่พนักงานเห็น" },
     { href: "/my-tasks", label: "แจ้งเตือนงาน", detail: "งานที่มอบหมายที่น้องยังไม่ได้ส่ง" },
     { href: "/my-tasks/file", label: "แฟ้มงาน", detail: "งานของน้องแยกเดือน เขียว/แดง" },
+    { href: "/work-guide", label: "คู่มืองานของฉัน", detail: "งานพื้นฐานและเกณฑ์สกิล" },
     { href: "/training", label: "คู่มืองาน", detail: "คู่มือที่พนักงานอ่าน" },
     { href: "/flowers", label: "ดอกไม้", detail: "สวนดอกไม้ของทีม" },
+    { href: "/teach-log", label: "บันทึกสอนเกม", detail: "บันทึกการสอนลูกค้า" },
     { href: "/peer-review", label: "ประเมินเพื่อนร่วมกะ (360)", detail: "พนักงานประเมินเพื่อนที่ทำกะเดียวกันทุกเดือน 6 ข้อ" },
+    { href: "/my-kpi", label: "คะแนน KPI ของฉัน", detail: "คะแนนรายเดือนและหมวดที่ยังไม่มีข้อมูล" },
+    { href: "/big-deal", label: "บันทึก Big Deal", detail: "บันทึกดีลและดูสถานะโบนัส" },
     { href: "/mistakes", label: "บันทึกความผิดของฉัน", detail: "พนักงานเห็นบันทึก ค1 ของตัวเอง + โต้แย้งใน 3 วัน" }
   ]
 };

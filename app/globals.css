@@ -9916,3 +9916,63 @@ a.peer-review__tr:hover,
 .skill-review__inline button.mistake-log__delete { background: transparent; color: #b42318; border: 1px solid rgba(180, 35, 24, 0.35); }
 .mistake-log .skill-review__inline .mistake-log__reason { flex: 1 1 100%; }
 .mistake-log .skill-review__inline button { min-height: 44px; }
+
+/* KPI person inputs */
+.kpi-entry-form { display: grid; gap: 1rem; max-width: 42rem; }
+.kpi-entry-form label { display: grid; gap: .4rem; min-width: 0; }
+.kpi-entry-form input, .kpi-entry-form select, .kpi-entry-form textarea { width: 100%; min-width: 0; min-height: 44px; padding: .65rem .75rem; font: inherit; font-size: 16px; }
+.kpi-entry-form textarea { min-height: 6rem; resize: vertical; }
+.kpi-entry-form button { min-height: 44px; font: inherit; }
+.kpi-entry-form button[type="submit"] { width: 100%; }
+
+.kpi-entry-form button[type="submit"] { border: 0; border-radius: 12px; background: var(--color-ink); color: white; font-weight: 600; cursor: pointer; }
+.kpi-entry-form button.kpi-entry-reset { background: transparent; border: 1px solid currentColor; box-shadow: none; color: var(--color-ink); border-radius: 12px; cursor: pointer; }
+.kpi-person-page .owner-ops__date button { min-width: 44px; min-height: 44px; }
+.kpi-person-page button { min-height: 44px; }
+
+.kpi-sales-table { overflow-x: auto; }
+.kpi-sales-table table { width: 100%; border-collapse: collapse; }
+.kpi-sales-table th, .kpi-sales-table td { padding: 0.65rem; text-align: left; border-bottom: 1px solid var(--color-border, #ddd); }
+
+.work-guide { font-size: 1rem; }
+.work-guide p, .work-guide li { line-height: 1.65; }
+.work-guide__group { border-bottom: 1px solid var(--color-border, #ddd); }
+.work-guide__group summary { cursor: pointer; padding: 14px 0; min-height: 44px; font-weight: 600; }
+.work-guide__group .peer-review__mine li { display: flex; justify-content: flex-start; gap: 1rem; }
+.work-guide__group .peer-review__mine li span:first-child { flex: 0 0 4.5rem; }
+.work-guide__levels > div, .work-guide__skills > article { padding: 1rem 0; border-bottom: 1px solid var(--color-border, #ddd); }
+.work-guide__levels h4, .work-guide__skills h4 { margin: 0; font-size: 1.1rem; }
+.work-guide__levels p, .work-guide__skills p { margin: .5rem 0 0; }
+.work-guide a { display: inline-block; padding: .65rem 0; }
+.work-guide p, .work-guide li, .work-guide summary, .work-guide a { font-size: 1rem; }
+.team-target-section { max-width: 900px; }
+.team-target-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1rem; }
+.team-target-field { display: grid; gap: .35rem; max-width: 100%; }
+.team-target-field input { width: 100%; min-height: 44px; font-size: 16px; }
+.team-target-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.team-target-actions button, .team-target-section button { min-height: 44px; }
+
+.sales-progress { padding: 1.5rem 0; max-width: 900px; }
+.sales-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.sales-heading h2, .sales-progress h3 { margin: 0; }
+.sales-heading p, .sales-caption { color: var(--color-ink-2, #555); font-size: .9rem; }
+.sales-heading a { flex-shrink: 0; padding: .75rem 0; }
+.sales-hero { font-size: clamp(2rem, 8vw, 3.5rem); line-height: 1.2; font-weight: 600; margin: .25rem 0 1rem; overflow-wrap: anywhere; }
+.sales-hero span { font-size: 1rem; font-weight: 400; }
+.sales-totals { margin: 1rem 0 1.5rem; }
+.sales-totals p { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: .45rem 0; }
+.sales-target { border-top: 1px solid var(--color-rule-2, #ddd); border-bottom: 1px solid var(--color-rule-2, #ddd); padding: .8rem 0 1rem; }
+.sales-target p { margin: .3rem 0; }
+.sales-bar { height: .5rem; border-radius: 1rem; overflow: hidden; background: var(--color-paper-4, #e2e8ef); }
+.sales-bar > span { display: block; height: 100%; background: var(--color-orange); border-radius: inherit; }
+.sales-days { margin: 1rem 0; }
+.sales-day { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .35rem 0; }
+.sales-day strong { min-width: 5rem; text-align: right; }
+.big-deal-form { display: grid; gap: 1rem; max-width: 44rem; }
+.big-deal-form label { display: grid; gap: .35rem; }
+.big-deal-form input, .big-deal-form select, .big-deal-form textarea { font-size: 16px; min-height: 44px; min-width: 0; max-width: 100%; }
+.big-deal-form button, .owner-ops__date button { min-height: 44px; }
+.big-deal-form fieldset { border: 0; padding: 0; min-width: 0; }
+.big-deal-share { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0; }
+.big-deal-share select { flex: 1 1 10rem; }
+.big-deal-share input { width: 5rem; }

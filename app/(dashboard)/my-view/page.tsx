@@ -1,3 +1,5 @@
+import { kpiV2Visible } from "../../../lib/launch-gate.ts";
+import { SalesProgress } from "../../../components/SalesProgress.tsx";
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
 import {
@@ -36,6 +38,7 @@ type PageProps = {
 export default async function MyViewPage({ searchParams }: PageProps) {
   const user = await requireUser();
   const isOwner = user.role === "admin";
+  const showKpiV2 = kpiV2Visible(user.role);
   const selfCode = employeeCodeForEmail(user.email);
   const params = searchParams ? await searchParams : {};
 
@@ -49,6 +52,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   if (!selectedCode) {
     return (
       <main className="page">
+        {showKpiV2 && <SalesProgress compact />}
         <section className="board-hero">
           <div>
             <p className="eyebrow">มุมมองพนักงาน</p>
@@ -91,6 +95,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
   return (
     <main className="page">
+      {showKpiV2 && <SalesProgress compact />}
       <section className="board-hero">
         <div>
           <p className="eyebrow">มุมมองพนักงาน</p>
@@ -134,7 +139,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
       <TaskInbox branch={branch} staffCode={selectedCode} today={workDate} readOnly={user.isImpersonating} />
 
       {/* คะแนน = ข้อมูลสรุป ไม่ใช่งานที่ต้องทำ — อยู่ล่างสุดตามใบงาน */}
-      {row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
+      {period.startDate.slice(0, 7) >= "2026-12" ? <p><Link href="/my-kpi">ดูคะแนน KPI ของฉัน</Link></p> : row ? <StaffScoreCard row={row} periodLabel={reviewPeriod().label} /> : null}
 
       <DashboardChecklistStatus phases={cardStoreWorkflow} staffCode={selectedCode} branch={branch} />
       <DashboardTaskSections

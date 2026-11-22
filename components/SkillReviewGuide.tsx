@@ -27,7 +27,7 @@ const learnSteps = [
   { title: "ใช้งานได้", text: "ชื่อเข้า portfolio ร้าน มีวันที่ได้ ทบทวนทุก 12 สัปดาห์" }
 ];
 
-const levels = [
+export const skillLevels = [
   {
     level: 1,
     name: "ฝึกหัด",
@@ -179,7 +179,7 @@ export function SkillReviewGuide() {
           ))}
         </ol>
         <dl className="skill-guide__rows">
-          {levels.map((item) => (
+          {skillLevels.map((item) => (
             <div key={item.level}>
               <dt>
                 <span className={`skill-guide__badge is-l${item.level}`}>{item.level}</span> {item.name}

@@ -1,4 +1,5 @@
 "use client";
+import { isKpiV2Path, kpiV2Live } from "../lib/launch-gate.ts";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -19,7 +20,7 @@ import {
 export function NavMenu({ isAdmin, owner = false, staffAdmin = false }: { isAdmin: boolean; owner?: boolean; staffAdmin?: boolean }) {
   const pathname = usePathname();
   const admin = isAdmin ? adminNav({ owner, staffAdmin }) : null;
-  const groups: NavGroup[] = admin ? admin.groups : staffGroups;
+  const groups: NavGroup[] = admin ? admin.groups : staffGroups.map((g) => ({ ...g, links: g.links.filter((l) => kpiV2Live() || !isKpiV2Path(l.href)) }));
   const tops: NavLink[] = admin ? admin.tops : quickLinks;
 
   const [open, setOpen] = useState(false);
