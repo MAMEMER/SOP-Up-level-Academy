@@ -6,7 +6,7 @@ import type { WorkProject } from "../lib/work-projects.ts";
 const base = { targets: {}, projects: [] };
 test("excludes missing targets and caps each available achievement", () => {
   assert.deepEqual(personNumbers("A", "2026-12", base), {});
-  assert.deepEqual(personNumbers("A", "2026-12", { ...base, teachCount: 15, productSales: 50, productTarget: 100, targets: { teachTarget: 10 } }), { advanced: 100, revenueOwn: 50 });
+  assert.deepEqual(personNumbers("A", "2026-12", { ...base, teachCount: 15, productSales: 50, productTarget: 100, targets: { teachTarget: 10 } }), { advanced: 100, sales: 50 });
   assert.deepEqual(personNumbers("A", "2026-12", { ...base, teachCount: 0, targets: { teachTarget: 10 } }), { advanced: 0 });
 });
 test("assigned work counts passed and on-time submissions against the target", () => {
@@ -19,7 +19,7 @@ test("assigned work counts passed and on-time submissions against the target", (
   assert.ok(score !== undefined && Math.abs(score - 100 / 3) < 1e-9);
 });
 
-test("revenue weights available metrics and renormalizes missing targets", () => {
-  assert.deepEqual(personNumbers("A", "2026-12", { ...base, productSales: 50, productTarget: 100, members: 1, eventCustomers: 0, targets: { memberTarget: 1, eventTarget: 1 } }), { revenueOwn: 50 });
-  assert.deepEqual(personNumbers("A", "2026-12", { ...base, productSales: 50, productTarget: 100, members: 1, targets: { memberTarget: 1 } }), { revenueOwn: 200 / 3 });
+test("revenue scores remain separate and skip missing targets", () => {
+  assert.deepEqual(personNumbers("A", "2026-12", { ...base, productSales: 50, productTarget: 100, members: 1, eventCustomers: 0, targets: { memberTarget: 1, eventTarget: 1 } }), { sales: 50, members: 100, events: 0 });
+  assert.deepEqual(personNumbers("A", "2026-12", { ...base, productSales: 50, productTarget: 100, members: 1, targets: { memberTarget: 1 } }), { sales: 50, members: 100 });
 });
