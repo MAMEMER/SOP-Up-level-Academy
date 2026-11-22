@@ -2,7 +2,7 @@ import Link from "next/link";
 import { loadTeamTargets } from "../lib/team-targets-server.ts";
 import { pace } from "../lib/team-targets.ts";
 
-const money = (n: number) => n.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+const money = (n: number) => n.toLocaleString("th-TH", { maximumFractionDigits: 0 });
 export async function SalesProgress({ compact = false }: { compact?: boolean }) {
   const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
   const month = today.slice(0, 7), day = Number(today.slice(8)), [year, m] = month.split("-").map(Number);
