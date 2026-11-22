@@ -72,7 +72,7 @@ export function splitEligiblePool(pool: number, staff: Array<{ code: string; tot
   };
 }
 
-export type Product = { id?: string; name?: string; category?: string };
+export type Product = { id?: string; name?: string; category?: string; unitPrice?: number; priceType?: string };
 export type Transaction = { employeeId?: string; storeId?: string; transactionTime?: string; transactionType?: string; status?: string; isCancelled?: boolean; total?: number; items?: Array<{ productId?: string; name?: string; quantity?: number; total?: number }> };
 export type OnlineOrder = { status?: string; slipStatus?: string; date: string; total?: number; items?: Array<{ name?: string; total?: number }> };
 export type OnlinePayment = { status?: string; date: string; amount?: number; eventType?: string; source?: string };

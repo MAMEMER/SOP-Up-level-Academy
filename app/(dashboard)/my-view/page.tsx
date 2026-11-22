@@ -51,6 +51,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
     return (
       <main className="page">
         <SalesProgress compact />
+      <Link href="/sell-post" className="sell-home-link">โพสต์ขายในกลุ่ม →</Link>
         <section className="board-hero">
           <div>
             <p className="eyebrow">มุมมองพนักงาน</p>
@@ -94,6 +95,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   return (
     <main className="page">
       <SalesProgress compact />
+      <Link href="/sell-post" className="sell-home-link">โพสต์ขายในกลุ่ม →</Link>
       <section className="board-hero">
         <div>
           <p className="eyebrow">มุมมองพนักงาน</p>

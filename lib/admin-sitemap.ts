@@ -34,6 +34,7 @@ export const adminSections: SiteSection[] = [
     label: "วันนี้",
     hint: "เปิดดูทุกวัน",
     links: [
+      { href: "/admin/sell-groups", label: "จัดกลุ่มซื้อขาย", detail: "แก้รายชื่อและกติกากลุ่มโพสต์ขาย" },
       { href: "/admin/team-targets", label: "เป้าทีมและกองทุน", detail: "ตั้งเป้ารายเดือนและดูความคืบหน้าทีม", ownerOnly: true },
       { href: "/admin/ops", label: "ดูงานรายคน", detail: "ใครทำอะไรไปแล้ว งานค้าง ปัญหาที่ต้องตาม แยกสาขา", keywords: "สรุปทั้งร้าน ops" },
       { href: "/admin/task-review", label: "ตรวจงานที่มอบหมาย", detail: "แยกสาขา · ทีม · พนักงาน → แฟ้มรายเดือน · คอมเมนต์ + ให้คะแนน", keywords: "แฟ้มงาน ตรวจ คะแนน" },
@@ -126,6 +127,7 @@ export const staffPagesSection: SiteSection = {
   label: "หน้าพนักงาน",
   hint: "หน้าที่พนักงานใช้ทุกวัน",
   links: [
+    { href: "/sell-post", label: "โพสต์ขายในกลุ่ม", detail: "เขียนโพสต์และเลือกกลุ่มซื้อขาย" },
     { href: "/", label: "หน้าหลักพนักงาน", detail: "หน้าแรกที่พนักงานเห็นตอนเข้ากะ" },
     { href: "/tasks", label: "งานวันนี้", detail: "งานประจำที่ขึ้นวันนี้" },
     { href: "/checklist", label: "เช็คลิสต์", detail: "เช็คลิสต์เปิด-ปิดร้านรายวัน" },
