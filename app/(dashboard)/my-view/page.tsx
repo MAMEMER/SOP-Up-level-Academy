@@ -1,3 +1,4 @@
+import { SalesProgress } from "../../../components/SalesProgress.tsx";
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth.ts";
 import {
@@ -49,6 +50,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
   if (!selectedCode) {
     return (
       <main className="page">
+        <SalesProgress compact />
         <section className="board-hero">
           <div>
             <p className="eyebrow">มุมมองพนักงาน</p>
@@ -91,6 +93,7 @@ export default async function MyViewPage({ searchParams }: PageProps) {
 
   return (
     <main className="page">
+      <SalesProgress compact />
       <section className="board-hero">
         <div>
           <p className="eyebrow">มุมมองพนักงาน</p>
