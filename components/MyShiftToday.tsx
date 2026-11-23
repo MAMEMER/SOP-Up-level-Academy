@@ -79,8 +79,8 @@ export function MyShiftToday({
                 <p className="my-shift__time">เข้า {start} · ออก {shiftEndTime(start ?? "")}</p>
                 <Link href="/checklist" className="primary-action my-shift__cta">เปิด Checklist กะฉัน</Link>
               </>
-            ) : assignment === "leave_personal" || assignment === "leave_sick" ? (
-              <strong className="my-shift__shift">{assignment === "leave_sick" ? "ลาป่วยวันนี้" : "ลากิจวันนี้"}</strong>
+            ) : assignment === "leave_personal" || assignment === "leave_sick" || assignment === "leave_vacation" ? (
+              <strong className="my-shift__shift">{assignment === "leave_sick" ? "ลาป่วยวันนี้" : assignment === "leave_vacation" ? "ลาพักร้อนวันนี้" : "ลากิจวันนี้"}</strong>
             ) : (
               <>
                 <strong className="my-shift__shift my-shift__shift--off">วันนี้ไม่ใช่กะคุณ</strong>

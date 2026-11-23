@@ -46,6 +46,7 @@ export const adminSections: SiteSection[] = [
     label: "ตาราง",
     hint: "ใครอยู่ไหน จัดอะไร",
     links: [
+      { href: "/admin/leave", label: "สิทธิ์วันลา", detail: "ดูวันลาและตั้งสิทธิ์รายตำแหน่ง" },
       { href: "/admin/schedule", label: "ตารางกะ", detail: "วางกะรายเดือนทั้ง 2 สาขา · เทียบเวลาเข้างานจริง", keywords: "กะ เข้างาน ลา" },
       {
         href: "/admin/activities",

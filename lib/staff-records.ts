@@ -35,6 +35,7 @@ export type StaffRecord = {
   displayName: string;
   employmentType: EmploymentType;
   position?: "temporary" | "regular" | "branch_manager";
+  startDate?: string;
   branch: string;
   /** lowercased substrings that identify this person in StoreHub exports */
   aliases: string[];
@@ -106,6 +107,7 @@ export function sanitizeStaffRecord(input: Partial<StaffRecord> & { email: strin
     displayName: String(input.displayName || "").trim() || code || String(input.name || "").trim(),
     employmentType: input.employmentType === "full_time" ? "full_time" : "part_time",
     ...(input.position === "temporary" || input.position === "regular" || input.position === "branch_manager" ? { position: input.position } : {}),
+    ...(typeof input.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.startDate) ? { startDate: input.startDate } : {}),
     branch: String(input.branch || "").trim() || "bangkae",
     aliases: (input.aliases || [])
       .map((alias) => String(alias || "").trim().toLowerCase())

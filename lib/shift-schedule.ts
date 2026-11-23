@@ -16,7 +16,7 @@ import { branchConfig, branchShortName } from "./store-config.ts";
 export type ShiftCode = "s1" | "s2";
 
 /** A planned assignment for one staff-day. */
-export type ShiftAssignment = "s1" | "s2" | "off" | "leave_personal" | "leave_sick";
+export type ShiftAssignment = "s1" | "s2" | "off" | "leave_personal" | "leave_sick" | "leave_vacation";
 
 export const SHIFT_WORK_HOURS = 9;
 
@@ -66,7 +66,7 @@ export function isWorkingAssignment(value: ShiftAssignment): value is ShiftCode 
 }
 
 export function isLeaveAssignment(value: ShiftAssignment): boolean {
-  return value === "leave_personal" || value === "leave_sick";
+  return value === "leave_personal" || value === "leave_sick" || value === "leave_vacation";
 }
 
 /** One planned cell: which shift + (for working shifts) the chosen entry time. */

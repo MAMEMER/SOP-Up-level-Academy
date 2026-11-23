@@ -58,7 +58,7 @@ export type AttendanceInput = {
   offDays?: { employeeName: string; workDate: string }[];
 };
 
-export type LeaveType = "sick" | "personal";
+export type LeaveType = "sick" | "personal" | "vacation";
 
 export type LeaveRecord = {
   employeeName: string;

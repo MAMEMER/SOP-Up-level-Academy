@@ -66,6 +66,7 @@ export type ScheduleCell = {
 
 const LEAVE_LABELS: Record<string, string> = {
   leave_personal: "ลากิจ",
+  leave_vacation: "ลาพักร้อน",
   leave_sick: "ลาป่วย"
 };
 

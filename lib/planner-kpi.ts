@@ -103,6 +103,8 @@ export async function fetchAttendanceSource(_branch?: string): Promise<Attendanc
       leaves.push({ employeeName: s.staffCode, workDate: s.workDate, type: "personal", source: "live" });
     } else if (s.assignment === "leave_sick") {
       leaves.push({ employeeName: s.staffCode, workDate: s.workDate, type: "sick", source: "live" });
+    } else if (s.assignment === "leave_vacation") {
+      leaves.push({ employeeName: s.staffCode, workDate: s.workDate, type: "vacation", source: "live" });
     } else if (s.assignment === "off") {
       offDays.push({ employeeName: s.staffCode, workDate: s.workDate });
     }
@@ -119,7 +121,7 @@ export async function fetchAttendanceSource(_branch?: string): Promise<Attendanc
       });
     }
     // Actual leave logged on the day overrides the plan for KPI (no attendance penalty).
-    if (a.leaveType === "personal" || a.leaveType === "sick") {
+    if (a.leaveType === "personal" || a.leaveType === "sick" || a.leaveType === "vacation") {
       leaves.push({ employeeName: a.staffCode, workDate: a.workDate, type: a.leaveType, source: "live" });
     }
   }

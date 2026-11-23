@@ -125,6 +125,8 @@ function StaffForm({
             </select>
           </label>
 
+          <label>วันที่เริ่มงาน<input type="date" name="startDate" defaultValue={record?.startDate || ""} /></label>
+
           <label>
             สาขา
             <select name="branch" defaultValue={record?.branch || branches[0]?.key}>
