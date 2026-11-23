@@ -1,3 +1,5 @@
+import { kpiV2Visible } from "../../lib/launch-gate.ts";
+import { SalesProgress } from "../../components/SalesProgress.tsx";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AssignedDailyList } from "../../components/AssignedDailyList.tsx";
@@ -92,8 +94,13 @@ export default async function HomePage() {
         <div className="hero-actions">
           <Link href="/checklist" className="primary-action">เปิด Checklist</Link>
           {user.role === "admin" ? <Link href="/admin" className="btn-soft">หน้ารวมงานจัดการ</Link> : null}
+          {kpiV2Visible(user.role) ? <Link href="/my-kpi" className="btn-soft">คะแนน KPI + QR ของฉัน</Link> : null}
+          {kpiV2Visible(user.role) ? <Link href="/work-guide" className="btn-soft">คู่มืองานของฉัน</Link> : null}
+          {kpiV2Visible(user.role) ? <Link href="/teach-log" className="btn-soft">บันทึกสอนเกม</Link> : null}
         </div>
       </section>
+
+      {kpiV2Visible(user.role) ? <Suspense fallback={null}><SalesProgress compact /></Suspense> : null}
 
       {/* ทำด่วน: เอกสารประกันสังคม — ขึ้นจนกว่าพนักงานคนนี้จะส่ง (เตือนอย่างเดียว ไม่ผูก KPI) */}
       <StaffDocsBanner email={user.email} />
