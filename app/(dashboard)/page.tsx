@@ -97,6 +97,7 @@ export default async function HomePage() {
           {kpiV2Visible(user.role) ? <Link href="/my-kpi" className="btn-soft">คะแนน KPI + QR ของฉัน</Link> : null}
           {kpiV2Visible(user.role) ? <Link href="/work-guide" className="btn-soft">คู่มืองานของฉัน</Link> : null}
           {kpiV2Visible(user.role) ? <Link href="/teach-log" className="btn-soft">บันทึกสอนเกม</Link> : null}
+          <Link href="/townhall" className="btn-soft">สไลด์ Townhall</Link>
         </div>
       </section>
 
