@@ -8,6 +8,7 @@ import { parcelCounts, type ParcelOrder } from "./parcel-orders.ts";
 import { restListCollection } from "./firestore-rest.ts";
 import { branchShortName } from "./store-config.ts";
 import { dailyScopeKey } from "./work-records.ts";
+import { pendingLeaveRequestCount } from "./leave-requests-server.ts";
 import { listRecordsForScopeKey } from "./work-records-store.ts";
 import type { OpsSummary } from "./ops-summary.ts";
 import type { WorkflowDailyRecord, WorkflowDayPayload } from "./workflow-records.ts";
@@ -143,7 +144,7 @@ export async function getAdminNotifications(
   deliveryTasks?: DeliveryTask[]
 ): Promise<AdminNotification[]> {
   const branches = summaries.map((entry) => entry.branch);
-  const [deliveries, lostPresses, tickets, assignments, guild, parcels] = await Promise.all([
+  const [deliveries, lostPresses, tickets, assignments, guild, parcels, leavePending] = await Promise.all([
     deliveryTasks
       ? Promise.resolve(deliveryTasks)
       : safe(() => syncDeliveryTasks(), [] as DeliveryTask[]),
@@ -159,7 +160,8 @@ export async function getAdminNotifications(
       guildShopOrders: 0,
       pendingMembers: 0
     }),
-    safe(() => listParcelOrders(), [] as ParcelOrder[])
+    safe(() => listParcelOrders(), [] as ParcelOrder[]),
+    safe(() => pendingLeaveRequestCount(), 0)
   ]);
 
   // หลายสาขา: รวมตัวเลขของทุกสาขาที่กำลังดู · ชื่อคนที่ยังไม่เริ่มต่อท้ายด้วยสาขาให้รู้ว่าต้องตามที่ไหน
@@ -178,6 +180,7 @@ export async function getAdminNotifications(
       )
     },
     bugReports: { open: tickets },
+    leaveRequests: { pending: leavePending },
     parcels: parcelCounts(parcels.filter((order) => branches.includes(order.branch)), workDate),
     guild
   });

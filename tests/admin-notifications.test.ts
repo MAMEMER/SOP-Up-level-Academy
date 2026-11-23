@@ -207,3 +207,15 @@ describe("sortNotifications / summariseNotifications", () => {
     assert.equal(notificationHeadline({ total: 2, urgent: 0, warning: 0 }), "2 เรื่อง");
   });
 });
+
+describe("leave requests", () => {
+  it("shows pending vacation requests and links to the approval page", () => {
+    const items = buildAdminNotifications({ ...quiet, leaveRequests: { pending: 2 } });
+    const item = items.find((entry) => entry.id === "leave-requests");
+    assert.equal(item?.count, 2);
+    assert.equal(item?.href, "/admin/leave");
+  });
+  it("stays quiet with no pending requests", () => {
+    assert.equal(buildAdminNotifications({ ...quiet, leaveRequests: { pending: 0 } }).some((entry) => entry.id === "leave-requests"), false);
+  });
+});

@@ -143,6 +143,7 @@ export const staffPagesSection: SiteSection = {
     { href: "/my-tasks", label: "แจ้งเตือนงาน", detail: "งานที่มอบหมายที่น้องยังไม่ได้ส่ง" },
     { href: "/my-tasks/file", label: "แฟ้มงาน", detail: "งานของน้องแยกเดือน เขียว/แดง" },
     { href: "/work-guide", label: "คู่มืองานของฉัน", detail: "งานพื้นฐานและเกณฑ์สกิล" },
+    { href: "/leave-request", label: "ขอวันหยุด", detail: "พนักงานขอวันหยุดประจำปี ล่วงหน้า 1 เดือน" },
     { href: "/townhall", label: "สไลด์ Townhall", detail: "สไลด์ประชุมทีม · ลิงก์ตั้งที่ sop_config/townhall" },
     { href: "/training", label: "คู่มืองาน", detail: "คู่มือที่พนักงานอ่าน" },
     { href: "/flowers", label: "ดอกไม้", detail: "สวนดอกไม้ของทีม" },
