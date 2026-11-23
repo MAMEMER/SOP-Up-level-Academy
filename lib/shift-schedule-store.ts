@@ -42,7 +42,7 @@ export type ActualDoc = {
   staffCode: string;
   clockIn?: string;
   clockInSource?: "storehub" | "manual";
-  leaveType?: "personal" | "sick";
+  leaveType?: "personal" | "sick" | "vacation";
   leaveNote?: string;
   absent?: boolean;
   swappedTo?: string;
@@ -172,7 +172,7 @@ export async function logLeave(input: {
   branch: string;
   workDate: string;
   staffCode: string;
-  leaveType: "personal" | "sick";
+  leaveType: "personal" | "sick" | "vacation";
   note?: string;
   updatedBy: string;
 }): Promise<void> {
@@ -188,7 +188,7 @@ export async function setActualStatus(input: {
   branch: string;
   workDate: string;
   staffCode: string;
-  status: "normal" | "leave_personal" | "leave_sick" | "absent";
+  status: "normal" | "leave_personal" | "leave_sick" | "leave_vacation" | "absent";
   updatedBy: string;
 }): Promise<void> {
   await post({ action: "setActualStatus", ...input });

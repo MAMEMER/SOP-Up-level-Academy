@@ -1,3 +1,5 @@
+import { loadLeaveData } from "../../../lib/leave-entitlement-server.ts";
+import { LeaveSummary } from "../../../components/LeaveSummary.tsx";
 import { SKILL_PART_ENABLED } from "../../../lib/kpi-v2-person-numbers.ts";
 import { kpiV2Visible } from "../../../lib/launch-gate.ts";
 import { notFound } from "next/navigation";
@@ -17,6 +19,8 @@ export const dynamic = "force-dynamic";
 export default async function MyKpi({ searchParams }: { searchParams?: Promise<{ period?: string }> }) {
   const user = await requireUser(); if (!kpiV2Visible(user.role)) notFound();
   const staff = (await listStaff()).find(person => person.email === user.email.toLowerCase());
+  const leaveYear = Number(formatWorkDate().slice(0, 4));
+  const leave = staff?.code ? await loadLeaveData(leaveYear, [staff], formatWorkDate()).then(x => x.rows[0]).catch(() => null) : null;
   const referral = staff?.code ? await referralCount(staff.code).catch(() => null) : null;
   const params = await searchParams;
   const period = isPeriod(params?.period) ? params.period : formatWorkDate().slice(0, 7);
@@ -28,6 +32,8 @@ export default async function MyKpi({ searchParams }: { searchParams?: Promise<{
     <Link href="/my-view" className="back-link">← กลับหน้างานของฉัน</Link>
     <section className="board-hero"><div><p className="eyebrow">KPI รายเดือน</p><h2>คะแนนของฉัน</h2><p>คะแนนที่ยังไม่มีข้อมูลจะไม่นำมาคิดในคะแนนรวม</p></div>
       <form className="owner-ops__date"><label>เดือน<input type="month" name="period" defaultValue={period} /></label><button type="submit">ดู</button></form></section>
+    {leave ? <LeaveSummary year={leaveYear} {...leave} startDate={staff?.startDate} /> : <p>ยังโหลดข้อมูลวันลาไม่ได้</p>}
+    <section className="owner-ops__panel"><Link href="/leave-request">ขอวันหยุด (ล่วงหน้าอย่างน้อย 1 เดือน) →</Link></section>
     {staff?.code ? <ReferralQr code={staff.code} name={staff.name} count={referral} /> : <section className="owner-ops__panel"><p>ยังไม่มีรหัสพนักงาน ติดต่อแอดมิน</p></section>}
     <section className="owner-ops__panel"><Link href="/work-guide">อ่านงานพื้นฐานและสกิลทั้งหมด →</Link></section>
     {today && <section className="owner-ops__panel"><h3>เป้าวันนี้</h3>

@@ -27,8 +27,8 @@ export async function GET(request: Request) {
     const days = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
     const leave = new Map<string, Set<string>>();
     const addLeave = (code: string, date: string) => { if (!code || !date?.startsWith(month)) return; const dates = leave.get(code) || new Set<string>(); dates.add(date); leave.set(code, dates); };
-    for (const shift of onePerStaffDay((shifts?.docs || []).map(doc => doc.data()))) if (shift.assignment === "leave_personal" || shift.assignment === "leave_sick") addLeave(shift.staffCode!, shift.workDate!);
-    for (const doc of actuals?.docs || []) { const d = doc.data(); if (d.leaveType === "personal" || d.leaveType === "sick") addLeave(d.staffCode, d.workDate); }
+    for (const shift of onePerStaffDay((shifts?.docs || []).map(doc => doc.data()))) if (shift.assignment === "leave_personal" || shift.assignment === "leave_sick" || shift.assignment === "leave_vacation") addLeave(shift.staffCode!, shift.workDate!);
+    for (const doc of actuals?.docs || []) { const d = doc.data(); if (d.leaveType === "personal" || d.leaveType === "sick" || d.leaveType === "vacation") addLeave(d.staffCode, d.workDate); }
     const staff = rows.map(row => ({ code: row.person.code, name: row.name, total: row.total, incentiveEligible: row.incentiveEligible, availableDays: days - (leave.get(row.person.code)?.size || 0) }));
     return json({ ...report, staff, daysInMonth: days });
   } catch { return json({ error: "อ่านข้อมูลไม่ได้ กรุณาตรวจสอบการเชื่อมต่อและลองใหม่" }, 503); }

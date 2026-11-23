@@ -87,6 +87,8 @@ export type NotificationInput = {
   parcels?: { overdue: number; late: number; problem: number; arrived: number; unmatched?: number };
   /** แจ้งบัค / ข้อเสนอแนะที่ยังไม่ได้อ่าน */
   bugReports: { open: number };
+  /** คำขอวันหยุดของพนักงานที่รออนุมัติ (sop_leave_requests) */
+  leaveRequests?: { pending: number };
   /**
    * งานที่ค้างอยู่ในเว็บกิลด์ (guild.uplevelguild.com) — คนละระบบกับ SOP แต่เจ้าของร้าน
    * คนเดียวกันต้องอนุมัติ. เดิมต้องเปิดเว็บกิลด์แยกถึงจะเห็นว่ามีอะไรรอ — พลาดง่ายมาก.
@@ -162,6 +164,18 @@ export function buildAdminNotifications(input: NotificationInput): AdminNotifica
       detail: input.deliveries.unclaimed ? `ยังไม่มีคนรับงาน ${input.deliveries.unclaimed} ใบ` : undefined,
       href: "/#delivery-orders",
       count: input.deliveries.unshipped
+    });
+  }
+
+  if (input.leaveRequests?.pending) {
+    items.push({
+      id: "leave-requests",
+      level: "urgent",
+      source: "วันหยุดพนักงาน",
+      title: `คำขอวันหยุดรออนุมัติ ${input.leaveRequests.pending} รายการ`,
+      detail: "อนุมัติแล้ววันหยุดลงตารางกะให้เอง",
+      href: "/admin/leave",
+      count: input.leaveRequests.pending
     });
   }
 

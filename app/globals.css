@@ -9976,3 +9976,7 @@ a.peer-review__tr:hover,
 .big-deal-share { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0; }
 .big-deal-share select { flex: 1 1 10rem; }
 .big-deal-share input { width: 5rem; }
+
+/* Annual leave controls */
+.leave-admin input, .leave-admin button { min-height: 44px; font-size: 16px; }
+.leave-admin article { padding: 1rem 0; border-bottom: 1px solid var(--line, #ddd); }

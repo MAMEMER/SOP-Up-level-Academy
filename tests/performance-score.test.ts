@@ -53,6 +53,11 @@ const schedule = {
 };
 
 describe("performance score engine", () => {
+  it("does not deduct attendance for vacation", () => {
+    const result = calculateAttendanceScore({ schedules: [schedule], clockEvents: [], leaveRecords: [{ employeeName: "ICE", workDate: "2026-07-01", type: "vacation", source: "live" }] });
+    assert.equal(result.score, 20);
+  });
+
   it("keeps full attendance points for an on-time clock-in", () => {
     const result = calculateAttendanceScore({
       schedules: [schedule],

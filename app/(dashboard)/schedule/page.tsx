@@ -1,3 +1,5 @@
+import { loadLeaveData } from "../../../lib/leave-entitlement-server.ts";
+import { LeaveSummary } from "../../../components/LeaveSummary.tsx";
 import Link from "next/link";
 import { MyScheduleView } from "../../../components/MyScheduleView.tsx";
 import { requireUser } from "../../../lib/auth.ts";
@@ -19,6 +21,9 @@ export default async function SchedulePage() {
 
   // ทุกคนที่ลงกะได้ ไม่แยกตามสาขาบ้าน — คนสลับไปช่วยอีกสาขาได้ ตารางจึงต้องเห็นทั้งร้าน
   const records = await listStaff();
+  const mine = records.find(record => record.email === user.email.toLowerCase());
+  const leaveYear = Number(today.slice(0, 4));
+  const leave = mine?.code ? await loadLeaveData(leaveYear, [mine], today).then(x => x.rows[0]).catch(() => null) : null;
   const staff = records
     .filter((record) => record.active && record.onSchedule && record.code)
     .map((record) => ({ code: record.code, displayName: record.displayName || record.name }));
@@ -44,6 +49,7 @@ export default async function SchedulePage() {
           </div>
         ) : null}
       </section>
+      {leave ? <LeaveSummary year={leaveYear} {...leave} startDate={mine?.startDate} /> : <p>ยังโหลดข้อมูลวันลาไม่ได้</p>}
       <MyScheduleView
         staff={staff}
         branches={branches}

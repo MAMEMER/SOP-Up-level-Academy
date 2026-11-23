@@ -497,13 +497,13 @@ export function ShiftPlanner({
   }
 
   // ACTUAL status (leave/absent) — a real event on the day, recorded in the ACTUAL row.
-  async function onActualChange(workDate: string, staffCode: string, status: "normal" | "leave_personal" | "leave_sick" | "absent") {
+  async function onActualChange(workDate: string, staffCode: string, status: "normal" | "leave_personal" | "leave_sick" | "leave_vacation" | "absent") {
     const key = cellKey(workDate, staffCode);
     const cellBranchKey = branchOfCell(workDate, staffCode);
     setActuals((prev) => {
       const base = prev[key] ?? ({ branch: cellBranchKey, month: workDate.slice(0, 7), workDate, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
       const next: ActualDoc = { ...base };
-      next.leaveType = status === "leave_personal" ? "personal" : status === "leave_sick" ? "sick" : undefined;
+      next.leaveType = status === "leave_personal" ? "personal" : status === "leave_sick" ? "sick" : status === "leave_vacation" ? "vacation" : undefined;
       next.absent = status === "absent" ? true : undefined;
       return { ...prev, [key]: next };
     });
@@ -532,7 +532,7 @@ export function ShiftPlanner({
         }
       }
       for (const [key, actual] of Object.entries(actuals)) {
-        const status = actual.leaveType === "personal" ? "leave_personal" : actual.leaveType === "sick" ? "leave_sick" : actual.absent ? "absent" : null;
+        const status = actual.leaveType === "personal" ? "leave_personal" : actual.leaveType === "sick" ? "leave_sick" : actual.leaveType === "vacation" ? "leave_vacation" : actual.absent ? "absent" : null;
         if (status) {
           const [workDate, staffCode] = key.split("__");
           jobs.push(setActualStatus({ branch: branchOfCell(workDate, staffCode), workDate, staffCode, status, updatedBy: plannedBy }));
@@ -1016,7 +1016,7 @@ export function ShiftPlanner({
                       const tone = working ? cellBranch?.color ?? color : color;
                       const conflicted = conflictKeys.has(`${entry.code}__${date}`);
                       const actual = actuals[key];
-                      const actualStatus = actual?.leaveType === "personal" ? "leave_personal" : actual?.leaveType === "sick" ? "leave_sick" : actual?.absent ? "absent" : "normal";
+                      const actualStatus = actual?.leaveType === "personal" ? "leave_personal" : actual?.leaveType === "sick" ? "leave_sick" : actual?.leaveType === "vacation" ? "leave_vacation" : actual?.absent ? "absent" : "normal";
                       const late = actualStatus === "normal" && actual?.clockIn && plans[key]?.startTime && actual.clockIn > (plans[key]?.startTime ?? "");
                       return (
                         <td
@@ -1064,12 +1064,13 @@ export function ShiftPlanner({
                             <select
                               className={`shift-planner__actual-sel${actualStatus !== "normal" || actual?.swappedTo ? " shift-planner__actual-sel--flag" : ""}`}
                               value={actualStatus}
-                              onChange={(e) => onActualChange(date, entry.code, e.target.value as "normal" | "leave_personal" | "leave_sick" | "absent")}
+                              onChange={(e) => onActualChange(date, entry.code, e.target.value as "normal" | "leave_personal" | "leave_sick" | "leave_vacation" | "absent")}
                               title="สิ่งที่เกิดขึ้นจริง (ลา/ขาด)"
                             >
                               <option value="normal">ตามจริง</option>
                               <option value="leave_personal">ลากิจ</option>
                               <option value="leave_sick">ลาป่วย</option>
+                              <option value="leave_vacation">ลาพักร้อน</option>
                               <option value="absent">ขาด</option>
                             </select>
                             <button type="button" className="shift-planner__swap-btn" title="สลับกะให้คนอื่น" onClick={() => { setSwapCell({ date, staffCode: entry.code }); setSwapTarget(""); setSwapNote(""); }}>⇄</button>

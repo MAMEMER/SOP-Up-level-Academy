@@ -89,7 +89,7 @@ export function StaffScoreCard({ row, periodLabel }: { row: EmployeePerformanceS
           <div>
             {row.leaveSummary.records.map((leave) => (
               <span key={`${leave.type}-${leave.workDate}`}>
-                {leave.workDate} · {leave.type === "sick" ? "ลาป่วย" : "ลากิจ"}
+                {leave.workDate} · {leave.type === "sick" ? "ลาป่วย" : leave.type === "vacation" ? "ลาพักร้อน" : "ลากิจ"}
               </span>
             ))}
           </div>
