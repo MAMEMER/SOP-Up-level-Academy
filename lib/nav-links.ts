@@ -13,6 +13,7 @@ export const quickLinks: NavLink[] = [
   { href: "/my-view", label: "งานของฉัน" },
   { href: "/my-tasks", label: "แจ้งเตือนงาน" },
   { href: "/my-review", label: "ผลงานของฉัน" },
+  { href: "/my-kpi", label: "คะแนน KPI ของฉัน" },
   { href: "/flowers", label: "ดอกไม้" }
 ];
 
@@ -33,7 +34,6 @@ export const staffGroups: NavGroup[] = [
       { href: "/peer-review", label: "ประเมินเพื่อนร่วมกะ (360)" },
       { href: "/teach-log", label: "บันทึกสอนเกม" },
       { href: "/mistakes", label: "บันทึกความผิดของฉัน" },
-      { href: "/my-kpi", label: "คะแนน KPI ของฉัน" },
       { href: "/big-deal", label: "บันทึก Big Deal" }
     ]
   },
