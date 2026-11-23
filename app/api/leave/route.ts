@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     await ref.update({startDate: body.startDate}); invalidateStaffCache();
   } else if (body?.action === "policy") {
     const p = body.policy; const positions: Position[] = ["temporary", "regular", "branch_manager"];
-    if (p?.year !== "calendar" || !Number.isInteger(p.vacationAfterMonths) || p.vacationAfterMonths < 0 || p.vacationAfterMonths > 1200 || positions.some(pos => LEAVE_KINDS.some(kind => !Number.isInteger(p.byPosition?.[pos]?.[kind]) || p.byPosition[pos][kind] < 0 || p.byPosition[pos][kind] > 366))) return NextResponse.json({error:"invalid"}, {status:400});
-    await adminDb().collection("sop_config").doc("leave_policy").set({year:"calendar", byPosition:p.byPosition, vacationAfterMonths:p.vacationAfterMonths});
+    if (p?.year !== "calendar" || positions.some(pos => LEAVE_KINDS.some(kind => !Number.isInteger(p.byPosition?.[pos]?.[kind]) || p.byPosition[pos][kind] < 0 || p.byPosition[pos][kind] > 366))) return NextResponse.json({error:"invalid"}, {status:400});
+    await adminDb().collection("sop_config").doc("leave_policy").set({year:"calendar", byPosition:p.byPosition, vacationAfterMonths:0});
   } else return NextResponse.json({error:"invalid"}, {status:400});
   return NextResponse.json({ok:true});
 }

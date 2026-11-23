@@ -6,11 +6,11 @@ export type LeavePolicy = { year: "calendar"; byPosition: Record<Position, Allow
 export const DEFAULT_LEAVE_POLICY: LeavePolicy = {
   year: "calendar",
   byPosition: {
-    temporary: { sick: 30, personal: 3, vacation: 6 },
-    regular: { sick: 30, personal: 3, vacation: 6 },
-    branch_manager: { sick: 30, personal: 3, vacation: 6 }
+    temporary: { sick: 30, personal: 3, vacation: 0 },
+    regular: { sick: 30, personal: 3, vacation: 13 },
+    branch_manager: { sick: 30, personal: 3, vacation: 13 }
   },
-  vacationAfterMonths: 12
+  vacationAfterMonths: 0
 };
 export const LEAVE_KINDS: LeaveKind[] = ["sick", "personal", "vacation"];
 export function validDate(value: string): boolean {
@@ -28,8 +28,7 @@ export function eligibilityDate(start: string, months: number): string | null {
 }
 export function entitlement(policy: LeavePolicy, position: Position, startDate: string | undefined, date: string): Allowances {
   const allowed = policy.byPosition[position];
-  const eligible = startDate && eligibilityDate(startDate, policy.vacationAfterMonths);
-  return { ...allowed, vacation: eligible && date >= eligible ? allowed.vacation : 0 };
+  return { ...allowed };
 }
 type Row = { staffCode?: string; workDate?: string; assignment?: string; leaveType?: string; updatedAt?: string };
 /** Actual leave takes precedence over the plan, and each person/date counts once. */
@@ -53,4 +52,13 @@ export function usedLeave(staffCode: string, year: number, shifts: Row[], actual
 }
 export function remaining(allowed: Allowances, used: Allowances): Allowances {
   return { sick: allowed.sick - used.sick, personal: allowed.personal - used.personal, vacation: allowed.vacation - used.vacation };
+}
+
+/** Calendar-month notice, clamped to the final day of the next month. */
+export function vacationRequestMinimumDate(today: string): string | null {
+  return eligibilityDate(today, 1);
+}
+
+export function pendingVacationDays(year: number, requests: Array<{status: string; dates: string[]}>) {
+  return new Set(requests.filter(r => r.status === "pending").flatMap(r => r.dates.filter(d => validDate(d) && d.startsWith(`${year}-`)))).size;
 }
