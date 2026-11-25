@@ -34,7 +34,17 @@ describe("recurring shift-planner activities", () => {
     assert.equal(sleeve.href, "/checklist-weekly#stock-sleeve-work");
     assert.equal(single.cadence, "monthly");
     assert.equal(single.href, "/checklist-monthly#stock-single-card-work");
-    assert.equal(taskPresets.length, 2);
+    assert.equal(taskPresets.length, 3);
+  });
+
+  it("adds ออกอีเวนต์ as a one-date marker with no checklist", () => {
+    const event = taskPreset("offsite-event-work");
+    assert.ok(event);
+    assert.equal(event.label, "ออกอีเวนต์");
+    assert.equal(event.badge, "EV");
+    assert.equal(event.marker, true);
+    assert.equal(event.href, "");
+    assert.equal(event.cadence, "monthly");
   });
 
   it("keeps game and task key namespaces separate", () => {
