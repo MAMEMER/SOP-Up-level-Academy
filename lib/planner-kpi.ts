@@ -79,9 +79,13 @@ export async function fetchAttendanceSource(_branch?: string): Promise<Attendanc
   const offDays: { employeeName: string; workDate: string }[] = [];
 
   // Swapped shifts: the original isn't expected to work (someone else covers), so drop
-  // their scheduled shift that day = no missing-clock-in penalty.
+  // their scheduled shift that day = no missing-clock-in penalty. Same for ออกอีเวนต์
+  // (leaveType "event"): they work off-site, so no shop clock-in is expected — and it is
+  // not leave, so it never counts against any leave allowance.
   const swapped = new Set(
-    actuals.filter((a) => a.swappedTo && a.workDate && a.staffCode).map((a) => `${a.workDate}__${a.staffCode}`)
+    actuals
+      .filter((a) => (a.swappedTo || a.leaveType === "event") && a.workDate && a.staffCode)
+      .map((a) => `${a.workDate}__${a.staffCode}`)
   );
 
   for (const s of shifts) {

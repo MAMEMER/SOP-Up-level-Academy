@@ -191,7 +191,7 @@ export function dayActivityChips(event: DayEventInput | undefined): ActivityChip
     const task = taskPreset(activity.game);
     const time = activity.time?.trim() ? activity.time : null;
     if (task) {
-      return { key: `${task.key}-${index}`, label: task.label, kind: "task", time, logo: null, badge: task.badge, href: task.href || null };
+      return { key: `${task.key}-${index}`, label: task.label, kind: "task", time, logo: null, badge: task.badge, href: task.href };
     }
     return {
       key: `${activity.game || "activity"}-${index}`,

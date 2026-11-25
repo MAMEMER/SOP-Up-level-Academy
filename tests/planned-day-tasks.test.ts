@@ -33,8 +33,6 @@ describe("planned day tasks (ตารางกะ → dashboard)", () => {
 
   it("ignores game events — they surface as weekly-event cards already", () => {
     assert.deepEqual(plannedTasksFromActivities([{ game: "pokemon", time: "19:00" }]), []);
-    // ออกอีเวนต์ is a marker on the grid, not work the dashboard should nag about
-    assert.deepEqual(plannedTasksFromActivities([{ game: "offsite-event-work", time: "" }]), []);
     assert.deepEqual(plannedTasksFromActivities(undefined), []);
     assert.deepEqual(plannedTasksFromActivities([]), []);
   });

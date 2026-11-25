@@ -497,13 +497,22 @@ export function ShiftPlanner({
   }
 
   // ACTUAL status (leave/absent) — a real event on the day, recorded in the ACTUAL row.
-  async function onActualChange(workDate: string, staffCode: string, status: "normal" | "leave_personal" | "leave_sick" | "leave_vacation" | "absent") {
+  async function onActualChange(workDate: string, staffCode: string, status: "normal" | "leave_personal" | "leave_sick" | "leave_vacation" | "leave_event" | "absent") {
     const key = cellKey(workDate, staffCode);
     const cellBranchKey = branchOfCell(workDate, staffCode);
     setActuals((prev) => {
       const base = prev[key] ?? ({ branch: cellBranchKey, month: workDate.slice(0, 7), workDate, staffCode, updatedAt: "", updatedBy: plannedBy } as ActualDoc);
       const next: ActualDoc = { ...base };
-      next.leaveType = status === "leave_personal" ? "personal" : status === "leave_sick" ? "sick" : status === "leave_vacation" ? "vacation" : undefined;
+      next.leaveType =
+        status === "leave_personal"
+          ? "personal"
+          : status === "leave_sick"
+            ? "sick"
+            : status === "leave_vacation"
+              ? "vacation"
+              : status === "leave_event"
+                ? "event"
+                : undefined;
       next.absent = status === "absent" ? true : undefined;
       return { ...prev, [key]: next };
     });
@@ -532,7 +541,7 @@ export function ShiftPlanner({
         }
       }
       for (const [key, actual] of Object.entries(actuals)) {
-        const status = actual.leaveType === "personal" ? "leave_personal" : actual.leaveType === "sick" ? "leave_sick" : actual.leaveType === "vacation" ? "leave_vacation" : actual.absent ? "absent" : null;
+        const status = actual.leaveType === "personal" ? "leave_personal" : actual.leaveType === "sick" ? "leave_sick" : actual.leaveType === "vacation" ? "leave_vacation" : actual.leaveType === "event" ? "leave_event" : actual.absent ? "absent" : null;
         if (status) {
           const [workDate, staffCode] = key.split("__");
           jobs.push(setActualStatus({ branch: branchOfCell(workDate, staffCode), workDate, staffCode, status, updatedBy: plannedBy }));
@@ -832,7 +841,7 @@ export function ShiftPlanner({
           <>
             <select value={presetTask} onChange={(e) => setPresetTask(e.target.value)}>
               {taskPresets.map((t) => (
-                <option key={t.key} value={t.key}>{t.label} ({t.marker ? "เลือกวัน" : t.cadence === "weekly" ? "รายสัปดาห์" : "รายเดือน"})</option>
+                <option key={t.key} value={t.key}>{t.label} ({t.cadence === "weekly" ? "รายสัปดาห์" : "รายเดือน"})</option>
               ))}
             </select>
             {taskPreset(presetTask)?.cadence === "weekly" ? (
@@ -958,10 +967,10 @@ export function ShiftPlanner({
                             const task = taskPreset(act.game);
                             const label = preset?.label ?? task?.label ?? act.title ?? act.game;
                             return (
-                              <span key={i} className={`shift-planner__act${task ? " shift-planner__act--task" : ""}`} title={`${label}${act.time ? ` ${act.time}` : ""}${task?.href ? " — เปิด checklist" : ""}`}>
+                              <span key={i} className={`shift-planner__act${task ? " shift-planner__act--task" : ""}`} title={`${label}${act.time ? ` ${act.time}` : ""}${task ? " — เปิด checklist" : ""}`}>
                                 {preset ? <img src={preset.logo} alt={preset.label} /> : null}
                                 {task ? <span className="shift-planner__act-badge">{task.badge}</span> : null}
-                                {task?.href ? (
+                                {task ? (
                                   <Link href={task.href} className="shift-planner__act-name shift-planner__act-link">{label}</Link>
                                 ) : (
                                   <span className="shift-planner__act-name">{label}</span>
@@ -1016,7 +1025,7 @@ export function ShiftPlanner({
                       const tone = working ? cellBranch?.color ?? color : color;
                       const conflicted = conflictKeys.has(`${entry.code}__${date}`);
                       const actual = actuals[key];
-                      const actualStatus = actual?.leaveType === "personal" ? "leave_personal" : actual?.leaveType === "sick" ? "leave_sick" : actual?.leaveType === "vacation" ? "leave_vacation" : actual?.absent ? "absent" : "normal";
+                      const actualStatus = actual?.leaveType === "personal" ? "leave_personal" : actual?.leaveType === "sick" ? "leave_sick" : actual?.leaveType === "vacation" ? "leave_vacation" : actual?.leaveType === "event" ? "leave_event" : actual?.absent ? "absent" : "normal";
                       const late = actualStatus === "normal" && actual?.clockIn && plans[key]?.startTime && actual.clockIn > (plans[key]?.startTime ?? "");
                       return (
                         <td
@@ -1064,13 +1073,14 @@ export function ShiftPlanner({
                             <select
                               className={`shift-planner__actual-sel${actualStatus !== "normal" || actual?.swappedTo ? " shift-planner__actual-sel--flag" : ""}`}
                               value={actualStatus}
-                              onChange={(e) => onActualChange(date, entry.code, e.target.value as "normal" | "leave_personal" | "leave_sick" | "leave_vacation" | "absent")}
-                              title="สิ่งที่เกิดขึ้นจริง (ลา/ขาด)"
+                              onChange={(e) => onActualChange(date, entry.code, e.target.value as "normal" | "leave_personal" | "leave_sick" | "leave_vacation" | "leave_event" | "absent")}
+                              title="สิ่งที่เกิดขึ้นจริง (ลา/ขาด/ออกอีเวนต์)"
                             >
                               <option value="normal">ตามจริง</option>
                               <option value="leave_personal">ลากิจ</option>
                               <option value="leave_sick">ลาป่วย</option>
                               <option value="leave_vacation">ลาพักร้อน</option>
+                              <option value="leave_event">ออกอีเวนต์</option>
                               <option value="absent">ขาด</option>
                             </select>
                             <button type="button" className="shift-planner__swap-btn" title="สลับกะให้คนอื่น" onClick={() => { setSwapCell({ date, staffCode: entry.code }); setSwapTarget(""); setSwapNote(""); }}>⇄</button>
