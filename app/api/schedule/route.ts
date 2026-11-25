@@ -214,7 +214,7 @@ export async function POST(request: Request) {
         const workDate = str(body.workDate);
         const staffCode = str(body.staffCode);
         const leaveType = str(body.leaveType);
-        if (!branch || !workDate || !staffCode || (leaveType !== "personal" && leaveType !== "sick" && leaveType !== "vacation"))
+        if (!branch || !workDate || !staffCode || (leaveType !== "personal" && leaveType !== "sick" && leaveType !== "vacation" && leaveType !== "event"))
           return badRequest("missing_params");
         const record: Record<string, unknown> = {
           branch,
@@ -243,7 +243,15 @@ export async function POST(request: Request) {
           updatedAt: nowIso,
           updatedBy,
           leaveType:
-            status === "leave_personal" ? "personal" : status === "leave_sick" ? "sick" : status === "leave_vacation" ? "vacation" : FieldValue.delete(),
+            status === "leave_personal"
+              ? "personal"
+              : status === "leave_sick"
+                ? "sick"
+                : status === "leave_vacation"
+                  ? "vacation"
+                  : status === "leave_event"
+                    ? "event"
+                    : FieldValue.delete(),
           absent: status === "absent" ? true : FieldValue.delete(),
           swappedTo: FieldValue.delete(),
           swapNote: FieldValue.delete()
