@@ -841,7 +841,7 @@ export function ShiftPlanner({
           <>
             <select value={presetTask} onChange={(e) => setPresetTask(e.target.value)}>
               {taskPresets.map((t) => (
-                <option key={t.key} value={t.key}>{t.label} ({t.marker ? "เลือกวัน" : t.cadence === "weekly" ? "รายสัปดาห์" : "รายเดือน"})</option>
+                <option key={t.key} value={t.key}>{t.label} ({t.cadence === "weekly" ? "รายสัปดาห์" : "รายเดือน"})</option>
               ))}
             </select>
             {taskPreset(presetTask)?.cadence === "weekly" ? (
@@ -967,10 +967,10 @@ export function ShiftPlanner({
                             const task = taskPreset(act.game);
                             const label = preset?.label ?? task?.label ?? act.title ?? act.game;
                             return (
-                              <span key={i} className={`shift-planner__act${task ? " shift-planner__act--task" : ""}`} title={`${label}${act.time ? ` ${act.time}` : ""}${task?.href ? " — เปิด checklist" : ""}`}>
+                              <span key={i} className={`shift-planner__act${task ? " shift-planner__act--task" : ""}`} title={`${label}${act.time ? ` ${act.time}` : ""}${task ? " — เปิด checklist" : ""}`}>
                                 {preset ? <img src={preset.logo} alt={preset.label} /> : null}
                                 {task ? <span className="shift-planner__act-badge">{task.badge}</span> : null}
-                                {task?.href ? (
+                                {task ? (
                                   <Link href={task.href} className="shift-planner__act-name shift-planner__act-link">{label}</Link>
                                 ) : (
                                   <span className="shift-planner__act-name">{label}</span>

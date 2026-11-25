@@ -83,7 +83,7 @@ export function plannedTasksFromActivities(activities: PlannedActivity[] | undef
   const tasks: PlannedDayTask[] = [];
   for (const activity of activities) {
     const preset = taskPreset(activity.game);
-    if (!preset || preset.marker || seen.has(preset.key)) continue;
+    if (!preset || seen.has(preset.key)) continue;
     seen.add(preset.key);
     tasks.push({ ...preset, ...(activity.time ? { time: activity.time } : {}) });
   }
