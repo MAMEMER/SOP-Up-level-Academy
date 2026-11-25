@@ -33,6 +33,9 @@ export type TaskPreset = {
   cadence: "weekly" | "monthly";
   /** work-record scope the task's checklist saves under (used to tell "ส่งแล้ว" apart) */
   recordScope: "weekly" | "monthly";
+  /** marker only (e.g. ออกอีเวนต์): shown on the grid on one chosen date, no checklist,
+   *  never becomes a due/overdue task on the staff dashboard */
+  marker?: boolean;
 };
 
 export const taskPresets: TaskPreset[] = [
@@ -60,9 +63,10 @@ export const taskPresets: TaskPreset[] = [
     label: "ออกอีเวนต์",
     badge: "EV",
     defaultTime: "",
-    href: "/checklist-weekly",
-    cadence: "weekly",
-    recordScope: "weekly"
+    href: "", // no checklist — just marks the day the team works an off-site event
+    cadence: "monthly", // pick one date (วันที่ X), not every weekday
+    recordScope: "monthly",
+    marker: true
   }
 ];
 
