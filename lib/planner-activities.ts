@@ -54,6 +54,15 @@ export const taskPresets: TaskPreset[] = [
     cadence: "monthly",
     // the Single card checklist saves under scope "monthly" but keys by ISO week
     recordScope: "monthly"
+  },
+  {
+    key: "offsite-event-work",
+    label: "ออกอีเวนต์",
+    badge: "EV",
+    defaultTime: "",
+    href: "/checklist-weekly",
+    cadence: "weekly",
+    recordScope: "weekly"
   }
 ];
 
